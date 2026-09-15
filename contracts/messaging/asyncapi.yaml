@@ -3,11 +3,11 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '2.0.0'
+  version: '3.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
-    Status: accepted (ADR-0001/0002 accepted у P02); з P03 підписка archive active (topology v2), решта — planned.
+    Status: accepted (ADR-0001/0002 accepted у P02); з P03 archive active (v2), з P04 raw-writer active (v3), решта — planned.
 defaultContentType: application/json
 servers:
   local:
@@ -370,7 +370,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/ingress_received'
-    summary: subscription raw-writer (required=true, owner_task=P04, status=planned)
+    summary: subscription raw-writer (required=true, owner_task=P04, status=active)
     messages:
       - $ref: '#/channels/ingress_received/messages/ingress_received'
     bindings:

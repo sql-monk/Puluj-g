@@ -33,3 +33,13 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `MESSAGING_OUTBOX_ENABLED=true` у `deploy/.env` вмикає DB-first bridge у collectors: `raw.stored` комітиться в `messaging.outbox` разом із raw
 (plan §11); без запущеного `messaging` outbox лише росте, reconciliation пише alarm. Rollback: `MESSAGING_OUTBOX_ENABLED=false` і зупинити
 профіль; схеми `messaging`/`processing` additive і не читаються legacy-шляхом.
+
+### Єдиний ingress (P04)
+
+`MESSAGING_INGRESS_ENABLED=true` у `deploy/.env` переводить collectors на producer outbox: `ingress.received` + checkpoint джерела в одній
+транзакції, raw пише воркер `messaging` (роль `raw-writer`, у профілі `broker`). Потребує запущених `relay` і `raw-writer`; без них нічого не
+потрапляє в `raw_messages` (reconciliation пише alarm про outbox/overdue). Міграція `AddRawMessageIdentity` додає `source_message_key`/`source_revision`
+(backfill з `source_message_id`) і знімає унікальність `hash`; її `Down` не відновлює unique hash. **Відкат образу до P04 — лише після `Down`**:
+нові колонки без default, старий writer падає на NOT NULL (гучно, `collector_states.last_error`), а не губить пости. Відкат поведінки: `MESSAGING_INGRESS_ENABLED=false`
+(collectors знову пишуть raw напряму; bridge `MESSAGING_OUTBOX_ENABLED` — окремий fallback). Зміна `topology.json` без bump `topology_version`
+зупиняє ingest/migrate — це навмисно (ADR-0002).

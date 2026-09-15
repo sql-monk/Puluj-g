@@ -13,17 +13,10 @@ namespace Puluj.Messaging.Tests.Unit;
 /// </summary>
 public sealed class EnvelopeContractTests
 {
-    private static readonly string Root = Path.Combine(AppContext.BaseDirectory, "contracts", "messaging");
-    private static readonly JsonSchema EnvelopeSchema;
-    private static readonly JsonSchema RawStoredSchema;
-    private static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
-
-    static EnvelopeContractTests()
-    {
-        JsonSchema.FromFile(Path.Combine(Root, "schemas", "common.schema.json"));
-        EnvelopeSchema = JsonSchema.FromFile(Path.Combine(Root, "schemas", "envelope.schema.json"));
-        RawStoredSchema = JsonSchema.FromFile(Path.Combine(Root, "schemas", "events", "raw.stored.schema.json"));
-    }
+    private static readonly string Root = ContractSchemas.Root;
+    private static readonly JsonSchema EnvelopeSchema = ContractSchemas.Envelope;
+    private static readonly JsonSchema RawStoredSchema = ContractSchemas.RawStored;
+    private static readonly EvaluationOptions Options = ContractSchemas.Options;
 
     private static JsonElement ToElement(JsonNode node) => JsonSerializer.SerializeToElement(node);
 

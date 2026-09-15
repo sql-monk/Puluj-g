@@ -217,6 +217,17 @@ public sealed class SubscriptionConsumer : BackgroundService
                     await FinishAttemptAsync(conn, tx, attemptId, "succeeded", null, ct);
                     await tx.CommitAsync(ct);
                     _metrics.Delivered(SubscriptionId, result.Outcome);
+                    if (result.AfterCommit is not null)
+                    {
+                        try
+                        {
+                            await result.AfterCommit(ct);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _logger.LogWarning(ex, "Post-commit side effect of {EventId} failed; the result is committed, delivery is acknowledged", eventId);
+                        }
+                    }
                 }
                 Hooks.AfterCommitBeforeAck(envelope);
                 await channel.BasicAckAsync(ea.DeliveryTag, false, ct);

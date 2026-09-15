@@ -12,6 +12,8 @@ public sealed class MessagingOptions
     public bool Enabled { get; set; }
 
     public OutboxOptions Outbox { get; set; } = new();
+    public IngressOptions Ingress { get; set; } = new();
+    public RawWriterOptions RawWriter { get; set; } = new();
     public BrokerOptions Broker { get; set; } = new();
     public RelayOptions Relay { get; set; } = new();
     public ConsumerOptions Consumer { get; set; } = new();
@@ -27,6 +29,29 @@ public sealed class MessagingOptions
 
         /// <summary>`pipeline_version` written into every envelope; defaults to the informational assembly version.</summary>
         public string? PipelineVersion { get; set; }
+    }
+
+    public sealed class IngressOptions
+    {
+        /// <summary>
+        /// Single ingress (plan §6.1, P04): collectors commit `ingress.received` + the source checkpoint in one transaction
+        /// and the `raw-writer` subscription stores the raw row. Needs `relay` and `raw-writer` roles running somewhere;
+        /// without them nothing reaches raw_messages (reconciliation alarms on outbox age / overdue deliveries).
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>How long a history load waits for the raw-writer to store everything it published before the rebuild.</summary>
+        public TimeSpan DrainTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    }
+
+    public sealed class RawWriterOptions
+    {
+        /// <summary>
+        /// Command timeout of the raw insert. `ReprocessService.ResetAsync` holds an ACCESS EXCLUSIVE lock on raw_messages for
+        /// the whole rebuild; the insert must wait it out rather than fail (a failure would count as an attempt and end in
+        /// quarantine). Keep it below the broker's consumer timeout (30 min by default).
+        /// </summary>
+        public TimeSpan InsertTimeout { get; set; } = TimeSpan.FromMinutes(25);
     }
 
     public sealed class BrokerOptions

@@ -26,7 +26,7 @@ namespace Puluj.Collectors.AlertsInUa;
 public sealed class AlertsInUaHistoryCollector(
     IHttpClientFactory httpFactory,
     IOptionsMonitor<AlertsInUaOptions> options,
-    RawMessageIngestor ingestor,
+    CollectorIngress ingress,
     SettingsStore settings,
     TimeProvider clock,
     ILogger<AlertsInUaHistoryCollector> logger) : ICollector
@@ -144,11 +144,11 @@ public sealed class AlertsInUaHistoryCollector(
                 open++;
                 continue;
             }
-            if ((await Ingest(source, $"{id}:start", "alert.started", alert, startedAt.Value, ct)).IsNew)
+            if ((await Ingest(source, $"{id}:start", "alert.started", alert, startedAt.Value, ct)).Stored)
             {
                 added++;
             }
-            if ((await Ingest(source, $"{id}:end", "alert.finished", alert, finishedAt.Value, ct)).IsNew)
+            if ((await Ingest(source, $"{id}:end", "alert.finished", alert, finishedAt.Value, ct)).Stored)
             {
                 added++;
             }
@@ -156,11 +156,13 @@ public sealed class AlertsInUaHistoryCollector(
         return (added, open);
     }
 
-    private Task<IngestResult> Ingest(Source source, string messageId, string kind, JsonObject alert, DateTimeOffset at, CancellationToken ct) =>
-        ingestor.IngestAsync(new IncomingMessage
+    private Task<IngressResult> Ingest(Source source, string messageId, string kind, JsonObject alert, DateTimeOffset at, CancellationToken ct) =>
+        ingress.PublishAsync(new IncomingMessage
         {
             SourceId = source.SourceId,
             SourceMessageId = messageId,
+            SourceMessageKey = messageId,
+            SourceRevision = "0",
             PublishedAt = at,
             RawPayload = JsonDocument.Parse(new JsonObject
             {
@@ -170,7 +172,7 @@ public sealed class AlertsInUaHistoryCollector(
                 ["alert"] = alert.DeepClone(),
             }.ToJsonString()),
             Url = "https://alerts.in.ua/",
-        }, source.Code, ct, enqueue: false);
+        }, source, Name, checkpoint: null, live: false, ct);
 
     private async Task<HistoryState?> ReadStateAsync(CancellationToken ct)
     {

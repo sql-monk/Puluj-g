@@ -74,3 +74,17 @@ public sealed class OnceHooks : ConsumerHooks
     public override void BeforeQuarantineCommit(Envelope? envelope) => Fire(nameof(BeforeQuarantineCommit));
     public override void AfterQuarantineCommitBeforeNack(Envelope? envelope) => Fire(nameof(AfterQuarantineCommitBeforeNack));
 }
+
+/// <summary>Raw-writer whose post-commit side effect throws (N8): the committed result must still be acknowledged.</summary>
+public sealed class ThrowingAfterCommitHandler(RawWriterHandler inner) : IDeliveryHandler
+{
+    public string SubscriptionId => inner.SubscriptionId;
+
+    public Task<object?> PrepareAsync(Envelope envelope, CancellationToken ct) => inner.PrepareAsync(envelope, ct);
+
+    public async Task<DeliveryResult> ApplyAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Envelope envelope, object? state, CancellationToken ct)
+    {
+        var result = await inner.ApplyAsync(conn, tx, envelope, state, ct);
+        return result with { AfterCommit = _ => throw new InvalidOperationException("simulated NOTIFY failure after commit") };
+    }
+}

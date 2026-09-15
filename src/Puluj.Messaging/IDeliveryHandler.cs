@@ -24,6 +24,9 @@ public sealed record DeliveryResult(string Outcome, string? Reason = null, IRead
 {
     public static readonly DeliveryResult Completed = new("completed");
     public static DeliveryResult Noop(string reason) => new("noop", reason);
+
+    /// <summary>Best-effort side effect after the commit and before the ACK (a NOTIFY, a metric); a failure is logged, never retried — the effect is already durable.</summary>
+    public Func<CancellationToken, Task>? AfterCommit { get; init; }
 }
 
 /// <summary>The delivery cannot succeed however often it is retried: invalid payload, unknown reference — straight to quarantine.</summary>

@@ -264,7 +264,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
     private static async Task<(int SourceId, long RawMessageId)> RawFor(PulujDbContext db, string key)
     {
         var sourceId = await db.Sources.Where(s => s.Code == "tg_kpszsu").Select(s => s.SourceId).SingleAsync();
-        var raw = new RawMessage { SourceId = sourceId, SourceMessageId = key, PublishedAt = At, ReceivedAt = At, RawText = key, Hash = key, ProcessingStatus = ProcessingStatus.Processed };
+        var raw = new RawMessage { SourceId = sourceId, SourceMessageId = key, SourceMessageKey = key, SourceRevision = "0", PublishedAt = At, ReceivedAt = At, RawText = key, Hash = key, ProcessingStatus = ProcessingStatus.Processed };
         db.RawMessages.Add(raw);
         await db.SaveChangesAsync();
         return (sourceId, raw.RawMessageId);

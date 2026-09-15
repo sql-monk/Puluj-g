@@ -1,6 +1,8 @@
 # ADR-0003 — Ідентичності, час і версіонування контрактів
 
-Статус: **proposed** (P01). Machine-readable: [`envelope.schema.json`](../../contracts/messaging/schemas/envelope.schema.json),
+Статус: **accepted** (P04, 2026-09-15: raw identity `(source_id, source_message_key, source_revision)` у `raw_messages` з backfill за таблицею
+нижче — міграція `AddRawMessageIdentity`; unique `hash` знято; collectors публікують `ingress.received` з явною identity; `IngestResult`
+повертає існуючий id при повторі). Запропоновано P01. Machine-readable: [`envelope.schema.json`](../../contracts/messaging/schemas/envelope.schema.json),
 [`identity-cases.json`](../../contracts/messaging/fixtures/identity-cases.json), [`compatibility.json`](../../contracts/messaging/fixtures/compatibility.json).
 Вимоги: plan §5.1, §5.2, §15.1, §15.2.
 
@@ -33,7 +35,10 @@
   ревізія того самого поста (та сама `correlation_id`, окремий raw і окремий `event_id`).
 - Content `hash` лишається **індексом схожості**, не причиною відкинути новий пост. Зняття unique constraint
   з `hash`, backfill `(key, revision)` із legacy `source_message_id` за таблицею вище, повернення існуючого
-  raw id при повторі — **P04**; повідомлення, раніше відкинуті content-dedup, з hash не відновлюються.
+  raw id при повторі — **done P04** (`AddRawMessageIdentity`; `Down` не відновлює unique hash — після зміни можуть існувати
+  рядки з однаковим контентом); повідомлення, раніше відкинуті content-dedup, з hash не відновлюються. `content_hash`
+  рахує collector на оригінальному JSON і передає в `ingress.received.payload.content_hash`, raw-writer копіює його —
+  direct і ingress режими дають той самий індекс.
 - Hash-derived revision (для джерел, що редагують без ознаки) — лише за явним рішенням P04, не за замовчуванням.
 - Межі відновлення (plan §6.1): Telegram edit update, для якого `IngestAsync` не закомітився, DB checkpoint
   (`min_id`, лише оригінали) не відновлює; відновлення можливе лише через WTelegram update state
@@ -48,8 +53,9 @@
 - `correlation_id` — один на джерельний пост (усі результати одного raw). Для aggregate-scoped подій —
   correlation повідомлення-причини; повний граф багатьох входів → `messaging.event_links` (ADR-0006).
 - `causation_id` — `event_id` події, що безпосередньо запустила крок; `null` лише для `ingress.received`.
-  **Bridge (P03, до P04):** `raw.stored`, який collector комітить напряму без `ingress.received`, є коренем ланцюга і
-  має `causation_id = event_id` (self-causation, resolvable в архіві; правило «causation == event_id ⇔ bridge root»).
+  **Bridge (P03; з P04 лише fallback `Messaging:Outbox:Enabled` без ingress):** `raw.stored`, який collector комітить напряму без
+  `ingress.received`, є коренем ланцюга і має `causation_id = event_id` (self-causation, resolvable в архіві; правило
+  «causation == event_id ⇔ bridge root»). У режимі ingress (P04) `raw.stored.causation_id` = `event_id` відповідного `ingress.received`.
   `correlation_id` bridge — детермінований UUIDv5 від `(source_id, source_message_key)` (`SourceIdentity.CorrelationId`), тож
   оригінал і його редакції ділять correlation без lookup; `source_message_key`/`source_revision` виводяться з legacy
   `source_message_id` за таблицею вище (`SourceIdentity.FromLegacy`).
@@ -106,8 +112,9 @@ Envelope містить `payload` **або** `payload_ref` (`uri`, sha256 `check
 
 | Питання | Задача |
 |---|---|
-| Unique hash migration, backfill, `IngestResult` при повторі, hash-derived revision для нових джерел | P04 |
+| ~~Unique hash migration, backfill, `IngestResult` при повторі~~ — done P04; hash-derived revision для нових джерел — за рішенням при появі джерела | P04 |
 | Payload/attachment storage і поріг | P04 |
 | Fencing token у `processing.attempts` (колонка є з P03, значення 0), lease takeover | P06 |
-| Заміна bridge-правила `causation_id = event_id` на справжній `ingress.received` causation | P04 |
+| ~~Заміна bridge-правила `causation_id = event_id` на справжній `ingress.received` causation~~ — done P04 (bridge лишається fallback) | P04 |
+| Analytics `RawMessageReader` парсить `:e{ts}` з legacy id — перейти на `source_message_key/revision` | P15 |
 | Формат `aggregate_id` (`track:5501`) vs окремі поля — узгодити з read-side | P09/P11 |

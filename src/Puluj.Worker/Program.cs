@@ -76,4 +76,13 @@ if (messaging.Outbox.Enabled)
 {
     startupLog.LogInformation("Outbox bridge enabled: raw.stored is committed to messaging.outbox; a `relay` role must run somewhere or the outbox only grows");
 }
+if (messaging.Ingress.Enabled)
+{
+    // The collectors of this process publish ingress.received; nothing reaches raw_messages until `relay` and `raw-writer`
+    // roles run (here or elsewhere). Reconciliation alarms on outbox age / overdue deliveries if they do not.
+    var hasRawWriter = roles.Contains(WorkerOptions.RawWriter) && roles.Contains(WorkerOptions.Relay) && messaging.Enabled;
+    startupLog.Log(hasRawWriter ? LogLevel.Information : LogLevel.Warning,
+        "Ingress enabled: collectors commit ingress.received + checkpoint to messaging.outbox; raw rows are written by the raw-writer subscription{Where}",
+        hasRawWriter ? " (running in this process)" : " — make sure `relay` and `raw-writer` roles run with Messaging:Enabled in another process");
+}
 await host.RunAsync();

@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Puluj.Collectors;
+using Puluj.Domain.Entities;
 using Puluj.Infrastructure;
 using Puluj.Infrastructure.Ingestion;
 using Puluj.Infrastructure.Messaging;
@@ -44,7 +46,11 @@ public sealed class MessagingFixture : IAsyncLifetime
     public TopologyRegistry Registry => Registrar.Registry;
     public TopologyDeclarer Declarer => Services.GetRequiredService<TopologyDeclarer>();
     public OutboxRelay Relay => Services.GetRequiredService<OutboxRelay>();
-    public SubscriptionConsumer Archive => Services.GetRequiredService<SubscriptionConsumer>();
+    public SubscriptionConsumer Archive => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ArchiveHandler.Subscription);
+    public SubscriptionConsumer RawWriter => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == RawWriterHandler.Subscription);
+    public IngressWriter IngressWriter => Services.GetRequiredService<IngressWriter>();
+    public CollectorIngress Ingress => Services.GetRequiredService<CollectorIngress>();
+    public CollectorStateStore States => Services.GetRequiredService<CollectorStateStore>();
     public DlqConsumer Dlq => Services.GetRequiredService<DlqConsumer>();
     public ReconciliationService Reconciliation => Services.GetRequiredService<ReconciliationService>();
     public SubscriptionAdmin Admin => Services.GetRequiredService<SubscriptionAdmin>();
@@ -58,6 +64,8 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         Enabled = true,
         Outbox = { Enabled = true, PipelineVersion = "p03-test" },
+        Ingress = { Enabled = true, DrainTimeout = TimeSpan.FromSeconds(3) },
+        RawWriter = { InsertTimeout = TimeSpan.FromSeconds(20) },
         Relay = { BatchSize = 200, ConfirmTimeout = TimeSpan.FromSeconds(2), Lease = TimeSpan.FromSeconds(3), PollInterval = TimeSpan.FromMilliseconds(200), MinBackoff = TimeSpan.FromMilliseconds(200), MaxBackoff = TimeSpan.FromSeconds(2), UnroutableRetry = TimeSpan.FromMilliseconds(500) },
         Consumer = { Prefetch = 10, MinBackoff = TimeSpan.FromMilliseconds(100), MaxBackoff = TimeSpan.FromMilliseconds(500) },
         Reconciliation = { DeliveryOverdue = TimeSpan.Zero, OutboxOverdue = TimeSpan.FromSeconds(1), OutboxGrace = TimeSpan.FromSeconds(1), InboxRetention = TimeSpan.FromSeconds(1), CleanupBatch = 1000 },
@@ -82,6 +90,9 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["Messaging:Enabled"] = "true",
             ["Messaging:Outbox:Enabled"] = "true",
             ["Messaging:Outbox:PipelineVersion"] = Options.Outbox.PipelineVersion,
+            ["Messaging:Ingress:Enabled"] = "true",
+            ["Messaging:Ingress:DrainTimeout"] = Options.Ingress.DrainTimeout.ToString(),
+            ["Messaging:RawWriter:InsertTimeout"] = Options.RawWriter.InsertTimeout.ToString(),
             ["Messaging:Broker:Host"] = _rabbit.Hostname,
             ["Messaging:Broker:Port"] = _rabbit.GetMappedPublicPort(5672).ToString(),
             ["Messaging:Broker:User"] = BrokerUser,
@@ -109,7 +120,10 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<IHostEnvironment>(new TestEnvironment(repoRoot));
         services.AddPulujInfrastructure(config, "p03-test");
-        services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole }, "p03-test");
+        services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole, DependencyInjection.RawWriterRole }, "p03-test");
+        // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
+        services.AddSingleton<CollectorStateStore>();
+        services.AddSingleton<CollectorIngress>();
         Services = services.BuildServiceProvider();
 
         await using (var db = await Factory.CreateDbContextAsync())
@@ -129,7 +143,7 @@ public sealed class MessagingFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        Evidence.Flush(Path.Combine(FindRepoRoot(), "docs", "evidence", "message-platform", "P03-crash-evidence.json"), BrokerVersion);
+        Evidence.Flush(Path.Combine(FindRepoRoot(), "docs", "evidence", "message-platform", "messaging-crash-evidence.json"), BrokerVersion);
         await Services.DisposeAsync();
         await _rabbit.DisposeAsync();
         await _postgres.DisposeAsync();
@@ -141,11 +155,12 @@ public sealed class MessagingFixture : IAsyncLifetime
         await ExecAsync("""
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
-                     raw_messages RESTART IDENTITY CASCADE
+                     collector_states, raw_messages RESTART IDENTITY CASCADE
             """);
         Registrar.Reset();
         Outbox.Runs.Reset();
         Archive.ResetCounters();
+        RawWriter.ResetCounters();
         await Registrar.EnsureRegisteredAsync(CancellationToken.None);
         await Declarer.DeclareAsync(CancellationToken.None);
         await PurgeQueuesAsync();
@@ -155,22 +170,35 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var lane in Registry.Subscription("archive").Lanes)
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription })
         {
-            await channel.QueuePurgeAsync(Registry.QueueName("archive", lane));
-            await channel.QueuePurgeAsync(Registry.DlqName("archive", lane));
+            foreach (var lane in Registry.Subscription(subscription).Lanes)
+            {
+                await channel.QueuePurgeAsync(Registry.QueueName(subscription, lane));
+                await channel.QueuePurgeAsync(Registry.DlqName(subscription, lane));
+            }
         }
     }
 
+    public IncomingMessage Message(string sourceMessageId, string? text, DateTimeOffset? publishedAt = null, int? sourceId = null) => new()
+    {
+        SourceId = sourceId ?? SourceId,
+        SourceMessageId = sourceMessageId,
+        PublishedAt = publishedAt ?? DateTimeOffset.UtcNow.AddSeconds(-5),
+        RawText = text,
+        Url = $"https://t.me/{SourceCode}/{sourceMessageId}",
+    };
+
+    /// <summary>Direct store (RawMessageIngestor with the P03 bridge): raw row + raw.stored outbox in one transaction.</summary>
     public Task<IngestResult> IngestAsync(string sourceMessageId, string text, bool enqueue = true, DateTimeOffset? publishedAt = null) =>
-        Ingestor.IngestAsync(new IncomingMessage
-        {
-            SourceId = SourceId,
-            SourceMessageId = sourceMessageId,
-            PublishedAt = publishedAt ?? DateTimeOffset.UtcNow.AddSeconds(-5),
-            RawText = text,
-            Url = $"https://t.me/{SourceCode}/{sourceMessageId}",
-        }, SourceCode, CancellationToken.None, enqueue);
+        Ingestor.IngestAsync(Message(sourceMessageId, text, publishedAt), SourceCode, CancellationToken.None, enqueue);
+
+    /// <summary>The collectors' path (P04): ingress.received + checkpoint in one transaction; the raw-writer stores the row.</summary>
+    public async Task<Source> SourceAsync()
+    {
+        await using var db = await Factory.CreateDbContextAsync();
+        return await db.Sources.AsNoTracking().SingleAsync(s => s.SourceId == SourceId);
+    }
 
     public async Task<int> ExecAsync(string sql, params (string Name, object Value)[] parameters)
     {
@@ -288,7 +316,7 @@ public sealed class Evidence
         {
             var document = new
             {
-                task = "P03",
+                task = "P03+P04", // one fixture, both tasks' tests write here
                 generated_at = DateTimeOffset.UtcNow,
                 environment = new { broker_image = MessagingFixture.BrokerImage, broker_version = brokerVersion, postgres_image = "postgis/postgis:17-3.5", os = Environment.OSVersion.ToString(), dotnet = Environment.Version.ToString() },
                 tests = _entries,

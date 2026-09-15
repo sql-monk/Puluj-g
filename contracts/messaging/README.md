@@ -3,7 +3,7 @@
 Machine-readable частина ADR-0002…0005 ([`docs/adr/`](../../docs/adr/README.md)). Статус: **accepted** (P02 spike підтвердив topology на RabbitMQ 4.3;
 P03 runtime). `topology.json` **вбудовується** у `Puluj.Infrastructure` як embedded resource (`Puluj.Infrastructure.csproj`), тож runtime
 (`TopologyRegistry`, `TopologyRegistrar`, `TopologyDeclarer`) читає той самий файл, що й контрактні тести; `tests/Puluj.Messaging.Tests`
-перевіряє, що embedded копія збігається з файлом. Поточна версія — **2** (P03: `archive` → `active`). Зміни — лише разом із тестами
+перевіряє, що embedded копія збігається з файлом. Поточна версія — **3** (P03: `archive` → `active`; P04: `raw-writer` → `active`). Зміни — лише разом із тестами
 `tests/Puluj.Messaging.Contracts.Tests` і, за потреби, новим `topology_version`.
 
 | Файл | Що це |
@@ -50,8 +50,11 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 
 - Черги оголошуються і deliveries очікуються лише для підписок зі `status` `active`/`paused` у `messaging.subscriptions` поточної
   `topology_version` (перший insert — з файлу, далі БД); `planned` підписки нічого не отримують до активації в новій версії.
-- Bridge-`raw.stored` (collector без `ingress.received`): `causation_id = event_id` (root), `correlation_id` = UUIDv5(`source_id`, `source_message_key`),
+- Bridge-`raw.stored` (collector без `ingress.received`, fallback): `causation_id = event_id` (root), `correlation_id` = UUIDv5(`source_id`, `source_message_key`),
   identity з legacy `source_message_id` за `fixtures/identity-cases.json` — ADR-0003.
+- Ingress (P04): collectors публікують `ingress.received` (root, `causation_id: null`) з явною identity, `legacy_source_message_id`,
+  `content_hash` (SHA-256 на оригінальному JSON — raw-writer копіює його в `raw_messages.hash`), `collector{name,version,instance}`,
+  `checkpoint`; raw-writer відповідає `raw.stored{is_new}` з `causation_id` = id ingress-події.
 - Consumer перевіряє `event_type` за registry і `schema_version` MAJOR = supported (`compatibility.json`, `major_equal`); невідповідність →
   `processing.quarantine` без retries. Повна JSON-Schema валідація — лише в тестах (`tests/Puluj.Messaging.Tests/Unit`).
 

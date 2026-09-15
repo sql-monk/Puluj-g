@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(2, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 (P03): archive активовано
+        Assert.Equal(3, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 (P03): archive; v3 (P04): raw-writer
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -101,8 +101,8 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             }
             Assert.All(ContractFiles.Strings(subscription["lanes"]), lane => Assert.Contains(lane, lanes));
             Assert.Matches("^P[0-9]{2}$", subscription["owner_task"]!.GetValue<string>());
-            // P03 активував лише archive (runtime реалізовано); решта — planned до своїх задач.
-            Assert.Equal(subscriptionId == "archive" ? "active" : "planned", subscription["status"]!.GetValue<string>());
+            // P03 активував archive, P04 — raw-writer (runtime реалізовано); решта — planned до своїх задач.
+            Assert.Equal(subscriptionId is "archive" or "raw-writer" ? "active" : "planned", subscription["status"]!.GetValue<string>());
         }
     }
 

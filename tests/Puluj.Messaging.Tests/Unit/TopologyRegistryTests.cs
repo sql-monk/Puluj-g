@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(2, Registry.TopologyVersion);
+        Assert.Equal(3, Registry.TopologyVersion);
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -33,9 +33,10 @@ public sealed class TopologyRegistryTests
     [Fact]
     public void Expected_set_is_required_active_or_paused_and_serving_the_lane()
     {
-        // topology.json v2: archive is active, normalizer and message-analytics still planned → only archive is expected.
+        // topology.json v3: archive and raw-writer are active, normalizer and message-analytics still planned → only archive is expected.
         var expected = Registry.ExpectedSubscriptions("raw.stored", "live");
         Assert.Equal(["archive"], expected.Select(s => s.Id));
+        Assert.Equal(["raw-writer", "archive"], Registry.ExpectedSubscriptions("ingress.received", "history").Select(s => s.Id));
 
         // Database-owned status wins over the file: a paused required consumer stays interested, a planned one activated later joins.
         var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "active" };

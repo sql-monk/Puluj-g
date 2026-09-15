@@ -9,14 +9,18 @@ public class RawMessage
     public long RawMessageId { get; set; }
     public int SourceId { get; set; }
     public Source? Source { get; set; }
-    /// <summary>Identifier inside the source (telegram message id, alert uid...). Unique per source.</summary>
+    /// <summary>Legacy identifier inside the source (telegram message id, `{id}:e{edit}` for an edit, alert `{id}:start`). Unique per source; kept for compatibility, the identity is <see cref="SourceMessageKey"/> + <see cref="SourceRevision"/>.</summary>
     public required string SourceMessageId { get; set; }
+    /// <summary>Stable key of the post inside the source without the revision (ADR-0003): telegram message id, alerts `{id}:start|end`.</summary>
+    public required string SourceMessageKey { get; set; }
+    /// <summary>Revision of the same key: `0` for the original, `e{editUnix}` for a Telegram edit. Unique (source, key, revision) is the raw identity (P04).</summary>
+    public required string SourceRevision { get; set; }
     public DateTimeOffset PublishedAt { get; set; }
     public DateTimeOffset ReceivedAt { get; set; }
     public string? RawText { get; set; }
     public JsonDocument? RawPayload { get; set; }
     public string? Url { get; set; }
-    /// <summary>SHA-256 of source code + normalized text/payload — second idempotency key.</summary>
+    /// <summary>SHA-256 of source code + text/payload: a similarity index (same content under a new source id is a new post, plan §5.2), no longer unique since P04.</summary>
     public required string Hash { get; set; }
 
     public ProcessingStatus ProcessingStatus { get; set; } = ProcessingStatus.Pending;

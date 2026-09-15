@@ -25,6 +25,7 @@ public static class DependencyInjection
             .AddStandardResilienceHandler();
 
         services.AddSingleton<CollectorStateStore>();
+        services.AddSingleton<CollectorIngress>();
         if (names is null || names.Contains(CollectorNames.AlertsInUa))
         {
             services.AddSingleton<ICollector, AlertsInUaCollector>();

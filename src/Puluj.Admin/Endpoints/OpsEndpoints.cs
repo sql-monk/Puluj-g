@@ -10,6 +10,7 @@ using Puluj.Admin.Docker;
 using Puluj.Api.Services;
 using Puluj.Domain.Entities;
 using Puluj.Infrastructure.Ingestion;
+using Puluj.Infrastructure.Messaging;
 using Puluj.Contracts;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Settings;
@@ -101,15 +102,16 @@ public static partial class OpsEndpoints
             return Results.Ok(new { queued, analyticsReset = analyticsStatus.Initialized });
         });
 
-        // Testing without real sources: inject a message as if a collector had received it.
-        ops.MapPost("/dev/ingest", async (IngestRequest req, ReferenceCache refs, RawMessageIngestor ingestor, TimeProvider clock, CancellationToken ct) =>
+        // Testing without real sources: inject a message as if a collector had received it. Takes the same path as the
+        // collectors: the single ingress when Messaging:Ingress:Enabled (the raw-writer stores it), the direct store otherwise.
+        ops.MapPost("/dev/ingest", async (IngestRequest req, ReferenceCache refs, RawMessageIngestor ingestor, IngressWriter ingress, TimeProvider clock, CancellationToken ct) =>
         {
             var source = refs.Sources.Values.FirstOrDefault(s => s.Code == req.SourceCode);
             if (source is null)
             {
                 return Results.BadRequest(new { error = $"unknown source '{req.SourceCode}'" });
             }
-            var result = await ingestor.IngestAsync(new IncomingMessage
+            var message = new IncomingMessage
             {
                 SourceId = source.SourceId,
                 SourceMessageId = req.SourceMessageId ?? $"dev-{Guid.NewGuid():N}",
@@ -119,7 +121,13 @@ public static partial class OpsEndpoints
                     ? JsonDocument.Parse(p.GetRawText())
                     : JsonDocument.Parse("{\"kind\":\"dev.ingest\"}"),
                 Url = null,
-            }, source.Code, ct);
+            };
+            if (ingress.Enabled)
+            {
+                var published = await ingress.PublishAsync(message, source.Code, "dev", null, live: true, ct);
+                return Results.Ok(new { published.EventId, published.Lane, RawMessageId = (long?)null, IsNew = (bool?)null });
+            }
+            var result = await ingestor.IngestAsync(message, source.Code, ct);
             return Results.Ok(result);
         });
 

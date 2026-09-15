@@ -51,8 +51,8 @@ sequenceDiagram
 
 | ID | Вікно | Стан | Повтор | Поглинання | Видно | Test |
 |---|---|---|---|---|---|---|
-| **W1a** | Collector впав **до** durable checkpoint (outbox row + checkpoint в одній транзакції не закомічені) | Нічого | Reconnect/backfill джерела за checkpoint | `(source_id, key, revision)` unique у raw-writer; повторний `ingress.received` → `raw.stored{is_new:false}` | collector `LastError`, backfill range | P04-C01 |
-| **W1b** | Collector впав **після** commit (outbox+checkpoint), до publish | outbox row unconfirmed | Relay | Той самий `event_id` | outbox unpublished age | P03-C01 |
+| **W1a** | Collector впав **до** durable checkpoint (outbox row + checkpoint в одній транзакції не закомічені) | Нічого | Reconnect/backfill джерела за checkpoint | `(source_id, key, revision)` unique у raw-writer; повторний `ingress.received` → `raw.stored{is_new:false}` | collector `LastError`, backfill range | P04-C01, P04-C02 (атомарність outbox+checkpoint) |
+| **W1b** | Collector впав **після** commit (outbox+checkpoint), до publish | outbox row unconfirmed | Relay | Той самий `event_id` | outbox unpublished age | P03-C01, P04-C05 (drain бачить unpublished) |
 | **W1c** | Межа: Telegram edit update отримано, `IngestAsync` не закомітився (crash/DB outage), поки collector пише raw напряму (bridge) | raw для edit відсутній; DB checkpoint (`min_id`, лише оригінали) edits не відновлює | Лише WTelegram update state (`SessionPath + ".updates"`, локальний файл, getDifference після рестарту) — не durable за §6.1 | — | Відома межа до P04 collector outbox | P04-C02 |
 | **W2** | Raw-writer закомітив raw + outbox(`raw.stored`), relay не публікував | outbox unconfirmed | Relay | `event_id` стабільний | outbox unpublished age > threshold → alarm | P03-C02 |
 | **W3** | Relay отримав confirm, впав до `confirmed_at` | Повідомлення у чергах; outbox unconfirmed | Relay публікує вдруге | Inbox кожної підписки дедуплікує (`event_id`); archive — unique `event_id` | duplicate suppression counter | P03-C03 |
@@ -157,7 +157,8 @@ sequenceDiagram
 |---|---|
 | ~~Реальні crash tests W4/W5/W7/W10/W11/W13 на Testcontainers RabbitMQ~~ — done, P02 spike | P02 |
 | ~~Outbox relay (lease, batch, confirm timeout), inbox, receipts, reconciliation, W2/W3/W6/W9/W12/W14a~~ — done, P03 (див. «Реалізація») | P03 |
-| Collector outbox/checkpoint, W1; `raw.stored{is_new:false}` при повторі (bridge зараз нічого не публікує для дубля) | P04 |
+| ~~Collector outbox/checkpoint, W1a/W1b; `raw.stored{is_new:false}` при повторі~~ — done P04 (`IngressWriter`, `RawWriterHandler`; bridge-шлях для дубля так само нічого не публікує — fallback) | P04 |
+| W1c (Telegram edit до commit) — durable spool для джерел без re-read | P16 / за потребою |
 | Fencing tokens у attempts (колонка є, завжди 0), lease takeover, W8 | P06 |
 | Readiness bindings через management API (зараз — idempotent re-declare у reconciliation) | P13/P16 |
 
@@ -174,3 +175,13 @@ sequenceDiagram
 
 Bridge-специфіка (до P04): `causation_id = event_id` для `raw.stored` без `ingress.received` (ADR-0003); дубль `ON CONFLICT`
 не публікує нічого; live-пости під час history load отримують lane `history` (`TelegramCollector` `enqueue: !_loadingHistory`).
+
+## Реалізація (P04)
+
+| Рішення ADR | Код | Перевірка |
+|---|---|---|
+| Producer outbox collectors + checkpoint в одній tx (§6.1, W1a) | `Puluj.Infrastructure.Messaging.IngressWriter.PublishAsync` (outbox `ingress.received` + expected deliveries + upsert `collector_states`); `Puluj.Collectors.CollectorIngress` (режим за `Messaging:Ingress:Enabled`) | P04-C02 (trigger-fail → ні outbox, ні checkpoint), P04-C01 |
+| Raw-writer: identity ON CONFLICT → `raw.stored{is_new}` в тій самій tx; NOTIFY після commit | `Puluj.Messaging.RawWriterHandler`, `DeliveryResult.AfterCommit` | P04-C01 (re-read → 1 raw, is_new true/false), P04-G01 (hook падає → ACK), P04-C03/C04 |
+| Raw insert чекає `ReprocessService.ResetAsync` lock, не падає | `Messaging:RawWriter:InsertTimeout` (25 хв). Межа: rebuild довший за timeout → перша доставка рахується як attempt, наступні prefetched чекають далі (unacked до 30 хв → broker закриває канал); після 5 спроб — quarantine + admin retry | P04-C07 |
+| Drain перед rebuild рахує лише expected без receipt | quarantined/waived доставки raw-writer не блокують drain — rebuild стартує без цих raw (видно в `processing.quarantine`) | P04-C05 |
+| History load → drain перед rebuild | `IngressWriter.WaitForDrainAsync`, `TelegramCollector.LoadHistoryAsync` | P04-C05 |

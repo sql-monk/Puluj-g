@@ -70,8 +70,9 @@ services:
       retries: 12
     restart: unless-stopped
 
-  # P03 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`) and the archive subscription with
-  # its DLQ consumer (`archive`). Scale with more replicas (relay leases rows with SKIP LOCKED; consumers share the queue).
+  # P03/P04 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive subscription (`archive`)
+  # and the raw-writer subscription (`raw-writer`) with the DLQ consumer of both. Scale with more replicas (relay leases rows
+  # with SKIP LOCKED; consumers share the queues).
   messaging:
     <<: *worker
     profiles: ["broker"]
@@ -79,7 +80,7 @@ services:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
-      Worker__Roles: relay,archive
+      Worker__Roles: relay,archive,raw-writer
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"
@@ -116,6 +117,7 @@ services:
       <<: *worker-env
       Worker__Name: collector-telegram
       Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}
       Worker__Roles: telegram
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-telegram-.log
     volumes:
@@ -129,6 +131,7 @@ services:
       <<: *worker-env
       Worker__Name: collector-alerts
       Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}
       Worker__Roles: alerts
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-alerts-.log
 
@@ -188,6 +191,7 @@ services:
       ASPNETCORE_URLS: http://+:8081
       Admin__ApiUrl: http://api:8080
       Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}  # /dev/ingest takes the collectors' path (P04)
       Logs__Directory: /app/logs
       Docker__Enabled: "true"
       Docker__ComposeDir: /deploy

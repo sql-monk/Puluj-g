@@ -77,7 +77,7 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
             (openFresh, openOld, ended) = (alerts[0].AirAlertId, alerts[1].AirAlertId, alerts[2].AirAlertId);
 
             // Reports need a raw message behind them (FK); one is enough for both.
-            var raw = new RawMessage { SourceId = source.SourceId, SourceMessageId = $"map-snapshot-test-{Guid.NewGuid():N}", PublishedAt = now, ReceivedAt = now, RawText = "test", ProcessingStatus = ProcessingStatus.Processed, Hash = Guid.NewGuid().ToString("N") };
+            var raw = new RawMessage { SourceId = source.SourceId, SourceMessageId = $"map-snapshot-test-{Guid.NewGuid():N}", SourceMessageKey = $"map-snapshot-test-{Guid.NewGuid():N}", SourceRevision = "0", PublishedAt = now, ReceivedAt = now, RawText = "test", ProcessingStatus = ProcessingStatus.Processed, Hash = Guid.NewGuid().ToString("N") };
             db.RawMessages.Add(raw);
             await db.SaveChangesAsync();
             var reports = new[]

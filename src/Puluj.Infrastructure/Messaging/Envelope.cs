@@ -24,7 +24,7 @@ public sealed class Envelope
     [JsonPropertyName("raw_message_id")] public long? RawMessageId { get; set; }
     [JsonPropertyName("correlation_id")] public Guid CorrelationId { get; set; }
     /// <summary>Event that caused this one; null only for `ingress.received`. A bridge-produced `raw.stored` (no ingress event, P03) is its own cause: causation_id == event_id marks a root (ADR-0003).</summary>
-    [JsonPropertyName("causation_id")] public Guid? CausationId { get; set; }
+    [JsonPropertyName("causation_id"), JsonIgnore(Condition = JsonIgnoreCondition.Never)] public Guid? CausationId { get; set; } // required by the schema, null for a root
     [JsonPropertyName("traceparent")] public required string Traceparent { get; set; }
     [JsonPropertyName("processing_run_id")] public Guid ProcessingRunId { get; set; }
     [JsonPropertyName("pipeline_version")] public required string PipelineVersion { get; set; }

@@ -37,6 +37,10 @@
     "url": {
       "type": "string"
     },
+    "content_hash": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/sha256",
+      "description": "SHA-256(source_code, text, raw_payload) обчислений collector на оригінальному JSON (P04): raw-writer копіює його в raw_messages.hash, щоб direct і ingress режими давали той самий індекс схожості"
+    },
     "text": {
       "type": "string"
     },

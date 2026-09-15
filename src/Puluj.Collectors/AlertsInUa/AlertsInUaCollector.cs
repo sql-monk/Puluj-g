@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
+using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Persistence;
 
 namespace Puluj.Collectors.AlertsInUa;
@@ -22,7 +23,7 @@ namespace Puluj.Collectors.AlertsInUa;
 public sealed class AlertsInUaCollector(
     IHttpClientFactory httpFactory,
     IOptionsMonitor<AlertsInUaOptions> options,
-    RawMessageIngestor ingestor,
+    CollectorIngress ingress,
     CollectorStateStore states,
     IDbContextFactory<PulujDbContext> factory,
     TimeProvider clock,
@@ -96,10 +97,18 @@ public sealed class AlertsInUaCollector(
         return result;
     }
 
+    /// <summary>Ids ended because they were open in the database but absent from the feed; not repeated every poll (through the ingress the store cannot say "already there").</summary>
+    private readonly HashSet<string> _endedFromDatabase = [];
+
     private async Task<Dictionary<string, JsonObject>> ReconcileAsync(Source source, Dictionary<string, JsonObject> known,
         Dictionary<string, JsonObject> active, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
+        // The cursor (the active set as seen now) is committed with the last message of this poll, so a crash before that
+        // commit re-emits the same starts/ends on the next poll — and the identity (`{id}:start|end`) makes that a no-op.
+        var cursor = new CollectorCheckpoint(null, active.Count == 0 ? null : now,
+            JsonDocument.Parse(new JsonObject { ["active"] = new JsonArray(active.Values.Select(a => (JsonNode)a.DeepClone()).ToArray()) }.ToJsonString()));
+        var messages = new List<IncomingMessage>();
         foreach (var (id, alert) in active)
         {
             if (known.ContainsKey(id))
@@ -107,47 +116,54 @@ public sealed class AlertsInUaCollector(
                 continue;
             }
             var startedAt = ParseTime(alert["started_at"]) ?? now;
-            await ingestor.IngestAsync(new IncomingMessage
-            {
-                SourceId = source.SourceId,
-                SourceMessageId = $"{id}:start",
-                PublishedAt = startedAt,
-                RawPayload = Wrap("alert.started", alert, startedAt),
-                Url = "https://alerts.in.ua/",
-            }, source.Code, ct);
+            messages.Add(Message(source, id, "start", "alert.started", alert, startedAt));
         }
         foreach (var (id, alert) in known)
         {
             if (!active.ContainsKey(id))
             {
-                await EndAsync(source, id, alert, now, ct);
+                messages.Add(Message(source, id, "end", "alert.finished", alert, now));
             }
         }
         // Open in the database but neither active nor known: not ours to have started (dev/ingest), or a rebuild handled
         // the live end before it got to the start. The `{id}:end` message is idempotent, so a repeat is a no-op.
         foreach (var (id, alert) in await OpenInDatabaseAsync(source.SourceId, ct))
         {
-            if (!active.ContainsKey(id) && !known.ContainsKey(id) && (await EndAsync(source, id, alert, now, ct)).IsNew)
+            if (!active.ContainsKey(id) && !known.ContainsKey(id) && _endedFromDatabase.Add(id))
             {
+                messages.Add(Message(source, id, "end", "alert.finished", alert, now));
                 logger.LogInformation("alerts.in.ua: alert {Id} is open in the database but not in the feed; ended it", id);
             }
         }
+        _endedFromDatabase.IntersectWith(await OpenIdsAsync(source.SourceId, ct)); // forget ids once the end is processed
 
-        var cursor = new JsonObject { ["active"] = new JsonArray(active.Values.Select(a => (JsonNode)a.DeepClone()).ToArray()) };
-        await states.MarkSuccessAsync(source.SourceId, null, active.Count == 0 ? null : now,
-            JsonDocument.Parse(cursor.ToJsonString()), ct);
+        for (var i = 0; i < messages.Count; i++)
+        {
+            await ingress.PublishAsync(messages[i], source, Name, i == messages.Count - 1 ? cursor : null, live: true, ct);
+        }
+        if (messages.Count == 0)
+        {
+            await states.MarkSuccessAsync(source.SourceId, null, cursor.LastMessageAt, cursor.Cursor, ct);
+        }
         return active;
     }
 
-    private Task<IngestResult> EndAsync(Source source, string id, JsonObject alert, DateTimeOffset now, CancellationToken ct) =>
-        ingestor.IngestAsync(new IncomingMessage
-        {
-            SourceId = source.SourceId,
-            SourceMessageId = $"{id}:end",
-            PublishedAt = now,
-            RawPayload = Wrap("alert.finished", alert, now),
-            Url = "https://alerts.in.ua/",
-        }, source.Code, ct);
+    private static IncomingMessage Message(Source source, string id, string phase, string kind, JsonObject alert, DateTimeOffset at) => new()
+    {
+        SourceId = source.SourceId,
+        SourceMessageId = $"{id}:{phase}",
+        SourceMessageKey = $"{id}:{phase}",
+        SourceRevision = "0",
+        PublishedAt = at,
+        RawPayload = Wrap(kind, alert, at),
+        Url = "https://alerts.in.ua/",
+    };
+
+    private async Task<HashSet<string>> OpenIdsAsync(int sourceId, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return await db.AirAlerts.AsNoTracking().Where(a => a.SourceId == sourceId && a.EndedAt == null).Select(a => a.SourceAlertId).ToHashSetAsync(ct);
+    }
 
     /// <summary>Alerts without an end in the database, with the alert object of their start message (the id alone when there is none).</summary>
     private async Task<List<(string Id, JsonObject Alert)>> OpenInDatabaseAsync(int sourceId, CancellationToken ct)

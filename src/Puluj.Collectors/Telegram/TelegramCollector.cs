@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
+using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Settings;
 using TL;
 
@@ -13,12 +14,13 @@ namespace Puluj.Collectors.Telegram;
 /// <summary>
 /// One MTProto session (WTelegramClient) serving every enabled Telegram source. Backfills recent history on start
 /// (or, with BackfillSince, the whole history from that instant, once), then stores every new/edited channel post as
-/// a RawMessage. Edits become separate RawMessages ("{id}:e{editDate}") so the original text is never lost (spec §5:
-/// RawMessage is immutable).
+/// a RawMessage. Edits become separate RawMessages (key = message id, revision "e{editDate}"; legacy id "{id}:e{editDate}")
+/// so the original text is never lost (spec §5: RawMessage is immutable). Messages go through <see cref="CollectorIngress"/>:
+/// with the ingress enabled the checkpoint (last message id / history cursor) is committed with the message (plan §6.1).
 /// </summary>
 public sealed class TelegramCollector(
     IOptionsMonitor<TelegramOptions> options,
-    RawMessageIngestor ingestor,
+    CollectorIngress ingress,
     ReprocessService reprocess,
     CollectorStateStore states,
     SettingsStore settings,
@@ -210,7 +212,9 @@ public sealed class TelegramCollector(
         var stored = 0;
         foreach (var m in messages)
         {
-            if (await StoreAsync(m, source, username, ct))
+            // The checkpoint travels with the message (ids are monotonic within a channel): a crash between them cannot
+            // move the cursor past an unpublished post.
+            if (await StoreAsync(m, source, username, ct, checkpoint: new CollectorCheckpoint(m.id.ToString(), ToUtc(m.date))))
             {
                 stored++;
             }
@@ -259,7 +263,14 @@ public sealed class TelegramCollector(
                 await settings.SetStatusAsync(StatusKey, $"history: @{username} since {since:yyyy-MM-dd}", ct);
                 await LoadChannelHistoryAsync(client, channel, source, username, start, ct);
             }
-            // Everything is in: rebuild in order. Held until now so no message was processed out of sequence.
+            // Everything is in: rebuild in order. Held until now so no message was processed out of sequence. Through the
+            // ingress the raw rows are written by the raw-writer: wait until every published message of these channels
+            // has one, otherwise the rebuild would start before the history is complete.
+            await settings.SetStatusAsync(StatusKey, "history: waiting for the raw-writer", ct);
+            if (!await ingress.WaitForDrainAsync(pending.Select(p => p.Source.SourceId).ToList(), ct))
+            {
+                await settings.SetStatusAsync(StatusKey, "history: drain timeout, rebuilding anyway", ct);
+            }
             await settings.SetStatusAsync(StatusKey, "history: rebuilding derived data", ct);
             var queued = await reprocess.ResetAsync(ct);
             logger.LogInformation("Telegram: history load complete, {Count} raw message(s) queued for processing in order", queued);
@@ -298,18 +309,26 @@ public sealed class TelegramCollector(
             {
                 break;
             }
-            // Pages before `since` are only paged past, not stored.
-            foreach (var m in page.Where(m => ToUtc(m.date) >= cursor.Since))
+            // Pages before `since` are only paged past, not stored. The page cursor is committed with the last stored
+            // message of the page (or on its own when the page stored nothing), so a restart resumes from a page whose
+            // messages are all published.
+            var toStore = page.Where(m => ToUtc(m.date) >= cursor.Since).ToList();
+            var messages = page;
+            lastId = messages[^1].id;
+            pages++;
+            var pageCursor = WriteCursor(new HistoryCursor(cursor.Since, lastId, stored + toStore.Count, false));
+            for (var i = 0; i < toStore.Count; i++)
             {
-                if (await StoreAsync(m, source, username, ct, enqueue: false))
+                var last = i == toStore.Count - 1;
+                if (await StoreAsync(toStore[i], source, username, ct, enqueue: false, checkpoint: last ? new CollectorCheckpoint(null, ToUtc(messages[^1].date), pageCursor) : null))
                 {
                     stored++;
                 }
             }
-            var messages = page;
-            lastId = messages[^1].id;
-            pages++;
-            await states.MarkSuccessAsync(source.SourceId, null, ToUtc(messages[^1].date), WriteCursor(new HistoryCursor(cursor.Since, lastId, stored, false)), ct);
+            if (toStore.Count == 0)
+            {
+                await states.MarkSuccessAsync(source.SourceId, null, ToUtc(messages[^1].date), pageCursor, ct);
+            }
             if (pages % 20 == 0)
             {
                 logger.LogInformation("Telegram: @{Username} history … id {LastId} ({Date:yyyy-MM-dd HH:mm}), {Stored} stored", username, lastId, ToUtc(messages[^1].date), stored);
@@ -379,31 +398,36 @@ public sealed class TelegramCollector(
             return;
         }
         var (source, username) = entry;
-        var stored = await StoreAsync(m, source, username, CancellationToken.None, enqueue: !_loadingHistory);
-        if (stored)
-        {
-            await states.MarkSuccessAsync(source.SourceId, isEdit ? null : m.id.ToString(), ToUtc(m.date), null, CancellationToken.None);
-        }
+        // An edit does not move the id checkpoint (it belongs to an old post); the date still counts as activity.
+        await StoreAsync(m, source, username, CancellationToken.None, enqueue: !_loadingHistory,
+            checkpoint: new CollectorCheckpoint(isEdit ? null : m.id.ToString(), ToUtc(m.date)));
     }
 
-    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, bool enqueue = true)
+    /// <summary>Publishes one post (or edit); returns whether it was stored/accepted (false for service messages and known duplicates).</summary>
+    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, bool enqueue = true, CollectorCheckpoint? checkpoint = null)
     {
         if (string.IsNullOrWhiteSpace(m.message) && m.media is null)
         {
-            return false; // service messages
+            if (checkpoint is not null)
+            {
+                await states.MarkSuccessAsync(source.SourceId, checkpoint.LastSourceMessageId, checkpoint.LastMessageAt, checkpoint.Cursor, ct);
+            }
+            return false; // service messages still move the cursor
         }
         var payload = TelegramMessagePayload.From(m, username);
-        var sourceMessageId = payload.EditDate is null ? m.id.ToString() : $"{m.id}:e{payload.EditDate.Value.ToUnixTimeSeconds()}";
-        var result = await ingestor.IngestAsync(new IncomingMessage
+        var revision = payload.EditDate is null ? "0" : $"e{payload.EditDate.Value.ToUnixTimeSeconds()}";
+        var result = await ingress.PublishAsync(new IncomingMessage
         {
             SourceId = source.SourceId,
-            SourceMessageId = sourceMessageId,
+            SourceMessageId = revision == "0" ? m.id.ToString() : $"{m.id}:{revision}",
+            SourceMessageKey = m.id.ToString(),
+            SourceRevision = revision,
             PublishedAt = payload.EditDate ?? payload.Date,
             RawText = m.message,
             RawPayload = payload.ToDocument(),
             Url = $"https://t.me/{username}/{m.id}",
-        }, source.Code, ct, enqueue);
-        return result.IsNew;
+        }, source, Name, checkpoint, live: enqueue, ct);
+        return result.Stored;
     }
 
     private static string? Username(Source source)

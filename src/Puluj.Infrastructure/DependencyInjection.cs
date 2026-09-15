@@ -59,6 +59,12 @@ public static class DependencyInjection
             return new ProcessingRuns(options.Outbox.PipelineVersion ?? PipelineVersion(), instanceName);
         });
         services.AddSingleton<OutboxWriter>();
+        services.AddSingleton(sp =>
+        {
+            var writer = ActivatorUtilities.CreateInstance<IngressWriter>(sp);
+            writer.Instance = instanceName;
+            return writer;
+        });
         services.AddSingleton<SubscriptionAdmin>();
         return services;
     }

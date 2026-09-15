@@ -18,7 +18,7 @@ public class TargetBuilderTests
         var normalized = new Normalizer().Normalize(text);
         var facts = new RuleParser(indexes).Parse(normalized, new ParseContext(1, normalized.Language, null));
         Assert.NotEmpty(facts);
-        var raw = new RawMessage { SourceId = 1, SourceMessageId = "t", PublishedAt = DateTimeOffset.UtcNow, ReceivedAt = DateTimeOffset.UtcNow, RawText = text, Hash = "h" };
+        var raw = new RawMessage { SourceId = 1, SourceMessageId = "t", SourceMessageKey = "t", SourceRevision = "0", PublishedAt = DateTimeOffset.UtcNow, ReceivedAt = DateTimeOffset.UtcNow, RawText = text, Hash = "h" };
         var source = new Source { SourceId = 1, Code = "test", Name = "test", Type = SourceType.Telegram, TrustLevel = 0.9 };
         var builder = new TargetBuilder(indexes);
         return facts.Select(f => builder.Build(f, raw, source, "test", IdentificationMethod.Rule, normalized.Language)).ToList();

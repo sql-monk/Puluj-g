@@ -36,7 +36,7 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(0, await f.CountAsync("messaging.events"));
         Assert.Equal(1, await f.CountAsync("processing.runs", "lane = 'live' AND state = 'running'"));
         var envelope = JsonNode.Parse(await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox"))!;
-        Assert.Equal(2, envelope["topology_version"]!.GetValue<int>());
+        Assert.Equal(f.Registry.TopologyVersion, envelope["topology_version"]!.GetValue<int>());
         Assert.Equal(eventId.ToString(), envelope["causation_id"]!.GetValue<string>());
         Assert.Equal("c01", envelope["source_message_key"]!.GetValue<string>());
         Assert.Equal("raw-writer@p03-test", envelope["producer"]!.GetValue<string>());
@@ -252,10 +252,10 @@ public sealed class CrashTests(MessagingFixture f)
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
         Assert.Equal([v2Event], report.OverdueDeliveries.Select(d => d.EventId));
         Assert.Equal(0, await f.CountAsync("processing.deliveries", $"event_id = '{v1Event}'"));
-        Assert.Equal(2, await f.ScalarAsync<int>("SELECT topology_version FROM processing.deliveries WHERE event_id = @e", ("e", v2Event)));
+        Assert.Equal(f.Registry.TopologyVersion, await f.ScalarAsync<int>("SELECT topology_version FROM processing.deliveries WHERE event_id = @e", ("e", v2Event)));
         Assert.Equal(1, await f.CountAsync("messaging.subscriptions", "subscription_id = 'archive' AND topology_version = 1 AND status = 'planned'"));
-        Assert.Equal(1, await f.CountAsync("messaging.subscriptions", "subscription_id = 'archive' AND topology_version = 2 AND status = 'active'"));
-        f.Evidence.Record("P03-C06", new { window = "W9a", v1_event_expected = 0, v2_event_expected = new[] { "archive" }, overdue_reported = report.OverdueDeliveries.Count, registry_versions = new[] { 1, 2 } });
+        Assert.Equal(1, await f.CountAsync("messaging.subscriptions", "subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion + " AND status = 'active'"));
+        f.Evidence.Record("P03-C06", new { window = "W9a", v1_event_expected = 0, v2_event_expected = new[] { "archive" }, overdue_reported = report.OverdueDeliveries.Count, registry_versions = new[] { 1, f.Registry.TopologyVersion } });
     }
 
     [Fact]
@@ -279,12 +279,12 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(3, await f.CountAsync("processing.deliveries", "outcome = 'waived' AND actor = 'operator:test' AND reason LIKE 'consumer retired%'"));
         var after = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
         Assert.Empty(after.OverdueDeliveries);
-        var waiver = await f.ScalarAsync<string>("SELECT waiver::text FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = 2");
+        var waiver = await f.ScalarAsync<string>("SELECT waiver::text FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion);
         Assert.Contains("operator:test", waiver);
-        Assert.Equal("paused", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = 2"));
+        Assert.Equal("paused", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion));
 
         await f.Admin.SetStatusAsync("archive", "active", "maintenance over", "operator:test", None);
-        Assert.Equal("active", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = 2"));
+        Assert.Equal("active", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion));
         f.Evidence.Record("P03-C07", new { window = "W9b", paused_expected = 3, backlog_kept = 3, waived, overdue_after_waiver = after.OverdueDeliveries.Count, waiver_audit = waiver });
     }
 

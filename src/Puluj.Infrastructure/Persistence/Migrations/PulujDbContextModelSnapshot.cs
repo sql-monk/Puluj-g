@@ -1334,6 +1334,18 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("source_message_id");
 
+                    b.Property<string>("SourceMessageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("source_message_key");
+
+                    b.Property<string>("SourceRevision")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_revision");
+
                     b.Property<string>("Url")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)")
@@ -1343,7 +1355,6 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasName("pk_raw_messages");
 
                     b.HasIndex("Hash")
-                        .IsUnique()
                         .HasDatabaseName("ix_raw_messages_hash");
 
                     b.HasIndex("ProcessingStatus")
@@ -1363,6 +1374,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.HasIndex("SourceId", "SourceMessageId")
                         .IsUnique()
                         .HasDatabaseName("ix_raw_messages_source_id_source_message_id");
+
+                    b.HasIndex("SourceId", "SourceMessageKey", "SourceRevision")
+                        .IsUnique()
+                        .HasDatabaseName("ix_raw_messages_source_id_source_message_key_source_revision");
 
                     b.HasIndex(new[] { "ClaimedAt" }, "ix_raw_messages_in_progress_claimed_at")
                         .HasDatabaseName("ix_raw_messages_in_progress_claimed_at")
