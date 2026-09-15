@@ -136,7 +136,7 @@ services:
       ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_admin;Password=${PULUJ_ADMIN_PASSWORD:-puluj_admin}"
       ASPNETCORE_URLS: http://+:8081
       Admin__ApiUrl: http://api:8080
-      Admin__Token: ${ADMIN_TOKEN:-}
+      Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
       Logs__Directory: /app/logs
       Docker__Enabled: "true"
       Docker__ComposeDir: /deploy
