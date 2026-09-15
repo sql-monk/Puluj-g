@@ -14,6 +14,10 @@ using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Messaging.Topology;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Seeding;
+using Puluj.Processing;
+using Puluj.Processing.Indexes;
+using Puluj.Processing.Pipeline;
+using Puluj.Processing.Stages;
 using RabbitMQ.Client;
 using Testcontainers.PostgreSql;
 using Testcontainers.RabbitMq;
@@ -48,6 +52,10 @@ public sealed class MessagingFixture : IAsyncLifetime
     public OutboxRelay Relay => Services.GetRequiredService<OutboxRelay>();
     public SubscriptionConsumer Archive => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ArchiveHandler.Subscription);
     public SubscriptionConsumer RawWriter => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == RawWriterHandler.Subscription);
+    public SubscriptionConsumer Normalizer => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == NormalizerHandler.Subscription);
+    public SubscriptionConsumer Parser => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ParserHandler.Subscription);
+    public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
+    public IndexProvider Indexes => Services.GetRequiredService<IndexProvider>();
     public IngressWriter IngressWriter => Services.GetRequiredService<IngressWriter>();
     public CollectorIngress Ingress => Services.GetRequiredService<CollectorIngress>();
     public CollectorStateStore States => Services.GetRequiredService<CollectorStateStore>();
@@ -86,7 +94,9 @@ public sealed class MessagingFixture : IAsyncLifetime
         {
             ["ConnectionStrings:Puluj"] = _postgres.GetConnectionString(),
             ["Seed:DataDirectory"] = Path.Combine(repoRoot, "data"),
-            ["Seed:SeedGazetteer"] = "false",
+            ["Seed:SeedGazetteer"] = "true", // the parser stage needs the gazetteer (P05)
+            ["Llm:Enabled"] = "true", // the fallback decision only (no API key, no call): parse.completed{needs_llm} + llm.requested
+            ["Llm:MaxMessageAgeHours"] = "72",
             ["Messaging:Enabled"] = "true",
             ["Messaging:Outbox:Enabled"] = "true",
             ["Messaging:Outbox:PipelineVersion"] = Options.Outbox.PipelineVersion,
@@ -121,6 +131,8 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddSingleton<IHostEnvironment>(new TestEnvironment(repoRoot));
         services.AddPulujInfrastructure(config, "p03-test");
         services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole, DependencyInjection.RawWriterRole }, "p03-test");
+        services.AddPulujProcessing(config, "p03-test"); // legacy processor for the parity test (hosted loop is never started here)
+        services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser }, "p03-test");
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -130,12 +142,13 @@ public sealed class MessagingFixture : IAsyncLifetime
         {
             await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS postgis");
             await db.Database.MigrateAsync();
-            foreach (var seeder in Services.GetServices<ISeeder>().OfType<SourceSeeder>())
+            foreach (var seeder in Services.GetServices<ISeeder>().OrderBy(s => s.Order))
             {
                 await seeder.SeedAsync(db, CancellationToken.None);
             }
             SourceId = await db.Sources.Where(s => s.Code == SourceCode).Select(s => s.SourceId).SingleAsync();
         }
+        await Indexes.RefreshAsync(CancellationToken.None);
         var connection = await Broker.GetAsync(CancellationToken.None);
         BrokerVersion = connection.ServerProperties is { } props && props.TryGetValue("version", out var v) && v is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : "?";
         await ResetAsync();
@@ -155,12 +168,14 @@ public sealed class MessagingFixture : IAsyncLifetime
         await ExecAsync("""
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
-                     collector_states, raw_messages RESTART IDENTITY CASCADE
+                     collector_states, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
             """);
         Registrar.Reset();
         Outbox.Runs.Reset();
         Archive.ResetCounters();
         RawWriter.ResetCounters();
+        Normalizer.ResetCounters();
+        Parser.ResetCounters();
         await Registrar.EnsureRegisteredAsync(CancellationToken.None);
         await Declarer.DeclareAsync(CancellationToken.None);
         await PurgeQueuesAsync();
@@ -170,7 +185,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, "finalizer", "llm-worker" })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {

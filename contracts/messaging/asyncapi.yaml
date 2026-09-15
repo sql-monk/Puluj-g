@@ -3,11 +3,11 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '3.0.0'
+  version: '4.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
-    Status: accepted (ADR-0001/0002 accepted у P02); з P03 archive active (v2), з P04 raw-writer active (v3), решта — planned.
+    Status: accepted (ADR-0001/0002 accepted у P02); з P03 archive active (v2), з P04 raw-writer (v3), з P05 normalizer/parser active і finalizer/llm-worker paused (v4), решта — planned.
 defaultContentType: application/json
 servers:
   local:
@@ -383,7 +383,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/raw_stored'
-    summary: subscription normalizer (required=true, owner_task=P05, status=planned)
+    summary: subscription normalizer (required=true, owner_task=P05, status=active)
     messages:
       - $ref: '#/channels/raw_stored/messages/raw_stored'
     bindings:
@@ -396,7 +396,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/message_normalized'
-    summary: subscription parser (required=true, owner_task=P05, status=planned)
+    summary: subscription parser (required=true, owner_task=P05, status=active)
     messages:
       - $ref: '#/channels/message_normalized/messages/message_normalized'
     bindings:
@@ -409,7 +409,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/llm_requested'
-    summary: subscription llm-worker (required=true, owner_task=P06, status=planned)
+    summary: subscription llm-worker (required=true, owner_task=P06, status=paused)
     messages:
       - $ref: '#/channels/llm_requested/messages/llm_requested'
     bindings:
@@ -422,7 +422,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/parse_completed'
-    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    summary: subscription finalizer (required=true, owner_task=P06, status=paused)
     messages:
       - $ref: '#/channels/parse_completed/messages/parse_completed'
     bindings:
@@ -435,7 +435,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/llm_completed'
-    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    summary: subscription finalizer (required=true, owner_task=P06, status=paused)
     messages:
       - $ref: '#/channels/llm_completed/messages/llm_completed'
     bindings:
@@ -448,7 +448,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/llm_failed'
-    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    summary: subscription finalizer (required=true, owner_task=P06, status=paused)
     messages:
       - $ref: '#/channels/llm_failed/messages/llm_failed'
     bindings:

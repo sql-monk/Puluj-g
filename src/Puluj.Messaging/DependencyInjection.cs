@@ -28,13 +28,10 @@ public static class DependencyInjection
             services.AddHostedService(sp => sp.GetRequiredService<ReconciliationService>());
         }
 
-        var consumed = new List<string>();
         if (roles.Contains(ArchiveRole))
         {
             services.AddSingleton<ArchiveHandler>();
-            services.AddSingleton(sp => ActivatorUtilities.CreateInstance<SubscriptionConsumer>(sp, sp.GetRequiredService<ArchiveHandler>(), ConsumerWorker(ArchiveHandler.Subscription, instanceName)));
-            services.AddHostedService(sp => sp.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ArchiveHandler.Subscription));
-            consumed.Add(ArchiveHandler.Subscription);
+            services.AddSubscriptionConsumer<ArchiveHandler>(instanceName);
         }
         if (roles.Contains(RawWriterRole))
         {
@@ -44,15 +41,28 @@ public static class DependencyInjection
                 handler.Producer = ConsumerWorker(RawWriterHandler.Subscription, instanceName);
                 return handler;
             });
-            services.AddSingleton(sp => ActivatorUtilities.CreateInstance<SubscriptionConsumer>(sp, sp.GetRequiredService<RawWriterHandler>(), ConsumerWorker(RawWriterHandler.Subscription, instanceName)));
-            services.AddHostedService(sp => sp.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == RawWriterHandler.Subscription));
-            consumed.Add(RawWriterHandler.Subscription);
+            services.AddSubscriptionConsumer<RawWriterHandler>(instanceName);
         }
-        if (consumed.Count > 0)
+        // One DLQ consumer per process for every subscription consumed here (the handlers registered so far and by
+        // other modules, e.g. the processing stages); resolved lazily, so registration order does not matter.
+        services.AddSingleton(sp => ActivatorUtilities.CreateInstance<DlqConsumer>(sp, (IReadOnlyList<string>)sp.GetServices<IDeliveryHandler>().Select(h => h.SubscriptionId).Distinct().ToList()));
+        services.AddHostedService(sp => sp.GetRequiredService<DlqConsumer>());
+        return services;
+    }
+
+    /// <summary>
+    /// A subscription consumer for <typeparamref name="THandler"/> (already registered as a singleton): exposes it as
+    /// <see cref="IDeliveryHandler"/> (DLQ coverage), one <see cref="SubscriptionConsumer"/> per subscription, hosted.
+    /// </summary>
+    public static IServiceCollection AddSubscriptionConsumer<THandler>(this IServiceCollection services, string? instanceName) where THandler : class, IDeliveryHandler
+    {
+        services.AddSingleton<IDeliveryHandler>(sp => sp.GetRequiredService<THandler>());
+        services.AddSingleton(sp =>
         {
-            services.AddSingleton(sp => ActivatorUtilities.CreateInstance<DlqConsumer>(sp, (IReadOnlyList<string>)consumed));
-            services.AddHostedService(sp => sp.GetRequiredService<DlqConsumer>());
-        }
+            var handler = sp.GetRequiredService<THandler>();
+            return ActivatorUtilities.CreateInstance<SubscriptionConsumer>(sp, (IDeliveryHandler)handler, ConsumerWorker(handler.SubscriptionId, instanceName));
+        });
+        services.AddHostedService(sp => sp.GetServices<SubscriptionConsumer>().Single(c => c.Handler is THandler));
         return services;
     }
 

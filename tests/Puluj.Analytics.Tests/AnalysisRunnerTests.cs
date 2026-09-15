@@ -100,8 +100,8 @@ public sealed class AnalysisRunnerTests : IAsyncLifetime
         var payload = channelId is null && forwardedFrom is null ? "{}" : $$"""{"channelId": {{(channelId?.ToString() ?? "null")}}, "forwardedFrom": {{(forwardedFrom is null ? "null" : $"\"{forwardedFrom}\"")}}}""";
         var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{source}|{key}|{text}")));
         await db.Database.ExecuteSqlAsync($"""
-            INSERT INTO raw_messages (source_id, source_message_id, published_at, received_at, raw_text, raw_payload, hash, processing_status, attempts)
-            VALUES ({source}, {key}, {publishedAt}, {DateTimeOffset.UtcNow.AddHours(-1)}, {text}, {payload}::jsonb, {hash}, 1, 1)
+            INSERT INTO raw_messages (source_id, source_message_id, source_message_key, source_revision, published_at, received_at, raw_text, raw_payload, hash, processing_status, attempts)
+            VALUES ({source}, {key}, {key}, '0', {publishedAt}, {DateTimeOffset.UtcNow.AddHours(-1)}, {text}, {payload}::jsonb, {hash}, 1, 1)
             """);
         return (await db.Database.SqlQuery<long>($"SELECT raw_message_id AS \"Value\" FROM raw_messages WHERE source_id = {source} AND source_message_id = {key}").ToListAsync()).Single();
     }

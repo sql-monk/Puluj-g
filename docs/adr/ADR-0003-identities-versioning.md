@@ -83,7 +83,7 @@
 | `topology_version` | Версія `topology.json`, що фіксує очікувані підписки на момент публікації. |
 | `pipeline_version` | Build identity producer (напр. `2026.09.15+6822541`); для порівняння результатів між збірками. |
 | `processing_run_id` / `generation_id` | ADR-0005. |
-| `payload.versions.{normalization,rules,ruleset_id,model,prompt,catalog_policy}` | Версії, що визначили результат; зберігаються в stage_results/extraction (P05/P06/P08). |
+| `payload.versions.{normalization,rules,ruleset_id,model,prompt,catalog_policy}` | Версії, що визначили результат; зберігаються в stage_results/extraction (P05/P06/P08). P05: `normalization` = `Normalizer.Version` (`norm-1`), `rules` = `RuleParser.Version` (`rule-0.1`), `ruleset_id` = `default`, `catalog_policy` = `EventKindIndex.PolicyVersion`; parser відхиляє `message.normalized` іншої `normalization_version` як transient (rolling deploy), а той самий version з іншим hash — як `failed{normalization_drift}`. |
 | `aggregate_revision` | Монотонна ревізія агрегату; client/projection ігнорує старіші. |
 | `fencing_token` | Монотонний токен lease на job (LLM); результат зі старим токеном відкидається (ADR-0004 W8). |
 

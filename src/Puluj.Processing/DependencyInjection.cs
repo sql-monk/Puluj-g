@@ -7,7 +7,9 @@ using Puluj.Processing.Indexes;
 using Puluj.Processing.Llm;
 using Puluj.Processing.Parsing;
 using Puluj.Processing.Pipeline;
+using Puluj.Processing.Stages;
 using Puluj.Processing.Structured;
+using Puluj.Messaging;
 using Puluj.Processing.Text;
 
 namespace Puluj.Processing;
@@ -22,18 +24,8 @@ public static class DependencyInjection
         services.AddSingleton(new ProcessorIdentity(instanceName ?? Environment.MachineName));
         services.AddSingleton<RawMessageClaims>();
         services.AddSingleton<ProcessingStats>();
-
-        services.AddSingleton<IndexProvider>();
-        services.AddSingleton<IIndexes>(sp => sp.GetRequiredService<IndexProvider>());
-        services.AddHostedService(sp => sp.GetRequiredService<IndexProvider>());
-
-        services.AddSingleton<INormalizer, Normalizer>();
-        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.Section));
-        services.AddSingleton(sp => new LlmBreaker(sp.GetRequiredService<IOptions<LlmOptions>>().Value.FailurePause));
-        services.AddSingleton<RuleParser>();
+        services.AddPulujParsing(configuration);
         services.AddSingleton<IParser, LlmParser>(); // rules first, model only as a fallback
-        services.AddSingleton<TargetBuilder>();
-        services.AddSingleton<AlertsInUaHandler>();
         services.AddSingleton<RawMessageProcessor>();
         services.AddHostedService<ProcessingLoop>();
 
@@ -43,4 +35,62 @@ public static class DependencyInjection
         services.AddHostedService<TrackWatchdog>();
         return services;
     }
+
+    /// <summary>Indexes, normalizer, rule parser, target builder, structured handler: what both the legacy processor and the stage workers need. Idempotent.</summary>
+    public static IServiceCollection AddPulujParsing(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (services.Any(d => d.ServiceType == typeof(IndexProvider)))
+        {
+            return services;
+        }
+        services.AddSingleton<IndexProvider>();
+        services.AddSingleton<IIndexes>(sp => sp.GetRequiredService<IndexProvider>());
+        services.AddHostedService(sp => sp.GetRequiredService<IndexProvider>());
+        services.AddSingleton<INormalizer, Normalizer>();
+        services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.Section));
+        services.AddSingleton(sp => new LlmBreaker(sp.GetRequiredService<IOptions<LlmOptions>>().Value.FailurePause));
+        services.AddSingleton<RuleParser>();
+        services.AddSingleton<TargetBuilder>();
+        services.AddSingleton<AlertsInUaHandler>();
+        return services;
+    }
+
+    /// <summary>
+    /// Stage workers of P05 as broker subscriptions (roles `normalizer`, `parser`): pure recognition with persisted stage
+    /// results, no domain writes. Requires <c>AddPulujMessaging</c> (broker runtime) in the same process; the legacy
+    /// processing loop is not started by this call.
+    /// </summary>
+    public static IServiceCollection AddPulujStages(this IServiceCollection services, IConfiguration configuration, IReadOnlySet<string> roles, string? instanceName = null)
+    {
+        services.AddPulujParsing(configuration);
+        services.AddSingleton<AlertsInUaStructuredAdapter>();
+        if (roles.Contains(StageRoles.Normalizer))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<NormalizerHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(NormalizerHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<NormalizerHandler>(instanceName);
+        }
+        if (roles.Contains(StageRoles.Parser))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<ParserHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(ParserHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<ParserHandler>(instanceName);
+        }
+        return services;
+    }
+}
+
+/// <summary>Worker role names of the stage subscriptions (WorkerOptions.Roles).</summary>
+public static class StageRoles
+{
+    public const string Normalizer = "normalizer";
+    public const string Parser = "parser";
 }

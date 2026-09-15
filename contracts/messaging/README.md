@@ -3,7 +3,8 @@
 Machine-readable частина ADR-0002…0005 ([`docs/adr/`](../../docs/adr/README.md)). Статус: **accepted** (P02 spike підтвердив topology на RabbitMQ 4.3;
 P03 runtime). `topology.json` **вбудовується** у `Puluj.Infrastructure` як embedded resource (`Puluj.Infrastructure.csproj`), тож runtime
 (`TopologyRegistry`, `TopologyRegistrar`, `TopologyDeclarer`) читає той самий файл, що й контрактні тести; `tests/Puluj.Messaging.Tests`
-перевіряє, що embedded копія збігається з файлом. Поточна версія — **3** (P03: `archive` → `active`; P04: `raw-writer` → `active`). Зміни — лише разом із тестами
+перевіряє, що embedded копія збігається з файлом. Поточна версія — **4** (P03: `archive` → `active`; P04: `raw-writer`; P05: `normalizer`, `parser` →
+`active`, `finalizer`/`llm-worker` → `paused` до P06). Зміни — лише разом із тестами
 `tests/Puluj.Messaging.Contracts.Tests` і, за потреби, новим `topology_version`.
 
 | Файл | Що це |
@@ -57,6 +58,30 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
   `checkpoint`; raw-writer відповідає `raw.stored{is_new}` з `causation_id` = id ingress-події.
 - Consumer перевіряє `event_type` за registry і `schema_version` MAJOR = supported (`compatibility.json`, `major_equal`); невідповідність →
   `processing.quarantine` без retries. Повна JSON-Schema валідація — лише в тестах (`tests/Puluj.Messaging.Tests/Unit`).
+
+## Runtime (P05): стадії normalizer і parser
+
+- `message.normalized` (`NormalizerHandler`): `text_kind` `text | structured | empty`; `structured_kind` = `alerts_in_ua.alert.started|finished`;
+  `normalization_version` = `norm-1`; `normalized_text_hash` = SHA-256 нормалізованого тексту. Стадія `normalize` у `processing.stage_results`.
+- `parse.completed` (`ParserHandler`, лише правила/структурований adapter, без LLM): `attempt_id` — UUIDv7 спроби парсингу (не `processing.attempts.attempt_id`,
+  який bigint; зв'язок — `stage_results.outputs.attempt_id` і `attempts.stage_result_id`); `method` `rules | structured | none`; `versions`
+  {normalization, rules, ruleset_id, catalog_policy}; `facts[]`: `event_kind_code` за `EventKindLegacyMap`, `category` з каталогу `event_kinds`,
+  `effective_at`, `location` {kind, place_id, geometry Point, accuracy_km, text}, `confidence`, `evidence` {segment_index, span, rule_id = join(rules),
+  rule_version, rules[]; для structured — structured_field: "alert"}, `attributes` — **усі** поля legacy `Target` (legacy_event_type, identification_*,
+  parser_version, segment_*, language, alert_level, target_*_id, model/classification_confidence, object_count[_is_approximate], location_*, origin/destination_place_id,
+  direction_*, confidence, event_kind_id, parser_metadata; для правил ще hedged, is_launch, places[]) — щоб fact writer (P06) відтворив рядок `targets`
+  без втрат (parity з legacy перевіряє `StageTests.S08`). Outcomes: `facts`, `no_facts` (+`fallback_reason` `llm_disabled|llm_skipped_lane|llm_skipped_stale`),
+  `unsupported` (`empty`), `needs_llm` (+ команда `llm.requested`), `failed{error.code=normalization_drift}`.
+- Structured adapter не читає і не пише `air_alerts`: факт `alert.air_raid.started|ended` несе `parser_metadata.startedAt/finishedAt/sourceAlertId` для alert worker (P09);
+  нерозв'язане місце → `location {kind: unknown, text: <title з feed>}` без вигаданого place_id.
+- Семантика полів: `evidence.span` — відносно `segment_text` і завжди покриває весь сегмент (позиція в `normalized_text` — не зберігається);
+  `hedged`/`is_launch`/`places[]` є лише у rules-фактах (відсутність = false/порожньо для fact writer); `llm.requested` і `parse.completed{needs_llm}` —
+  sibling-події з тим самим `causation_id` (вхідний `message.normalized`), зв'язок між ними — `rules_context.attempt_id`; `message.normalized` іншої
+  `normalization_version` парсер відхиляє як transient (після ліміту спроб — quarantine `attempts_exhausted`, причина в `error`), той самий version з іншим
+  hash → `parse.completed{failed, error.code=normalization_drift}`; `failed`-стадія не блокує повтор — наступна коректна доставка того самого raw/run
+  переписує її (successful стадії лишаються ідемпотентними).
+- Shadow-режим: стадії працюють поруч із legacy `ProcessingLoop` (той далі пише `targets`/`air_alerts`/`ProcessingStatus`); `parse.completed`/`llm.requested`
+  чекають у paused-чергах finalizer/llm-worker до P06.
 
 ## Правила сумісності
 

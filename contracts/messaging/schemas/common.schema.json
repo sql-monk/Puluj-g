@@ -32,7 +32,9 @@
         "rule_version": { "type": "string" },
         "model": { "type": "string" },
         "prompt_version": { "type": "string" },
-        "structured_field": { "type": "string" }
+        "structured_field": { "type": "string" },
+        "segment_index": { "type": "integer", "minimum": 0, "description": "Сегмент нормалізованого тексту, з якого факт (P05)" },
+        "rules": { "type": "array", "items": { "type": "string" }, "description": "Правила, що спрацювали (P05); rule_id — їх join" }
       }
     },
     "observation": {

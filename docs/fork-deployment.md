@@ -43,3 +43,10 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 нові колонки без default, старий writer падає на NOT NULL (гучно, `collector_states.last_error`), а не губить пости. Відкат поведінки: `MESSAGING_INGRESS_ENABLED=false`
 (collectors знову пишуть raw напряму; bridge `MESSAGING_OUTBOX_ENABLED` — окремий fallback). Зміна `topology.json` без bump `topology_version`
 зупиняє ingest/migrate — це навмисно (ADR-0002).
+
+### Стадії normalizer/parser (P05)
+
+Воркер `messaging` (профіль `broker`) з ролями `normalizer,parser` виконує `raw.stored` → `message.normalized` → `parse.completed`/`llm.requested` і
+пише `processing.stage_results`; `targets`/`air_alerts`/`processing_status` далі пише legacy `processor` (shadow-режим до cutover). Черги `finalizer`
+і `llm-worker` існують (paused, P06) і накопичують backlog — reconciliation показує їх як overdue; це очікувано до P06. Вимкнення стадій — прибрати
+ролі з `Worker__Roles` сервісу `messaging` (черги лишаються, backlog чекає).

@@ -50,6 +50,10 @@ var brokerRoles = roles.Intersect(WorkerOptions.BrokerRoles).ToHashSet();
 if (brokerRoles.Count > 0 && messaging.Enabled)
 {
     builder.Services.AddPulujMessaging(brokerRoles, worker.InstanceName);
+    if (brokerRoles.Overlaps([WorkerOptions.Normalizer, WorkerOptions.Parser]))
+    {
+        builder.Services.AddPulujStages(builder.Configuration, brokerRoles, worker.InstanceName); // P05 stage workers (no legacy loop)
+    }
 }
 var collectors = new List<string>();
 if (roles.Contains(WorkerOptions.Telegram))

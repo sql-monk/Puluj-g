@@ -18,10 +18,14 @@ public sealed class WorkerOptions
     public const string Archive = "archive";
     /// <summary>Raw-writer subscription (P04): stores `ingress.received` as raw_messages; needs Messaging:Enabled and a broker.</summary>
     public const string RawWriter = "raw-writer";
+    /// <summary>Normalizer stage subscription (P05): `raw.stored` → `message.normalized`.</summary>
+    public const string Normalizer = "normalizer";
+    /// <summary>Rules/structured parser stage subscription (P05): `message.normalized` → `parse.completed` / `llm.requested`.</summary>
+    public const string Parser = "parser";
 
-    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter];
+    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser];
     /// <summary>Roles that talk to the broker: skipped with a warning unless Messaging:Enabled (a plain local run has no RabbitMQ).</summary>
-    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter];
+    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser];
 
     /// <summary>Instance name for the heartbeat, logs, telemetry and claims (`worker`, `processor`, `collector-telegram`…); see <see cref="InstanceName"/>.</summary>
     public string Name { get; set; } = "worker";

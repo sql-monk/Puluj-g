@@ -27,17 +27,19 @@ public sealed class AlertsInUaHandler(IIndexes indexes, INormalizer normalizer, 
         && raw.RawPayload.RootElement.TryGetProperty("kind", out var k)
         && k.GetString() is "alert.started" or "alert.finished";
 
-    public async Task<List<Target>> HandleAsync(PulujDbContext db, RawMessage raw, Source source, CancellationToken ct)
+    /// <summary>What the feed says about one alert, as the collector wrapped it (`{kind, at, alert{…}}`); no place resolution yet.</summary>
+    public sealed record AlertPayload(string Kind, string SourceAlertId, string Title, string Oblast, string? Raion, string LocationType, string? AlertTypeText, AirAlertType AlertType, string? LevelText, AirAlertLevel Level, DateTimeOffset At, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt)
     {
-        var root = raw.RawPayload!.RootElement;
+        public bool IsStart => Kind == "alert.started";
+    }
+
+    public static AlertPayload ParsePayload(JsonElement root, DateTimeOffset fallbackAt)
+    {
         var kind = root.GetProperty("kind").GetString()!;
         var alert = root.GetProperty("alert");
-        var sourceAlertId = alert.GetProperty("id").ToString();
         var title = Str(alert, "location_title") ?? "";
-        var oblast = Str(alert, "location_oblast") ?? title;
-        var raion = Str(alert, "location_raion");
-        var locationType = Str(alert, "location_type") ?? "oblast";
-        var alertType = Str(alert, "alert_type") switch
+        var alertTypeText = Str(alert, "alert_type");
+        var alertType = alertTypeText switch
         {
             "air_raid" => AirAlertType.AirRaid,
             "artillery_shelling" => AirAlertType.ArtilleryShelling,
@@ -47,15 +49,30 @@ public sealed class AlertsInUaHandler(IIndexes indexes, INormalizer normalizer, 
             _ => AirAlertType.Unknown,
         };
         // The feed carries the administration's level where one is published (yellow = drones, red = missiles).
-        var level = Str(alert, "alert_level")?.ToLowerInvariant() switch
+        var levelText = Str(alert, "alert_level");
+        var level = levelText?.ToLowerInvariant() switch
         {
             "yellow" => AirAlertLevel.Yellow,
             "red" => AirAlertLevel.Red,
             _ => AirAlertLevel.Unknown,
         };
-        var at = root.TryGetProperty("at", out var atEl) && DateTimeOffset.TryParse(atEl.GetString(), out var parsed) ? parsed : raw.PublishedAt;
+        var at = root.TryGetProperty("at", out var atEl) && DateTimeOffset.TryParse(atEl.GetString(), out var parsed) ? parsed : fallbackAt;
+        var startedAt = DateTimeOffset.TryParse(Str(alert, "started_at"), out var s) ? s : at;
+        var finishedAt = DateTimeOffset.TryParse(Str(alert, "finished_at"), out var f) ? f : (DateTimeOffset?)null;
+        return new AlertPayload(kind, alert.GetProperty("id").ToString(), title, Str(alert, "location_oblast") ?? title, Str(alert, "location_raion"),
+            Str(alert, "location_type") ?? "oblast", alertTypeText, alertType, levelText, level, at, startedAt, finishedAt);
+    }
 
-        var place = Resolve(locationType, title, raion, oblast);
+    public async Task<List<Target>> HandleAsync(PulujDbContext db, RawMessage raw, Source source, CancellationToken ct)
+    {
+        var payload = ParsePayload(raw.RawPayload!.RootElement, raw.PublishedAt);
+        var (kind, sourceAlertId, title, oblast, raion, locationType) = (payload.Kind, payload.SourceAlertId, payload.Title, payload.Oblast, payload.Raion, payload.LocationType);
+        var alertType = payload.AlertType;
+        var level = payload.Level;
+        var at = payload.At;
+        var alert = raw.RawPayload.RootElement.GetProperty("alert");
+
+        var place = ResolvePlace(locationType, title, raion, oblast);
         if (place is null)
         {
             logger.LogWarning("alerts.in.ua: unknown location '{Title}' ({Type}) / '{Oblast}'", title, locationType, oblast);
@@ -66,10 +83,10 @@ public sealed class AlertsInUaHandler(IIndexes indexes, INormalizer normalizer, 
         }
 
         var existing = await db.AirAlerts.FirstOrDefaultAsync(a => a.SourceId == source.SourceId && a.SourceAlertId == sourceAlertId, ct);
-        var startedAt = DateTimeOffset.TryParse(Str(alert, "started_at"), out var s) ? s : at;
+        var startedAt = payload.StartedAt;
         // A history load carries the whole alert in the start message too: store it closed straight away, so an old
         // alert never shows up open on the map for the seconds between its start and end being processed.
-        var finishedAt = DateTimeOffset.TryParse(Str(alert, "finished_at"), out var f) ? f : (DateTimeOffset?)null;
+        var finishedAt = payload.FinishedAt;
         if (kind == "alert.started")
         {
             if (existing is null && place is not null)
@@ -154,7 +171,7 @@ public sealed class AlertsInUaHandler(IIndexes indexes, INormalizer normalizer, 
         return [obs];
     }
 
-    private static PlaceLevel? LevelOf(string locationType) => locationType switch
+    public static PlaceLevel? LevelOf(string locationType) => locationType switch
     {
         "oblast" => PlaceLevel.Region,
         "raion" => PlaceLevel.District,
@@ -166,7 +183,7 @@ public sealed class AlertsInUaHandler(IIndexes indexes, INormalizer normalizer, 
     /// From the most precise level the feed names down to the oblast: hromada → raion → oblast, city → its hromada
     /// polygon (the settlement lies inside it) → the settlement itself → oblast.
     /// </summary>
-    private PlaceEntry? Resolve(string locationType, string title, string? raion, string oblast)
+    public PlaceEntry? ResolvePlace(string locationType, string title, string? raion, string oblast)
     {
         var gazetteer = indexes.Gazetteer;
         var region = ResolveRegion(oblast) ?? ResolveRegion(title);

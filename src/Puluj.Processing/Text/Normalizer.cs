@@ -14,6 +14,9 @@ public interface INormalizer
 /// </summary>
 public sealed partial class Normalizer : INormalizer
 {
+    /// <summary>`normalization_version` of the contracts (ADR-0003): bump when the output of <see cref="Normalize"/> changes.</summary>
+    public const string Version = "norm-1";
+
     private static readonly Dictionary<string, string> EmojiWords = new()
     {
         ["🛵"] = "шахед",

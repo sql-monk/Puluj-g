@@ -27,6 +27,9 @@ public sealed record DeliveryResult(string Outcome, string? Reason = null, IRead
 
     /// <summary>Best-effort side effect after the commit and before the ACK (a NOTIFY, a metric); a failure is logged, never retried — the effect is already durable.</summary>
     public Func<CancellationToken, Task>? AfterCommit { get; init; }
+
+    /// <summary>`processing.stage_results.stage_result_id` written by this delivery, linked from the attempt row (ADR-0006).</summary>
+    public long? StageResultId { get; init; }
 }
 
 /// <summary>The delivery cannot succeed however often it is retried: invalid payload, unknown reference — straight to quarantine.</summary>

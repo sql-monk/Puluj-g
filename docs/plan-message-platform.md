@@ -206,7 +206,7 @@ flowchart TD
 | Collectors | API/історія/live джерел | `ingress.received` | За джерелом/акаунтом, з дотриманням лімітів і ownership сесії |
 | Raw writer | `ingress.received` | `raw_messages`, provenance, `raw.stored` | Паралельно, unique key повідомлення/редакції |
 | Normalizer | `raw.stored` | Версію нормалізації, `message.normalized` | За повідомленням, без спільного store lock |
-| Rules/structured parser | `message.normalized` | Parse attempt; `parse.completed` або `llm.requested` | CPU workers; structured adapter не змінює alerts |
+| Rules/structured parser | `message.normalized` | Parse attempt; `parse.completed` (для fallback — `needs_llm` **разом із** командою `llm.requested`, ADR-0005) | CPU workers; structured adapter не змінює alerts |
 | LLM worker | `llm.requested` | Request audit, `llm.completed/failed` | Окремі concurrency, timeout, provider/account rate limit і бюджет |
 | Extraction finalizer / fact writer | `parse.completed`, `llm.completed/failed` | Канонічний extraction result, факти, `observations.recorded`, `message.analysis.completed` | Один запис результату на message/run/version |
 | Track worker | Цільові observations | Tracks, links, revisions; `track.changed` | За доведеними межами конфліктів |
@@ -862,7 +862,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P02 | done | p02 (Claude Code) | p02_review: approved | [GitHub P02](https://github.com/sql-monk/Puluj-g/issues/2); [handoff, crash evidence, metrics](evidence/message-platform/P02-handoff.md); рішення **go**, ADR-0001/0002 accepted; локальні зміни, commit не виконувався |
 | P03 | done | Claude Code (p03) | p03_review: approve after fixes → виправлено → re-run зелений | [GitHub P03](https://github.com/sql-monk/Puluj-g/issues/4); [handoff, crash evidence](evidence/message-platform/P03-handoff.md); схеми `messaging`/`processing`, `Puluj.Messaging`, bridge під flag; ADR-0004/0006 accepted; локальні зміни, commit не виконувався |
 | P04 | done | Claude Code (p04) | p04_review: approve after fixes → виправлено → re-run зелений | [GitHub P04](https://github.com/sql-monk/Puluj-g/issues/5); [handoff, crash evidence](evidence/message-platform/P04-handoff.md); identity міграція, `IngressWriter`/`CollectorIngress`, raw-writer (topology v3), ADR-0003 accepted; закомічено |
-| P05 | planned | — | — | [GitHub P05](https://github.com/sql-monk/Puluj-g/issues/6); — |
+| P05 | done | Claude Code (p05) | p05_review: approve after fixes → виправлено → re-run зелений | [GitHub P05](https://github.com/sql-monk/Puluj-g/issues/6); [handoff, evidence](evidence/message-platform/P05-handoff.md); normalizer/parser стадії (topology v4), `stage_results`, pure structured adapter; shadow поруч із legacy loop; закомічено |
 | P06 | planned | — | — | [GitHub P06](https://github.com/sql-monk/Puluj-g/issues/8); — |
 | P07 | done | Claude Code (p07) | p07_review: approved | [GitHub P07](https://github.com/sql-monk/Puluj-g/issues/7); [handoff, tests, backfill report](evidence/message-platform/P07-handoff.md); ADR-0008; локальні зміни, commit не виконувався |
 | P08 | planned | — | — | [GitHub P08](https://github.com/sql-monk/Puluj-g/issues/9); — |

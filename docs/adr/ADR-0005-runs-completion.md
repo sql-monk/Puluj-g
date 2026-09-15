@@ -2,7 +2,8 @@
 
 Статус: **proposed** (P01); частково реалізовано P03 — receipts `processing.deliveries` з terminal `completed/noop/quarantined/waived`
 (`SubscriptionConsumer`, `DlqConsumer`, `SubscriptionAdmin.WaiveAsync`) і мінімальні `processing.runs` (один відкритий run на lane
-`live`/`history`, `ProcessingRuns`). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
+`live`/`history`, `ProcessingRuns`); P05 — стадії `normalize`/`parse` у `processing.stage_results` (unique `(raw, run, stage, stage_version)`,
+повтор → `noop`) і outcomes parser'а `facts | no_facts | unsupported | needs_llm | failed` у `parse.completed`. Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
 Вимоги: plan §4, §5.2, §11, §15.1 «Completion semantics», §15.2. Orchestration/generations/state machine — P14.
 
 ## Контекст
@@ -46,6 +47,13 @@ replay lane у projection).
 публікується для **кожного**. `observations.recorded` — лише для `completed`. Finalizer state machine:
 `rules sufficient → completed`; `fallback required → awaiting_llm → completed | failed | needs_review`;
 проміжні результати — `processing.attempts`, пізній LLM результат — за `fencing_token` (ADR-0004 W8).
+
+**Fallback (P05):** коли правила нічого не знайшли, а текст схожий на звіт про ціль (`LlmParser.LooksLikeTargetReport`), модель увімкнена,
+lane `live` і пост свіжий (`Llm:MaxMessageAgeHours`), parser публікує **обидві** події: факт спроби `parse.completed{outcome: needs_llm,
+fallback_reason}` (finalizer бачить, що правила відпрацювали, і переходить у `awaiting_llm`) і команду `llm.requested` (`request_id`,
+`fencing_token: 1`, `deadline_at`, `input.normalized_text_hash`, `rules_context.attempt_id`). Інакше — `no_facts` з `fallback_reason`
+`llm_disabled | llm_skipped_lane | llm_skipped_stale` (або без причини, якщо текст не схожий на звіт). Формулювання §4 «parse.completed або
+llm.requested» читається як «команда додатково до факту спроби». Lease/attempt LLM-job створює llm-worker (P06).
 
 ### Completion manifest
 
@@ -100,5 +108,5 @@ stale revision) — receipt обов'язковий; `quarantined` — retries �
 | Питання | Задача |
 |---|---|
 | Checkpoint format, pause/cancel, delta catchup до watermark, promote/rollback, partial replay scope | P14 |
-| Точний mapping `ProcessingStatus` ⇔ workflow stages | P05 |
+| Точний mapping `ProcessingStatus` ⇔ workflow stages — P05 не змінює `ProcessingStatus` (його далі пише legacy `ProcessingLoop`; стадії P05 працюють поруч у shadow-режимі і пишуть лише `stage_results`/outbox); stage `analyzed` з'явиться з finalizer'ом | P06 (analyzed) / P14–P16 (cutover) |
 | Правила conservative merge при promote generation для incidents/tracks з контекстом поза інтервалом | P14 + P09/P10 |

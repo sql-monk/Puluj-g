@@ -1,0 +1,116 @@
+{
+  "event_id": "019957a0-0004-7000-8000-000000000181",
+  "event_type": "parse.completed",
+  "schema_version": "1.0",
+  "producer": "parser",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": "019957a0-0003-7000-8000-000000000180",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90204-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 4,
+  "lane": "live",
+  "source_id": 3,
+  "source_message_key": "48213",
+  "source_revision": "0",
+  "raw_message_id": 4716,
+  "payload": {
+    "raw_message_id": 4716,
+    "attempt_id": "019957a0-0400-7000-8000-000000000581",
+    "outcome": "facts",
+    "method": "rules",
+    "versions": {
+      "normalization": "norm-1",
+      "rules": "rule-0.1",
+      "ruleset_id": "default",
+      "catalog_policy": "1"
+    },
+    "facts": [
+      {
+        "event_kind_code": "target.observed",
+        "category": "target",
+        "effective_at": "2026-09-15T09:59:40Z",
+        "location": {
+          "kind": "region",
+          "place_id": 101,
+          "accuracy_km": 80
+        },
+        "confidence": "medium",
+        "evidence": {
+          "segment_index": 1,
+          "span": {
+            "start": 0,
+            "end": 12
+          },
+          "rule_id": "target+place",
+          "rule_version": "rule-0.1",
+          "rules": [
+            "target",
+            "place"
+          ]
+        },
+        "attributes": {
+          "legacy_event_type": "TargetObserved",
+          "identification_method": "Rule",
+          "target_category_id": 1,
+          "target_class_id": 3,
+          "object_count": 2,
+          "object_count_is_approximate": false,
+          "location_kind": "region",
+          "location_place_id": 101,
+          "direction_kind": "Unknown",
+          "confidence": "medium",
+          "parser_version": "rule-0.1",
+          "segment_index": 1,
+          "segment_text": "Шахеди: Суми",
+          "language": "uk"
+        }
+      },
+      {
+        "event_kind_code": "target.observed",
+        "category": "target",
+        "effective_at": "2026-09-15T09:59:40Z",
+        "location": {
+          "kind": "city",
+          "place_id": 1201,
+          "accuracy_km": 5
+        },
+        "confidence": "medium",
+        "evidence": {
+          "segment_index": 2,
+          "span": {
+            "start": 0,
+            "end": 12
+          },
+          "rule_id": "target+place",
+          "rule_version": "rule-0.1",
+          "rules": [
+            "target",
+            "place"
+          ]
+        },
+        "attributes": {
+          "legacy_event_type": "TargetObserved",
+          "identification_method": "Rule",
+          "target_category_id": 2,
+          "target_class_id": 7,
+          "object_count": 1,
+          "object_count_is_approximate": false,
+          "location_kind": "city",
+          "location_place_id": 1201,
+          "direction_kind": "TowardsPlace",
+          "confidence": "medium",
+          "parser_version": "rule-0.1",
+          "segment_index": 2,
+          "segment_text": "Ракета на Київ",
+          "language": "uk",
+          "direction_deg": 310.5,
+          "destination_place_id": 1201
+        }
+      }
+    ],
+    "duration_ms": 21
+  }
+}

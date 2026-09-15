@@ -1,0 +1,34 @@
+{
+  "event_id": "019957a0-0004-7000-8000-000000000161",
+  "event_type": "parse.completed",
+  "schema_version": "1.0",
+  "producer": "parser",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": "019957a0-0003-7000-8000-000000000141",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90204-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 4,
+  "lane": "live",
+  "source_id": 3,
+  "source_message_key": "48213",
+  "source_revision": "0",
+  "raw_message_id": 4713,
+  "payload": {
+    "raw_message_id": 4713,
+    "attempt_id": "019957a0-0400-7000-8000-000000000561",
+    "outcome": "unsupported",
+    "method": "none",
+    "versions": {
+      "normalization": "norm-1",
+      "rules": "rule-0.1",
+      "ruleset_id": "default",
+      "catalog_policy": "1"
+    },
+    "facts": [],
+    "fallback_reason": "no_text_no_payload",
+    "duration_ms": 1
+  }
+}

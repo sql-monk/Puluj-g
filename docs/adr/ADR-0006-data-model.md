@@ -113,7 +113,12 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
 - `processing.runs`: partial unique `(lane) WHERE state = 'running' AND kind IN ('live','history')` — один відкритий run на lane (P14 знімає для replay).
 - `processing.generations`: partial unique `(is_active) WHERE is_active`; рядки з'являться в P14.
 - `processing.attempts`: `job_key = "{subscription_id}:{event_id}"`, `fencing_token` = 0 до P06, `retry_of_attempt_id`/`retry_reason='admin_retry'`
-  після retry з quarantine, `state` ∈ `running | succeeded | failed | interrupted | superseded`; індекси `(subscription_id, event_id)`, `(job_key, fencing_token)`.
+  після retry з quarantine, `state` ∈ `running | succeeded | failed | interrupted | superseded`; індекси `(subscription_id, event_id)`, `(job_key, fencing_token)`;
+  з P05 `stage_result_id` заповнює consumer, коли handler повертає `DeliveryResult.StageResultId`.
+- `processing.stage_results` (writers з P05: `normalize` — `NormalizerHandler`, `parse` — `ParserHandler`): `stage_version` = `Normalizer.Version` /
+  `RuleParser.Version` / `AlertsInUaStructuredAdapter.Version` / `empty`; `outputs` jsonb (text_kind, hash, outcome, facts_count, attempt_id (uuid спроби
+  парсингу з `parse.completed`), event ids), `versions` jsonb; insert `ON CONFLICT DO NOTHING` — повтор того самого raw/run/stage → `noop` без другої події.
+  `ReprocessService.ResetAsync` (legacy) стадій не чіпає; replay (P14) — інший run.
 - `processing.deliveries`: PK `(event_id, subscription_id)`; expected рядок = `outcome IS NULL`; partial index `(expected_at) WHERE outcome IS NULL`;
   `completed` ніколи не понижується (upsert лише з `NULL`/`quarantined`).
 - `processing.quarantine`: partial unique `(subscription_id, event_id) WHERE resolved_at IS NULL`; зберігає **повний envelope + headers** —

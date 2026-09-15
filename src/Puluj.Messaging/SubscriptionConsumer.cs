@@ -58,6 +58,7 @@ public sealed class SubscriptionConsumer : BackgroundService
     }
 
     public string SubscriptionId => _handler.SubscriptionId;
+    public IDeliveryHandler Handler => _handler;
     public TopologyRegistry Registry => _registrar.Registry;
     /// <summary>Crash points (tests); replaced per test.</summary>
     public ConsumerHooks Hooks { get; set; } = ConsumerHooks.None;
@@ -214,7 +215,7 @@ public sealed class SubscriptionConsumer : BackgroundService
                     {
                         await _outbox.EnqueueAsync(conn, tx, outgoing, ct);
                     }
-                    await FinishAttemptAsync(conn, tx, attemptId, "succeeded", null, ct);
+                    await FinishAttemptAsync(conn, tx, attemptId, "succeeded", null, ct, result.StageResultId);
                     await tx.CommitAsync(ct);
                     _metrics.Delivered(SubscriptionId, result.Outcome);
                     if (result.AfterCommit is not null)
@@ -476,11 +477,12 @@ public sealed class SubscriptionConsumer : BackgroundService
         return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }
 
-    private static async Task FinishAttemptAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, long attemptId, string state, string? error, CancellationToken ct)
+    private static async Task FinishAttemptAsync(NpgsqlConnection conn, NpgsqlTransaction? tx, long attemptId, string state, string? error, CancellationToken ct, long? stageResultId = null)
     {
-        await using var cmd = new NpgsqlCommand("UPDATE processing.attempts SET state = @state, error = @error, finished_at = now() WHERE attempt_id = @id", conn, tx);
+        await using var cmd = new NpgsqlCommand("UPDATE processing.attempts SET state = @state, error = @error, finished_at = now(), stage_result_id = COALESCE(@stage, stage_result_id) WHERE attempt_id = @id", conn, tx);
         cmd.Parameters.AddWithValue("state", state);
         cmd.Parameters.AddWithValue("error", (object?)(error is { Length: > 4000 } ? error[..4000] : error) ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("stage", (object?)stageResultId ?? DBNull.Value);
         cmd.Parameters.AddWithValue("id", attemptId);
         await cmd.ExecuteNonQueryAsync(ct);
     }

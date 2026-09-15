@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(3, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 (P03): archive; v3 (P04): raw-writer
+        Assert.Equal(4, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser (+ finalizer/llm-worker paused)
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -101,8 +101,15 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             }
             Assert.All(ContractFiles.Strings(subscription["lanes"]), lane => Assert.Contains(lane, lanes));
             Assert.Matches("^P[0-9]{2}$", subscription["owner_task"]!.GetValue<string>());
-            // P03 активував archive, P04 — raw-writer (runtime реалізовано); решта — planned до своїх задач.
-            Assert.Equal(subscriptionId is "archive" or "raw-writer" ? "active" : "planned", subscription["status"]!.GetValue<string>());
+            // P03 archive, P04 raw-writer, P05 normalizer/parser — active (runtime реалізовано); finalizer/llm-worker — paused
+            // (черги для parse.completed/llm.requested існують до P06); решта — planned до своїх задач.
+            var expectedStatus = subscriptionId switch
+            {
+                "archive" or "raw-writer" or "normalizer" or "parser" => "active",
+                "finalizer" or "llm-worker" => "paused",
+                _ => "planned",
+            };
+            Assert.Equal(expectedStatus, subscription["status"]!.GetValue<string>());
         }
     }
 

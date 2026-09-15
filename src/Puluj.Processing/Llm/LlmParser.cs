@@ -191,7 +191,8 @@ public sealed class LlmParser : IParser
         return ex.Message;
     }
 
-    private static bool LooksLikeTargetReport(NormalizedMessage message) =>
+    /// <summary>Heuristic behind the LLM fallback: the text mentions something that reads like a target report even though the rules found nothing.</summary>
+    internal static bool LooksLikeTargetReport(NormalizedMessage message) =>
         message.Segments.SelectMany(s => s.Tokens).Any(t => TriggerStems.Any(stem => t.Text.StartsWith(stem, StringComparison.Ordinal)));
 
     private async Task<LlmAnswer> AskAsync(string text, CancellationToken ct)

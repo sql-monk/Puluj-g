@@ -8,6 +8,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Puluj.Messaging\Puluj.Messaging.csproj" />
     <ProjectReference Include="..\..\src\Puluj.Collectors\Puluj.Collectors.csproj" />
+    <ProjectReference Include="..\..\src\Puluj.Processing\Puluj.Processing.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
@@ -23,6 +24,7 @@
     <Content Include="..\..\contracts\messaging\fixtures\identity-cases.json" Link="contracts\messaging\fixtures\identity-cases.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\contracts\messaging\fixtures\valid\raw.stored.json" Link="contracts\messaging\fixtures\valid\raw.stored.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\contracts\messaging\fixtures\valid\ingress.received.json" Link="contracts\messaging\fixtures\valid\ingress.received.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\contracts\messaging\fixtures\valid\parse.completed.json" Link="contracts\messaging\fixtures\valid\parse.completed.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\contracts\messaging\topology.json" Link="contracts\messaging\topology.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

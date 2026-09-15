@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(3, Registry.TopologyVersion);
+        Assert.Equal(4, Registry.TopologyVersion);
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -33,14 +33,17 @@ public sealed class TopologyRegistryTests
     [Fact]
     public void Expected_set_is_required_active_or_paused_and_serving_the_lane()
     {
-        // topology.json v3: archive and raw-writer are active, normalizer and message-analytics still planned → only archive is expected.
+        // topology.json v4: archive, raw-writer, normalizer, parser active; message-analytics still planned → normalizer + archive are expected.
         var expected = Registry.ExpectedSubscriptions("raw.stored", "live");
-        Assert.Equal(["archive"], expected.Select(s => s.Id));
+        Assert.Equal(["normalizer", "archive"], expected.Select(s => s.Id));
+        Assert.Equal(["parser"], Registry.ExpectedSubscriptions("message.normalized", "live").Select(s => s.Id));
+        Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // paused = still interested (P06)
+        Assert.Equal(["llm-worker"], Registry.ExpectedSubscriptions("llm.requested", "live").Select(s => s.Id));
         Assert.Equal(["raw-writer", "archive"], Registry.ExpectedSubscriptions("ingress.received", "history").Select(s => s.Id));
 
         // Database-owned status wins over the file: a paused required consumer stays interested, a planned one activated later joins.
-        var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "active" };
-        Assert.Equal(["normalizer", "archive"], Registry.ExpectedSubscriptions("raw.stored", "live", overrides).Select(s => s.Id));
+        var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "retired", ["message-analytics"] = "active" };
+        Assert.Equal(["message-analytics", "archive"], Registry.ExpectedSubscriptions("raw.stored", "live", overrides).Select(s => s.Id));
 
         // Lanes: projection has no replay lane, so it is never expected for a replay-lane track.changed.
         var projectionActive = new Dictionary<string, string> { ["projection"] = "active" };
@@ -48,7 +51,7 @@ public sealed class TopologyRegistryTests
         Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("track.changed", "replay", projectionActive).Select(s => s.Id));
 
         // Retired/planned are not expected.
-        Assert.Empty(Registry.ExpectedSubscriptions("raw.stored", "live", new Dictionary<string, string> { ["archive"] = "retired" }));
+        Assert.Empty(Registry.ExpectedSubscriptions("raw.stored", "live", new Dictionary<string, string> { ["archive"] = "retired", ["normalizer"] = "retired" }));
         Assert.Throws<KeyNotFoundException>(() => Registry.ExpectedSubscriptions("no.such.event", "live"));
     }
 

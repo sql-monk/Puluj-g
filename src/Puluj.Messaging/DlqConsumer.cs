@@ -34,6 +34,11 @@ public sealed class DlqConsumer(
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         var registry = registrar.Registry;
+        if (subscriptionIds.Count == 0)
+        {
+            logger.LogInformation("DLQ consumer idle: no subscription consumed in this process");
+            return;
+        }
         while (!ct.IsCancellationRequested)
         {
             try

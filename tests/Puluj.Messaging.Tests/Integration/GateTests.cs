@@ -97,8 +97,7 @@ public sealed class GateTests(MessagingFixture f)
         await f.ExecAsync("INSERT INTO processing.quarantine (subscription_id, event_id, lane, reason, envelope, quarantined_at) VALUES ('archive', @e, 'live', 'invalid_payload', '{}'::jsonb, now())", ("e", Guid.CreateVersion7()));
         await Task.Delay(1100);
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: true);
-        Assert.Single(report.OverdueDeliveries);
-        Assert.Equal("archive", report.OverdueDeliveries[0].SubscriptionId);
+        Assert.Equal(["archive", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order()); // active subscriptions of raw.stored (v4)
         Assert.Equal(["ghost-subscription"], report.UnknownSubscriptions);
         Assert.Equal(1, report.QuarantineOpen);
         Assert.Equal(1, report.OutboxUnconfirmed);

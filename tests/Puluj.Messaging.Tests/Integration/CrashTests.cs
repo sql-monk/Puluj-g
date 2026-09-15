@@ -32,7 +32,8 @@ public sealed class CrashTests(MessagingFixture f)
         var eventId = Guid.Parse(parts[0]);
         Assert.Equal(1, await f.CountAsync("raw_messages"));
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND subscription_id = 'archive'"));
-        Assert.Equal(0, await f.CountAsync("processing.deliveries", "subscription_id <> 'archive'")); // normalizer/analytics are planned, not expected
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND subscription_id = 'normalizer'")); // active since v4 (P05)
+        Assert.Equal(0, await f.CountAsync("processing.deliveries", "subscription_id NOT IN ('archive', 'normalizer')")); // message-analytics is planned, not expected
         Assert.Equal(0, await f.CountAsync("messaging.events"));
         Assert.Equal(1, await f.CountAsync("processing.runs", "lane = 'live' AND state = 'running'"));
         var envelope = JsonNode.Parse(await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox"))!;
@@ -46,7 +47,7 @@ public sealed class CrashTests(MessagingFixture f)
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
         Assert.Equal(1, report.OutboxUnconfirmed);
         Assert.True(report.OutboxOldestAge > TimeSpan.FromSeconds(1));
-        Assert.Single(report.OverdueDeliveries);
+        Assert.Equal(["archive", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order());
 
         var pass = await f.Relay.RelayOnceAsync(None);
         Assert.Equal((1, 1), (pass.Leased, pass.Confirmed));
@@ -65,7 +66,7 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(eventId, await f.ScalarAsync<Guid>("SELECT event_id FROM messaging.events"));
         Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'completed'"));
         Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'succeeded'"));
-        f.Evidence.Record("P03-C01", new { window = "W1b/W2", raw = 1, outbox_unconfirmed_before_relay = 1, expected_deliveries = new[] { "archive" }, outbox_age_seen_s = report.OutboxOldestAge.TotalSeconds, relay = pass, events = 1, receipt = "completed" });
+        f.Evidence.Record("P03-C01", new { window = "W1b/W2", raw = 1, outbox_unconfirmed_before_relay = 1, expected_deliveries = new[] { "archive", "normalizer" }, outbox_age_seen_s = report.OutboxOldestAge.TotalSeconds, relay = pass, events = 1, receipt = "completed" });
     }
 
     [Fact]
@@ -250,7 +251,7 @@ public sealed class CrashTests(MessagingFixture f)
         var v2Event = await f.ScalarAsync<Guid>("SELECT event_id FROM messaging.outbox WHERE event_id <> @e", ("e", v1Event));
 
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
-        Assert.Equal([v2Event], report.OverdueDeliveries.Select(d => d.EventId));
+        Assert.Equal([v2Event], report.OverdueDeliveries.Select(d => d.EventId).Distinct()); // one row per active subscription (archive, normalizer)
         Assert.Equal(0, await f.CountAsync("processing.deliveries", $"event_id = '{v1Event}'"));
         Assert.Equal(f.Registry.TopologyVersion, await f.ScalarAsync<int>("SELECT topology_version FROM processing.deliveries WHERE event_id = @e", ("e", v2Event)));
         Assert.Equal(1, await f.CountAsync("messaging.subscriptions", "subscription_id = 'archive' AND topology_version = 1 AND status = 'planned'"));
@@ -272,20 +273,20 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(3, await f.CountAsync("processing.deliveries", "subscription_id = 'archive' AND outcome IS NULL"));
         Assert.Equal(3u, (await f.QueueAsync(LiveQueue)).Messages);
         var before = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
-        Assert.Equal(3, before.OverdueDeliveries.Count);
+        Assert.Equal(3, before.OverdueDeliveries.Count(d => d.SubscriptionId == "archive"));
 
         var waived = await f.Admin.WaiveAsync("archive", "consumer retired for the maintenance window; evidence kept in raw_messages", "operator:test", null, None);
         Assert.Equal(3, waived);
         Assert.Equal(3, await f.CountAsync("processing.deliveries", "outcome = 'waived' AND actor = 'operator:test' AND reason LIKE 'consumer retired%'"));
         var after = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
-        Assert.Empty(after.OverdueDeliveries);
+        Assert.DoesNotContain(after.OverdueDeliveries, d => d.SubscriptionId == "archive"); // the normalizer's rows (v4) are still expected
         var waiver = await f.ScalarAsync<string>("SELECT waiver::text FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion);
         Assert.Contains("operator:test", waiver);
         Assert.Equal("paused", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion));
 
         await f.Admin.SetStatusAsync("archive", "active", "maintenance over", "operator:test", None);
         Assert.Equal("active", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion));
-        f.Evidence.Record("P03-C07", new { window = "W9b", paused_expected = 3, backlog_kept = 3, waived, overdue_after_waiver = after.OverdueDeliveries.Count, waiver_audit = waiver });
+        f.Evidence.Record("P03-C07", new { window = "W9b", paused_expected = 3, backlog_kept = 3, waived, overdue_after_waiver_archive = after.OverdueDeliveries.Count(d => d.SubscriptionId == "archive"), waiver_audit = waiver });
     }
 
     [Fact]
@@ -295,7 +296,10 @@ public sealed class CrashTests(MessagingFixture f)
         var connection = await f.Broker.GetAsync(None);
         await using (var channel = await connection.CreateChannelAsync())
         {
+            // Every bound queue must go: `mandatory` only says "at least one queue" (P02 C08), so with the normalizer still
+            // bound (v4) the publish would be confirmed and only the archive would silently miss the event.
             await channel.QueueUnbindAsync(LiveQueue, f.Registry.ExchangeName, "puluj.live.raw.stored");
+            await channel.QueueUnbindAsync("puluj.normalizer.live", f.Registry.ExchangeName, "puluj.live.raw.stored");
         }
         await f.IngestAsync("c08", "Пуск ракет з Криму.");
         var pass = await f.Relay.RelayOnceAsync(None);

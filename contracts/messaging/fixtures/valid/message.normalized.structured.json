@@ -1,0 +1,25 @@
+{
+  "event_id": "019957a0-0003-7000-8000-000000000131",
+  "event_type": "message.normalized",
+  "schema_version": "1.0",
+  "producer": "normalizer",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": "019957a0-0002-7000-8000-000000000132",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90203-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 4,
+  "lane": "live",
+  "source_id": 7,
+  "source_message_key": "31:start",
+  "source_revision": "0",
+  "raw_message_id": 4712,
+  "payload": {
+    "raw_message_id": 4712,
+    "normalization_version": "norm-1",
+    "text_kind": "structured",
+    "structured_kind": "alerts_in_ua.alert.started"
+  }
+}

@@ -70,9 +70,10 @@ services:
       retries: 12
     restart: unless-stopped
 
-  # P03/P04 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive subscription (`archive`)
-  # and the raw-writer subscription (`raw-writer`) with the DLQ consumer of both. Scale with more replicas (relay leases rows
-  # with SKIP LOCKED; consumers share the queues).
+  # P03–P05 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive (`archive`), raw-writer
+  # (`raw-writer`), normalizer and rules/structured parser (`normalizer`, `parser`) subscriptions with one DLQ consumer for all.
+  # The stages run next to the legacy `processor` (shadow: stage results and events only, no domain writes) until the cutover.
+  # Scale with more replicas (relay leases rows with SKIP LOCKED; consumers share the queues).
   messaging:
     <<: *worker
     profiles: ["broker"]
@@ -80,7 +81,7 @@ services:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
-      Worker__Roles: relay,archive,raw-writer
+      Worker__Roles: relay,archive,raw-writer,normalizer,parser
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"

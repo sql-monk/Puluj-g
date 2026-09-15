@@ -1,6 +1,6 @@
 {
-  "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
-  "topology_version": 3,
+  "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; версія 4 (P05): normalizer, parser → active, finalizer і llm-worker → paused (черги існують і копять backlog, deliveries очікуються — «required consumer відсутній до P06», видно в reconciliation; без цього parse.completed/llm.requested були б unroutable); expected set і черги — лише для active/paused підписок (ADR-0002).",
+  "topology_version": 4,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -171,25 +171,25 @@
       "idempotency": "inbox + unique(source_id, source_message_key, source_revision)"
     },
     "normalizer": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P05",
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P05",
       "bindings": ["raw.stored"], "lanes": ["live", "history", "replay"],
       "emits": ["message.normalized"], "queue_policy": "required",
       "idempotency": "inbox + stage_results"
     },
     "parser": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P05",
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P05",
       "bindings": ["message.normalized"], "lanes": ["live", "history", "replay"],
       "emits": ["parse.completed", "llm.requested"], "queue_policy": "required",
       "idempotency": "inbox + stage_results"
     },
     "llm-worker": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P06",
+      "role": "consumer", "required": true, "status": "paused", "owner_task": "P06",
       "bindings": ["llm.requested"], "lanes": ["live", "history", "replay"],
       "emits": ["llm.completed", "llm.failed"], "queue_policy": "required",
       "idempotency": "inbox + request_id + fencing_token"
     },
     "finalizer": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P06",
+      "role": "consumer", "required": true, "status": "paused", "owner_task": "P06",
       "bindings": ["parse.completed", "llm.completed", "llm.failed"], "lanes": ["live", "history", "replay"],
       "emits": ["observations.recorded", "message.analysis.completed"], "queue_policy": "required",
       "idempotency": "inbox + unique(raw_message_id, run_id, stage, stage_version)"

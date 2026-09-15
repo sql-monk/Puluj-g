@@ -211,7 +211,7 @@ public sealed class RawMessageProcessor(
         var sw = Stopwatch.StartNew();
         var normalized = normalizer.Normalize(raw.RawText!);
         var normalizeMs = sw.ElapsedMilliseconds;
-        var ctx = new ParseContext(source.SourceId, normalized.Language, HomeRegionOf(source), raw.PublishedAt, raw.RawMessageId);
+        var ctx = new ParseContext(source.SourceId, normalized.Language, HomeRegionOf(source, normalizer, indexes), raw.PublishedAt, raw.RawMessageId);
         var facts = await parser.ParseAsync(normalized, ctx, ct);
         var parseMs = sw.ElapsedMilliseconds - normalizeMs;
         var targets = facts.Select(f => builder.Build(f, raw, source, f.ParserVersion, f.Method, normalized.Language)).ToList();
@@ -219,8 +219,8 @@ public sealed class RawMessageProcessor(
         return targets;
     }
 
-    /// <summary>Source config may name a home region ("Київська область") or give a place id; used to disambiguate settlement names.</summary>
-    private int? HomeRegionOf(Source source)
+    /// <summary>Source config may name a home region ("Київська область") or give a place id; used to disambiguate settlement names. Shared with the parser stage (P05).</summary>
+    internal static int? HomeRegionOf(Source source, INormalizer normalizer, IIndexes indexes)
     {
         if (source.Config is null)
         {
