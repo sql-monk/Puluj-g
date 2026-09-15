@@ -30,8 +30,8 @@ public interface ITargetSink
 /// All writes for a message happen in one transaction that holds the raw_messages row lock from its first statement:
 /// every status decision (process, skip, fail) is made under that lock, so an expired-claim sweep or another instance
 /// that re-claimed the row waits and then sees what this transaction decided. Parsing runs in parallel across workers
-/// and instances; the store stage (targets and their triggers, sinks) runs under AdvisoryLocks.Store, one message at a
-/// time, so correlation and deduplication never race. Failures are recorded in ProcessingError and retried up to MaxAttempts;
+/// and instances. Derived reads and writes, including SQL trigger effects, run under Store through commit.
+/// Messages without facts only update their raw row. Failures are recorded in ProcessingError and retried up to MaxAttempts;
 /// a transient database failure (a deadlock with a writer that does not hold the store lock, a serialization failure)
 /// is retried without counting, up to MaxTransientRetries per message.
 /// </summary>
@@ -77,8 +77,9 @@ public sealed class RawMessageProcessor(
             long parsedMs, lockedMs;
             if (AlertsInUaHandler.CanHandle(raw))
             {
-                await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct); // the handler reads and updates air_alerts
                 parsedMs = 0;
+                // The handler already reads and modifies AirAlerts; locking after it is too late.
+                await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
                 lockedMs = sw.ElapsedMilliseconds;
                 targets = await alertsHandler.HandleAsync(db, raw, source, ct);
             }
@@ -86,7 +87,10 @@ public sealed class RawMessageProcessor(
             {
                 targets = await ParseTextAsync(raw, source, ct);
                 parsedMs = sw.ElapsedMilliseconds;
-                await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
+                if (targets.Count > 0)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
+                }
                 lockedMs = sw.ElapsedMilliseconds;
             }
             else
@@ -98,6 +102,32 @@ public sealed class RawMessageProcessor(
                 await tx.CommitAsync(ct);
                 metrics.RawProcessed(identity.Name, "skipped");
                 stats.Outcome("skipped", raw.RawMessageId);
+                return 0;
+            }
+
+            // Most incoming posts yield no facts. They only update their own raw row, so neither correlation nor
+            // alerts can observe them and they must not queue behind a message that does have derived state to write.
+            if (targets.Count == 0)
+            {
+                raw.ProcessingStatus = ProcessingStatus.Processed;
+                raw.ProcessedAt = clock.GetUtcNow();
+                raw.Attempts++;
+                Stamp(raw);
+                raw.ProcessingMs = (int)Math.Min(sw.ElapsedMilliseconds, int.MaxValue);
+                await db.SaveChangesAsync(ct);
+                await tx.CommitAsync(ct);
+                _transientRetries.TryRemove(raw.RawMessageId, out _);
+                metrics.ParserUnmatched(source.Code);
+                metrics.ProcessingStage("parse", parsedMs);
+                metrics.ProcessingStage("lock", 0);
+                metrics.ProcessingStage("store", sw.ElapsedMilliseconds - parsedMs);
+                metrics.RawProcessed(identity.Name, "processed");
+                stats.Outcome("processed", raw.RawMessageId);
+                stats.Record("parse", parsedMs);
+                stats.Record("lock", 0);
+                stats.Record("store", sw.ElapsedMilliseconds - parsedMs);
+                stats.Record("total", sw.ElapsedMilliseconds);
+                logger.LogInformation("RawMessage {Id} ({Source}): no target(s) in {Ms} ms", raw.RawMessageId, source.Code, sw.ElapsedMilliseconds);
                 return 0;
             }
 
@@ -133,11 +163,6 @@ public sealed class RawMessageProcessor(
                 await notifier.PublishAsync(evt, ct);
             }
 
-            if (targets.Count == 0)
-            {
-                metrics.ParserUnmatched(source.Code);
-                logger.LogDebug("RawMessage {Id}: no facts in \"{Text}\"", raw.RawMessageId, Truncate(raw.RawText, 120));
-            }
             foreach (var o in targets)
             {
                 metrics.TargetCreated(source.Code, o.IdentificationMethod.ToString());
@@ -293,5 +318,4 @@ public sealed class RawMessageProcessor(
         return null;
     }
 
-    private static string Truncate(string? s, int max) => s is null ? "" : s.Length <= max ? s : s[..max] + "…";
 }

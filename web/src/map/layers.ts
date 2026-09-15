@@ -188,7 +188,30 @@ export function addTrackSources(map: maplibregl.Map, cluster = true) {
   map.addSource('track-forecasts', { type: 'geojson', data: empty })
   // Clustering only folds markers that practically coincide (two reports on one oblast centroid), never neighbours.
   map.addSource('track-points', cluster ? { type: 'geojson', data: empty, cluster: true, clusterRadius: 6, clusterMaxZoom: 10 } : { type: 'geojson', data: empty })
+  map.addSource('events', { type: 'geojson', data: empty })
   map.addSource('home', { type: 'geojson', data: empty })
+}
+
+/** Localized reports that are not moving targets: a halo makes them legible without borrowing target glyphs. */
+export function addEventLayers(map: maplibregl.Map, p: MapPalette) {
+  map.addLayer({
+    id: 'event-halo',
+    type: 'circle',
+    source: 'events',
+    paint: { 'circle-color': p.glyphHalo, 'circle-radius': 9, 'circle-opacity': ['get', 'opacity'] },
+  })
+  map.addLayer({
+    id: 'event-points',
+    type: 'circle',
+    source: 'events',
+    paint: {
+      'circle-color': ['get', 'color'],
+      'circle-radius': ['match', ['get', 'eventType'], 'ExplosionReport', 6, 'AirDefenseActivity', 5, 4],
+      'circle-opacity': ['get', 'opacity'],
+      'circle-stroke-color': p.glyphEdge,
+      'circle-stroke-width': 1.5,
+    },
+  })
 }
 
 /** Every layer a click on a track can land on: marker, badges, crumbs, forecast line / cone / chevron. */

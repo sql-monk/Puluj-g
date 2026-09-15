@@ -47,6 +47,8 @@ export interface Filters {
   ballistic: boolean
   aircraft: boolean
   alerts: boolean
+  /** Localized, non-track reports such as explosions and air-defence activity. */
+  events: boolean
   activeOnly: boolean
   /** Forecast cone and dashed centreline ahead of every marker (crumbs and predecessors belong to the selected target only). */
   forecast: boolean
@@ -61,6 +63,7 @@ export interface Filters {
 interface State {
   tracks: Record<number, TrackDto>
   alerts: Record<number, AlertDto>
+  events: Record<number, TargetDto>
   regions: RegionDto[]
   sources: SourceDto[]
   /** The live windows the server works with (lifetime choices, feed depth); defaults until /api/map/config answers. */
@@ -88,12 +91,13 @@ interface State {
   loading: boolean
   error: string | null
 
-  setSnapshot: (tracks: TrackDto[], alerts: AlertDto[]) => void
+  setSnapshot: (tracks: TrackDto[], alerts: AlertDto[], events: TargetDto[]) => void
   upsertTrack: (t: TrackDto) => void
   /** A batch of hub updates in one store change (the hub is flushed every few hundred ms). Tracks outside the window are dropped. */
   upsertTracks: (list: TrackDto[]) => void
   upsertAlert: (a: AlertDto) => void
   upsertAlerts: (list: AlertDto[]) => void
+  upsertEvents: (list: TargetDto[]) => void
   setRegions: (r: RegionDto[]) => void
   setMapConfig: (c: MapConfig) => void
   setSources: (s: SourceDto[]) => void
@@ -151,6 +155,7 @@ export const defaultFilters: Filters = {
   ballistic: true,
   aircraft: false,
   alerts: true,
+  events: true,
   activeOnly: true,
   forecast: true,
   highlightTargets: true,
@@ -161,6 +166,7 @@ export const defaultFilters: Filters = {
 export const useStore = create<State>((set, get) => ({
   tracks: {},
   alerts: {},
+  events: {},
   regions: [],
   sources: [],
   mapConfig: defaultMapConfig,
@@ -183,10 +189,11 @@ export const useStore = create<State>((set, get) => ({
   loading: false,
   error: null,
 
-  setSnapshot: (tracks, alerts) =>
+  setSnapshot: (tracks, alerts, events) =>
     set({
       tracks: Object.fromEntries(tracks.map((t) => [t.id, t])),
       alerts: Object.fromEntries(alerts.map((a) => [a.id, a])),
+      events: Object.fromEntries(events.map((o) => [o.id, o])),
     }),
   upsertTrack: (t) => get().upsertTracks([t]),
   upsertTracks: (list) =>
@@ -205,6 +212,14 @@ export const useStore = create<State>((set, get) => ({
         else alerts[a.id] = a
       }
       return { alerts }
+    }),
+  upsertEvents: (list) =>
+    set((s) => {
+      if (s.mode !== 'live' || list.length === 0) return {}
+      const cutoff = Date.now() - s.mapConfig.maxLifetimeMinutes * 60_000
+      const events = { ...s.events }
+      for (const o of list) if (new Date(o.observedAt).getTime() >= cutoff && isMapEvent(o)) events[o.id] = o
+      return { events }
     }),
   setRegions: (regions) => set({ regions }),
   setMapConfig: (mapConfig) =>
@@ -226,7 +241,9 @@ export const useStore = create<State>((set, get) => ({
       const now = new Date()
       if (s.mode !== 'live') return { now }
       const tracks = pruneTracks(s.tracks, now, s.mapConfig)
-      return tracks === s.tracks ? { now } : { now, tracks }
+      const cutoff = now.getTime() - s.mapConfig.maxLifetimeMinutes * 60_000
+      const events = Object.fromEntries(Object.entries(s.events).filter(([, o]) => new Date(o.observedAt).getTime() >= cutoff))
+      return { now, ...(tracks === s.tracks ? {} : { tracks }), ...(Object.keys(events).length === Object.keys(s.events).length ? {} : { events }) }
     }),
   setConnection: (connection) => set({ connection }),
   setFilter: (key, value) =>
@@ -299,6 +316,11 @@ export function displayModeEnabled(mode: DisplayMode, f: Filters): boolean {
     case 'aircraft':
       return f.aircraft
   }
+}
+
+/** Only these fact types are point-in-time map events; alerts and moving targets have dedicated map models. */
+export function isMapEvent(o: TargetDto): boolean {
+  return o.eventType === 'ExplosionReport' || o.eventType === 'AirDefenseActivity' || o.eventType === 'TargetCancelled'
 }
 
 /** Does the source filter let this source through? */

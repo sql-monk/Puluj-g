@@ -6,10 +6,11 @@
 --
 --   docker exec -i puluj-pg psql -U puluj -d puluj -f - < scripts/reprocess.sql
 --
--- Safe while processors run: the raw rows are reset first (waits for the messages being processed to commit), then the
--- store lock (AdvisoryLocks.Store = 0x50554C554A01, the processors' lock order is raw row -> advisory) and the truncate.
+-- Fence the raw table first: in-flight messages finish, new claims/ingestion wait until commit. Then reset raw rows
+-- and take Store (AdvisoryLocks.Store = 0x50554C554A01) before truncating derived state.
 -- Track ids change; anything that stored one (a bookmark, a screenshot) will not match afterwards.
 BEGIN;
+LOCK TABLE raw_messages IN ACCESS EXCLUSIVE MODE;
 UPDATE raw_messages
 SET processing_status = 0, attempts = 0, processed_at = NULL, claimed_by = NULL, claimed_at = NULL
 WHERE processing_status <> 0; -- Failed ones too: a parser fix is one of the reasons to be here

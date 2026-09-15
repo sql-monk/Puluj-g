@@ -6,6 +6,9 @@
 
 ## Документація
 
+Єдиний план розвитку черги, воркерів, інших подій, карт та аналітики, з задачами й інструкціями для агентів:
+[`docs/plan-message-platform.md`](docs/plan-message-platform.md). Це цільова програма; статус реалізації ведеться всередині.
+
 Базовий устрій описано в [`docs/README.md`](docs/README.md). Редаговані діаграми алгоритмів, БД, коду, live-взаємодій і Docker deploy — у [`docs/diagrams/`](docs/diagrams/README.md). Правила кореляції, її конфігурація та безпечне впровадження змін — у [`docs/correlation.md`](docs/correlation.md). Правила ізоляції цього форку, імена контейнерів та порти — у [`docs/fork-deployment.md`](docs/fork-deployment.md).
 
 ## Архітектура
@@ -76,11 +79,16 @@ python scripts/dev-scenario.py             # демо-ситуація чере�
 ```powershell
 dotnet test tests/Puluj.Processing.Tests          # парсер (golden corpus), корелятор, LLM-мапінг
 $env:PULUJ_TEST_CONNECTION="Host=localhost;Port=5442;Database=puluj_test;Username=puluj;Password=puluj"
+$env:PULUJ_TEST_ALLOW_RESET="1"                    # лише для одноразової _test БД: fixture очищує дані
 dotnet test tests/Puluj.Integration.Tests         # end-to-end на реальній PostGIS (або Testcontainers, якщо є Docker)
 cd web && npm test                                # ETA / fade
 ```
 
 Додати новий випадок парсингу = додати запис у `data/corpus/cases.json`.
+
+Перевірка P00 на автоматичній одноразовій PostGIS: `pwsh scripts/test-p00.ps1 -Baseline`.
+Команда виконує race-тести, SQL inventory та baseline 1/2/4 workers; результати — у
+[`docs/evidence/message-platform/`](docs/evidence/message-platform/P00-handoff.md).
 
 ## API
 

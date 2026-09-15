@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Puluj.Processing.Tests" />
+    <InternalsVisibleTo Include="Puluj.Integration.Tests" />
   </ItemGroup>
 </Project>

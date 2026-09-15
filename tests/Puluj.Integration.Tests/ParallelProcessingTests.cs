@@ -63,6 +63,24 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
     }
 
     [Fact]
+    public async Task Store_serializes_derived_transactions()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+        await using var first = await Factory.CreateDbContextAsync();
+        await using var firstTx = await first.Database.BeginTransactionAsync();
+        await first.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store));
+
+        var contended = TakeStoreAsync();
+        Assert.NotSame(contended, await Task.WhenAny(contended, Task.Delay(200)));
+
+        await firstTx.CommitAsync();
+        await contended;
+    }
+
+    [Fact]
     public async Task Expired_claims_return_to_pending_and_count_the_attempt()
     {
         if (Services is null)
@@ -293,6 +311,14 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
     }
 
     private IDbContextFactory<PulujDbContext> Factory => Services!.GetRequiredService<IDbContextFactory<PulujDbContext>>();
+
+    private async Task TakeStoreAsync()
+    {
+        await using var db = await Factory.CreateDbContextAsync();
+        await using var tx = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store));
+        await tx.CommitAsync();
+    }
 
     /// <summary>Stores <paramref name="count"/> Pending sightings, ten minutes apart, without a NOTIFY.</summary>
     private async Task<List<long>> IngestAsync(string prefix, int count)

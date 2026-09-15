@@ -83,7 +83,7 @@ services:
 
   # Parsing, correlation, track watchdog (and the LLM fallback). Scales horizontally: every replica claims messages
   # from raw_messages (status InProgress + claimed_by), so a message is processed exactly once; parsing runs in
-  # parallel, the store stage is serialised by an advisory lock. Worker__AppendHostName gives each replica its own name
+  # parallel, while only messages that touch the same track category or alert region are serialised. Worker__AppendHostName gives each replica its own name
   # (heartbeat, claimed_by, `app` in the shared log file). Processing__Concurrency = workers per replica.
   # For a strictly ordered, reproducible rebuild run one replica with Processing__Concurrency=1.
   processor:

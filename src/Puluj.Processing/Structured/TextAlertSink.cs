@@ -50,6 +50,27 @@ public sealed class TextAlertSink(TimeProvider clock, ILogger<TextAlertSink> log
                 }
                 if (open is null)
                 {
+                    // A cancellation may have committed before this late start. Stored facts are the evidence;
+                    // include every ancestor, since an oblast cancellation also covers a grandchild settlement.
+                    var ancestors = await db.Database.SqlQuery<int>($"""
+                        WITH RECURSIVE scope AS (
+                            SELECT place_id, parent_id FROM places WHERE place_id = {placeId}
+                            UNION
+                            SELECT p.place_id, p.parent_id FROM places p JOIN scope s ON p.place_id = s.parent_id
+                        ) SELECT place_id AS "Value" FROM scope
+                        """).ToListAsync(ct);
+                    var cancellation = await db.Targets.Where(t => t.EventType == EventType.AlertCancelled
+                            && t.IdentificationMethod != IdentificationMethod.Structured
+                            && t.LocationPlaceId != null && ancestors.Contains(t.LocationPlaceId.Value)
+                            && t.ObservedAt >= o.ObservedAt)
+                        .OrderBy(t => t.ObservedAt).ThenBy(t => t.TargetId)
+                        .Select(t => new { t.ObservedAt, t.RawMessageId }).FirstOrDefaultAsync(ct);
+                    var cancelledAt = cancellation?.ObservedAt;
+                    // The same start can be reported again after the interval is already closed.
+                    if (await db.AirAlerts.AnyAsync(a => a.SourceId == source.SourceId && a.SourceAlertId == key, ct))
+                    {
+                        continue;
+                    }
                     // A message older than MaxAge is history (a rebuild, a backfill): the interval is stored already
                     // expired, so an alert of months ago never shows open on the live map until the watchdog's next pass.
                     // A later "відбій" inside it still shortens it.
@@ -62,8 +83,11 @@ public sealed class TextAlertSink(TimeProvider clock, ILogger<TextAlertSink> log
                         AlertType = AirAlertType.AirRaid,
                         Level = o.AlertLevel,
                         StartedAt = o.ObservedAt,
-                        EndedAt = history ? o.ObservedAt + MaxAge : null,
+                        EndedAt = history && (cancelledAt is null || cancelledAt > o.ObservedAt + MaxAge)
+                            ? o.ObservedAt + MaxAge : cancelledAt,
                         StartRawMessageId = o.RawMessageId,
+                        EndRawMessageId = cancellation is not null && (!history || cancelledAt <= o.ObservedAt + MaxAge)
+                            ? cancellation.RawMessageId : null,
                     };
                     db.AirAlerts.Add(alert);
                     await db.SaveChangesAsync(ct);
@@ -80,10 +104,17 @@ public sealed class TextAlertSink(TimeProvider clock, ILogger<TextAlertSink> log
                 // "Відбій" for a place also ends the text alerts of the places inside it (raion towns inside their oblast).
                 // Only what was in force at that moment: a replayed old "відбій" must not close an alert that started
                 // after it, and one that a history load stored already expired is shortened to the real end.
-                var open = await db.AirAlerts.Include(a => a.Place)
+                var descendants = await db.Database.SqlQuery<int>($"""
+                    WITH RECURSIVE scope AS (
+                        SELECT place_id FROM places WHERE place_id = {placeId}
+                        UNION
+                        SELECT p.place_id FROM places p JOIN scope s ON p.parent_id = s.place_id
+                    ) SELECT place_id AS "Value" FROM scope
+                    """).ToListAsync(ct);
+                var open = await db.AirAlerts
                     .Where(a => a.SourceAlertId.StartsWith(KeyPrefix)
                         && a.StartedAt <= o.ObservedAt && (a.EndedAt == null || a.EndedAt > o.ObservedAt)
-                        && (a.PlaceId == placeId || a.Place!.ParentId == placeId))
+                        && descendants.Contains(a.PlaceId))
                     .ToListAsync(ct);
                 foreach (var a in open)
                 {

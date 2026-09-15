@@ -12,6 +12,8 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
 {
     /// <summary>In history mode, tracks last reported earlier than this before `at` are not part of a snapshot.</summary>
     private static readonly TimeSpan HistoryWindow = TimeSpan.FromHours(3);
+    /// <summary>Facts shown as event markers, rather than as moving tracks or regional alert state.</summary>
+    private static readonly EventType[] MapEventTypes = [EventType.ExplosionReport, EventType.AirDefenseActivity, EventType.TargetCancelled];
 
     private MapOptions Map => options.Value;
 
@@ -63,7 +65,8 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         var sources = await SourceIdsAsync(db, ids, null, ct);
         var fixes = await FixesAsync(db, ids, null, ct);
         var messages = await MessageIdsAsync(db, ids, null, ct);
-        return new SnapshotDto(now, false, tracks.Select(t => mapper.Track(t, sources.GetValueOrDefault(t.TargetTrackId, []), fixes.GetValueOrDefault(t.TargetTrackId), messages.GetValueOrDefault(t.TargetTrackId))).ToList(), alerts.Select(mapper.Alert).ToList());
+        var events = await MapEventsAsync(db, since, null, ct);
+        return new SnapshotDto(now, false, tracks.Select(t => mapper.Track(t, sources.GetValueOrDefault(t.TargetTrackId, []), fixes.GetValueOrDefault(t.TargetTrackId), messages.GetValueOrDefault(t.TargetTrackId))).ToList(), alerts.Select(mapper.Alert).ToList(), events);
     }
 
     public async Task<SnapshotDto> AtAsync(DateTimeOffset at, bool activeOnly, CancellationToken ct)
@@ -89,9 +92,22 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
             .Where(a => a.StartedAt <= at && (a.EndedAt == null || a.EndedAt > at))
             .OrderBy(a => a.StartedAt)
             .ToListAsync(ct);
+        var events = await MapEventsAsync(db, since, at, ct);
         return new SnapshotDto(at, true,
             visible.OrderByDescending(r => r.LastSeenAt).Select(r => mapper.Track(r, sources.GetValueOrDefault(r.TargetTrackId, []), fixes.GetValueOrDefault(r.TargetTrackId), messages.GetValueOrDefault(r.TargetTrackId))).ToList(),
-            alerts.Select(mapper.Alert).ToList());
+            alerts.Select(mapper.Alert).ToList(),
+            events);
+    }
+
+    /// <summary>Map events are individual facts, not tracks: only show a reported location, never an invented point.</summary>
+    private async Task<IReadOnlyList<TargetDto>> MapEventsAsync(PulujDbContext db, DateTimeOffset since, DateTimeOffset? until, CancellationToken ct)
+    {
+        var rows = await db.Targets.AsNoTracking()
+            .Include(o => o.RawMessage)
+            .Where(o => MapEventTypes.Contains(o.EventType) && o.Location != null && o.ObservedAt >= since && (until == null || o.ObservedAt <= until))
+            .OrderByDescending(o => o.ObservedAt).ThenByDescending(o => o.TargetId)
+            .ToListAsync(ct);
+        return rows.Select(o => mapper.Target(o, null)).ToList();
     }
 
     /// <summary>A replay window may span at most this much.</summary>

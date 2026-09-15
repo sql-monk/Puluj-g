@@ -103,7 +103,7 @@ export default function App() {
       if (seq !== snapshotSeq.current) return
       if (feed) useStore.getState().setTargets(feed)
       // The store applies "active only" itself so toggling the filter needs no round-trip.
-      useStore.getState().setSnapshot(snap.tracks, snap.alerts)
+      useStore.getState().setSnapshot(snap.tracks, snap.alerts, snap.events)
       s.setError(null)
     } catch (e) {
       if (seq === snapshotSeq.current) s.setError(`Не вдалося завантажити стан: ${(e as Error).message}`)
@@ -121,16 +121,18 @@ export default function App() {
     const store = useStore.getState()
     // Events are buffered and flushed together: a burst (a busy night, a reprocess) then costs one store update per
     // batch, not one per event. The last state of a track or alert within a batch wins.
-    const pending = { tracks: new Map<number, TrackDto>(), alerts: new Map<number, AlertDto>(), targets: [] as TargetDto[] }
+    const pending = { tracks: new Map<number, TrackDto>(), alerts: new Map<number, AlertDto>(), events: [] as TargetDto[], targets: [] as TargetDto[] }
     let timer: number | null = null
     const flush = () => {
       timer = null
       const s = useStore.getState()
       if (pending.tracks.size > 0) s.upsertTracks([...pending.tracks.values()])
       if (pending.alerts.size > 0) s.upsertAlerts([...pending.alerts.values()])
+      if (pending.events.length > 0) s.upsertEvents(pending.events)
       if (pending.targets.length > 0) s.addTargets(pending.targets)
       pending.tracks.clear()
       pending.alerts.clear()
+      pending.events = []
       pending.targets = []
     }
     const schedule = () => {
@@ -153,6 +155,7 @@ export default function App() {
       },
       targetCreated: (o) => {
         pending.targets.push(o)
+        if (o.eventType === 'ExplosionReport' || o.eventType === 'AirDefenseActivity' || o.eventType === 'TargetCancelled') pending.events.push(o)
         schedule()
       },
       connectionChanged: (state) => {

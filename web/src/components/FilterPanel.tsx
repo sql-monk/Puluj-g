@@ -10,6 +10,7 @@ const classItems: { key: BoolFilter; label: string }[] = [
   { key: 'ballistic', label: 'Балістика' },
   { key: 'aircraft', label: 'Авіація' },
   { key: 'alerts', label: 'Тривоги' },
+  { key: 'events', label: 'Події' },
   { key: 'activeOnly', label: 'Лише активні' },
 ]
 
@@ -31,6 +32,7 @@ export default function FilterPanel({ open, onClose, picking, onPickingChange, o
   const home = useStore((s) => s.home)
   const trackCount = useStore((s) => Object.keys(s.tracks).length)
   const alertCount = useStore((s) => Object.keys(s.alerts).length)
+  const eventCount = useStore((s) => Object.keys(s.events).length)
 
   const sourceOn = (id: number) => filters.sources === null || filters.sources.includes(id)
   const toggleSource = (id: number, on: boolean) => {
@@ -54,7 +56,7 @@ export default function FilterPanel({ open, onClose, picking, onPickingChange, o
         <div className="mb-1 flex items-baseline justify-between">
           <span className="font-medium">Фільтри</span>
           <span className="flex items-center gap-2 text-xs text-slate-500">
-            {trackCount} об'єктів · {alertCount} тривог
+            {trackCount} об'єктів · {alertCount} тривог · {eventCount} подій
             <button className="rounded px-1.5 py-0.5 text-base leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200" onClick={onClose} title="Згорнути панель" aria-label="Згорнути панель">
               ‹
             </button>

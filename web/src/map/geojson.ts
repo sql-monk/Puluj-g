@@ -3,11 +3,11 @@ import difference from '@turf/difference'
 import distance from '@turf/distance'
 import { point } from '@turf/helpers'
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry, LineString, Point, Polygon, MultiPolygon, Position } from 'geojson'
-import type { AlertDto, AlertLevel, Confidence, PredecessorLinkDto, PredecessorsDto, RegionDto, TrackDto } from '../api/types'
+import type { AlertDto, AlertLevel, Confidence, PredecessorLinkDto, PredecessorsDto, RegionDto, TargetDto, TrackDto } from '../api/types'
 import { computeEta, distanceToRegionKm, type Home } from '../eta/computeEta'
 import { effectiveLevel } from '../lib/alerts'
 import type { ReplayPosition } from '../replay/engine'
-import { displayModeEnabled, type Filters, type SelectedLink } from '../store/useStore'
+import { displayModeEnabled, sourceEnabled, type Filters, type SelectedLink } from '../store/useStore'
 
 import { getPalette, type MapPalette } from './palette'
 
@@ -74,6 +74,28 @@ export interface TrackLayers {
   forecasts: FeatureCollection<LineString | Point | Polygon, TrackProps>
   areas: FeatureCollection<Polygon | MultiPolygon, TrackProps>
   predecessors: FeatureCollection<Point | LineString, FixProps>
+}
+
+/** A point-in-time public report. Unlike a target track, it has no inferred course, path, or forecast. */
+export interface EventProps {
+  id: number
+  eventType: string
+  color: string
+  opacity: number
+}
+
+export function buildEventLayer(events: TargetDto[], now: Date, filters: Filters): FeatureCollection<Point, EventProps> {
+  if (!filters.events) return emptyCollection() as FeatureCollection<Point, EventProps>
+  const features: Feature<Point, EventProps>[] = []
+  for (const event of events) {
+    const point = event.location?.point
+    if (!point || !sourceEnabled(event.source.id, filters)) continue
+    const age = Math.max(0, (now.getTime() - new Date(event.observedAt).getTime()) / 60000)
+    if (age > filters.lifetimeMinutes) continue
+    const color = event.eventType === 'ExplosionReport' ? '#dc2626' : event.eventType === 'AirDefenseActivity' ? '#2563eb' : '#16a34a'
+    features.push({ type: 'Feature', id: event.id, geometry: point, properties: { id: event.id, eventType: event.eventType, color, opacity: Math.max(0.35, 1 - 0.6 * age / Math.max(1, filters.lifetimeMinutes)) } })
+  }
+  return { type: 'FeatureCollection', features }
 }
 
 /** The forecast reaches this far ahead: a short pointer, not a flight plan. */

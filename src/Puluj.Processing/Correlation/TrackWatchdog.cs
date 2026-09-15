@@ -14,8 +14,8 @@ namespace Puluj.Processing.Correlation;
 /// The closure is stamped at event time (last seen + the timeout), never at wall-clock time, so a replay sees the
 /// track end when it faded. While the pipeline is behind (a rebuild or a history load: pending messages older than
 /// half an hour), "now" is the oldest pending message's time, so tracks of 2022 are not closed under the feet of the
-/// 2022 messages still to come. The sweep runs under AdvisoryLocks.Store like the correlation sink, so it never
-/// races a message being stored; every processor instance runs one, the others simply find nothing to close.
+/// 2022 messages still to come. The sweep takes Store, so it never races a message being
+/// stored; every processor instance runs one, the others simply find nothing to close.
 /// </summary>
 public sealed class TrackWatchdog(
     IDbContextFactory<PulujDbContext> factory,
@@ -46,14 +46,16 @@ public sealed class TrackWatchdog(
         }
     }
 
-    private async Task SweepAsync(CancellationToken ct)
+    internal async Task SweepAsync(CancellationToken ct)
     {
         var wall = clock.GetUtcNow();
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        // Reset fences the raw table before Store. Take the read lock in the same order, not inside Store.
+        await db.Database.ExecuteSqlRawAsync("LOCK TABLE raw_messages IN ACCESS SHARE MODE", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
         var oldestPending = await db.RawMessages.AsNoTracking()
-            .Where(r => r.ProcessingStatus == ProcessingStatus.Pending)
+            .Where(r => r.ProcessingStatus == ProcessingStatus.Pending || r.ProcessingStatus == ProcessingStatus.InProgress)
             .MinAsync(r => (DateTimeOffset?)r.PublishedAt, ct);
         var now = oldestPending is { } p && p < wall.AddMinutes(-30) ? p : wall;
         var active = await db.TargetTracks.Where(t => t.Status == TrackStatus.Active).ToListAsync(ct);

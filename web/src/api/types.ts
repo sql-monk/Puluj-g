@@ -119,6 +119,8 @@ export interface SnapshotDto {
   historical: boolean
   tracks: TrackDto[]
   alerts: AlertDto[]
+  /** Localized non-track facts: explosions, air-defence activity, and threat cancellations. */
+  events: TargetDto[]
 }
 
 /** One reported position of a track inside a replay window. */

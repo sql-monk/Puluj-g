@@ -11,10 +11,9 @@ namespace Puluj.Infrastructure.Ingestion;
 /// pipeline over all of them in publication order (see ProcessingLoop), so the result is what live processing would
 /// have produced had the messages arrived in that order. The raw messages themselves are never touched.
 /// Plain DELETEs (not TRUNCATE) so the admin role, which has no TRUNCATE privilege, can run it too.
-/// Safe next to running processors: the raw rows are reset first (waiting for the messages being processed to commit,
-/// after which they are reset too), then the store lock is taken and the derived data deleted. A message claimed in
-/// between finds its row Pending under the row lock and stores its targets after the delete: that is the rebuild.
-/// Lock order raw rows -> AdvisoryLocks.Store is the processor's, so there is no cycle.
+/// Takes an exclusive raw table lock first: existing processors finish, while new claims, processing and ingestion
+/// wait until reset commits. This also fences Pending rows that a status-filtered UPDATE alone would miss.
+/// Lock order raw table/rows -> Store is shared with processor and watchdog.
 /// </summary>
 public sealed class ReprocessService(IDbContextFactory<PulujDbContext> factory, SettingsStore settings, ILogger<ReprocessService> logger)
 {
@@ -40,6 +39,7 @@ public sealed class ReprocessService(IDbContextFactory<PulujDbContext> factory, 
         await using var db = await factory.CreateDbContextAsync(ct);
         db.Database.SetCommandTimeout(TimeSpan.FromMinutes(30));
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await db.Database.ExecuteSqlRawAsync("LOCK TABLE raw_messages IN ACCESS EXCLUSIVE MODE", ct);
         // Failed ones too: a parser fix is one of the reasons to reprocess. Before the deletes: see the class summary.
         var reset = await db.Database.ExecuteSqlRawAsync(
             "UPDATE raw_messages SET processing_status = 0, attempts = 0, processed_at = NULL, claimed_by = NULL, claimed_at = NULL WHERE processing_status <> 0", ct);

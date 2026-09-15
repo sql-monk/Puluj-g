@@ -9,13 +9,15 @@ using Puluj.Infrastructure.Seeding;
 using Puluj.Processing;
 using Puluj.Processing.Indexes;
 using Testcontainers.PostgreSql;
+using Npgsql;
 
 namespace Puluj.Integration.Tests;
 
 /// <summary>
 /// One real PostGIS database for every integration test class (xunit collection fixture: the classes run one after
 /// another). Uses PULUJ_TEST_CONNECTION when set (e.g. a local PostGIS), otherwise starts a postgis container via
-/// Docker; with neither, <see cref="Services"/> is null and the tests are no-ops. Migrated, seeded, indexes loaded.
+/// Docker. Infrastructure failures fail the suite: an unexecuted database test must never appear passed.
+/// External databases must end in _test and require PULUJ_TEST_ALLOW_RESET=1. Migrated, seeded, indexes loaded.
 /// </summary>
 public sealed class PipelineFixture : IAsyncLifetime
 {
@@ -26,6 +28,15 @@ public sealed class PipelineFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var connectionString = Environment.GetEnvironmentVariable("PULUJ_TEST_CONNECTION");
+        if (!string.IsNullOrEmpty(connectionString))
+        {
+            var target = new NpgsqlConnectionStringBuilder(connectionString);
+            if (target.Database?.EndsWith("_test", StringComparison.Ordinal) != true
+                || Environment.GetEnvironmentVariable("PULUJ_TEST_ALLOW_RESET") != "1")
+            {
+                throw new InvalidOperationException("External integration DB must end in _test and explicitly allow destructive reset with PULUJ_TEST_ALLOW_RESET=1. Use an expendable database, or unset PULUJ_TEST_CONNECTION for Testcontainers.");
+            }
+        }
         if (string.IsNullOrEmpty(connectionString))
         {
             try
@@ -34,10 +45,11 @@ public sealed class PipelineFixture : IAsyncLifetime
                 await _container.StartAsync();
                 connectionString = _container.GetConnectionString();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                _container = null; // no Docker: tests become no-ops
-                return;
+                if (_container is not null) await _container.DisposeAsync();
+                _container = null;
+                throw new InvalidOperationException("Real PostGIS is required. Start Docker or configure an expendable _test database; no tests were executed.", ex);
             }
         }
 

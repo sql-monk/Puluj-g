@@ -2,8 +2,9 @@
 -- hromadas, so the alerts move from the oblast polygon to the polygon the feed actually names).
 -- Run: docker exec -i puluj-pg psql -U puluj -d puluj -f - < scripts/reprocess-alerts.sql
 -- The processors re-handle the messages in publication order within a minute. Same order as reprocess.sql: raw rows
--- first, then the store lock, then the deletes.
+-- first (exclusive table fence includes new/Pending rows), then Store, then the deletes.
 BEGIN;
+LOCK TABLE raw_messages IN ACCESS EXCLUSIVE MODE;
 UPDATE raw_messages SET processing_status = 0, attempts = 0, processed_at = NULL, claimed_by = NULL, claimed_at = NULL
  WHERE raw_payload->>'kind' IN ('alert.started', 'alert.finished');
 SELECT pg_advisory_xact_lock(88327283100161); -- AdvisoryLocks.Store = 0x50554C554A01

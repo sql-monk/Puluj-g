@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using NetTopologySuite.Geometries;
 using Puluj.Api.Services;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
@@ -30,7 +31,7 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
         var now = DateTimeOffset.UtcNow;
         var (snapshots, uncached) = await BuildAsync(factory, new MapOptions { SnapshotCacheSeconds = 0 });
 
-        long freshActive, staleActive, freshClosed, staleClosed, openFresh, openOld, ended, freshTarget, staleTarget;
+        long freshActive, staleActive, freshClosed, staleClosed, openFresh, openOld, ended, freshTarget, staleTarget, freshEvent, staleEvent, unlocatedEvent;
         await using (var db = await factory.CreateDbContextAsync())
         {
             var categoryId = await db.TargetCategories.Select(c => c.TargetCategoryId).OrderBy(x => x).FirstAsync();
@@ -56,13 +57,15 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
                 SourceId = source.SourceId,
                 SourceAlertId = $"map-snapshot-test-{key}-{Guid.NewGuid():N}",
             };
-            Target Report(TimeSpan age) => new()
+            Target Report(TimeSpan age, EventType type = EventType.TargetObserved, bool located = false) => new()
             {
                 SourceId = source.SourceId,
                 RawMessageId = 0,
                 ObservedAt = now - age,
-                EventType = EventType.TargetObserved,
+                EventType = type,
                 TargetCategoryId = categoryId,
+                LocationKind = located ? LocationKind.Point : LocationKind.Unknown,
+                Location = located ? new Point(30, 50) { SRID = 4326 } : null,
             };
 
             var tracks = new[] { Track(TrackStatus.Active, TimeSpan.FromMinutes(5)), Track(TrackStatus.Active, TimeSpan.FromDays(3)), Track(TrackStatus.Closed, TimeSpan.FromMinutes(30)), Track(TrackStatus.Closed, TimeSpan.FromDays(3)) };
@@ -77,14 +80,21 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
             var raw = new RawMessage { SourceId = source.SourceId, SourceMessageId = $"map-snapshot-test-{Guid.NewGuid():N}", PublishedAt = now, ReceivedAt = now, RawText = "test", ProcessingStatus = ProcessingStatus.Processed, Hash = Guid.NewGuid().ToString("N") };
             db.RawMessages.Add(raw);
             await db.SaveChangesAsync();
-            var reports = new[] { Report(TimeSpan.FromMinutes(20)), Report(TimeSpan.FromHours(7)) };
+            var reports = new[]
+            {
+                Report(TimeSpan.FromMinutes(20)),
+                Report(TimeSpan.FromHours(7)),
+                Report(TimeSpan.FromMinutes(10), EventType.ExplosionReport, located: true),
+                Report(TimeSpan.FromHours(7), EventType.AirDefenseActivity, located: true),
+                Report(TimeSpan.FromMinutes(10), EventType.AirDefenseActivity),
+            };
             foreach (var r in reports)
             {
                 r.RawMessageId = raw.RawMessageId;
             }
             db.Targets.AddRange(reports);
             await db.SaveChangesAsync();
-            (freshTarget, staleTarget) = (reports[0].TargetId, reports[1].TargetId);
+            (freshTarget, staleTarget, freshEvent, staleEvent, unlocatedEvent) = (reports[0].TargetId, reports[1].TargetId, reports[2].TargetId, reports[3].TargetId, reports[4].TargetId);
         }
 
         try
@@ -104,6 +114,11 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
             Assert.Contains(openFresh, alertIds);
             Assert.Contains(openOld, alertIds); // an open alert is a state: Luhansk has been under one since 2022
             Assert.DoesNotContain(ended, alertIds);
+
+            // Events are short-lived individual reports, shown only when the source named a location.
+            Assert.Contains(freshEvent, all.Events.Select(e => e.Id));
+            Assert.DoesNotContain(staleEvent, all.Events.Select(e => e.Id));
+            Assert.DoesNotContain(unlocatedEvent, all.Events.Select(e => e.Id));
 
             // The realtime bridge asks with the same windows.
             var notBefore = now - TimeSpan.FromMinutes(120);
@@ -127,7 +142,7 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
         finally
         {
             await using var db = await factory.CreateDbContextAsync();
-            await db.Targets.Where(t => t.TargetId == freshTarget || t.TargetId == staleTarget).ExecuteDeleteAsync();
+            await db.Targets.Where(t => new[] { freshTarget, staleTarget, freshEvent, staleEvent, unlocatedEvent }.Contains(t.TargetId)).ExecuteDeleteAsync();
             await db.RawMessages.Where(r => r.SourceMessageId.StartsWith("map-snapshot-test-")).ExecuteDeleteAsync();
             await db.TargetTracks.Where(t => new[] { freshActive, staleActive, freshClosed, staleClosed }.Contains(t.TargetTrackId)).ExecuteDeleteAsync();
             await db.AirAlerts.Where(a => a.SourceAlertId.StartsWith("map-snapshot-test-")).ExecuteDeleteAsync();

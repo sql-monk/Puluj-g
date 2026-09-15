@@ -1,0 +1,2575 @@
+{
+  "recordedAt": "2026-09-15T12:07:29.4165057+00:00",
+  "schema": 1,
+  "assemblySha256": "033a634b7955f59b3e418e108d897d65bb21fee15dbd6f1f963971c263646418",
+  "runtime": ".NET 10.0.12",
+  "os": "Microsoft Windows 10.0.26200",
+  "logicalProcessors": 12,
+  "inputVersion": "p00-synthetic-v1",
+  "messagesPerRun": 120,
+  "notes": [
+    "Workers are concurrent claim/processor loops with distinct identities in one testhost, sharing a DB/pool; not separate OS processes.",
+    "Parser is real rules except explicit 25ms slow-parser stub. LLM provider and RabbitMQ absent.",
+    "Root latency includes claim\u002Bprocess\u002Bpostcommit notify; backlog latency begins at drain start (preloaded backlog).",
+    "Stage summaries expose existing p50/p90/max, not p95/p99. Root percentiles below are measured directly.",
+    "SQL lock samples are pg_stat_activity sampled every 20ms, not exact wait time. No separate pool/commit timing or DB CPU/disk attribution.",
+    "Host is shared with existing services; no throughput guarantee or production SLO is inferred."
+  ],
+  "runs": [
+    {
+      "profile": "mixed",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 3875.1503,
+      "rootsPerSecond": 30.966540833267807,
+      "rootP95Ms": 53.782300000000305,
+      "rootP99Ms": 63.879599999999755,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 2046.875,
+      "testhostWorkingSetBytes": 747122688,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 33,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0.9666666666666667,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 6
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.2833333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 4
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 20.35,
+          "P50Ms": 23,
+          "P90Ms": 34,
+          "MaxMs": 46
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 22.6,
+          "P50Ms": 25,
+          "P90Ms": 37,
+          "MaxMs": 56
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "mixed",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 8193.2317,
+      "rootsPerSecond": 14.646235379868482,
+      "rootP95Ms": 315.23789999999997,
+      "rootP99Ms": 534.8458,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1046.875,
+      "testhostWorkingSetBytes": 737705984,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 29,
+        "IO:DataFileExtend": 1,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 2.8583333333333334,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 56
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 2.941666666666667,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 49
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 41.775,
+          "P50Ms": 26,
+          "P90Ms": 63,
+          "MaxMs": 449
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 47.575,
+          "P50Ms": 28,
+          "P90Ms": 101,
+          "MaxMs": 452
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "mixed",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 3657.6137,
+      "rootsPerSecond": 32.80827606261426,
+      "rootP95Ms": 143.56009999999992,
+      "rootP99Ms": 239.29269999999997,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 875,
+      "testhostWorkingSetBytes": 737669120,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 31,
+        "Lock:advisory": 59
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.5333333333333334,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 14
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 18.691666666666666,
+          "P50Ms": 6,
+          "P90Ms": 50,
+          "MaxMs": 130
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 28.758333333333333,
+          "P50Ms": 27,
+          "P90Ms": 55,
+          "MaxMs": 172
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 48.983333333333334,
+          "P50Ms": 40,
+          "P90Ms": 89,
+          "MaxMs": 241
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "mixed",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 3589.3179,
+      "rootsPerSecond": 33.43253602585605,
+      "rootP95Ms": 150.64589999999998,
+      "rootP99Ms": 284.9243999999999,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 968.75,
+      "testhostWorkingSetBytes": 737779712,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 31,
+        "IO:DataFileExtend": 1,
+        "Lock:advisory": 60
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.15,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 7
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 18.391666666666666,
+          "P50Ms": 5,
+          "P90Ms": 40,
+          "MaxMs": 173
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 28.4,
+          "P50Ms": 26,
+          "P90Ms": 46,
+          "MaxMs": 174
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 47.94166666666667,
+          "P50Ms": 35,
+          "P90Ms": 82,
+          "MaxMs": 348
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "mixed",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 2106.7387,
+      "rootsPerSecond": 56.9600776783566,
+      "rootP95Ms": 103.27690000000007,
+      "rootP99Ms": 114.30580000000009,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 890.625,
+      "testhostWorkingSetBytes": 739065856,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 29,
+        "Lock:advisory": 154
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0.7833333333333333,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 41.35,
+          "P50Ms": 52,
+          "P90Ms": 64,
+          "MaxMs": 76
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 18.65,
+          "P50Ms": 19,
+          "P90Ms": 31,
+          "MaxMs": 37
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 60.78333333333333,
+          "P50Ms": 74,
+          "P90Ms": 91,
+          "MaxMs": 104
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "mixed",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "7d385c0b1402fedc1db718a4d882913f1e87174af58b768c31d8c98fada8df49",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 2122.7677,
+      "rootsPerSecond": 56.52997263902216,
+      "rootP95Ms": 139.6497999999999,
+      "rootP99Ms": 165.15970000000004,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1000,
+      "testhostWorkingSetBytes": 692772864,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 28,
+        "Lock:advisory": 167
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0.9,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 14
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 41.80833333333333,
+          "P50Ms": 47,
+          "P90Ms": 67,
+          "MaxMs": 135
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 18.808333333333334,
+          "P50Ms": 18,
+          "P90Ms": 30,
+          "MaxMs": 71
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 61.516666666666666,
+          "P50Ms": 68,
+          "P90Ms": 99,
+          "MaxMs": 158
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 30
+        },
+        {
+          "type": "TargetObserved",
+          "count": 60
+        }
+      ],
+      "tracks": 2,
+      "alerts": 30
+    },
+    {
+      "profile": "single-category",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 5513.079,
+      "rootsPerSecond": 21.766421268405548,
+      "rootP95Ms": 72.85310000000027,
+      "rootP99Ms": 86.88650000000001,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1171.875,
+      "testhostWorkingSetBytes": 689303552,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 72,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.05,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 5
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.1416666666666666,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 5
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 34.925,
+          "P50Ms": 33,
+          "P90Ms": 49,
+          "MaxMs": 78
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 37.11666666666667,
+          "P50Ms": 35,
+          "P90Ms": 51,
+          "MaxMs": 85
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "single-category",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 6685.3077,
+      "rootsPerSecond": 17.949809550276946,
+      "rootP95Ms": 126.83439999999973,
+      "rootP99Ms": 224.50670000000002,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1015.625,
+      "testhostWorkingSetBytes": 686796800,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 75
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.4,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 8
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.5166666666666666,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 8
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 41.666666666666664,
+          "P50Ms": 33,
+          "P90Ms": 58,
+          "MaxMs": 200
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 44.583333333333336,
+          "P50Ms": 36,
+          "P90Ms": 61,
+          "MaxMs": 205
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "single-category",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4490.6643,
+      "rootsPerSecond": 26.722104344339435,
+      "rootP95Ms": 110.49879999999985,
+      "rootP99Ms": 153.85919999999987,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1125,
+      "testhostWorkingSetBytes": 687636480,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 74,
+        "Lock:advisory": 88
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.5333333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 12
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 24.958333333333332,
+          "P50Ms": 22,
+          "P90Ms": 32,
+          "MaxMs": 70
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 37.28333333333333,
+          "P50Ms": 34,
+          "P90Ms": 52,
+          "MaxMs": 102
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 63.775,
+          "P50Ms": 60,
+          "P90Ms": 85,
+          "MaxMs": 145
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "single-category",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4260.0901,
+      "rootsPerSecond": 28.168418315847354,
+      "rootP95Ms": 94.33280000000013,
+      "rootP99Ms": 106.47899999999981,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1218.75,
+      "testhostWorkingSetBytes": 689070080,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 63,
+        "Lock:advisory": 97
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.3083333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 7
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 24.166666666666668,
+          "P50Ms": 23,
+          "P90Ms": 29,
+          "MaxMs": 52
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 35.34166666666667,
+          "P50Ms": 34,
+          "P90Ms": 44,
+          "MaxMs": 66
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 60.81666666666667,
+          "P50Ms": 58,
+          "P90Ms": 74,
+          "MaxMs": 97
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "single-category",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4321.8636,
+      "rootsPerSecond": 27.76579992020109,
+      "rootP95Ms": 182.42799999999943,
+      "rootP99Ms": 209.7514000000001,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1281.25,
+      "testhostWorkingSetBytes": 689192960,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 68,
+        "Lock:advisory": 385
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.2833333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 8
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 95.41666666666667,
+          "P50Ms": 94,
+          "P90Ms": 116,
+          "MaxMs": 166
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 35.875,
+          "P50Ms": 35,
+          "P90Ms": 45,
+          "MaxMs": 67
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 132.575,
+          "P50Ms": 130,
+          "P90Ms": 158,
+          "MaxMs": 204
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "single-category",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4720.8267,
+      "rootsPerSecond": 25.419276670334032,
+      "rootP95Ms": 217.32299999999998,
+      "rootP99Ms": 274.7194,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1531.25,
+      "testhostWorkingSetBytes": 387981312,
+      "sqlWaitSamples": {
+        "LWLock:BufferContent": 1,
+        "CPU/runnable:active": 79,
+        "Lock:advisory": 419,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.3833333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 10
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 103.44166666666666,
+          "P50Ms": 97,
+          "P90Ms": 134,
+          "MaxMs": 220
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 39.19166666666667,
+          "P50Ms": 36,
+          "P90Ms": 47,
+          "MaxMs": 122
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 144.01666666666668,
+          "P50Ms": 135,
+          "P90Ms": 180,
+          "MaxMs": 262
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "alerts",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 3135.6531,
+      "rootsPerSecond": 38.269539446184275,
+      "rootP95Ms": 38.683400000000006,
+      "rootP99Ms": 54.60770000000002,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 953.125,
+      "testhostWorkingSetBytes": 389914624,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 17
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 2.066666666666667,
+          "P50Ms": 2,
+          "P90Ms": 3,
+          "MaxMs": 14
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 14.583333333333334,
+          "P50Ms": 13,
+          "P90Ms": 17,
+          "MaxMs": 85
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 16.65,
+          "P50Ms": 15,
+          "P90Ms": 21,
+          "MaxMs": 99
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "alerts",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 3834.2141,
+      "rootsPerSecond": 31.29715682804463,
+      "rootP95Ms": 51.41749999999999,
+      "rootP99Ms": 174.03870000000006,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1156.25,
+      "testhostWorkingSetBytes": 366198784,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 18
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 2.725,
+          "P50Ms": 2,
+          "P90Ms": 4,
+          "MaxMs": 25
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 18.083333333333332,
+          "P50Ms": 14,
+          "P90Ms": 21,
+          "MaxMs": 135
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 20.808333333333334,
+          "P50Ms": 16,
+          "P90Ms": 25,
+          "MaxMs": 153
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "alerts",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1737.3928,
+      "rootsPerSecond": 69.069009610262,
+      "rootP95Ms": 38.92679999999996,
+      "rootP99Ms": 44.41120000000001,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 828.125,
+      "testhostWorkingSetBytes": 367583232,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 13,
+        "Lock:advisory": 8
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 4.891666666666667,
+          "P50Ms": 5,
+          "P90Ms": 6,
+          "MaxMs": 19
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 14.3,
+          "P50Ms": 14,
+          "P90Ms": 17,
+          "MaxMs": 29
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 19.191666666666666,
+          "P50Ms": 18,
+          "P90Ms": 23,
+          "MaxMs": 34
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "alerts",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1777.4802,
+      "rootsPerSecond": 67.51130054782044,
+      "rootP95Ms": 37.927200000000084,
+      "rootP99Ms": 91.76029999999997,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 859.375,
+      "testhostWorkingSetBytes": 369991680,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 17,
+        "Lock:advisory": 8
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 5.025,
+          "P50Ms": 4,
+          "P90Ms": 6,
+          "MaxMs": 36
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 14.683333333333334,
+          "P50Ms": 13,
+          "P90Ms": 18,
+          "MaxMs": 48
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 19.708333333333332,
+          "P50Ms": 18,
+          "P90Ms": 24,
+          "MaxMs": 83
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "alerts",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1639.7745,
+      "rootsPerSecond": 73.18079406650122,
+      "rootP95Ms": 76.1959,
+      "rootP99Ms": 121.99470000000002,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 703.125,
+      "testhostWorkingSetBytes": 371191808,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 14,
+        "Lock:advisory": 125
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 30.975,
+          "P50Ms": 29,
+          "P90Ms": 37,
+          "MaxMs": 98
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 13.375,
+          "P50Ms": 12,
+          "P90Ms": 16,
+          "MaxMs": 57
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 44.35,
+          "P50Ms": 42,
+          "P90Ms": 54,
+          "MaxMs": 112
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "alerts",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "6e5c565305b584a8db50a86b1d98b2ff6de0c7a032aa4fd5bde4046ad1f09ff0",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1703.5665,
+      "rootsPerSecond": 70.44045536232369,
+      "rootP95Ms": 81.4511,
+      "rootP99Ms": 130.7215000000001,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 906.25,
+      "testhostWorkingSetBytes": 374059008,
+      "sqlWaitSamples": {
+        "LWLock:BufferContent": 1,
+        "CPU/runnable:active": 11,
+        "Lock:advisory": 127
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 32.03333333333333,
+          "P50Ms": 30,
+          "P90Ms": 42,
+          "MaxMs": 105
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 13.966666666666667,
+          "P50Ms": 13,
+          "P90Ms": 17,
+          "MaxMs": 79
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 46,
+          "P50Ms": 42,
+          "P90Ms": 60,
+          "MaxMs": 122
+        }
+      },
+      "facts": [
+        {
+          "type": "AirRaidAlert",
+          "count": 120
+        }
+      ],
+      "tracks": 0,
+      "alerts": 120
+    },
+    {
+      "profile": "no-facts",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1504.8229,
+      "rootsPerSecond": 79.74360305122948,
+      "rootP95Ms": 17.094100000000026,
+      "rootP99Ms": 26.67489999999998,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 500,
+      "testhostWorkingSetBytes": 375255040,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 10
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 8
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 5.166666666666667,
+          "P50Ms": 5,
+          "P90Ms": 6,
+          "MaxMs": 17
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 6.166666666666667,
+          "P50Ms": 6,
+          "P90Ms": 8,
+          "MaxMs": 25
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "no-facts",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1549.8664,
+      "rootsPerSecond": 77.4260284628404,
+      "rootP95Ms": 18.60520000000008,
+      "rootP99Ms": 35.05400000000009,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 437.5,
+      "testhostWorkingSetBytes": 376905728,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 11
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0.9666666666666667,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 3
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 5.508333333333334,
+          "P50Ms": 5,
+          "P90Ms": 7,
+          "MaxMs": 32
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 6.475,
+          "P50Ms": 6,
+          "P90Ms": 8,
+          "MaxMs": 33
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "no-facts",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 935.0502,
+      "rootsPerSecond": 128.33535568464666,
+      "rootP95Ms": 27.383700000000033,
+      "rootP99Ms": 74.00779999999997,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 328.125,
+      "testhostWorkingSetBytes": 374620160,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 4
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.5583333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 15
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 6.8,
+          "P50Ms": 5,
+          "P90Ms": 9,
+          "MaxMs": 41
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 8.358333333333333,
+          "P50Ms": 6,
+          "P90Ms": 10,
+          "MaxMs": 56
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "no-facts",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 702.7237,
+      "rootsPerSecond": 170.76412820572298,
+      "rootP95Ms": 14.70980000000003,
+      "rootP99Ms": 18.96539999999999,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 187.5,
+      "testhostWorkingSetBytes": 375455744,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 2
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 0.9416666666666667,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 4.733333333333333,
+          "P50Ms": 5,
+          "P90Ms": 6,
+          "MaxMs": 7
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 5.683333333333334,
+          "P50Ms": 5,
+          "P90Ms": 7,
+          "MaxMs": 8
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "no-facts",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 496.2386,
+      "rootsPerSecond": 241.81915715544903,
+      "rootP95Ms": 35.46139999999997,
+      "rootP99Ms": 73.42090000000002,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 328.125,
+      "testhostWorkingSetBytes": 375808000,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 5
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.7166666666666666,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 17
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 6.783333333333333,
+          "P50Ms": 5,
+          "P90Ms": 9,
+          "MaxMs": 48
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 8.5,
+          "P50Ms": 6,
+          "P90Ms": 12,
+          "MaxMs": 65
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "no-facts",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "ff3e13ff4ffc6f7f077450ba2e39156d5c2539110e4fc1df3137a427a2da3119",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 764.2541,
+      "rootsPerSecond": 157.01584067393293,
+      "rootP95Ms": 88.14269999999999,
+      "rootP99Ms": 96.37360000000001,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 312.5,
+      "testhostWorkingSetBytes": 377065472,
+      "sqlWaitSamples": {
+        "LWLock:BufferContent": 2,
+        "CPU/runnable:active": 9
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 2,
+          "P50Ms": 1,
+          "P90Ms": 4,
+          "MaxMs": 21
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 0,
+          "P50Ms": 0,
+          "P90Ms": 0,
+          "MaxMs": 0
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 10.233333333333333,
+          "P50Ms": 6,
+          "P90Ms": 21,
+          "MaxMs": 48
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 12.241666666666667,
+          "P50Ms": 7,
+          "P90Ms": 24,
+          "MaxMs": 56
+        }
+      },
+      "facts": [],
+      "tracks": 0,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 10290.6458,
+      "rootsPerSecond": 11.661075731515314,
+      "rootP95Ms": 117.48029999999972,
+      "rootP99Ms": 153.9611,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1609.375,
+      "testhostWorkingSetBytes": 376975360,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 74
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 32.266666666666666,
+          "P50Ms": 32,
+          "P90Ms": 37,
+          "MaxMs": 46
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.85,
+          "P50Ms": 1,
+          "P90Ms": 3,
+          "MaxMs": 11
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 41.35,
+          "P50Ms": 37,
+          "P90Ms": 57,
+          "MaxMs": 119
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 75.46666666666667,
+          "P50Ms": 72,
+          "P90Ms": 90,
+          "MaxMs": 164
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 10225.9686,
+      "rootsPerSecond": 11.734829696230438,
+      "rootP95Ms": 115.86989999999969,
+      "rootP99Ms": 140.23030000000017,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1468.75,
+      "testhostWorkingSetBytes": 380276736,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 71
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 31.766666666666666,
+          "P50Ms": 31,
+          "P90Ms": 37,
+          "MaxMs": 39
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 2.1666666666666665,
+          "P50Ms": 2,
+          "P90Ms": 3,
+          "MaxMs": 13
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 40.833333333333336,
+          "P50Ms": 36,
+          "P90Ms": 59,
+          "MaxMs": 104
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 74.76666666666667,
+          "P50Ms": 70,
+          "P90Ms": 94,
+          "MaxMs": 146
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 5170.453,
+      "rootsPerSecond": 23.20879814592648,
+      "rootP95Ms": 113.83070000000043,
+      "rootP99Ms": 145.28790000000026,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1453.125,
+      "testhostWorkingSetBytes": 380481536,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 78,
+        "Lock:advisory": 27
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 32.44166666666667,
+          "P50Ms": 32,
+          "P90Ms": 38,
+          "MaxMs": 50
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 4.341666666666667,
+          "P50Ms": 2,
+          "P90Ms": 11,
+          "MaxMs": 32
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 38.7,
+          "P50Ms": 36,
+          "P90Ms": 49,
+          "MaxMs": 105
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 75.48333333333333,
+          "P50Ms": 72,
+          "P90Ms": 92,
+          "MaxMs": 171
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 6434.3595,
+      "rootsPerSecond": 18.64987494093235,
+      "rootP95Ms": 165.40220000000045,
+      "rootP99Ms": 309.08230000000003,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1437.5,
+      "testhostWorkingSetBytes": 380559360,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 89,
+        "Timeout:VacuumDelay": 1,
+        "Lock:advisory": 38
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 33.68333333333333,
+          "P50Ms": 33,
+          "P90Ms": 39,
+          "MaxMs": 46
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 9.566666666666666,
+          "P50Ms": 3,
+          "P90Ms": 24,
+          "MaxMs": 140
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 50.43333333333333,
+          "P50Ms": 42,
+          "P90Ms": 76,
+          "MaxMs": 225
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 93.68333333333334,
+          "P50Ms": 81,
+          "P90Ms": 122,
+          "MaxMs": 401
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4427.1978,
+      "rootsPerSecond": 27.105181521367758,
+      "rootP95Ms": 190.6587999999997,
+      "rootP99Ms": 197.94500000000016,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1453.125,
+      "testhostWorkingSetBytes": 385032192,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 85,
+        "IO:DataFileExtend": 1,
+        "Lock:advisory": 290,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 30.85,
+          "P50Ms": 30,
+          "P90Ms": 36,
+          "MaxMs": 42
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 68.06666666666666,
+          "P50Ms": 65,
+          "P90Ms": 89,
+          "MaxMs": 120
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 36.483333333333334,
+          "P50Ms": 35,
+          "P90Ms": 45,
+          "MaxMs": 70
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 135.4,
+          "P50Ms": 133,
+          "P90Ms": 163,
+          "MaxMs": 191
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "slow-parser-stub",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "598af9c7bc46939e97c1f9088ae07a031f0d3066bcd3b44f67e07e0c85061975",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 5226.5943,
+      "rootsPerSecond": 22.959501562996767,
+      "rootP95Ms": 261.6895999999997,
+      "rootP99Ms": 303.8635999999997,
+      "liveRoots": 0,
+      "liveBacklogP95Ms": null,
+      "liveBacklogP99Ms": null,
+      "testhostCpuMs": 1718.75,
+      "testhostWorkingSetBytes": 388067328,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 82,
+        "IO:DataFileExtend": 2,
+        "Lock:advisory": 346
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 32.175,
+          "P50Ms": 32,
+          "P90Ms": 38,
+          "MaxMs": 44
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 84.14166666666667,
+          "P50Ms": 77,
+          "P90Ms": 107,
+          "MaxMs": 220
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 43.083333333333336,
+          "P50Ms": 39,
+          "P90Ms": 52,
+          "MaxMs": 160
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 159.4,
+          "P50Ms": 150,
+          "P90Ms": 215,
+          "MaxMs": 297
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1266.9216,
+      "rootsPerSecond": 23.67944472649294,
+      "rootP95Ms": 62.62749999999994,
+      "rootP99Ms": 77.8202,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 1227.9138,
+      "liveBacklogP99Ms": 1265.4123,
+      "testhostCpuMs": 281.25,
+      "testhostWorkingSetBytes": 386396160,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 10
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.0666666666666667,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 1.2666666666666666,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 4
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 30.533333333333335,
+          "P50Ms": 28,
+          "P90Ms": 37,
+          "MaxMs": 57
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 32.86666666666667,
+          "P50Ms": 30,
+          "P90Ms": 39,
+          "MaxMs": 63
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 1325.9022,
+      "rootsPerSecond": 22.626103192226395,
+      "rootP95Ms": 57.956300000000056,
+      "rootP99Ms": 62.66269999999997,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 1276.7481,
+      "liveBacklogP99Ms": 1324.7237,
+      "testhostCpuMs": 296.875,
+      "testhostWorkingSetBytes": 386441216,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 10,
+        "Client:ClientRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.1333333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 1.2333333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 2
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 32.03333333333333,
+          "P50Ms": 30,
+          "P90Ms": 38,
+          "MaxMs": 52
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 34.4,
+          "P50Ms": 32,
+          "P90Ms": 42,
+          "MaxMs": 54
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 921.8855,
+      "rootsPerSecond": 32.542002233466086,
+      "rootP95Ms": 80.72359999999998,
+      "rootP99Ms": 82.17770000000002,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 887.9897,
+      "liveBacklogP99Ms": 918.9867,
+      "testhostCpuMs": 406.25,
+      "testhostWorkingSetBytes": 386441216,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 13,
+        "Lock:advisory": 23
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.3333333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 18.933333333333334,
+          "P50Ms": 18,
+          "P90Ms": 27,
+          "MaxMs": 34
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 30.066666666666666,
+          "P50Ms": 29,
+          "P90Ms": 39,
+          "MaxMs": 43
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 50.333333333333336,
+          "P50Ms": 49,
+          "P90Ms": 63,
+          "MaxMs": 71
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 908.8283,
+      "rootsPerSecond": 33.00953546450963,
+      "rootP95Ms": 74.5385,
+      "rootP99Ms": 74.70240000000001,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 879.6399,
+      "liveBacklogP99Ms": 907.135,
+      "testhostCpuMs": 343.75,
+      "testhostWorkingSetBytes": 386441216,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 13,
+        "Lock:advisory": 24
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.3666666666666667,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 4
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 18.666666666666668,
+          "P50Ms": 18,
+          "P90Ms": 23,
+          "MaxMs": 37
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 29.766666666666666,
+          "P50Ms": 30,
+          "P90Ms": 35,
+          "MaxMs": 40
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 49.8,
+          "P50Ms": 49,
+          "P90Ms": 58,
+          "MaxMs": 64
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 916.0526,
+      "rootsPerSecond": 32.74921112608599,
+      "rootP95Ms": 141.3906,
+      "rootP99Ms": 176.2795,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 888.4586,
+      "liveBacklogP99Ms": 913.8451,
+      "testhostCpuMs": 265.625,
+      "testhostWorkingSetBytes": 386457600,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 12,
+        "Lock:advisory": 80
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.8666666666666667,
+          "P50Ms": 1,
+          "P90Ms": 6,
+          "MaxMs": 8
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 74.6,
+          "P50Ms": 76,
+          "P90Ms": 86,
+          "MaxMs": 112
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 29.2,
+          "P50Ms": 29,
+          "P90Ms": 35,
+          "MaxMs": 37
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 105.66666666666667,
+          "P50Ms": 105,
+          "P90Ms": 120,
+          "MaxMs": 155
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "live-only",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "e59a318b9dbbe555d5185e9a38bba3b165135dd96439e297be5c7cfab00b1d3d",
+      "completedRoots": 30,
+      "attempts": 30,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 842.8788,
+      "rootsPerSecond": 35.592305797701876,
+      "rootP95Ms": 128.87240000000008,
+      "rootP99Ms": 129.80180000000007,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 816.9484,
+      "liveBacklogP99Ms": 841.5648,
+      "testhostCpuMs": 312.5,
+      "testhostWorkingSetBytes": 386519040,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 11,
+        "Lock:advisory": 73
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 30,
+          "MeanMs": 1.1,
+          "P50Ms": 1,
+          "P90Ms": 1,
+          "MaxMs": 2
+        },
+        "Lock": {
+          "Samples": 30,
+          "MeanMs": 69.4,
+          "P50Ms": 72,
+          "P90Ms": 86,
+          "MaxMs": 96
+        },
+        "Store": {
+          "Samples": 30,
+          "MeanMs": 27.566666666666666,
+          "P50Ms": 27,
+          "P90Ms": 31,
+          "MaxMs": 45
+        },
+        "Total": {
+          "Samples": 30,
+          "MeanMs": 98.06666666666666,
+          "P50Ms": 100,
+          "P90Ms": 115,
+          "MaxMs": 121
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 30
+        }
+      ],
+      "tracks": 1,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 1,
+      "repeat": 1,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 6133.4419,
+      "rootsPerSecond": 19.56487107182021,
+      "rootP95Ms": 68.0635999999995,
+      "rootP99Ms": 105.35640000000001,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 6085.0338,
+      "liveBacklogP99Ms": 6129.5855,
+      "testhostCpuMs": 1453.125,
+      "testhostWorkingSetBytes": 386441216,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 69
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.2833333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 4
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.475,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 5
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 37.63333333333333,
+          "P50Ms": 36,
+          "P90Ms": 47,
+          "MaxMs": 93
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 40.391666666666666,
+          "P50Ms": 39,
+          "P90Ms": 49,
+          "MaxMs": 95
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 1,
+      "repeat": 2,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 5462.0978,
+      "rootsPerSecond": 21.969580991391258,
+      "rootP95Ms": 60.13529999999997,
+      "rootP99Ms": 71.50500000000011,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 5419.5976,
+      "liveBacklogP99Ms": 5460.75,
+      "testhostCpuMs": 1484.375,
+      "testhostWorkingSetBytes": 385265664,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 50,
+        "IO:DataFileRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.2333333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 6
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 1.25,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 3
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 33.43333333333333,
+          "P50Ms": 32,
+          "P90Ms": 44,
+          "MaxMs": 105
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 35.916666666666664,
+          "P50Ms": 35,
+          "P90Ms": 47,
+          "MaxMs": 107
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 2,
+      "repeat": 1,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4301.6394,
+      "rootsPerSecond": 27.8963411019529,
+      "rootP95Ms": 95.74389999999994,
+      "rootP99Ms": 194.036,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 4273.8883,
+      "liveBacklogP99Ms": 4299.6197,
+      "testhostCpuMs": 1218.75,
+      "testhostWorkingSetBytes": 385359872,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 67,
+        "Lock:advisory": 94
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.4,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 9
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 23.841666666666665,
+          "P50Ms": 22,
+          "P90Ms": 27,
+          "MaxMs": 125
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 35.65,
+          "P50Ms": 33,
+          "P90Ms": 41,
+          "MaxMs": 162
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 60.891666666666666,
+          "P50Ms": 57,
+          "P90Ms": 70,
+          "MaxMs": 189
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 2,
+      "repeat": 2,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4166.1787,
+      "rootsPerSecond": 28.80337322064462,
+      "rootP95Ms": 88.7844,
+      "rootP99Ms": 111.05369999999994,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 4130.471,
+      "liveBacklogP99Ms": 4163.5447,
+      "testhostCpuMs": 1421.875,
+      "testhostWorkingSetBytes": 385347584,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 68,
+        "Lock:advisory": 96
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.3583333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 10
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 22.916666666666668,
+          "P50Ms": 22,
+          "P90Ms": 29,
+          "MaxMs": 57
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 34.55,
+          "P50Ms": 33,
+          "P90Ms": 42,
+          "MaxMs": 68
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 58.825,
+          "P50Ms": 57,
+          "P90Ms": 72,
+          "MaxMs": 112
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 4,
+      "repeat": 1,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4344.7824,
+      "rootsPerSecond": 27.619334860130166,
+      "rootP95Ms": 235.35900000000038,
+      "rootP99Ms": 245.08350000000019,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 4305.8885,
+      "liveBacklogP99Ms": 4342.5694,
+      "testhostCpuMs": 1578.125,
+      "testhostWorkingSetBytes": 296407040,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 56,
+        "IO:DataFileExtend": 1,
+        "Lock:advisory": 388,
+        "IO:DataFileRead": 1
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.3333333333333333,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 11
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 95.275,
+          "P50Ms": 91,
+          "P90Ms": 113,
+          "MaxMs": 192
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 36.00833333333333,
+          "P50Ms": 34,
+          "P90Ms": 42,
+          "MaxMs": 104
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 132.61666666666667,
+          "P50Ms": 127,
+          "P90Ms": 154,
+          "MaxMs": 234
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    },
+    {
+      "profile": "history-live",
+      "workers": 4,
+      "repeat": 2,
+      "inputHash": "4909d79de142785df851aea18b448f52f85d807024fe888d3aac101dd0be8a00",
+      "completedRoots": 120,
+      "attempts": 120,
+      "errors": 0,
+      "retries": 0,
+      "drainMs": 4154.9473,
+      "rootsPerSecond": 28.881232741507937,
+      "rootP95Ms": 184.82830000000013,
+      "rootP99Ms": 201.42340000000013,
+      "liveRoots": 30,
+      "liveBacklogP95Ms": 4120.2347,
+      "liveBacklogP99Ms": 4152.4081,
+      "testhostCpuMs": 1468.75,
+      "testhostWorkingSetBytes": 296456192,
+      "sqlWaitSamples": {
+        "CPU/runnable:active": 54,
+        "Lock:advisory": 364
+      },
+      "stages": {
+        "Parse": {
+          "Samples": 120,
+          "MeanMs": 1.2833333333333334,
+          "P50Ms": 1,
+          "P90Ms": 2,
+          "MaxMs": 7
+        },
+        "Lock": {
+          "Samples": 120,
+          "MeanMs": 90.8,
+          "P50Ms": 87,
+          "P90Ms": 119,
+          "MaxMs": 151
+        },
+        "Store": {
+          "Samples": 120,
+          "MeanMs": 34.458333333333336,
+          "P50Ms": 33,
+          "P90Ms": 45,
+          "MaxMs": 76
+        },
+        "Total": {
+          "Samples": 120,
+          "MeanMs": 126.54166666666667,
+          "P50Ms": 120,
+          "P90Ms": 163,
+          "MaxMs": 192
+        }
+      },
+      "facts": [
+        {
+          "type": "TargetObserved",
+          "count": 120
+        }
+      ],
+      "tracks": 2,
+      "alerts": 0
+    }
+  ]
+}

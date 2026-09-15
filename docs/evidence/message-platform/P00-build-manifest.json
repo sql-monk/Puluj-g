@@ -1,0 +1,84 @@
+{
+  "baseCommit": "3fa6e9145a15ba3f44472d14db63fdf229ce61f5",
+  "configuration": "Debug/net10.0",
+  "sdk": "10.0.401",
+  "files": [
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/AdvisoryLocks.cs",
+      "sha256": "a5b884f54771f3871ccc12f62bad3d97e817cf4e8fb6ad12ab5d3dcdf4920be7"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Ingestion/ReprocessService.cs",
+      "sha256": "3bda71d6f8bab8667ec1895786e417df7dd72cb7c1dade6dcdbae7f4faa21963"
+    },
+    {
+      "path": "src/Puluj.Processing/Pipeline/RawMessageProcessor.cs",
+      "sha256": "35ac671988e183feed0836217e00450c7557b0bc51f46ffbf5e8041ab1401aa8"
+    },
+    {
+      "path": "src/Puluj.Processing/Correlation/TrackWatchdog.cs",
+      "sha256": "f2eb9e14f46b385f7ec3818bba8fd248071255f8f4ef0521e3d418c744d56ed7"
+    },
+    {
+      "path": "src/Puluj.Processing/Structured/TextAlertSink.cs",
+      "sha256": "158c29bc004dd96ba2285520885b1a406fb05de57dd6ddea16f4220f6da79aee"
+    },
+    {
+      "path": "src/Puluj.Processing/Puluj.Processing.csproj",
+      "sha256": "9219d0bd15e2a39d5bb6cd4055c444395e35a1b59ff12dc39198e7874ee2919e"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/PipelineFixture.cs",
+      "sha256": "77818b3a2c784278cc53eb569ee4a36c8af72141dc1eca0d89b1fabb507a267f"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/ParallelProcessingTests.cs",
+      "sha256": "f36aacad8c60f8740e8b08e04ee4e6781ad6d0ce5f25f8bf0128e4c3487699fc"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/P00ConcurrencyTests.cs",
+      "sha256": "510faa257cf34e3c4d629060262fc2aefb8f325326b7db1b763052a2900738ff"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/P00BaselineTests.cs",
+      "sha256": "2e113a2f4ad10e3ea6c97b109e54223395d0cfbd526a17d8dd8f0d769d833863"
+    },
+    {
+      "path": "scripts/test-p00.ps1",
+      "sha256": "d72940ab05e2084ae4b4ac47906b614ca009113b2b62a6333ad938d20e17eedb"
+    },
+    {
+      "path": "scripts/reprocess.sql",
+      "sha256": "c40d1db094e6a77a2fd4a19b6efd828c63dcba38598487a5955c2f8efecc5564"
+    },
+    {
+      "path": "scripts/reprocess-alerts.sql",
+      "sha256": "080f325fde0899d844a4936f7348bf167a4c42655538cb70e16924822ab90faf"
+    },
+    {
+      "path": "scripts/fix-text-alert-ends.sql",
+      "sha256": "3e961a902a8eb22aab7827108438013aad0eb294f4bd2060437e9f4fd35cee0d"
+    }
+  ],
+  "assemblies": [
+    {
+      "path": "src/Puluj.Processing/bin/Debug/net10.0/Puluj.Processing.dll",
+      "sha256": "033a634b7955f59b3e418e108d897d65bb21fee15dbd6f1f963971c263646418"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/bin/Debug/net10.0/Puluj.Infrastructure.dll",
+      "sha256": "57e7920def9f77a26a3268927cb9b1678cb7b7beaa9632444c964d10bf50d1be"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/bin/Debug/net10.0/Puluj.Integration.Tests.dll",
+      "sha256": "af337283de25dd495c0207bd00b68dc98b60099219db82ead0d1a0a22b803e86"
+    }
+  ],
+  "docs": [
+    "README.md",
+    "docs/README.md",
+    "docs/plan-message-platform.md",
+    "docs/evidence/message-platform/"
+  ],
+  "note": "Pre-existing uncommitted changes were present. File hashes identify tested working-copy content; only P00 hunks in shared files belong to this task."
+}

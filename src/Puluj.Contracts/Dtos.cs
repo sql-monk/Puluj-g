@@ -53,7 +53,8 @@ public sealed record TrackDto(
 /// for a raion, empty for an oblast or Kyiv): the client tells from these which alerts cover a place and which lie inside it.</param>
 public sealed record AlertDto(long Id, int PlaceId, string PlaceName, string AlertType, string Level, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, LocationDto? Location, IReadOnlyList<int> AncestorIds);
 
-public sealed record SnapshotDto(DateTimeOffset At, bool Historical, IReadOnlyList<TrackDto> Tracks, IReadOnlyList<AlertDto> Alerts);
+/// <param name="Events">Short-lived, non-track facts that have a reported location (explosions, air-defence activity, and threat cancellations).</param>
+public sealed record SnapshotDto(DateTimeOffset At, bool Historical, IReadOnlyList<TrackDto> Tracks, IReadOnlyList<AlertDto> Alerts, IReadOnlyList<TargetDto> Events);
 
 /// <summary>
 /// The live map's time windows (GET /api/map/config), so the client and the server agree on what is still on the map:
