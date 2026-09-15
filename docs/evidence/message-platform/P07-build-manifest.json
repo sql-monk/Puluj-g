@@ -1,0 +1,214 @@
+{
+  "task": "P07",
+  "baseCommit": "d4ec6be4fed23616fafdb8cb0065776a6d4635b1",
+  "configuration": "Debug/net10.0",
+  "sdk": "10.0.401",
+  "files": [
+    {
+      "path": "data/taxonomy/event-kinds.json",
+      "status": "??",
+      "sha256": "b5a541bec59b5d8f8c21890f36f7bbe75d4934a35c731c3fed2417a1ccdae2fe"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "M",
+      "sha256": "35d49ae4230f53eda0ffbdfd1b814522afed149058f79a5b33941cbb396234f7"
+    },
+    {
+      "path": "docs/adr/ADR-0008-event-catalog.md",
+      "status": "??",
+      "sha256": "63c8da384a8de46d8b41f2944ddf03b57910e5910b3ec31ba2683d8f65d35f2b"
+    },
+    {
+      "path": "docs/evidence/message-platform/P07-backfill-report.json",
+      "status": "??",
+      "sha256": "91a36c18d5b335ee81b194d3675f9c76b7a1d2fc7f6803a7b397fd5c1a6af8a4"
+    },
+    {
+      "path": "docs/evidence/message-platform/P07-handoff.md",
+      "status": "??",
+      "sha256": "f01802359b69c728b9a10e3b650bfa0c2edc6454260231b228e8fa03560bc16e"
+    },
+    {
+      "path": "docs/evidence/message-platform/P07-plan.md",
+      "status": "M",
+      "sha256": "df8ac4c4ed40f94b0d5d529cc908bcd71700a3757a02725f5aeb680005b13928"
+    },
+    {
+      "path": "scripts/backfill-event-kinds.sql",
+      "status": "??",
+      "sha256": "48e7130c50bb74efddb8c3f9b11628d087420a8f0356511bc96ff0b3d186b91b"
+    },
+    {
+      "path": "src/Puluj.Api/Endpoints/EndpointRouteBuilderExtensions.cs",
+      "status": "M",
+      "sha256": "7568b2003c173cfa7c2f572f647821828da06a8f46b6f236977565b638f4443f"
+    },
+    {
+      "path": "src/Puluj.Api/Services/DtoMapper.cs",
+      "status": "M",
+      "sha256": "24d724c290c299d0e9286f6c0e4bcd0614c2cc719970ff15741bf3f45a1ba95e"
+    },
+    {
+      "path": "src/Puluj.Api/Services/ReferenceCache.cs",
+      "status": "M",
+      "sha256": "bd5e85032b557b829c35f88d838e1ddfb9d1ccfb2ae14fdafdc0417ecceae158"
+    },
+    {
+      "path": "src/Puluj.Contracts/Dtos.cs",
+      "status": "M",
+      "sha256": "71ba7a601d4c87d6201ca08a766478b3f2049d467bf85b116ced7abea4b9bf55"
+    },
+    {
+      "path": "src/Puluj.Domain/Entities/EventKind.cs",
+      "status": "??",
+      "sha256": "49ef5f80aa62ce9f9fce89664c0f6b025f7e9bcc0e9470026cdd2233c445b1b0"
+    },
+    {
+      "path": "src/Puluj.Domain/Entities/Target.cs",
+      "status": "M",
+      "sha256": "9d35d2041d01ce8e6d771945be170537c3a5a2baeb766be1bb7471eca01ebeef"
+    },
+    {
+      "path": "src/Puluj.Domain/Enums/Enums.cs",
+      "status": "M",
+      "sha256": "55a5ff20eab92352fffeb51951cc2f2a582777243bc87b9d58c264f4ba79d5cb"
+    },
+    {
+      "path": "src/Puluj.Domain/EventKindCodes.cs",
+      "status": "??",
+      "sha256": "9e95f963b29a232a6dc6ca09027d671762a478d4bb469a4d7c430821dc4ab3b3"
+    },
+    {
+      "path": "src/Puluj.Domain/EventKindLegacyMap.cs",
+      "status": "??",
+      "sha256": "df451689a69e6c9d9fdcacabb654bc5edcee38fe0fc129de4292db17f1130e44"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/DependencyInjection.cs",
+      "status": "M",
+      "sha256": "040dd68a11232d8754ac9fbfb46c95aa8e3d96f46a8e89896ca8d478d61fa3ce"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Configurations/TargetConfiguration.cs",
+      "status": "M",
+      "sha256": "5faab01ed3d790a46554e14d44f212ed09cba60f62b36f94b2bebdda60758fdb"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/20260915132238_AddEventKinds.Designer.cs",
+      "status": "??",
+      "sha256": "400a64461357ebf1ed205c032c034b3009c29903e9217e9f79402f86d3ef5855"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/20260915132238_AddEventKinds.cs",
+      "status": "??",
+      "sha256": "9894549a99a6b498b370afe254248cc0eb81c5afea51db5a88580fd750d8fb0d"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/PulujDbContextModelSnapshot.cs",
+      "status": "M",
+      "sha256": "6f3806b1c35e75f7872dcc6b5f8ac94527633894d14aa487af70cbaad6381a35"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/PulujDbContext.cs",
+      "status": "M",
+      "sha256": "ffdb66a66cf2174dd5d3bae9f104f8b9272781c28f6e446a946c42ede87c4d4f"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Seeding/EventKindBackfill.cs",
+      "status": "??",
+      "sha256": "16ecf0e1dddbda26b2a3452065597f699a253d1d30554ea0d0ab3a47bf6f142d"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Seeding/EventKindSeeder.cs",
+      "status": "??",
+      "sha256": "156db87ba053bdb434eae53f844899d369fcd2d1d0dc2bfc2ea13194c4c803a3"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Seeding/SeedOptions.cs",
+      "status": "M",
+      "sha256": "989468f2463af62a02cd464df4e93ec23346631bc59decfe63b742e0a2583fa2"
+    },
+    {
+      "path": "src/Puluj.Processing/Indexes/EventKindIndex.cs",
+      "status": "??",
+      "sha256": "0a5d66e649b9c63cbd091d9f90d78a3c2326f6cf2e51f631011130a8e8442bdb"
+    },
+    {
+      "path": "src/Puluj.Processing/Indexes/IIndexes.cs",
+      "status": "M",
+      "sha256": "55429cfd7f187f8fd00566de08c0dc3387bbda8306fa5b4a1316477d08b18a43"
+    },
+    {
+      "path": "src/Puluj.Processing/Indexes/IndexProvider.cs",
+      "status": "M",
+      "sha256": "1f95f264268a900f48128737e6c2f18108178fc80338bd64f3771b5689a87b2f"
+    },
+    {
+      "path": "src/Puluj.Processing/Pipeline/RawMessageProcessor.cs",
+      "status": "M",
+      "sha256": "c1d3b5e3a631772711f626a497b0c053dbe6feb50748606eced039a328722be6"
+    },
+    {
+      "path": "tests/Puluj.Api.Tests/EventKindDtoTests.cs",
+      "status": "??",
+      "sha256": "6fed4a16f5612e079803ab35e0da5e499d45e62927fbcc21ea0bd4fe5d1620eb"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/P07EventKindTests.cs",
+      "status": "??",
+      "sha256": "02ff197814f105e23a0edc3834c14c2111e6b8dfc204341c2c3c5c90c8c4f0cb"
+    },
+    {
+      "path": "tests/Puluj.Processing.Tests/Parsing/ParserBenchTests.cs",
+      "status": "M",
+      "sha256": "2d12811d04ab4659434f9086fa980483a5d5fd811540eaebedd49da20a5ed170"
+    },
+    {
+      "path": "tests/Puluj.Processing.Tests/Seeding/EventKindCatalogTests.cs",
+      "status": "??",
+      "sha256": "66be38e4c3382c8c5f095779218144e9740eaa6f007269e17ccba8d520ab8fff"
+    },
+    {
+      "path": "tests/Puluj.Processing.Tests/Support/StaticIndexes.cs",
+      "status": "M",
+      "sha256": "8fcfc56207a0aa422ce1122d3b6acd28b4d98caf7b992e333bfa6cee25761358"
+    }
+  ],
+  "assemblies": [
+    {
+      "path": "src/Puluj.Domain/bin/Debug/net10.0/Puluj.Domain.dll",
+      "sha256": "78d3e1cd3359abf286b278e64f26be7d6c38d12c61c54803eac857fb49c98eb2"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/bin/Debug/net10.0/Puluj.Infrastructure.dll",
+      "sha256": "5c9c88d9588b63027293f95bd63abcf132c779993cda82d84f88da4acd7a564b"
+    },
+    {
+      "path": "src/Puluj.Processing/bin/Debug/net10.0/Puluj.Processing.dll",
+      "sha256": "4d2e7d4ed6a8caa2a3a62c556faf95165bef803e8b3c1107a3cc211159e2243b"
+    },
+    {
+      "path": "src/Puluj.Api/bin/Debug/net10.0/Puluj.Api.dll",
+      "sha256": "60cc8feddde8018d108587225212324b6ea39bda220fe890e5d59103ed1a1a1b"
+    },
+    {
+      "path": "src/Puluj.Contracts/bin/Debug/net10.0/Puluj.Contracts.dll",
+      "sha256": "4f5bc759673af8d91c4420fca8edadc28d00d4ebaa70c7a8b050e4b881276a84"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/bin/Debug/net10.0/Puluj.Integration.Tests.dll",
+      "sha256": "354bd81ad3cbdbd178554430e5e8982b95761d3f53089e3f3e12d2d51bbdf339"
+    }
+  ],
+  "testResults": [
+    "p07-Puluj.Admin.Tests.trx",
+    "p07-Puluj.Analytics.Tests.trx",
+    "p07-Puluj.Api.Tests.trx",
+    "p07-Puluj.Integration.Tests.trx",
+    "p07-Puluj.Messaging.Contracts.Tests.trx",
+    "p07-Puluj.Processing.Tests.trx",
+    "p07-integration-run1.trx"
+  ],
+  "note": "Файли ownership P07 (src/, data/taxonomy/event-kinds.json, міграція AddEventKinds, scripts/backfill-event-kinds.sql, тести, ADR-0008, docs/README.md, P07-* evidence). Паралельні незакомічені зміни P01/P02 (contracts/, ADR-0001..0007, Directory.Packages.props, Puluj.sln, deploy/) не входять."
+}

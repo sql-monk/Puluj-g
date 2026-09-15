@@ -11,8 +11,8 @@ ADR фіксують рішення програми [`plan-message-platform.md`
 
 | ADR | Тема | Статус | Задача | Закриває / відкрите |
 |---|---|---|---|---|
-| [0001](ADR-0001-transport.md) | Транспорт: RabbitMQ topic exchange + quorum queues; альтернативи | proposed | P01 | Версії/deployment profile — P02 |
-| [0002](ADR-0002-topology-subscriptions.md) | Topology, registry підписок, «видалити після всіх», DLQ, waiver | proposed | P01 | Broker arguments — P02; runtime registry — P03 |
+| [0001](ADR-0001-transport.md) | Транспорт: RabbitMQ topic exchange + quorum queues; альтернативи | accepted (P02, go) | P01, P02 | HA profile/loss of quorum — P16; batch confirms — P03 |
+| [0002](ADR-0002-topology-subscriptions.md) | Topology, registry підписок, «видалити після всіх», DLQ, waiver | accepted (P02) | P01, P02 | Runtime registry/receipts — P03 |
 | [0003](ADR-0003-identities-versioning.md) | Identities (event, raw, run), timestamps, schema/topology versions, сумісність | proposed | P01 | Unique hash migration, нові джерела — P04 |
 | [0004](ADR-0004-delivery-guarantees.md) | Outbox/inbox, ACK після commit, crash windows W1–W14 | proposed | P01 | Crash tests — P02/P03 |
 | [0005](ADR-0005-runs-completion.md) | Runs/generations/lanes, completion manifest, terminal outcomes, workflow status | proposed | P01 | Orchestration — P14 |

@@ -1,7 +1,7 @@
 {
   "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для майбутнього runtime (P02/P03). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закриває P02.",
   "topology_version": 1,
-  "status": "proposed",
+  "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
   "queue_name_pattern": "puluj.{subscription_id}.{lane}",
@@ -157,9 +157,11 @@
     }
   },
   "queue_policies": {
-    "$comment": "Абстрактні політики; відображення на broker arguments закриває P02. ttl:none і drop_oldest:false обов'язкові для required.",
-    "required": { "durable": true, "ttl": "none", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5 },
-    "optional": { "durable": true, "ttl": "bounded", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5 }
+    "$comment": "Абстрактні політики + broker_arguments (P02, RabbitMQ 4.3 quorum). Delivery-limit (RabbitMQ >= 4.3, за офіційною документацією Poison Message Handling): x-delivery-limit рахує redeliveries за x-delivery-count; інкрементують його basic.reject(requeue=true), crash/закриття каналу чи з'єднання з unacked; НЕ інкрементують basic.nack(requeue=true) і consumer timeout (до 4.3 ліміт рахувався за acquired-count). Тому бізнес-retry P03 робить через basic.nack(requeue=true) з лічильником у processing.attempts (max_delivery_attempts), а x-delivery-limit = max_delivery_attempts-1 — запобіжник crash loop. Dead-lettering at-least-once потребує x-overflow=reject-publish; DLX/DLQ routing додає declarer. ttl:none і drop_oldest:false обов'язкові для required.",
+    "required": { "durable": true, "ttl": "none", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5,
+      "broker_arguments": { "x-queue-type": "quorum", "x-delivery-limit": 4, "x-dead-letter-strategy": "at-least-once", "x-overflow": "reject-publish" } },
+    "optional": { "durable": true, "ttl": "bounded", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5,
+      "broker_arguments": { "x-queue-type": "quorum", "x-delivery-limit": 4, "x-dead-letter-strategy": "at-least-once", "x-overflow": "reject-publish" } }
   },
   "subscriptions": {
     "raw-writer": {
@@ -245,5 +247,12 @@
     "alert.changed": ["AlertChanged"],
     "observations.recorded": ["TargetCreated"],
     "raw.stored": ["RawMessageStored"]
+  },
+  "broker": {
+    "$comment": "Закріплено P02 spike (ADR-0001): server image, .NET client, Testcontainers.",
+    "server_image": "rabbitmq:4.3-management", "client": "RabbitMQ.Client 7.2.2", "testcontainers": "Testcontainers.RabbitMq 4.15.0",
+    "dead_letter_exchange": "puluj.dlx", "dead_letter_exchange_type": "direct",
+    "publisher": { "persistent": true, "confirms": true, "mandatory": true },
+    "consumer": { "manual_ack": true, "default_prefetch": 10 }
   }
 }

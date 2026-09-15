@@ -23,6 +23,8 @@ public sealed class ReferenceCache(IDbContextFactory<PulujDbContext> factory, IL
     /// <summary>Parent → children, rebuilt with <see cref="Places"/>: the descendant walk for alert history.</summary>
     private ILookup<int, int> _children = Array.Empty<PlaceInfo>().ToLookup(p => 0, p => p.Id);
     public IReadOnlyDictionary<int, Source> Sources { get; private set; } = new Dictionary<int, Source>();
+    /// <summary>Plan §8.2 event catalog by id; the DTO mapper resolves targets.event_kind_id to its code from here.</summary>
+    public IReadOnlyDictionary<int, EventKind> EventKinds { get; private set; } = new Dictionary<int, EventKind>();
     public TaxonomyDto Taxonomy { get; private set; } = new([]);
 
     public Task Ready => _ready.Task;
@@ -146,6 +148,7 @@ public sealed class ReferenceCache(IDbContextFactory<PulujDbContext> factory, IL
         Families = await db.TargetFamilies.AsNoTracking().ToDictionaryAsync(x => x.TargetFamilyId, ct);
         Models = await db.TargetModels.AsNoTracking().ToDictionaryAsync(x => x.TargetModelId, ct);
         Sources = await db.Sources.AsNoTracking().ToDictionaryAsync(x => x.SourceId, ct);
+        EventKinds = await db.EventKinds.AsNoTracking().ToDictionaryAsync(x => x.EventKindId, ct);
         Places = (await db.Places.AsNoTracking()
                 .Select(p => new { p.PlaceId, p.Name, p.Level, p.ParentId, p.CountryCode, p.Centroid, p.RadiusKm, p.Population })
                 .ToListAsync(ct))

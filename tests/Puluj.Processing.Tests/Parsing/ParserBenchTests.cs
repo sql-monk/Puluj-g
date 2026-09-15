@@ -22,6 +22,7 @@ public sealed class ParserBenchTests(ITestOutputHelper output)
     {
         public TaxonomyIndex Taxonomy => taxonomy;
         public GazetteerIndex Gazetteer => gazetteer;
+        public EventKindIndex EventKinds => EventKindIndex.Empty;
     }
 
     [Fact]

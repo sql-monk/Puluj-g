@@ -46,6 +46,29 @@ services:
       timeout: 5s
       retries: 20
 
+  # RabbitMQ dev profile (ADR-0001, P02 spike): single node, quorum queues, management UI on 15672.
+  # Not part of the default deploy: no service consumes it until P03 (`docker compose --profile broker up -d rabbitmq`).
+  # HA (3 fault domains) is not provided by this profile.
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    profiles: ["broker"]
+    hostname: puluj-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-puluj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-puluj}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
   # Applies migrations (including the puluj_reader / puluj_admin roles) and the seed data, then exits.
   # Every other service waits for it, so a schema change is applied exactly once before anything starts.
   migrate:
@@ -190,3 +213,6 @@ volumes:
     external: true
   tgsession:
   logs:
+  # RabbitMQ node data (quorum queue segments). Broker is transport, not the source of truth (ADR-0004): losing it
+  # loses only unconsumed transport copies, which the outbox/archive re-publish.
+  rabbitmq:

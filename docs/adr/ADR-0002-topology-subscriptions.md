@@ -1,6 +1,6 @@
 # ADR-0002 — Topology, registry підписок і семантика «видалити після всіх»
 
-Статус: **proposed** (P01). Machine-readable джерело: [`contracts/messaging/topology.json`](../../contracts/messaging/topology.json)
+Статус: **accepted** (P02 spike підтвердив declare/bindings/DLQ/lanes на RabbitMQ 4.3; запропоновано P01). Machine-readable джерело: [`contracts/messaging/topology.json`](../../contracts/messaging/topology.json)
 (`topology_version` = 1), AsyncAPI — [`asyncapi.yaml`](../../contracts/messaging/asyncapi.yaml). Вимоги: plan §3.2, §4, §6.3, §15.2.
 
 ## Контекст
@@ -63,12 +63,29 @@ owner перевіряє `expected_revision`/час і або застосову
 `queue_policies.required`: durable, `ttl: none`, `drop_oldest: false`, `dlq: true`, `max_delivery_attempts: 5`.
 Для required черг заборонені message TTL / max-length з drop-head, що тихо викидають недоставлене; при
 disk/memory alarm брокера producer отримує backpressure, непідтверджене лишається в outbox, alarm видимий
-(ADR-0004 W13). Відображення на конкретні `x-*` аргументи, DLX і `delivery-limit` — P02.
+(ADR-0004 W13).
+
+Broker arguments (закріплено P02, `topology.json.queue_policies.*.broker_arguments`):
+`x-queue-type: quorum`, `x-delivery-limit: 4` (= `max_delivery_attempts − 1` redeliveries після crash loop),
+`x-dead-letter-strategy: at-least-once` + `x-overflow: reject-publish` (обов'язкова пара для at-least-once
+dead-lettering), `x-dead-letter-exchange: puluj.dlx` (direct) + `x-dead-letter-routing-key = <dlq name>` — додає
+declarer; DLQ — теж quorum. Delivery-limit (RabbitMQ ≥ 4.3, [Poison Message Handling](https://www.rabbitmq.com/docs/quorum-queues)):
+`x-delivery-count` інкрементують `basic.reject(requeue=true)` і crash/закриття каналу з unacked; **не** інкрементують
+`basic.nack(requeue=true)` (лише `x-acquired-count`) і consumer timeout. Бізнес-retries та їх ліміт — у `processing.attempts`
+через `basic.nack(requeue=true)` (ADR-0001 п.8); `x-delivery-limit` — запобіжник crash loop.
+
+Інваріанти declare для P03: (1) `x-*` queue arguments незмінні після створення — повторний declare з іншими
+аргументами дає `PRECONDITION_FAILED`; змінювані параметри (delivery-limit, overflow тощо) задавати **policies**, у
+arguments лишати лише `x-queue-type` і DLX routing, або мігрувати чергу через нову назву + transfer; (2) DLX і DLQ
+оголошуються **до** основної черги: at-least-once dead-lettering тримає повідомлення в source queue до підтвердження DLQ.
 
 ### Readiness і reconciliation
 
-- Readiness воркера = усі required queues/bindings своєї `topology_version` існують; інакше not ready
-  і alarm «missing required binding». `mandatory`/confirms не доводять існування очікуваних підписок.
+- Readiness воркера = усі required queues **і bindings** своєї `topology_version` існують; інакше not ready
+  і alarm «missing required binding». Passive declare черги (spike C08) бачить лише відсутню чергу, **не** drift
+  bindings живої черги — bindings перевіряти через management API `/api/queues/{vhost}/{queue}/bindings` (як G00)
+  або `queue.bind` idempotent при старті + reconciliation (P03). `mandatory`/confirms не доводять існування
+  очікуваних підписок.
 - Reconciliation (producer-side роль) звіряє `processing.deliveries` з registry: expected без receipt довше
   за SLO → alarm; receipts від підписок, яких немає в registry поточної версії → аудит.
 - Новий consumer/binding отримує лише нові події після активації; минулі — окремим backfill із
@@ -102,7 +119,9 @@ disk/memory alarm брокера producer отримує backpressure, непі�
 
 | Питання | Задача |
 |---|---|
-| Broker arguments (quorum size, DLX, delivery-limit, prefetch за роллю), поведінка при alarm | P02 |
+| Prefetch за роллю (за вимірами), batch confirms у relay | P03 |
+| Relay розрізняє `PublishException`: return (`IsReturn`/`PublishReturnException`, unroutable → alarm missing binding, без retry) vs nack брокера (→ retry) | P03 |
+| Readiness bindings через management API/reconciliation; policies замість `x-*` arguments для змінюваних параметрів | P03 |
 | Runtime registry loader, readiness/health, reconciliation job, receipts | P03 |
 | Чи потрібна окрема `history` черга для `projection` (зараз так) чи достатньо live з event-time | P11 |
 | Retire NOTIFY bridge | P11 |

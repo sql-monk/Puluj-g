@@ -1,0 +1,97 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="081de19a-4e34-47b6-b095-8fa77830ea52" name="aleks@ASUS-MONK 2026-09-15 16:37:31" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-15T16:37:31.5468730+03:00" queuing="2026-09-15T16:37:31.5468734+03:00" start="2026-09-15T16:36:48.7201992+03:00" finish="2026-09-15T16:37:45.9403717+03:00" />
+  <TestSettings name="default" id="21877d12-4d10-4a3c-88d6-5d36db09a612">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-15_16_37_31" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="32529620-cd37-4b93-b2b6-0a416d8c1899" testId="155931dd-c377-e790-3086-26fdba1ba74e" testName="Puluj.Integration.Tests.P07EventKindTests.Seed_parity_reseed_is_a_noop_and_newer_policy_refreshes_presentation_only" computerName="ASUS-MONK" duration="00:00:00.1318622" startTime="2026-09-15T16:37:33.4236883+03:00" endTime="2026-09-15T16:37:33.5559136+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="32529620-cd37-4b93-b2b6-0a416d8c1899" />
+    <UnitTestResult executionId="9b909448-8bbd-454a-9a37-ae5bed13e943" testId="4bc5d380-36ac-e89a-d789-9323c112df7d" testName="Puluj.Integration.Tests.P07EventKindTests.Migration_down_removes_catalog_and_up_restores_it" computerName="ASUS-MONK" duration="00:00:09.9002294" startTime="2026-09-15T16:37:35.4027541+03:00" endTime="2026-09-15T16:37:45.3030163+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9b909448-8bbd-454a-9a37-ae5bed13e943" />
+    <UnitTestResult executionId="e423aefd-a2e9-4adc-ba64-71b3464fdcfa" testId="0fa6ca7c-865d-0882-5fde-b5c8c28ed76d" testName="Puluj.Integration.Tests.P07EventKindTests.Backfill_maps_every_legacy_value_reports_unresolved_and_is_idempotent" computerName="ASUS-MONK" duration="00:00:00.1951647" startTime="2026-09-15T16:37:33.2301586+03:00" endTime="2026-09-15T16:37:33.4234257+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e423aefd-a2e9-4adc-ba64-71b3464fdcfa" />
+    <UnitTestResult executionId="f4a47d14-3efa-4c50-bbac-d0547141a45c" testId="101973e5-6327-2fce-c4fa-54af068e49e2" testName="Puluj.Integration.Tests.P07EventKindTests.Foreign_key_restricts_delete_of_a_referenced_kind_and_code_is_unique" computerName="ASUS-MONK" duration="00:00:00.2736296" startTime="2026-09-15T16:37:30.0149749+03:00" endTime="2026-09-15T16:37:30.2880921+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f4a47d14-3efa-4c50-bbac-d0547141a45c" />
+    <UnitTestResult executionId="d3cfcff3-b0fb-4828-9231-05a947850f0f" testId="6d0c2232-1fbc-23bc-513f-72722b268dd3" testName="Puluj.Integration.Tests.P07EventKindTests.Production_shaped_backfill_of_50k_targets_uses_the_kind_index" computerName="ASUS-MONK" duration="00:00:02.9364097" startTime="2026-09-15T16:37:30.3055874+03:00" endTime="2026-09-15T16:37:33.2279373+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d3cfcff3-b0fb-4828-9231-05a947850f0f" />
+    <UnitTestResult executionId="c4a2afcf-c7ef-4933-8db6-20c4aa1e707c" testId="ae3a2028-556e-4915-4de1-e5a818e355c9" testName="Puluj.Integration.Tests.P07EventKindTests.Pipeline_writes_catalog_id_next_to_legacy_enum_for_text_and_structured_messages" computerName="ASUS-MONK" duration="00:00:01.8455621" startTime="2026-09-15T16:37:33.5562675+03:00" endTime="2026-09-15T16:37:35.4025618+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c4a2afcf-c7ef-4933-8db6-20c4aa1e707c" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Migration_down_removes_catalog_and_up_restores_it" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="4bc5d380-36ac-e89a-d789-9323c112df7d">
+      <Execution id="9b909448-8bbd-454a-9a37-ae5bed13e943" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Migration_down_removes_catalog_and_up_restores_it" />
+    </UnitTest>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Production_shaped_backfill_of_50k_targets_uses_the_kind_index" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="6d0c2232-1fbc-23bc-513f-72722b268dd3">
+      <Execution id="d3cfcff3-b0fb-4828-9231-05a947850f0f" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Production_shaped_backfill_of_50k_targets_uses_the_kind_index" />
+    </UnitTest>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Backfill_maps_every_legacy_value_reports_unresolved_and_is_idempotent" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="0fa6ca7c-865d-0882-5fde-b5c8c28ed76d">
+      <Execution id="e423aefd-a2e9-4adc-ba64-71b3464fdcfa" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Backfill_maps_every_legacy_value_reports_unresolved_and_is_idempotent" />
+    </UnitTest>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Pipeline_writes_catalog_id_next_to_legacy_enum_for_text_and_structured_messages" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="ae3a2028-556e-4915-4de1-e5a818e355c9">
+      <Execution id="c4a2afcf-c7ef-4933-8db6-20c4aa1e707c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Pipeline_writes_catalog_id_next_to_legacy_enum_for_text_and_structured_messages" />
+    </UnitTest>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Foreign_key_restricts_delete_of_a_referenced_kind_and_code_is_unique" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="101973e5-6327-2fce-c4fa-54af068e49e2">
+      <Execution id="f4a47d14-3efa-4c50-bbac-d0547141a45c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Foreign_key_restricts_delete_of_a_referenced_kind_and_code_is_unique" />
+    </UnitTest>
+    <UnitTest name="Puluj.Integration.Tests.P07EventKindTests.Seed_parity_reseed_is_a_noop_and_newer_policy_refreshes_presentation_only" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="155931dd-c377-e790-3086-26fdba1ba74e">
+      <Execution id="32529620-cd37-4b93-b2b6-0a416d8c1899" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.P07EventKindTests" name="Seed_parity_reseed_is_a_noop_and_newer_policy_refreshes_presentation_only" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="155931dd-c377-e790-3086-26fdba1ba74e" executionId="32529620-cd37-4b93-b2b6-0a416d8c1899" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4bc5d380-36ac-e89a-d789-9323c112df7d" executionId="9b909448-8bbd-454a-9a37-ae5bed13e943" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0fa6ca7c-865d-0882-5fde-b5c8c28ed76d" executionId="e423aefd-a2e9-4adc-ba64-71b3464fdcfa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="101973e5-6327-2fce-c4fa-54af068e49e2" executionId="f4a47d14-3efa-4c50-bbac-d0547141a45c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6d0c2232-1fbc-23bc-513f-72722b268dd3" executionId="d3cfcff3-b0fb-4828-9231-05a947850f0f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ae3a2028-556e-4915-4de1-e5a818e355c9" executionId="c4a2afcf-c7ef-4933-8db6-20c4aa1e707c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="6" executed="6" passed="6" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.71]   Discovering: Puluj.Integration.Tests&#xD;
+[xUnit.net 00:00:00.77]   Discovered:  Puluj.Integration.Tests&#xD;
+[xUnit.net 00:00:00.80]   Starting:    Puluj.Integration.Tests&#xD;
+[testcontainers.org 00:00:00.14] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.42] Docker container 0f9ad4b780ab created&#xD;
+[testcontainers.org 00:00:00.58] Start Docker container 0f9ad4b780ab&#xD;
+[testcontainers.org 00:00:00.82] Wait for Docker container 0f9ad4b780ab to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.89] Docker container 0f9ad4b780ab ready&#xD;
+[testcontainers.org 00:00:02.09] Docker container 627672ac12e6 created&#xD;
+[testcontainers.org 00:00:02.15] Start Docker container 627672ac12e6&#xD;
+[testcontainers.org 00:00:02.39] Wait for Docker container 627672ac12e6 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.41] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 627672ac12e6&#xD;
+[testcontainers.org 00:00:03.61] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 627672ac12e6&#xD;
+[testcontainers.org 00:00:04.70] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 627672ac12e6&#xD;
+[testcontainers.org 00:00:05.80] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 627672ac12e6&#xD;
+[testcontainers.org 00:00:05.88] Docker container 627672ac12e6 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (3ms) [Parameters=[@p0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']&#xD;
+      DELETE FROM event_kinds WHERE event_kind_id = @p0&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      INSERT INTO event_kinds (code, name_uk, category, requires_location_for_map, creates_incident, enabled, map_visible, sort_order, policy_version) VALUES ('target.observed', 'dup', 'target', false, false, true, true, 0, 1)&#xD;
+[testcontainers.org 00:00:55.15] Delete Docker container 627672ac12e6&#xD;
+[xUnit.net 00:00:56.54]   Finished:    Puluj.Integration.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

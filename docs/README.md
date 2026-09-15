@@ -340,6 +340,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `air_alerts` | інтервали тривог по областях (лише зі структурованих джерел) |
 | `places` | газетир: області/зони, райони (`cod:UA…`, District) і громади (Hromada) з COD-AB (полігони, батько = область/район за пcode/центроїдом), населені пункти (точки), варіанти назв-стемів (для районів і громад — лише повні форми «бахмутськ район», «вовчанськ громад»), радіус |
 | `target_categories → classes → families → models`, `target_model_aliases` | таксономія з `metadata` (швидкість, fade, вікно кореляції) та словник назв |
+| `event_kinds` | каталог видів подій (P07, [ADR-0008](adr/ADR-0008-event-catalog.md)): стабільний `code`, `category` (`target/alert/incident/info`), map policy, `policy_version`; `targets.event_kind_id` (nullable, compatibility window поряд з `event_type`) заповнюється writer-ом і батчевим backfill |
 | `collector_states`, `processing_errors` | курсори/здоров'я колекторів, помилки |
 
 Ланцюжок походження: карта → трек → зв'язки → факти → оригінали → джерело → URL. Нічого не видаляється.
@@ -358,6 +359,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `GET /api/alerts/history?placeId=&hours=` | тривоги, що стосуються місця, за останні `hours` (до 14 діб), новіші перші: на самому місці, на його предках і на нащадках (`ReferenceCache.Related`); `AlertDto.ancestorIds` — предки місця тривоги від найближчого |
 | `GET /api/targets?since&until&limit` | стрічка спостережень (новіші перші), не глибше вікна стрічки (типово 6 год); `until` — для вікна відтворення (не глибше 36 год) |
 | `GET /api/taxonomy`, `/api/sources` | довідники; в таксономії — швидкості, fade, `displayMode` |
+| `GET /api/event-kinds` | каталог видів подій (лише `enabled`): `code`, `category`, map policy, `legacyEventType`; `TargetDto.eventKindCode` — той самий код на факті |
 | `GET /api/stats?from&to` | сторінка «Статистика»: усі графіки одного періоду одним payload (`StatsDto`: KPI, динаміка за категоріями, класи, області, маршрути «звідки → куди», година × день тижня, зрізи, тривоги по областях і тривалості, джерела). Без параметрів — 24 год; кінець обрізається до «зараз», довжина — до 366 днів; крок `hour`/`day`/`week` (≤ 3 дні / ≤ 120 днів / далі), бакети в `Europe/Kyiv`. Кеш 2 хв на період, клієнт округлює кінець до 5 хв. Лише агрегати — нічого про глядача |
 | `GET /api/places/search?q=`, `/api/places/regions`, `/api/places/{id}/geometry` | пошук пункту (лише центроїд), полігони регіонів і районів Києва (кеш 1 год) |
 | `GET /api/health` | БД + свіжість колекторів: `ok` / `stale` (немає успіху > 3× інтервалу → `Degraded`) / `idle` (колектор вимкнено) |
@@ -498,7 +500,8 @@ eta_min = (d_edge, або max(0, d − accuracy)) / v_max − elapsed;   eta_max
 | нова назва загрози | `data/taxonomy/aliases*.json`: `{alias (стем), target: "family:SHAHED", lang, confidence, exact?, priority?}` | рестарт Worker + кейс у `data/corpus/cases.json` |
 | нова модель / швидкість / fade / вікно кореляції | `data/taxonomy/models.json`, `taxonomy.json` (`metadata`) | рестарт Worker; клієнт бере з `/api/taxonomy` |
 | розмовна назва області, нова акваторія | `data/gazetteer/regions.json` | рестарт Worker |
+| новий вид події / колір / іконка / час на мапі | `data/taxonomy/event-kinds.json` (`kinds[]`, підняти `policyVersion` для оновлення presentation існуючих кодів; `code` не змінювати) | рестарт Worker; `/api/event-kinds`; правила розпізнавання — окремо (P08) |
 | емодзі-позначення каналу | `Normalizer.EmojiWords` (єдине місце в коді) | збірка |
 
-Aliases і місця, видалені з seed-файлів, видаляються і з БД при наступному старті. Діаграми — `diagrams/build.py`
+Aliases і місця, видалені з seed-файлів, видаляються і з БД при наступному старті; `event_kinds` — ні (БД володіє каталогом, seed лише додає/оновлює presentation). Діаграми — `diagrams/build.py`
 (→ `.drawio` → `export.mjs` → `.png`), див. `diagrams/README.md`.

@@ -163,6 +163,108 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("collector_states", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKind", b =>
+                {
+                    b.Property<int>("EventKindId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("event_kind_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("EventKindId"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("CreatesIncident")
+                        .HasColumnType("boolean")
+                        .HasColumnName("creates_incident");
+
+                    b.Property<JsonDocument>("DedupPolicy")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("dedup_policy");
+
+                    b.Property<string>("DefaultSeverity")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("default_severity");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("MapColor")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("map_color");
+
+                    b.Property<string>("MapIcon")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("map_icon");
+
+                    b.Property<TimeSpan?>("MapLifetime")
+                        .HasColumnType("interval")
+                        .HasColumnName("map_lifetime");
+
+                    b.Property<bool>("MapVisible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("map_visible");
+
+                    b.Property<JsonDocument>("Metadata")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata");
+
+                    b.Property<string>("NameUk")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name_uk");
+
+                    b.Property<int>("PolicyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("policy_version");
+
+                    b.Property<JsonDocument>("Presentation")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("presentation");
+
+                    b.Property<string>("RenderMode")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("render_mode");
+
+                    b.Property<bool>("RequiresLocationForMap")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_location_for_map");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("StateModel")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("state_model");
+
+                    b.HasKey("EventKindId")
+                        .HasName("pk_event_kinds");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_kinds_code");
+
+                    b.ToTable("event_kinds", (string)null);
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.LlmRequest", b =>
                 {
                     b.Property<long>("LlmRequestId")
@@ -705,6 +807,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("duplicate_of_target_id");
 
+                    b.Property<int?>("EventKindId")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_kind_id");
+
                     b.Property<int>("EventType")
                         .HasColumnType("integer")
                         .HasColumnName("event_type");
@@ -832,6 +938,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TargetModelId")
                         .HasDatabaseName("ix_targets_target_model_id");
+
+                    b.HasIndex("EventKindId", "ObservedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_targets_event_kind_id_observed_at");
 
                     b.HasIndex("TargetCategoryId", "ObservedAt")
                         .HasDatabaseName("ix_targets_target_category_id_observed_at");
@@ -1514,6 +1624,12 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_targets_targets_duplicate_of_target_id");
 
+                    b.HasOne("Puluj.Domain.Entities.EventKind", "EventKind")
+                        .WithMany()
+                        .HasForeignKey("EventKindId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_targets_event_kinds_event_kind_id");
+
                     b.HasOne("Puluj.Domain.Entities.Place", "LocationPlace")
                         .WithMany()
                         .HasForeignKey("LocationPlaceId")
@@ -1563,6 +1679,8 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TargetModelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_targets_target_models_target_model_id");
+
+                    b.Navigation("EventKind");
 
                     b.Navigation("LocationPlace");
 

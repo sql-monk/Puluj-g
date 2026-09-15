@@ -17,6 +17,12 @@ public class Target
 
     public DateTimeOffset ObservedAt { get; set; }
     public EventType EventType { get; set; }
+    /// <summary>
+    /// Plan §8.2. Catalog kind of this fact (event_kinds.code). Written together with the legacy <see cref="EventType"/>
+    /// during the compatibility window; null for rows the backfill has not reached yet or when the catalog was empty.
+    /// </summary>
+    public int? EventKindId { get; set; }
+    public EventKind? EventKind { get; set; }
     /// <summary>For AirRaidAlert events: the level the source stated ("жовтий рівень"), if any.</summary>
     public AirAlertLevel AlertLevel { get; set; }
 

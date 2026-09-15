@@ -1,5 +1,6 @@
 using NetTopologySuite.Geometries;
 using Puluj.Contracts;
+using Puluj.Domain;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Persistence;
@@ -113,8 +114,14 @@ public sealed class DtoMapper(ReferenceCache refs)
             Direction(o.DirectionKind, o.DirectionDeg, o.DirectionConfidence),
             o.ObjectCount, o.ObjectCountIsApproximate,
             o.IdentificationMethod.ToString(), o.IdentificationSource, o.SegmentText, o.DuplicateOfTargetId,
-            associationConfidence, source, RawMessage(o.RawMessage!), trackId, links ?? []);
+            associationConfidence, source, RawMessage(o.RawMessage!), trackId, links ?? [],
+            o.EventKindId is int kind && refs.EventKinds.TryGetValue(kind, out var k) ? k.Code : null);
     }
+
+    public static EventKindDto EventKind(EventKind k) =>
+        new(k.EventKindId, k.Code, k.NameUk, k.Category.ToString().ToLowerInvariant(), k.DefaultSeverity, k.StateModel, k.RequiresLocationForMap,
+            k.RenderMode, k.MapColor, k.MapIcon, k.MapLifetime, k.CreatesIncident, k.MapVisible, k.SortOrder,
+            EventKindLegacyMap.ToEventType(k.Code)?.ToString(), k.PolicyVersion);
 
     public PlaceDto Place(ReferenceCache.PlaceInfo p) =>
         new(p.Id, p.Name, p.Level.ToString(), p.ParentId, refs.Place(p.ParentId)?.Name, p.Lon, p.Lat, p.RadiusKm, p.Population);

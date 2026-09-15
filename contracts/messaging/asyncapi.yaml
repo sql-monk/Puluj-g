@@ -1,5 +1,5 @@
 # AsyncAPI 3.0 registry шини Puluj (P01, ADR-0002). Генерується з topology.json (scripts у contracts/messaging/README.md);
-# рукописні правки — лише через topology.json + повторну генерацію. Broker bindings (quorum, DLX) закриває P02.
+# рукописні правки — лише через topology.json + повторну генерацію. Broker arguments (quorum, DLX, delivery-limit) — topology.json.queue_policies (P02).
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
@@ -7,13 +7,13 @@ info:
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
-    Status: proposed; жодна підписка не active до P02/P03.
+    Status: accepted (ADR-0001/0002 accepted у P02); жодна підписка не active до P03.
 defaultContentType: application/json
 servers:
   local:
     host: localhost:5672
     protocol: amqp
-    description: Один RabbitMQ контейнер для розробки (ADR-0001, deployment profile — початкове припущення до P02).
+    description: Один RabbitMQ контейнер для розробки (ADR-0001, dev profile закріплено P02: rabbitmq:4.3-management, Compose profile broker; HA — P16).
 channels:
   ingress_received:
     address: puluj.{lane}.ingress.received

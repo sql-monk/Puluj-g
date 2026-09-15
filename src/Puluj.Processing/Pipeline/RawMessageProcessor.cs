@@ -53,6 +53,8 @@ public sealed class RawMessageProcessor(
 {
     private const string Savepoint = "message";
     private readonly ConcurrentDictionary<long, int> _transientRetries = new();
+    /// <summary>Once per process: a message without a catalog kind is expected only until the seeder ran (plan 8.2).</summary>
+    private int _kindWarningLogged;
 
     /// <summary>
     /// Processes the message if it is Pending (a direct call: tests, a dev scenario) or InProgress and claimed by this
@@ -131,6 +133,13 @@ public sealed class RawMessageProcessor(
                 return 0;
             }
 
+            // Plan §8.2 compatibility window: every target carries the catalog kind next to the legacy enum. One catalog
+            // snapshot per message; an empty catalog (not seeded yet) leaves the column NULL for the backfill, never a guess.
+            var kinds = indexes.EventKinds;
+            if (kinds.Stamp(targets) < targets.Count && Interlocked.Exchange(ref _kindWarningLogged, 1) == 0)
+            {
+                logger.LogWarning("RawMessage {Id}: {Count} target(s) without an event kind (catalog has {Kinds} kinds); further occurrences are not logged, the backfill fills them", raw.RawMessageId, targets.Count(t => t.EventKindId is null), kinds.Count);
+            }
             db.Targets.AddRange(targets);
             raw.ProcessingStatus = ProcessingStatus.Processed;
             raw.ProcessedAt = clock.GetUtcNow();

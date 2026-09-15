@@ -64,6 +64,10 @@ public static class EndpointRouteBuilderExtensions
 
         api.MapGet("/taxonomy", (ReferenceCache refs) => refs.Taxonomy);
 
+        // Plan §8.2 catalog for the read-side; disabled kinds stay out of the UI (their targets keep the code in TargetDto).
+        api.MapGet("/event-kinds", (ReferenceCache refs) =>
+            refs.EventKinds.Values.Where(k => k.Enabled).OrderBy(k => k.SortOrder).ThenBy(k => k.Code, StringComparer.Ordinal).Select(DtoMapper.EventKind));
+
         api.MapGet("/sources", (ReferenceCache refs, DtoMapper mapper) =>
             refs.Sources.Values.OrderByDescending(s => s.Priority).Select(mapper.Source));
 

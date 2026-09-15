@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Puluj.Domain.Entities;
+using Puluj.Domain.Enums;
 
 namespace Puluj.Infrastructure.Persistence.Configurations;
 
@@ -22,6 +23,9 @@ public class TargetConfiguration : IEntityTypeConfiguration<Target>
         b.HasIndex(x => new { x.TargetCategoryId, x.ObservedAt });
         b.HasIndex(x => x.RawMessageId);
         b.HasIndex(x => x.DuplicateOfTargetId);
+        // Plan §8.2 candidate for map/feed queries by kind; with fresh statistics the planner also uses it for the backfill's
+        // `event_kind_id IS NULL` pass (Index Only Scan; EXPLAIN evidence in P07-backfill-report.json).
+        b.HasIndex(x => new { x.EventKindId, x.ObservedAt }).IsDescending(false, true);
 
         b.HasOne(x => x.RawMessage).WithMany(x => x.Targets).HasForeignKey(x => x.RawMessageId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Source).WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);
@@ -33,6 +37,29 @@ public class TargetConfiguration : IEntityTypeConfiguration<Target>
         b.HasOne<TargetFamily>().WithMany().HasForeignKey(x => x.TargetFamilyId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<TargetModel>().WithMany().HasForeignKey(x => x.TargetModelId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Target>().WithMany().HasForeignKey(x => x.DuplicateOfTargetId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.EventKind).WithMany().HasForeignKey(x => x.EventKindId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary>Plan §8.2 event catalog. Code is the stable identity; category is stored as the contract string.</summary>
+public class EventKindConfiguration : IEntityTypeConfiguration<EventKind>
+{
+    public void Configure(EntityTypeBuilder<EventKind> b)
+    {
+        b.HasKey(x => x.EventKindId);
+        b.Property(x => x.Code).HasMaxLength(96);
+        b.HasIndex(x => x.Code).IsUnique();
+        b.Property(x => x.NameUk).HasMaxLength(160);
+        b.Property(x => x.Category).HasMaxLength(16)
+            .HasConversion(c => c.ToString().ToLowerInvariant(), s => Enum.Parse<EventKindCategory>(s, true));
+        b.Property(x => x.DefaultSeverity).HasMaxLength(32);
+        b.Property(x => x.StateModel).HasMaxLength(64);
+        b.Property(x => x.RenderMode).HasMaxLength(32);
+        b.Property(x => x.MapColor).HasMaxLength(32);
+        b.Property(x => x.MapIcon).HasMaxLength(64);
+        b.Property(x => x.DedupPolicy).HasColumnType("jsonb");
+        b.Property(x => x.Presentation).HasColumnType("jsonb");
+        b.Property(x => x.Metadata).HasColumnType("jsonb");
     }
 }
 

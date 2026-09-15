@@ -5,4 +5,6 @@ public interface IIndexes
 {
     TaxonomyIndex Taxonomy { get; }
     GazetteerIndex Gazetteer { get; }
+    /// <summary>Plan §8.2 event catalog snapshot; take it once per message so a refresh cannot change kinds mid-message.</summary>
+    EventKindIndex EventKinds { get; }
 }

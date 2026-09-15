@@ -33,6 +33,8 @@ public static class DependencyInjection
         services.AddSingleton<ISeeder, TaxonomySeeder>();
         services.AddSingleton<ISeeder, SourceSeeder>();
         services.AddSingleton<ISeeder, GazetteerSeeder>();
+        services.AddSingleton<ISeeder, EventKindSeeder>();
+        services.AddSingleton<ISeeder, EventKindBackfill>();
         services.AddSingleton<PgNotifyListener>();
         return services;
     }

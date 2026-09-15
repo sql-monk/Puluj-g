@@ -14,6 +14,7 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILo
 
     public TaxonomyIndex Taxonomy { get; private set; } = TaxonomyIndex.Empty;
     public GazetteerIndex Gazetteer { get; private set; } = GazetteerIndex.Empty;
+    public EventKindIndex EventKinds { get; private set; } = EventKindIndex.Empty;
 
     /// <summary>Completes after the first successful load.</summary>
     public Task Ready => _ready.Task;
@@ -23,8 +24,9 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILo
         await using var db = await factory.CreateDbContextAsync(ct);
         Taxonomy = await LoadTaxonomyAsync(db, ct);
         Gazetteer = await LoadGazetteerAsync(db, ct);
+        EventKinds = await LoadEventKindsAsync(db, ct);
         _ready.TrySetResult();
-        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places", Taxonomy.Aliases.Count, Gazetteer.Count);
+        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places, {Kinds} event kinds", Taxonomy.Aliases.Count, Gazetteer.Count, EventKinds.Count);
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -43,9 +45,13 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILo
             {
                 logger.LogError(ex, "Index refresh failed");
             }
-            await Task.Delay(RefreshInterval, ct);
+            // Until the seeder has filled the catalog (fresh database) targets would get no kind: poll faster, like ReferenceCache.
+            await Task.Delay(EventKinds.IsEmpty ? TimeSpan.FromSeconds(15) : RefreshInterval, ct);
         }
     }
+
+    public static async Task<EventKindIndex> LoadEventKindsAsync(PulujDbContext db, CancellationToken ct) =>
+        new(await db.EventKinds.AsNoTracking().ToListAsync(ct));
 
     public static async Task<TaxonomyIndex> LoadTaxonomyAsync(PulujDbContext db, CancellationToken ct)
     {

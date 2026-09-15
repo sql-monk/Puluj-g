@@ -97,7 +97,15 @@ public sealed record TargetDto(
     SourceDto Source,
     RawMessageDto RawMessage,
     long? TrackId,
-    IReadOnlyList<TargetLinkDto> Links);
+    IReadOnlyList<TargetLinkDto> Links,
+    /// <summary>Plan §8.2 catalog code (event_kinds.code), next to the legacy <c>EventType</c> for the compatibility window; null until backfilled.</summary>
+    string? EventKindCode = null);
+
+/// <summary>Plan §8.2 event catalog entry as the read-side sees it (GET /api/event-kinds). Presentation only; legacy EventType is the enum name this kind maps to, or null.</summary>
+public sealed record EventKindDto(
+    int Id, string Code, string NameUk, string Category, string? DefaultSeverity, string? StateModel, bool RequiresLocationForMap,
+    string? RenderMode, string? MapColor, string? MapIcon, TimeSpan? MapLifetime, bool CreatesIncident, bool MapVisible, int SortOrder,
+    string? LegacyEventType, int PolicyVersion);
 
 /// <summary>A link from this target to another: which one, how ("continuation" = kinematic predecessor, "duplicate"), how probable,
 /// whether the other one is earlier ("from") or later ("to"), and the kinematics behind the number.</summary>

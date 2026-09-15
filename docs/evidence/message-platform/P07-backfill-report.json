@@ -1,0 +1,34 @@
+{
+  "environment": {
+    "at": "2026-09-15T14:03:43.6938683+00:00",
+    "postgres": "PostgreSQL 17.5 (Debian 17.5-1.pgdg110\u002B1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 10.2.1-6) 10.2.1 20210110, 64-bit"
+  },
+  "syntheticRows": 50000,
+  "batchSize": 5000,
+  "report": {
+    "totalTargets": 50000,
+    "nullBefore": 50000,
+    "updated": 50000,
+    "batches": 10,
+    "nullAfter": 0,
+    "elapsedMs": 1746,
+    "unresolvedByEventType": {},
+    "perKind": {
+      "impact.explosion.reported": 5000,
+      "alert.air_raid.started": 5000,
+      "target.cancelled": 5000,
+      "unknown.unclassified": 5000,
+      "target.observed": 20000,
+      "air_defence.activity": 5000,
+      "alert.air_raid.ended": 5000
+    },
+    "coverage": 1
+  },
+  "explain": {
+    "mapQuery": "SELECT target_id FROM targets WHERE event_kind_id = 1 ORDER BY observed_at DESC LIMIT 100",
+    "mapPlan": "Limit  (cost=0.41..33.03 rows=100 width=16) (actual time=0.018..0.043 rows=100 loops=1)\r\n  Buffers: shared hit=7\r\n  -\u003E  Index Scan using ix_targets_event_kind_id_observed_at on targets  (cost=0.41..6556.91 rows=20102 width=16) (actual time=0.017..0.036 rows=100 loops=1)\r\n        Index Cond: (event_kind_id = 1)\r\n        Buffers: shared hit=7\r\nPlanning:\r\n  Buffers: shared hit=116\r\nPlanning Time: 0.409 ms\r\nExecution Time: 0.073 ms",
+    "backfillScan": "SELECT count(*) FROM targets WHERE event_kind_id IS NULL",
+    "scanPlan": "Aggregate  (cost=8.32..8.33 rows=1 width=8) (actual time=3.708..3.709 rows=1 loops=1)\r\n  Buffers: shared hit=909\r\n  -\u003E  Index Only Scan using ix_targets_event_kind_id_observed_at on targets  (cost=0.41..8.32 rows=1 width=0) (actual time=3.703..3.703 rows=0 loops=1)\r\n        Index Cond: (event_kind_id IS NULL)\r\n        Heap Fetches: 50000\r\n        Buffers: shared hit=909\r\nPlanning Time: 0.085 ms\r\nExecution Time: 3.734 ms"
+  },
+  "note": "Synthetic 50k targets (triggers disabled for the INSERT only). Timing is a single Testcontainers run, not a production measurement."
+}

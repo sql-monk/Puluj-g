@@ -1,7 +1,7 @@
 # P07 — план виконання і review
 
-Issue: https://github.com/sql-monk/Puluj-g/issues/7. Початок: 2026-09-15. Base: `6822541` + локальні незакомічені
-результати P01 (`contracts/messaging/schemas/common.schema.json`: `eventKindCode`, `observationCategory`).
+Issue: https://github.com/sql-monk/Puluj-g/issues/7. Початок: 2026-09-15. Base: `6822541` + P01 commit `d4ec6be`
+(`contracts/messaging/schemas/common.schema.json`: `eventKindCode`, `observationCategory`).
 Виконавець: агент `p07` (Claude Code fork); незалежний reviewer: субагент `p07_review` (план і результат).
 **Паралельно виконується P02 у тому самому робочому дереві** — див. «Правила паралельної роботи».
 
@@ -40,9 +40,9 @@ ExplosionReport, AirDefenseActivity`) у `Target.EventType` (int), DTO `TargetDt
 | Артефакт | Шлях |
 |---|---|
 | Domain | `src/Puluj.Domain/Entities/EventKind.cs`, `Target.EventKindId/EventKind`, enum `EventKindCategory` (значення = contract strings) |
-| Persistence | `Configurations/EventKindConfiguration.cs`, `TargetConfiguration` (FK/index), міграція `AddEventKinds`, `PulujDbContext.EventKinds` |
-| Seed/backfill | `data/taxonomy/event-kinds.json`, `Seeding/EventKindSeeder.cs`, `Ingestion/EventKindBackfill.cs`, `scripts/backfill-event-kinds.sql` |
-| Processing | `Puluj.Processing/Catalog/{EventKindResolver,EventKindLegacyMap}.cs`, зміни `TargetBuilder`/`AlertsInUaHandler` (мінімальні), DI |
+| Persistence | `Configurations/TargetConfiguration.cs` (містить `EventKindConfiguration`, FK/index), міграція `20260915132238_AddEventKinds`, `PulujDbContext.EventKinds` |
+| Seed/backfill | `data/taxonomy/event-kinds.json`, `Infrastructure/Seeding/{EventKindSeeder,EventKindBackfill}.cs` (ISeeder Order 30/90), `scripts/backfill-event-kinds.sql` |
+| Processing | `Puluj.Domain/{EventKindLegacyMap,EventKindCodes}.cs`, `Puluj.Processing/Indexes/EventKindIndex.cs` (snapshot у `IIndexes`), стемпінг у `RawMessageProcessor`; `TargetBuilder`/`AlertsInUaHandler` без змін |
 | API/Contracts | `Puluj.Contracts` `EventKindDto`, `TargetDto.EventKindCode`; `Puluj.Api` endpoint `GET /api/event-kinds`, `DtoMapper` |
 | Тести | unit у `tests/Puluj.Processing.Tests` (mapping bijection/fallback, resolver pinning, seed file ↔ contract pattern/category); integration у `tests/Puluj.Integration.Tests` (clean migration → seed parity → legacy targets → backfill counts/coverage/unresolved → rerun idempotent → FK RESTRICT → pipeline пише kind id; production-shaped: synthetic ≥50k targets batch backfill timing + `EXPLAIN`; `Down` міграції); контрактна перевірка seed codes ↔ `common.schema.json` (у Processing.Tests, читає файл) |
 | Docs | `docs/adr/ADR-0008-event-catalog.md` (mapping, fallback, seed policy, compatibility window); `docs/README.md` (розділ «Дані»/«Розширення без коду»: event kinds seed); plan §17; `P07-plan.md`, `P07-handoff.md`, `P07-backfill-report.json`, TRX `test-results/p07-*.trx`, `P07-build-manifest.json` |
@@ -81,3 +81,42 @@ ExplosionReport, AirDefenseActivity`) у `Target.EventType` (int), DTO `TargetDt
 - Один writer scope: `event_kind_id` пишеться в тій самій транзакції targets під Store; backfill — maintenance з Store.
 - Seed не вмикає `casualties.reported`; `unknown.unclassified` — явний outcome.
 - Контрактна сумісність: коди й категорії перевіряються проти `common.schema.json` тестом.
+
+## Незалежне review плану — p07_review
+
+Обмеження: агент-виконавець P07 (fork) не має права запускати субагентів, тому цей прохід виконано тим самим
+агентом окремим read-only проходом по коду/інвентарю **до** реалізації (§8.1–8.2, §16.2 п.3, 5, 6, 7, P00 writer map).
+Повноцінне незалежне review результату має виконати координатор окремим агентом до закриття issue.
+
+Findings і як внесено:
+
+1. **Тригери targets** (`P00-sql-inventory.json`): `trg_targets_insert_kinematics` — `AFTER INSERT`,
+   `trg_targets_duplicate` — `AFTER UPDATE OF duplicate_of_target_id`; функції фільтрують `event_type = 1`.
+   Backfill `UPDATE targets SET event_kind_id` не запускає жодного тригера; legacy `event_type` мусить писатися
+   далі (§8.2 «новий writer записує і catalog id, і legacy enum») → ADR-0008 + integration assert обох значень.
+2. **Єдина точка стемпінгу.** Два шляхи створення `Target` (`TargetBuilder` для тексту, `AlertsInUaHandler`
+   для structured) → стемпінг `EventKindId` в `RawMessageProcessor` одразу після отримання `targets`, одним
+   snapshot `indexes.EventKinds` на повідомлення (pinned), у тій самій транзакції під Store. Без нового DI-сервісу:
+   `IIndexes` отримує `EventKinds` (fakes у Processing.Tests оновлюються — ownership P07).
+3. **Backfill як `ISeeder` (Order 90)** у `DatabaseInitializer` під session advisory lock; кожен batch — окрема
+   транзакція з `pg_advisory_xact_lock(Store)`, `WHERE event_kind_id IS NULL AND target_id BETWEEN` (btree
+   `(event_kind_id, observed_at)` індексує NULL → повторний старт дешевий). Ціна: короткі паузи store-фази live
+   процесорів на час batch — зафіксувати в ADR-0008 і виміряти на synthetic 50k.
+4. **DTO additive**: `TargetDto` — positional record; новий параметр `EventKindCode` **в кінці з default null**,
+   щоб існуючі виклики/тести компілювалися; web ігнорує невідомі поля. `GET /api/event-kinds` через `ReferenceCache`.
+5. **Category як contract string**: `EventKindCategory` enum з конвертацією у lowercase text (`target|alert|incident|info`),
+   тест звіряє з `common.schema.json`. `map_lifetime` — `interval` (TimeSpan?).
+6. **Seed policy**: insert-missing; для існуючих — оновлення presentation/policy лише при більшому `policy_version`;
+   `code` незмінний; `casualties.reported` відсутній у файлі (документовано). `unknown.unclassified` — category `info`.
+7. **Rollback**: `Down` міграції знімає FK/індекс/колонку/таблицю; перед Down на production треба зупинити writers
+   нової збірки (вони пишуть `event_kind_id`) — записати в handoff.
+8. **Не зачіпати P08/P10/P11**: без rules у БД, без incidents, без UI; `EventTypeMatcher` без змін.
+
+## Незалежне review результату — p07_review (координатор)
+
+Вердикт: **approve after fixes**. Blocking: B1 — `ANALYZE` до backfill давав EXPLAIN на застарілій статистиці →
+перенесено після backfill, evidence і коментар індексу/ADR оновлено за фактичним планом (Index Scan для map-запиту,
+Index Only Scan для `IS NULL`); B2 — base commit `6822541` + P01 `d4ec6be` у plan/handoff/issue. Non-blocking N1–N8
+внесено (policy version у `ParserMetadata`, MIN/MAX лише по mapped рядках, retry 15 s порожнього каталогу + throttle
+warning, валідація категорії за іменами і зрозуміла помилка `legacyEventType`, doc-дрейф, `EventKindSeedEntry`,
+N4/N7 зафіксовано в ADR-0008). Повторні прогони — у `P07-handoff.md`.

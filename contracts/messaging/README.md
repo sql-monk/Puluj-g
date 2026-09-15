@@ -1,6 +1,6 @@
 # Контракти шини повідомлень (P01)
 
-Machine-readable частина ADR-0002…0005 ([`docs/adr/`](../../docs/adr/README.md)). Статус: **proposed**;
+Machine-readable частина ADR-0002…0005 ([`docs/adr/`](../../docs/adr/README.md)). Статус: **accepted** (P02 spike підтвердив topology на RabbitMQ 4.3);
 runtime (P02/P03) читає ці файли, а не власні копії. Зміни — лише разом із тестами
 `tests/Puluj.Messaging.Contracts.Tests` і, за потреби, новим `topology_version`.
 

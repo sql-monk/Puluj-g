@@ -1,0 +1,202 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="0e1dfd19-48f4-4857-8686-bef90b6746e2" name="aleks@ASUS-MONK 2026-09-15 17:18:07" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-15T17:18:07.3822807+03:00" queuing="2026-09-15T17:18:07.3822816+03:00" start="2026-09-15T17:17:52.1915218+03:00" finish="2026-09-15T17:21:28.9029558+03:00" />
+  <TestSettings name="default" id="18e7150d-417c-4cea-b013-53d4bbcebb99">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-15_17_18_07" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="bb0f78fb-2574-432d-aecd-1017e3aafe2f" testId="652160ca-e0cb-be43-c60e-98abdc6406e2" testName="Puluj.Transport.Spike.Tests.CrashTests.C06_PublishBeforeConsumerStarts_DurableBacklogDelivered" computerName="ASUS-MONK" duration="00:00:05.6169379" startTime="2026-09-15T17:21:22.7715338+03:00" endTime="2026-09-15T17:21:28.3888334+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bb0f78fb-2574-432d-aecd-1017e3aafe2f" />
+    <UnitTestResult executionId="70b6b5d6-49fc-4afe-abce-1f9d5673f37a" testId="6c7e0e2a-c3d4-6c8e-d59c-82456646d7b2" testName="Puluj.Transport.Spike.Tests.CrashTests.C05_BrokerRestartWhileUnacked_RedeliveredToNewConsumerProcess" computerName="ASUS-MONK" duration="00:00:25.6345359" startTime="2026-09-15T17:18:42.0467719+03:00" endTime="2026-09-15T17:19:07.6821509+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="70b6b5d6-49fc-4afe-abce-1f9d5673f37a" />
+    <UnitTestResult executionId="42d56141-c90d-4173-b532-7624f22bf512" testId="a6529f97-14e7-6ce6-d3d6-78a7dbe3aa5f" testName="Puluj.Transport.Spike.Tests.CrashTests.C03_BrokerRestartDuringPublish_UnconfirmedRepublishedSameEventId_NoLossNoDuplicateEffect" computerName="ASUS-MONK" duration="00:00:31.8749836" startTime="2026-09-15T17:20:40.9050829+03:00" endTime="2026-09-15T17:21:12.7801864+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="42d56141-c90d-4173-b532-7624f22bf512" />
+    <UnitTestResult executionId="8fbeec69-c512-49a4-b47e-63702365b42a" testId="c1b23467-818e-400d-9a5b-f2f4c4552eb6" testName="Puluj.Transport.Spike.Tests.CrashTests.C01_ConsumerCrashBeforeCommit_RedeliveredAndAppliedExactlyOnce" computerName="ASUS-MONK" duration="00:00:09.8879232" startTime="2026-09-15T17:21:12.8825413+03:00" endTime="2026-09-15T17:21:22.7710516+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8fbeec69-c512-49a4-b47e-63702365b42a" />
+    <UnitTestResult executionId="d4736ad4-c4be-47e3-aacd-c52d14a8348c" testId="4da6fddd-5cd5-2d4b-81bd-e84d82011586" testName="Puluj.Transport.Spike.Tests.CrashTests.C09_MemoryAlarm_PublisherBlocked_OutboxRetainsUntilAlarmCleared" computerName="ASUS-MONK" duration="00:01:10.7156796" startTime="2026-09-15T17:19:30.1888731+03:00" endTime="2026-09-15T17:20:40.9045283+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d4736ad4-c4be-47e3-aacd-c52d14a8348c" />
+    <UnitTestResult executionId="212de686-ac25-4707-bd3a-b4e6035429fe" testId="53269122-0076-8083-ba45-22d058c17713" testName="Puluj.Transport.Spike.Tests.CrashTests.C02_ConsumerCrashAfterCommitBeforeAck_RedeliveryAbsorbedByInbox" computerName="ASUS-MONK" duration="00:00:36.1182591" startTime="2026-09-15T17:18:05.9276475+03:00" endTime="2026-09-15T17:18:42.0461838+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="212de686-ac25-4707-bd3a-b4e6035429fe" />
+    <UnitTestResult executionId="d5441921-1b5e-4b77-8eb3-cee3486f19e9" testId="2997c404-7eec-254b-0a4d-bfd980270e97" testName="Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare" computerName="ASUS-MONK" duration="00:00:02.0338057" startTime="2026-09-15T17:19:07.6833586+03:00" endTime="2026-09-15T17:19:09.7306086+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d5441921-1b5e-4b77-8eb3-cee3486f19e9">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ&#xD;
+Expected: 0&#xD;
+Actual:   1</Message>
+          <StackTrace>   at Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare() in C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\CrashTests.cs:line 278&#xD;
+   at Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare() in C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\CrashTests.cs:line 286&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="3937bc0b-e20e-417d-8118-3b87ac04843e" testId="d369ed1d-f25d-96f6-261d-27c0221f8e9b" testName="Puluj.Transport.Spike.Tests.LoadSmokeTests.L01_TwoSubscriptionsTwoReplicas_5000Messages_NoLossNoDuplicates_MetricsRecorded" computerName="ASUS-MONK" duration="00:00:45.4286659" startTime="2026-09-15T17:18:05.8395314+03:00" endTime="2026-09-15T17:18:51.2389758+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3937bc0b-e20e-417d-8118-3b87ac04843e" />
+    <UnitTestResult executionId="c5de9261-0bf0-4945-b88c-6b25e8c92f9e" testId="f0cdbd63-211e-d6dc-4991-5cd1635961c8" testName="Puluj.Transport.Spike.Tests.GateTests.G04b_CrashLoop_DeliveryLimitDeadLettersAfterConfiguredRedeliveries" computerName="ASUS-MONK" duration="00:00:05.3474348" startTime="2026-09-15T17:18:26.7579348+03:00" endTime="2026-09-15T17:18:32.0930883+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c5de9261-0bf0-4945-b88c-6b25e8c92f9e" />
+    <UnitTestResult executionId="fb703a7d-0347-46cd-b9ba-a443bb02dca5" testId="f5e9e7a9-92eb-22bc-c90a-d2fcad8dca51" testName="Puluj.Transport.Spike.Tests.GateTests.G05_LossOfQuorum_ThreeNodeCluster" computerName="ASUS-MONK" duration="00:00:00.0010000" startTime="2026-09-15T17:18:26.7468968+03:00" endTime="2026-09-15T17:18:26.7485879+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="NotExecuted" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="fb703a7d-0347-46cd-b9ba-a443bb02dca5">
+      <Output>
+        <ErrorInfo>
+          <Message>Loss of quorum потребує кластера з 3 вузлів; spike працює на одному Testcontainers-вузлі (single-member quorum). HA — P16/окремий harness.</Message>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="08c6650f-5a65-4f71-824d-5387a8a8876c" testId="5ac1ace6-1f0a-01bd-1c76-fbb2cb3df379" testName="Puluj.Transport.Spike.Tests.GateTests.G04_BusinessFailuresExhausted_QuarantineReceiptThenDlq" computerName="ASUS-MONK" duration="00:00:10.1278618" startTime="2026-09-15T17:18:46.5813816+03:00" endTime="2026-09-15T17:18:56.7333604+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="08c6650f-5a65-4f71-824d-5387a8a8876c" />
+    <UnitTestResult executionId="ba79afe8-4e7a-4526-b2dd-cb4058529de2" testId="c0370d91-3a06-b3c4-38cf-d08d58b3f7c3" testName="Puluj.Transport.Spike.Tests.GateTests.G02_CompetingConsumers_TwoReplicasShareJobsWithoutDuplicates" computerName="ASUS-MONK" duration="00:00:20.4843512" startTime="2026-09-15T17:18:06.2805451+03:00" endTime="2026-09-15T17:18:26.7419917+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ba79afe8-4e7a-4526-b2dd-cb4058529de2" />
+    <UnitTestResult executionId="83559d9c-805c-4d16-b1e1-1449f03b6fa8" testId="8d54816d-7797-96c1-beee-15eb40246998" testName="Puluj.Transport.Spike.Tests.CrashTests.C07_OneSubscriptionOffline_OthersProceed_BacklogCatchesUpLater" computerName="ASUS-MONK" duration="00:00:20.4500324" startTime="2026-09-15T17:19:09.7395186+03:00" endTime="2026-09-15T17:19:30.1879095+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="83559d9c-805c-4d16-b1e1-1449f03b6fa8" />
+    <UnitTestResult executionId="b82480ee-bfe4-43d5-8d57-7aaa7b29d25c" testId="d77c4490-3336-f6cc-aed4-6c8a3a95e2ab" testName="Puluj.Transport.Spike.Tests.GateTests.G00_TopologyDeclaredFromRegistry_AllRequiredQueuesQuorumWithBindingsAndDlq" computerName="ASUS-MONK" duration="00:00:03.1012749" startTime="2026-09-15T17:18:32.0941320+03:00" endTime="2026-09-15T17:18:35.1951038+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b82480ee-bfe4-43d5-8d57-7aaa7b29d25c" />
+    <UnitTestResult executionId="c986272e-efb2-441c-90c9-bfc2eab0076f" testId="05e644f3-f400-c05f-46a6-cfa7606a53f3" testName="Puluj.Transport.Spike.Tests.GateTests.G03_Lanes_HistoryPublicationDoesNotEnterLiveQueue" computerName="ASUS-MONK" duration="00:00:11.3836536" startTime="2026-09-15T17:18:35.1957621+03:00" endTime="2026-09-15T17:18:46.5797653+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c986272e-efb2-441c-90c9-bfc2eab0076f" />
+    <UnitTestResult executionId="d949407d-3bc2-4e69-ad0e-020384ad2e17" testId="c325a62d-ee96-b928-37c6-b1971920acc7" testName="Puluj.Transport.Spike.Tests.CrashTests.C04_DelayedConfirm_RepublishAbsorbedAsDuplicate" computerName="ASUS-MONK" duration="00:00:00.1016676" startTime="2026-09-15T17:21:12.7815051+03:00" endTime="2026-09-15T17:21:12.8823829+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d949407d-3bc2-4e69-ad0e-020384ad2e17" />
+    <UnitTestResult executionId="25b82b3f-d36f-47de-998a-ce9c4d1952a8" testId="8270792a-b9f9-b1e6-6404-52d552f41f11" testName="Puluj.Transport.Spike.Tests.GateTests.G01_FanOut_OnePublicationReachesEveryRequiredSubscriptionOnce" computerName="ASUS-MONK" duration="00:00:00.4301782" startTime="2026-09-15T17:18:05.8462770+03:00" endTime="2026-09-15T17:18:06.2511276+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="25b82b3f-d36f-47de-998a-ce9c4d1952a8" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C07_OneSubscriptionOffline_OthersProceed_BacklogCatchesUpLater" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="8d54816d-7797-96c1-beee-15eb40246998">
+      <Execution id="83559d9c-805c-4d16-b1e1-1449f03b6fa8" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C07_OneSubscriptionOffline_OthersProceed_BacklogCatchesUpLater" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C09_MemoryAlarm_PublisherBlocked_OutboxRetainsUntilAlarmCleared" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="4da6fddd-5cd5-2d4b-81bd-e84d82011586">
+      <Execution id="d4736ad4-c4be-47e3-aacd-c52d14a8348c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C09_MemoryAlarm_PublisherBlocked_OutboxRetainsUntilAlarmCleared" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G00_TopologyDeclaredFromRegistry_AllRequiredQueuesQuorumWithBindingsAndDlq" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="d77c4490-3336-f6cc-aed4-6c8a3a95e2ab">
+      <Execution id="b82480ee-bfe4-43d5-8d57-7aaa7b29d25c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G00_TopologyDeclaredFromRegistry_AllRequiredQueuesQuorumWithBindingsAndDlq" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C05_BrokerRestartWhileUnacked_RedeliveredToNewConsumerProcess" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="6c7e0e2a-c3d4-6c8e-d59c-82456646d7b2">
+      <Execution id="70b6b5d6-49fc-4afe-abce-1f9d5673f37a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C05_BrokerRestartWhileUnacked_RedeliveredToNewConsumerProcess" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G05_LossOfQuorum_ThreeNodeCluster" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="f5e9e7a9-92eb-22bc-c90a-d2fcad8dca51">
+      <Execution id="fb703a7d-0347-46cd-b9ba-a443bb02dca5" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G05_LossOfQuorum_ThreeNodeCluster" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="2997c404-7eec-254b-0a4d-bfd980270e97">
+      <Execution id="d5441921-1b5e-4b77-8eb3-cee3486f19e9" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C04_DelayedConfirm_RepublishAbsorbedAsDuplicate" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="c325a62d-ee96-b928-37c6-b1971920acc7">
+      <Execution id="d949407d-3bc2-4e69-ad0e-020384ad2e17" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C04_DelayedConfirm_RepublishAbsorbedAsDuplicate" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C03_BrokerRestartDuringPublish_UnconfirmedRepublishedSameEventId_NoLossNoDuplicateEffect" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="a6529f97-14e7-6ce6-d3d6-78a7dbe3aa5f">
+      <Execution id="42d56141-c90d-4173-b532-7624f22bf512" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C03_BrokerRestartDuringPublish_UnconfirmedRepublishedSameEventId_NoLossNoDuplicateEffect" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G04b_CrashLoop_DeliveryLimitDeadLettersAfterConfiguredRedeliveries" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="f0cdbd63-211e-d6dc-4991-5cd1635961c8">
+      <Execution id="c5de9261-0bf0-4945-b88c-6b25e8c92f9e" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G04b_CrashLoop_DeliveryLimitDeadLettersAfterConfiguredRedeliveries" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G01_FanOut_OnePublicationReachesEveryRequiredSubscriptionOnce" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="8270792a-b9f9-b1e6-6404-52d552f41f11">
+      <Execution id="25b82b3f-d36f-47de-998a-ce9c4d1952a8" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G01_FanOut_OnePublicationReachesEveryRequiredSubscriptionOnce" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C06_PublishBeforeConsumerStarts_DurableBacklogDelivered" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="652160ca-e0cb-be43-c60e-98abdc6406e2">
+      <Execution id="bb0f78fb-2574-432d-aecd-1017e3aafe2f" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C06_PublishBeforeConsumerStarts_DurableBacklogDelivered" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C01_ConsumerCrashBeforeCommit_RedeliveredAndAppliedExactlyOnce" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="c1b23467-818e-400d-9a5b-f2f4c4552eb6">
+      <Execution id="8fbeec69-c512-49a4-b47e-63702365b42a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C01_ConsumerCrashBeforeCommit_RedeliveredAndAppliedExactlyOnce" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G04_BusinessFailuresExhausted_QuarantineReceiptThenDlq" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="5ac1ace6-1f0a-01bd-1c76-fbb2cb3df379">
+      <Execution id="08c6650f-5a65-4f71-824d-5387a8a8876c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G04_BusinessFailuresExhausted_QuarantineReceiptThenDlq" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G02_CompetingConsumers_TwoReplicasShareJobsWithoutDuplicates" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="c0370d91-3a06-b3c4-38cf-d08d58b3f7c3">
+      <Execution id="ba79afe8-4e7a-4526-b2dd-cb4058529de2" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G02_CompetingConsumers_TwoReplicasShareJobsWithoutDuplicates" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.LoadSmokeTests.L01_TwoSubscriptionsTwoReplicas_5000Messages_NoLossNoDuplicates_MetricsRecorded" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="d369ed1d-f25d-96f6-261d-27c0221f8e9b">
+      <Execution id="3937bc0b-e20e-417d-8118-3b87ac04843e" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.LoadSmokeTests" name="L01_TwoSubscriptionsTwoReplicas_5000Messages_NoLossNoDuplicates_MetricsRecorded" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.GateTests.G03_Lanes_HistoryPublicationDoesNotEnterLiveQueue" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="05e644f3-f400-c05f-46a6-cfa7606a53f3">
+      <Execution id="c986272e-efb2-441c-90c9-bfc2eab0076f" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.GateTests" name="G03_Lanes_HistoryPublicationDoesNotEnterLiveQueue" />
+    </UnitTest>
+    <UnitTest name="Puluj.Transport.Spike.Tests.CrashTests.C02_ConsumerCrashAfterCommitBeforeAck_RedeliveryAbsorbedByInbox" storage="c:\repos\puluj-g\tests\puluj.transport.spike.tests\bin\debug\net10.0\puluj.transport.spike.tests.dll" id="53269122-0076-8083-ba45-22d058c17713">
+      <Execution id="212de686-ac25-4707-bd3a-b4e6035429fe" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\bin\Debug\net10.0\Puluj.Transport.Spike.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Transport.Spike.Tests.CrashTests" name="C02_ConsumerCrashAfterCommitBeforeAck_RedeliveryAbsorbedByInbox" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="652160ca-e0cb-be43-c60e-98abdc6406e2" executionId="bb0f78fb-2574-432d-aecd-1017e3aafe2f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6c7e0e2a-c3d4-6c8e-d59c-82456646d7b2" executionId="70b6b5d6-49fc-4afe-abce-1f9d5673f37a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a6529f97-14e7-6ce6-d3d6-78a7dbe3aa5f" executionId="42d56141-c90d-4173-b532-7624f22bf512" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c1b23467-818e-400d-9a5b-f2f4c4552eb6" executionId="8fbeec69-c512-49a4-b47e-63702365b42a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4da6fddd-5cd5-2d4b-81bd-e84d82011586" executionId="d4736ad4-c4be-47e3-aacd-c52d14a8348c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="53269122-0076-8083-ba45-22d058c17713" executionId="212de686-ac25-4707-bd3a-b4e6035429fe" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2997c404-7eec-254b-0a4d-bfd980270e97" executionId="d5441921-1b5e-4b77-8eb3-cee3486f19e9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d369ed1d-f25d-96f6-261d-27c0221f8e9b" executionId="3937bc0b-e20e-417d-8118-3b87ac04843e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f0cdbd63-211e-d6dc-4991-5cd1635961c8" executionId="c5de9261-0bf0-4945-b88c-6b25e8c92f9e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f5e9e7a9-92eb-22bc-c90a-d2fcad8dca51" executionId="fb703a7d-0347-46cd-b9ba-a443bb02dca5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5ac1ace6-1f0a-01bd-1c76-fbb2cb3df379" executionId="08c6650f-5a65-4f71-824d-5387a8a8876c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c0370d91-3a06-b3c4-38cf-d08d58b3f7c3" executionId="ba79afe8-4e7a-4526-b2dd-cb4058529de2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8d54816d-7797-96c1-beee-15eb40246998" executionId="83559d9c-805c-4d16-b1e1-1449f03b6fa8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d77c4490-3336-f6cc-aed4-6c8a3a95e2ab" executionId="b82480ee-bfe4-43d5-8d57-7aaa7b29d25c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="05e644f3-f400-c05f-46a6-cfa7606a53f3" executionId="c986272e-efb2-441c-90c9-bfc2eab0076f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c325a62d-ee96-b928-37c6-b1971920acc7" executionId="d949407d-3bc2-4e69-ad0e-020384ad2e17" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8270792a-b9f9-b1e6-6404-52d552f41f11" executionId="25b82b3f-d36f-47de-998a-ce9c4d1952a8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="17" executed="16" passed="15" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.14]   Discovering: Puluj.Transport.Spike.Tests&#xD;
+[xUnit.net 00:00:00.18]   Discovered:  Puluj.Transport.Spike.Tests&#xD;
+[xUnit.net 00:00:00.20]   Starting:    Puluj.Transport.Spike.Tests&#xD;
+[testcontainers.org 00:00:00.17] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.47] Docker container e7f812c548be created&#xD;
+[testcontainers.org 00:00:00.75] Start Docker container e7f812c548be&#xD;
+[testcontainers.org 00:00:01.48] Wait for Docker container e7f812c548be to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.63] Docker container e7f812c548be ready&#xD;
+[testcontainers.org 00:00:02.01] Docker container 2f671edc6c55 created&#xD;
+[testcontainers.org 00:00:02.03] Docker container 4bc3dbe7327e created&#xD;
+[testcontainers.org 00:00:02.06] Docker container 9291ac6e370b created&#xD;
+[testcontainers.org 00:00:02.32] Start Docker container 2f671edc6c55&#xD;
+[testcontainers.org 00:00:02.37] Start Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:00:02.38] Start Docker container 9291ac6e370b&#xD;
+[testcontainers.org 00:00:03.26] Wait for Docker container 2f671edc6c55 to complete readiness checks&#xD;
+[testcontainers.org 00:00:03.41] Wait for Docker container 9291ac6e370b to complete readiness checks&#xD;
+[testcontainers.org 00:00:03.60] Wait for Docker container 4bc3dbe7327e to complete readiness checks&#xD;
+[testcontainers.org 00:00:08.68] Docker container 2f671edc6c55 ready&#xD;
+[testcontainers.org 00:00:08.88] Docker container 9291ac6e370b ready&#xD;
+[testcontainers.org 00:00:09.03] Docker container 4bc3dbe7327e ready&#xD;
+[xUnit.net 00:00:33.90]       Loss of quorum потребує кластера з 3 вузлів; spike працює на одному Testcontainers-вузлі (single-member quorum). HA — P16/окремий harness.&#xD;
+Test 'Puluj.Transport.Spike.Tests.GateTests.G05_LossOfQuorum_ThreeNodeCluster' was skipped in the test run.&#xD;
+[testcontainers.org 00:00:54.08] Stop Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:00:56.60] Start Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:00:56.91] Wait for Docker container 4bc3dbe7327e to complete readiness checks&#xD;
+[testcontainers.org 00:00:58.11] Delete Docker container 2f671edc6c55&#xD;
+[testcontainers.org 00:01:02.39] Docker container 4bc3dbe7327e ready&#xD;
+[testcontainers.org 00:01:03.58] Delete Docker container 9291ac6e370b&#xD;
+[xUnit.net 00:01:16.88]       Assert.Equal() Failure: Values differ&#xD;
+[xUnit.net 00:01:16.88]       Expected: 0&#xD;
+[xUnit.net 00:01:16.88]       Actual:   1&#xD;
+[xUnit.net 00:01:16.88]       Stack Trace:&#xD;
+[xUnit.net 00:01:16.88]         C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\CrashTests.cs(278,0): at Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare()&#xD;
+[xUnit.net 00:01:16.88]         C:\repos\Puluj-g\tests\Puluj.Transport.Spike.Tests\CrashTests.cs(286,0): at Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare()&#xD;
+[xUnit.net 00:01:16.88]         --- End of stack trace from previous location ---&#xD;
+[testcontainers.org 00:01:37.09] Execute "rabbitmqctl set_vm_memory_high_watermark 0.0000001" at Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:02:36.72] Execute "rabbitmqctl set_vm_memory_high_watermark 0.4" at Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:02:52.98] Stop Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:02:54.43] Start Docker container 4bc3dbe7327e&#xD;
+[testcontainers.org 00:02:54.65] Wait for Docker container 4bc3dbe7327e to complete readiness checks&#xD;
+[testcontainers.org 00:02:59.83] Docker container 4bc3dbe7327e ready&#xD;
+[testcontainers.org 00:03:35.20] Delete Docker container 4bc3dbe7327e&#xD;
+[xUnit.net 00:03:35.96]   Finished:    Puluj.Transport.Spike.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Warning" timestamp="2026-09-15T17:18:26.7518139+03:00">
+        <Text>[xUnit.net 00:00:33.89]     Puluj.Transport.Spike.Tests.GateTests.G05_LossOfQuorum_ThreeNodeCluster [SKIP]</Text>
+      </RunInfo>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-15T17:19:09.7354603+03:00">
+        <Text>[xUnit.net 00:01:16.88]     Puluj.Transport.Spike.Tests.CrashTests.C08_UnroutableOrMissingRequiredQueue_ReturnedAndReadinessFails_UnbindInvisibleToPassiveDeclare [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>
