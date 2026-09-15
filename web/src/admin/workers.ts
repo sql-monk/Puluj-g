@@ -43,6 +43,7 @@ export type Health = { ok: boolean | null; text: string }
 /** One line of state for a card: heartbeat first, then what the instance says about itself. */
 export function instanceHealth(w: WorkerInstanceDto, now: number = Date.now()): Health {
   if (!w.alive) return { ok: false, text: w.heartbeatAt ? `heartbeat застарів на ${Math.round(Math.max(0, now - new Date(w.heartbeatAt).getTime()) / 60000)} хв` : 'heartbeat відсутній' }
+  if (w.status?.paused?.startsWith('history load:')) return { ok: null, text: 'Telegram дочитує історію' }
   if (w.status?.paused) return { ok: null, text: `обробку призупинено: ${w.status.paused}` }
   if (w.status?.llm?.pausedUntil && new Date(w.status.llm.pausedUntil).getTime() > now) return { ok: null, text: 'LLM на паузі' }
   if (w.containerState && w.containerState !== 'running') return { ok: false, text: `контейнер ${w.containerState}` }

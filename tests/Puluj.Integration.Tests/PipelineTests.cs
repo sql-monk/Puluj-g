@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Puluj.Admin;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
 using Puluj.Infrastructure.Persistence;
@@ -13,6 +14,26 @@ namespace Puluj.Integration.Tests;
 public sealed class PipelineTests(PipelineFixture fixture)
 {
     private ServiceProvider? _services => fixture.Services;
+
+    [Fact]
+    public async Task Pipeline_report_builds_all_supported_periods()
+    {
+        if (_services is null)
+        {
+            return; // neither PULUJ_TEST_CONNECTION nor Docker available
+        }
+
+        var factory = _services.GetRequiredService<IDbContextFactory<PulujDbContext>>();
+        var now = DateTimeOffset.UtcNow;
+        foreach (var hours in PipelineBuckets.AllowedHours)
+        {
+            await using var db = await factory.CreateDbContextAsync();
+            var report = await PipelineReport.BuildAsync(db, hours, now, CancellationToken.None);
+
+            Assert.Equal(PipelineBuckets.Unit(hours), report.Bucket);
+            Assert.Equal(hours <= 48 ? hours : hours / 24, report.Timeline.Count);
+        }
+    }
 
     [Fact]
     public async Task Raw_messages_become_targets_tracks_and_revisions()

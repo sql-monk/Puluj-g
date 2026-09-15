@@ -76,6 +76,11 @@ public sealed class WorkerStatusReporter(
         using var process = Process.GetCurrentProcess();
         var now = clock.GetUtcNow();
         var paused = await reprocess.PausedAsync(ct);
+        // The hold itself is global, while the Telegram collector publishes the useful context: its current channel
+        // or a concrete error. Include both in every Worker status so the processors panel is self-explanatory.
+        var pause = paused is null ? null : new ProcessingPauseDto(
+            paused,
+            await settings.GetAsync("Runtime:Telegram:Status", ct));
         var llmOptions = llm.CurrentValue;
         return new WorkerStatusDto(
             options.Value.InstanceName,
@@ -97,7 +102,8 @@ public sealed class WorkerStatusReporter(
                 _breaker.PauseReason,
                 _breaker.Calls,
                 _breaker.Failures),
-            paused);
+            paused,
+            pause);
     }
 
     /// <summary>Processor time used since the previous call over the wall time that passed, per core, in percent.</summary>

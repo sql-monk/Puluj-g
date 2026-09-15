@@ -471,26 +471,32 @@ public static partial class OpsEndpoints
         command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
         command.CommandText = sql;
         command.CommandTimeout = 10;
-        await using var reader = await command.ExecuteReaderAsync(ct);
-        var columns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToList();
-        var sensitive = redactSensitiveColumns
-            ? columns.Select(IsSensitiveColumn).ToArray()
-            : new bool[columns.Count];
+        List<string> columns;
         var rows = new List<IReadOnlyList<string?>>();
         var truncated = false;
-        while (await reader.ReadAsync(ct))
+        // Dispose the reader before rolling back the read-only transaction. In particular,
+        // the table browser reads one extra row to detect truncation, leaving the result set
+        // active when it has more than maxRows rows.
+        await using (var reader = await command.ExecuteReaderAsync(ct))
         {
-            if (rows.Count >= maxRows)
+            columns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToList();
+            var sensitive = redactSensitiveColumns
+                ? columns.Select(IsSensitiveColumn).ToArray()
+                : new bool[columns.Count];
+            while (await reader.ReadAsync(ct))
             {
-                truncated = true;
-                break;
+                if (rows.Count >= maxRows)
+                {
+                    truncated = true;
+                    break;
+                }
+                var row = new string?[columns.Count];
+                for (var i = 0; i < columns.Count; i++)
+                {
+                    row[i] = sensitive[i] ? "••••••" : DbValue(reader, i);
+                }
+                rows.Add(row);
             }
-            var row = new string?[columns.Count];
-            for (var i = 0; i < columns.Count; i++)
-            {
-                row[i] = sensitive[i] ? "••••••" : DbValue(reader, i);
-            }
-            rows.Add(row);
         }
         await transaction.RollbackAsync(ct);
         stopwatch.Stop();

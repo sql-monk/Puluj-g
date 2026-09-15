@@ -6,6 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Puluj.Worker\Puluj.Worker.csproj" />
     <ProjectReference Include="..\..\src\Puluj.Api\Puluj.Api.csproj" />
+    <ProjectReference Include="..\..\src\Puluj.Admin\Puluj.Admin.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

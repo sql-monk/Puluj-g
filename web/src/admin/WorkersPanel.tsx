@@ -225,7 +225,7 @@ function InstanceCard({ w, container, docker, onAct }: { w: WorkerInstanceDto; c
           )}
         </div>
       )}
-      {s?.paused && <div className="text-amber-700 dark:text-amber-300">Обробку призупинено: {s.paused}</div>}
+      {s?.paused && <PauseNotice reason={s.pause?.reason ?? s.paused} sourceStatus={s.pause?.sourceStatus} />}
       {(w.containerName || container) && (
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2 dark:border-slate-800">
           <span className="text-slate-500">контейнер</span>
@@ -236,6 +236,32 @@ function InstanceCard({ w, container, docker, onAct }: { w: WorkerInstanceDto; c
           {docker && container?.controllable && <ContainerButtons c={container} onAct={onAct} />}
         </div>
       )}
+    </div>
+  )
+}
+
+function PauseNotice({ reason, sourceStatus }: { reason: string; sourceStatus?: string }) {
+  const history = /^history load: (\d+) channel\(s\) since (\d{4})-(\d{2})-(\d{2})$/.exec(reason)
+  if (!history) {
+    return (
+      <div className="rounded bg-amber-50 p-2 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+        <div className="font-medium">Обробку тимчасово призупинено</div>
+        <div>Причина: {reason}</div>
+        {sourceStatus && <div className={sourceStatus.startsWith('error:') ? 'mt-1 text-red-700 dark:text-red-300' : 'mt-1'}>Стан джерела: {sourceStatus}</div>}
+      </div>
+    )
+  }
+  const [, count, year, month, day] = history
+  const channels = Number(count) === 1 ? 'каналу' : 'каналів'
+  const current = sourceStatus?.startsWith('history: ') ? sourceStatus.slice('history: '.length) : undefined
+  const error = sourceStatus?.startsWith('error: ') ? sourceStatus.slice('error: '.length) : undefined
+  return (
+    <div className="rounded bg-amber-50 p-2 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+      <div className="font-medium">Обробку тимчасово призупинено для історії Telegram</div>
+      <div>Дочитується історія {count} {channels} від {day}.{month}.{year}, щоб потім обробити всі повідомлення у правильному порядку.</div>
+      {current && <div className="mt-1">Зараз: {current}</div>}
+      {error && <div className="mt-1 text-red-700 dark:text-red-300">Помилка Telegram: {error}</div>}
+      {!error && <div className="mt-1">Після завершення обробка та live-повідомлення відновляться автоматично.</div>}
     </div>
   )
 }

@@ -184,5 +184,9 @@ services:
 
 volumes:
   pgdata:
+    # Keep database storage outside Compose's lifecycle. `scripts/deploy.ps1` refuses to create it unless
+    # -InitializeDatabase was explicitly supplied, preventing an accidental empty database on redeploy.
+    name: ${PULUJ_PGDATA_VOLUME:-puluj-g-pgdata}
+    external: true
   tgsession:
   logs:

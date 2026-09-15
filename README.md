@@ -31,7 +31,8 @@
 ```bash
 cp .env.example deploy/.env            # ADMIN_TOKEN обов’язковий (панель у Docker не бачить localhost); токени джерел можна ввести в панелі (⚙) — вони зберігаються в БД
 pwsh scripts/gazetteer/download.ps1   # або scripts/gazetteer/download.sh — геодані (~80 MB, не в git)
-docker compose -p puluj-g -f deploy/docker-compose.yml up --build
+pwsh scripts/deploy.ps1 -InitializeDatabase  # лише для першої, порожньої інсталяції
+# Надалі: pwsh scripts/deploy.ps1 — міграції оновлять наявну БД, а налаштування в ній залишаться
 # карта http://localhost:8090, адмін-панель http://localhost:8091  (health: /api/health на обох)
 ```
 

@@ -18,7 +18,11 @@ public sealed record WorkerStatusDto(
     int Threads,
     ProcessingStatusDto? Processing,
     LlmStatusDto? Llm,
-    string? Paused);
+    string? Paused,
+    ProcessingPauseDto? Pause = null);
+
+/// <summary>Why all processors are temporarily held. SourceStatus is the live collector status that owns the hold.</summary>
+public sealed record ProcessingPauseDto(string Reason, string? SourceStatus);
 
 /// <summary>Counters since the process started plus timings over the last five minutes.</summary>
 public sealed record ProcessingStatusDto(

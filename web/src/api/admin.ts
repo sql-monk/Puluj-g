@@ -138,6 +138,10 @@ export interface LlmStatusDto {
   calls: number
   failures: number
 }
+export interface ProcessingPauseDto {
+  reason: string
+  sourceStatus?: string
+}
 /** What an instance writes about itself every 10 s (`Runtime:Worker:{name}:Status`). */
 export interface WorkerStatusDto {
   instance: string
@@ -154,6 +158,7 @@ export interface WorkerStatusDto {
   processing?: ProcessingStatusDto
   llm?: LlmStatusDto
   paused?: string
+  pause?: ProcessingPauseDto
 }
 export interface WorkerInstanceDto {
   name: string

@@ -3,13 +3,23 @@
            waits for the one-shot migrate service, runs the one-off SQL fixes and then checks that the stack is healthy.
            Everything here needs Docker on the host, which the Claude Code session is not allowed to drive — run it
            yourself from the repo root:  .\scripts\deploy.ps1
-           The steps are idempotent: a second run only rebuilds what changed, the SQL scripts touch nothing when
-           there is nothing left to fix.
+           The steps are idempotent: a second run rebuilds what changed and applies outstanding migrations to the
+           existing database; it never replaces its data or settings.
 .PARAMETER NoBuild   Restart with the existing images (no `--build`).
 .PARAMETER SkipSql   Skip the one-off SQL scripts (scripts/requeue-failed.sql, scripts/fix-text-alert-ends.sql).
 .PARAMETER Services  Rebuild only these compose services (e.g. api,admin); default — the whole stack.
+.PARAMETER DatabaseVolume
+           Existing Docker volume that contains PostgreSQL data. Defaults to puluj-g-pgdata.
+.PARAMETER InitializeDatabase
+           Create DatabaseVolume when it does not exist. Required only for a deliberately new, empty installation.
 #>
-param([switch]$NoBuild, [switch]$SkipSql, [string[]]$Services = @())
+param(
+    [switch]$NoBuild,
+    [switch]$SkipSql,
+    [string[]]$Services = @(),
+    [string]$DatabaseVolume = "puluj-g-pgdata",
+    [switch]$InitializeDatabase
+)
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 $deploy = Join-Path $root "deploy"
@@ -17,6 +27,24 @@ $composeProject = "puluj-g"
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not found (Docker Desktop is not installed or not in PATH)" }
+if ([string]::IsNullOrWhiteSpace($DatabaseVolume)) { throw "DatabaseVolume must not be empty" }
+
+# The Postgres volume is external: Compose must never silently make a fresh database when a volume name was mistyped
+# or the persistent disk was not mounted.  A first install is deliberately opt-in via -InitializeDatabase.
+$volume = $DatabaseVolume.Trim()
+$volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
+if (-not $volumeExists) {
+    if (-not $InitializeDatabase) {
+        throw "PostgreSQL volume '$volume' does not exist. Refusing to create a new database; restore or pass -DatabaseVolume <existing-volume>. For a new installation, run again with -InitializeDatabase."
+    }
+    Step "Creating an empty PostgreSQL volume '$volume'"
+    & docker volume create $volume | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "could not create PostgreSQL volume '$volume'" }
+}
+else {
+    Write-Host "Using existing PostgreSQL volume '$volume'; migrations will update it in place." -ForegroundColor Green
+}
+$env:PULUJ_PGDATA_VOLUME = $volume
 
 function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
 function Sql([string]$file) {

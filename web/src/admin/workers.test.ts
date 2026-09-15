@@ -77,6 +77,7 @@ describe('instanceHealth', () => {
 
   it('prefers the pause reasons over everything but the heartbeat', () => {
     expect(instanceHealth(worker({ status: status({ paused: 'history load' }) }), NOW)).toEqual({ ok: null, text: 'обробку призупинено: history load' })
+    expect(instanceHealth(worker({ status: status({ paused: 'history load: 2 channel(s) since 2022-02-24' }) }), NOW)).toEqual({ ok: null, text: 'Telegram дочитує історію' })
     expect(instanceHealth(worker({ status: status({ llm: { enabled: true, model: 'm', pausedUntil: '2026-09-15T11:00:00Z', calls: 1, failures: 1 } }) }), NOW).text).toBe('LLM на паузі')
     expect(instanceHealth(worker({ status: status({ llm: { enabled: true, model: 'm', pausedUntil: '2026-09-15T09:00:00Z', calls: 1, failures: 1 } }) }), NOW).text).toBe('працює')
   })

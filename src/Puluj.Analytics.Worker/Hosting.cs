@@ -147,7 +147,8 @@ public sealed class AnalyticsHeartbeat(IDbContextFactory<AnalyticsDbContext> fac
             process.Threads.Count,
             Processing: null,
             Llm: null,
-            Paused: null);
+            Paused: null,
+            Pause: null);
     }
 
     /// <summary>Processor time used since the previous call over the wall time that passed, per core, in percent.</summary>

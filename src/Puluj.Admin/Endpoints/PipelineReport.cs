@@ -106,9 +106,9 @@ public static class PipelineReport
                    count(*) FILTER (WHERE r.processing_status = 1 AND r.processed_at >= {from} AND r.processed_at < {to}
                                       AND EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = r.raw_message_id)) AS with_targets,
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8))
-                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p50_ms,
+                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p50ms,
                    percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8))
-                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p90_ms,
+                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p90ms,
                    CAST(avg(r.processing_ms) FILTER (WHERE r.processed_at >= {from} AND r.processed_at < {to}) AS float8) AS mean_ms,
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(extract(epoch FROM r.received_at - r.published_at) AS float8))
                        FILTER (WHERE r.received_at >= {from} AND r.received_at < {to}
@@ -141,8 +141,8 @@ public static class PipelineReport
             """).ToListAsync(ct);
         var processedBuckets = await db.Database.SqlQuery<ProcessedBucketRow>($"""
             SELECT date_trunc({unit}, processed_at, {Tz}) AS bucket_at, count(*) AS n,
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p50_ms,
-                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p90_ms
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p50ms,
+                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p90ms
             FROM raw_messages
             WHERE processing_status = 1 AND processed_at >= {from} AND processed_at < {to}
             GROUP BY 1
@@ -161,8 +161,8 @@ public static class PipelineReport
             """).ToListAsync(ct);
         var instanceRows = await db.Database.SqlQuery<InstanceRow>($"""
             SELECT claimed_by AS instance, count(*) AS processed,
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p50_ms,
-                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p90_ms,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p50ms,
+                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(processing_ms AS float8)) FILTER (WHERE processing_ms IS NOT NULL) AS p90ms,
                    max(processed_at) AS last_at
             FROM raw_messages
             WHERE claimed_by IS NOT NULL AND processing_status = 1 AND processed_at >= {from} AND processed_at < {to}
