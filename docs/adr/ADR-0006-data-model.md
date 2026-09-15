@@ -127,7 +127,9 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
   null у compat window (P09/P14 зв'язують із `targets`, які далі пише legacy loop).
 - `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; `outcome` ∈ `answered → applied | late`, коди помилок
   провайдера; рядок пишеться autocommit до result-tx. `processing.attempts`: partial unique `(job_key, fencing_token) WHERE fencing_token > 0`
-  (lease takeover), job-рядки llm-worker під `subscription_id = 'llm-worker:job'` (не рахуються consumer'ом).
+  (lease takeover), job-рядки llm-worker під `subscription_id = 'llm-worker:job'` (не рахуються consumer'ом; `event_id` = `request_id` команди,
+  `state` ∈ `running | succeeded | failed | superseded | interrupted` — останнє ставить takeover після `lease_until` або cancel під час виклику).
+  Індекс `ix_processing_attempts_job_key_fencing_token` (неунікальний) дублює partial unique — прибрати наступною міграцією.
 - `processing.deliveries`: PK `(event_id, subscription_id)`; expected рядок = `outcome IS NULL`; partial index `(expected_at) WHERE outcome IS NULL`;
   `completed` ніколи не понижується (upsert лише з `NULL`/`quarantined`).
 - `processing.quarantine`: partial unique `(subscription_id, event_id) WHERE resolved_at IS NULL`; зберігає **повний envelope + headers** —

@@ -31,7 +31,7 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
     public string SubscriptionId => Subscription;
     public string Producer { get; set; } = Subscription;
 
-    private sealed record Timings(DateTimeOffset? ReceivedAt, DateTimeOffset? StoredAt, DateTimeOffset? NormalizedAt, DateTimeOffset? ParsedAt);
+    private sealed record Timings(DateTimeOffset? ReceivedAt, DateTimeOffset? StoredAt, DateTimeOffset? NormalizedAt, DateTimeOffset? ParsedAt, DateTimeOffset? LlmCompletedAt = null);
 
     private sealed record Prepared(long RawMessageId, string Action, string? LateReason, string Method, string Outcome, JsonArray Facts, JsonObject Versions,
         JsonObject? Error, Guid? LlmRequestId, Timings Timings, DateTimeOffset StartedAt);
@@ -75,6 +75,8 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
                 {
                     return new Prepared(rawId, "late", $"fencing token {token} < current {current}", "llm", "late", [], versions, null, requestId, timings, startedAt);
                 }
+                // Versions of the whole chain (review N6): normalization/rules from the parser's `awaiting_llm` stage row, model/prompt from the worker.
+                versions = await AwaitingVersionsAsync(conn, rawId, envelope.ProcessingRunId, ct) ?? versions;
                 if (payload["model"]?.GetValue<string>() is { } model)
                 {
                     versions["model"] = model;
@@ -83,6 +85,7 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
                 {
                     versions["prompt"] = prompt;
                 }
+                timings = timings with { LlmCompletedAt = envelope.OccurredAt };
                 if (envelope.EventType == LlmWorkerHandler.FailedEventType)
                 {
                     var final = payload["final"]?.GetValue<bool>() ?? true;
@@ -131,9 +134,13 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
         {
             return DeliveryResult.Noop("extraction already recorded for this raw/run (concurrent finalizer)");
         }
-        foreach (var fact in facts)
+        if (p.Outcome == "completed")
         {
-            await InsertObservationAsync(conn, tx, extractionId, p.RawMessageId, envelope.ProcessingRunId, fact!.AsObject(), ct);
+            // Observation rows only for a completed extraction; `needs_review` keeps its facts in the extraction for the operator (review Q2).
+            foreach (var fact in facts)
+            {
+                await InsertObservationAsync(conn, tx, extractionId, p.RawMessageId, envelope.ProcessingRunId, fact!.AsObject(), ct);
+            }
         }
         var stageId = await UpsertStageAsync(conn, tx, p.RawMessageId, envelope.ProcessingRunId, p.Outcome,
             new JsonObject { ["extraction_result_id"] = extractionId.ToString(), ["method"] = p.Method, ["fact_count"] = facts.Count, ["caused_by"] = envelope.EventId.ToString(), ["llm_request_id"] = p.LlmRequestId?.ToString() },
@@ -164,14 +171,7 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
             ["fact_count"] = facts.Count,
             ["expected_branches"] = new JsonArray((p.Outcome == "completed" ? branches : []).Select(b => (JsonNode)b).ToArray()),
             ["versions"] = p.Versions.DeepClone(),
-            ["timings"] = new JsonObject
-            {
-                ["received_at"] = p.Timings.ReceivedAt is { } r ? FactMapper.Iso(r) : null,
-                ["stored_at"] = p.Timings.StoredAt is { } s ? FactMapper.Iso(s) : null,
-                ["normalized_at"] = p.Timings.NormalizedAt is { } n ? FactMapper.Iso(n) : null,
-                ["parsed_at"] = p.Timings.ParsedAt is { } pa ? FactMapper.Iso(pa) : null,
-                ["finalized_at"] = FactMapper.Iso(finalizedAt),
-            },
+            ["timings"] = TimingsJson(p.Timings, finalizedAt),
         };
         if (p.Error is not null)
         {
@@ -249,7 +249,7 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
         return await cmd.ExecuteScalarAsync(ct) is not null;
     }
 
-    private static async Task InsertObservationAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid extractionId, long rawId, Guid runId, JsonObject fact, CancellationToken ct)
+    private async Task InsertObservationAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid extractionId, long rawId, Guid runId, JsonObject fact, CancellationToken ct)
     {
         await using var cmd = new NpgsqlCommand(
             """
@@ -262,7 +262,7 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
         cmd.Parameters.AddWithValue("run", runId);
         cmd.Parameters.AddWithValue("kind", fact["event_kind_code"]?.GetValue<string>() ?? "unknown");
         cmd.Parameters.AddWithValue("category", fact["category"]?.GetValue<string>() ?? "info");
-        cmd.Parameters.AddWithValue("at", DateTimeOffset.TryParse(fact["effective_at"]?.GetValue<string>(), null, System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at.ToUniversalTime() : DateTimeOffset.UtcNow);
+        cmd.Parameters.AddWithValue("at", DateTimeOffset.TryParse(fact["effective_at"]?.GetValue<string>(), null, System.Globalization.DateTimeStyles.AssumeUniversal, out var at) ? at.ToUniversalTime() : clock.GetUtcNow());
         cmd.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = fact.ToJsonString() });
         await cmd.ExecuteNonQueryAsync(ct);
     }
@@ -289,6 +289,36 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
         cmd.Parameters.AddWithValue("worker", Producer);
         cmd.Parameters.Add(new NpgsqlParameter("versions", NpgsqlDbType.Jsonb) { Value = versions.ToJsonString() });
         return await cmd.ExecuteScalarAsync(ct) as long?;
+    }
+
+    /// <summary>Only the timestamps that exist (the schema types them as dateTime, never null): stored_at is gone once the outbox row was swept.</summary>
+    private static JsonObject TimingsJson(Timings t, DateTimeOffset finalizedAt)
+    {
+        var o = new JsonObject();
+        void Put(string key, DateTimeOffset? value)
+        {
+            if (value is { } v)
+            {
+                o[key] = FactMapper.Iso(v);
+            }
+        }
+        Put("received_at", t.ReceivedAt);
+        Put("stored_at", t.StoredAt);
+        Put("normalized_at", t.NormalizedAt);
+        Put("parsed_at", t.ParsedAt);
+        Put("llm_completed_at", t.LlmCompletedAt);
+        o["finalized_at"] = FactMapper.Iso(finalizedAt);
+        return o;
+    }
+
+    private static async Task<JsonObject?> AwaitingVersionsAsync(NpgsqlConnection conn, long rawId, Guid runId, CancellationToken ct)
+    {
+        await using var cmd = new NpgsqlCommand("SELECT versions::text FROM processing.stage_results WHERE raw_message_id = @raw AND run_id = @run AND stage = @stage AND stage_version = @version", conn);
+        cmd.Parameters.AddWithValue("raw", rawId);
+        cmd.Parameters.AddWithValue("run", runId);
+        cmd.Parameters.AddWithValue("stage", Stage);
+        cmd.Parameters.AddWithValue("version", StageVersion);
+        return await cmd.ExecuteScalarAsync(ct) is string json ? JsonNode.Parse(json)?.AsObject() : null;
     }
 
     private static async Task<Timings> TimingsAsync(NpgsqlConnection conn, long rawId, Guid runId, CancellationToken ct)
@@ -325,9 +355,11 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
                 }
             }
         }
-        await using (var storedCmd = new NpgsqlCommand("SELECT min(o.created_at) FROM messaging.outbox o WHERE o.event_type = 'raw.stored' AND (o.envelope->>'raw_message_id')::bigint = @raw", conn))
+        // `raw.stored` from the archive (indexed by raw/run) — absent when the archive lags or the row was swept; the key is then omitted.
+        await using (var storedCmd = new NpgsqlCommand("SELECT min(occurred_at) FROM messaging.events WHERE raw_message_id = @raw AND processing_run_id = @run AND event_type = 'raw.stored'", conn))
         {
             storedCmd.Parameters.AddWithValue("raw", rawId);
+            storedCmd.Parameters.AddWithValue("run", runId);
             if (await storedCmd.ExecuteScalarAsync(ct) is DateTime st)
             {
                 stored = new DateTimeOffset(DateTime.SpecifyKind(st, DateTimeKind.Utc));

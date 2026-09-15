@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Puluj.Infrastructure.Messaging;
 using Puluj.Messaging.Tests.Unit;
+using Puluj.Processing.Llm;
 using Puluj.Processing.Stages;
 
 namespace Puluj.Messaging.Tests.Integration;
@@ -78,6 +79,7 @@ public sealed class FinalizerTests(MessagingFixture f)
 
     private static void Valid(JsonSchema schema, JsonNode payload)
     {
+        _ = ContractSchemas.Envelope; // registers common.schema.json ($ref targets) on first use
         var result = schema.Evaluate(JsonSerializer.SerializeToElement(payload), ContractSchemas.Options);
         Assert.True(result.IsValid, string.Join("; ", (result.Details ?? []).Where(d => d.Errors is { Count: > 0 }).SelectMany(d => d.Errors!.Select(e => $"{d.InstanceLocation}: {e.Key}: {e.Value}")).Distinct()));
     }
@@ -199,10 +201,14 @@ public sealed class FinalizerTests(MessagingFixture f)
             // Takeover by "another replica" after the lease expired: token 2 exists before our answer arrives.
             await f.ExecAsync("INSERT INTO processing.attempts (subscription_id, event_id, job_key, worker, state, fencing_token, started_at) VALUES ('llm-worker:job', @e, @k, 'llm-worker@replica-2', 'succeeded', 2, now())", ("e", requestId), ("k", jobKey));
             f.Llm.Gate.Release();
+            // The late result is recorded right after the call (job superseded, audit late); the new holder is not running
+            // any more, so the delivery ends as a noop receipt — no second paid call.
             Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "subscription_id = 'llm-worker' AND outcome = 'noop'") == 1, TimeSpan.FromSeconds(40)));
             Assert.Empty(await EventsAsync("llm.completed"));
             Assert.Equal(1, await f.CountAsync("llm_requests", $"request_id = '{requestId}' AND fencing_token = 1 AND outcome = 'late'")); // the paid call is on record
             Assert.Equal(1, await f.CountAsync("processing.attempts", $"job_key = '{jobKey}' AND fencing_token = 1 AND state = 'superseded'"));
+            Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker' AND state = 'succeeded'"));
+            Assert.Single(f.Llm.Calls);
 
             // Finalizer side: a synthetic llm.completed carrying the stale token 1 must not become the extraction.
             var stale = JsonNode.Parse(await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox WHERE event_type = 'llm.requested'"))!.AsObject();
@@ -228,9 +234,160 @@ public sealed class FinalizerTests(MessagingFixture f)
         }
         finally
         {
+            f.Llm.Gate?.Release(); // an earlier failed assert must not leave the worker stuck in the provider (StopAsync waits for it)
             await StopAllAsync();
         }
-        f.Evidence.Record("P06-F04", new { window = "W8", worker_late_noop = 1, audit_outcome = "late", finalizer_late_noop = 1, extractions = 0 });
+        f.Evidence.Record("P06-F04", new { window = "W8", worker_late = "deferred → noop", audit_outcome = "late", finalizer_late_noop = 1, extractions = 0, provider_calls = 1 });
+    }
+
+    [Fact]
+    public async Task F04b_W8_Real_takeover_after_lease_expiry_publishes_the_new_holders_result_and_records_the_old_one_as_late()
+    {
+        await f.ResetAsync();
+        // Replica 1 is stuck in the provider call (first scripted answer waits for gate 1); the lease (LeaseSeconds 3 →
+        // max(TimeoutSeconds + 5, 3) = 7 s) lapses; replica 2 receives a duplicate of the command (same event_id), waits
+        // the lease out, takes token 2 through AcquireLeaseAsync and is itself slow (gate 2). Replica 1's answer arrives
+        // while replica 2 still runs: late + deferred; then replica 2 publishes; the redelivery ends on the inbox fast path.
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var gate2 = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        f.Llm.Enqueue(async _ =>
+        {
+            await gate.Task;
+            return new LlmCompletionResult(FakeLlmCompletion.DefaultAnswer, false, 812, 0, 0, 96, "msg_slow_replica_1");
+        });
+        f.Llm.Enqueue(async _ =>
+        {
+            await gate2.Task;
+            return new LlmCompletionResult(FakeLlmCompletion.DefaultAnswer, false, 812, 0, 0, 96, "msg_replica_2");
+        });
+        var replica = f.NewConsumer(f.Services.GetRequiredService<LlmWorkerHandler>(), "llm-worker@replica-2");
+        var source = await f.SourceAsync();
+        await f.Ingress.PublishAsync(f.Message("f04b", TargetReport), source, "test", null, live: true, None);
+        string eventId;
+        Guid requestId;
+        string jobKey;
+        await StartAllAsync();
+        try
+        {
+            Assert.True(await MessagingFixture.WaitUntilAsync(() => Task.FromResult(f.Llm.Calls.Count == 1), TimeSpan.FromSeconds(40)));
+            var command = await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox WHERE event_type = 'llm.requested'");
+            eventId = JsonNode.Parse(command)!["event_id"]!.GetValue<string>();
+            requestId = await f.ScalarAsync<Guid>("SELECT event_id FROM processing.attempts WHERE subscription_id = 'llm-worker:job' AND fencing_token = 1");
+            jobKey = LlmWorkerHandler.JobKey(requestId);
+            await replica.StartAsync(None);
+            await f.PublishRawAsync("puluj.live.llm.requested", Encoding.UTF8.GetBytes(command), eventId); // at-least-once: the same command again
+            Assert.True(await MessagingFixture.WaitUntilAsync(() => Task.FromResult(f.Llm.Calls.Count == 2), TimeSpan.FromSeconds(40)), "replica 2 took the job over after the lease lapsed");
+            Assert.Equal(1, await f.CountAsync("processing.attempts", $"job_key = '{jobKey}' AND fencing_token = 2 AND state = 'running'"));
+            Assert.Equal(1, await f.CountAsync("processing.attempts", $"job_key = '{jobKey}' AND fencing_token = 1 AND state = 'interrupted'")); // marked by the takeover
+            gate.SetResult(); // the old holder's answer arrives while the new holder is still running
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("llm_requests", $"request_id = '{requestId}' AND fencing_token = 1 AND outcome = 'late'") == 1, TimeSpan.FromSeconds(40)));
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker' AND state = 'superseded' AND error LIKE 'late result%'") == 1, TimeSpan.FromSeconds(40)),
+                "the late delivery was deferred, not completed");
+            Assert.Empty(await EventsAsync("llm.completed"));
+            gate2.SetResult(); // the new holder publishes
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.extractions") == 1, TimeSpan.FromSeconds(40)), "the new holder's result was finalized");
+            Assert.True(await MessagingFixture.WaitUntilAsync(() => Task.FromResult(f.LlmWorker.Duplicates + replica.Duplicates >= 1), TimeSpan.FromSeconds(40)), "the deferred delivery came back and hit the inbox conflict/fast path");
+            Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker' AND state = 'succeeded' AND worker = 'llm-worker@replica-2'")); // the duplicate landed on replica 2
+        }
+        finally
+        {
+            gate.TrySetResult(); // never leave a replica stuck in the provider: StopAsync waits for the in-flight delivery
+            gate2.TrySetResult();
+            await replica.StopAsync(None);
+            await StopAllAsync();
+        }
+        Assert.Equal(2, f.Llm.Calls.Count);
+        var completed = Assert.Single(await EventsAsync("llm.completed"));
+        Valid(LlmCompleted, completed["payload"]!);
+        Assert.Equal(2, completed["payload"]!["fencing_token"]!.GetValue<int>());
+        Assert.Equal("msg_replica_2", completed["payload"]!["provider_request_id"]!.GetValue<string>());
+        Assert.Equal(1, await f.CountAsync("processing.attempts", $"job_key = '{jobKey}' AND fencing_token = 1 AND state = 'superseded'"));
+        Assert.Equal(1, await f.CountAsync("llm_requests", $"request_id = '{requestId}' AND fencing_token = 2 AND outcome = 'applied' AND provider_request_id = 'msg_replica_2'"));
+        Assert.Equal(1, await f.CountAsync("processing.extractions", "outcome = 'completed' AND method = 'llm'"));
+        Assert.Equal(1, await f.CountAsync("messaging.inbox", $"event_id = '{eventId}' AND outcome = 'completed'"));
+        f.Evidence.Record("P06-F04b", new { window = "W8", takeover = "lease expiry → token 2 via AcquireLeaseAsync", provider_calls = 2, published_token = 2, old_result = "late (audit) while holder running → delivery deferred → inbox duplicate", extractions = 1 });
+    }
+
+    [Fact]
+    public async Task F09_W4_Crash_after_the_paid_call_keeps_the_audit_and_the_takeover_waits_for_the_lease()
+    {
+        await f.ResetAsync();
+        var hooks = new OnceHooks().Arm(nameof(OnceHooks.BeforeCommit)); // after the provider answered and the audit row is durable
+        f.LlmWorker.Hooks = hooks;
+        f.LlmWorker.RestartDelay = TimeSpan.FromMilliseconds(300);
+        var source = await f.SourceAsync();
+        await f.Ingress.PublishAsync(f.Message("f09", TargetReport), source, "test", null, live: true, None);
+        await StartAllAsync();
+        try
+        {
+            Assert.True(await MessagingFixture.WaitUntilAsync(() => Task.FromResult(hooks.Fired.Count == 1), TimeSpan.FromSeconds(40)));
+            var crashedAt = DateTime.UtcNow;
+            Assert.Equal(1, await f.CountAsync("llm_requests", "outcome = 'answered' AND fencing_token = 1 AND response_text IS NOT NULL")); // the paid call survived the crash
+            Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker:job' AND fencing_token = 1 AND state = 'running'"));
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            Assert.Single(f.Llm.Calls); // the redelivery waits for the lease (7 s) instead of paying again
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.extractions") == 1, TimeSpan.FromSeconds(40)));
+            Assert.True(DateTime.UtcNow - crashedAt >= TimeSpan.FromSeconds(6), "the second call came after the lease lapsed");
+        }
+        finally
+        {
+            f.LlmWorker.Hooks = ConsumerHooks.None;
+            await StopAllAsync();
+        }
+        Assert.Equal(2, f.Llm.Calls.Count);
+        Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker:job' AND fencing_token = 1 AND state = 'interrupted'"));
+        Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'llm-worker:job' AND fencing_token = 2 AND state = 'succeeded'"));
+        Assert.Equal(1, await f.CountAsync("llm_requests", "fencing_token = 1 AND outcome = 'answered'")); // orphaned by the crash: paid, never applied
+        Assert.Equal(1, await f.CountAsync("llm_requests", "fencing_token = 2 AND outcome = 'applied'"));
+        var completed = Assert.Single(await EventsAsync("llm.completed"));
+        Assert.Equal(2, completed["payload"]!["fencing_token"]!.GetValue<int>());
+        f.Evidence.Record("P06-F09", new { window = "W4", crash = "after audit, before commit", audit_rows = 2, orphaned_answered = 1, provider_calls = 2, second_call = "after lease expiry", extractions = 1 });
+    }
+
+    [Fact]
+    public async Task F10_Terminal_failures_before_any_call_carry_a_job_token_and_at_least_one_attempt()
+    {
+        await f.ResetAsync();
+        var ingested = await f.IngestAsync("f10", TargetReport);
+        var parent = Envelope.TryParse(Encoding.UTF8.GetBytes(await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox")), out _)!;
+        var handler = f.Services.GetRequiredService<LlmWorkerHandler>();
+        var now = f.Services.GetRequiredService<TimeProvider>().GetUtcNow();
+
+        async Task<JsonNode> TerminalAsync(JsonObject payload)
+        {
+            var command = StageSupport.Child(parent, "llm.requested", "1.0", "parser@test", now, payload);
+            var state = await handler.PrepareAsync(command, None);
+            await using var db = await f.Factory.CreateDbContextAsync();
+            var conn = (Npgsql.NpgsqlConnection)db.Database.GetDbConnection();
+            await conn.OpenAsync();
+            await using var tx = await conn.BeginTransactionAsync();
+            var result = await handler.ApplyAsync(conn, tx, command, state, None);
+            await tx.CommitAsync();
+            var failed = Assert.Single(result.OutEvents!);
+            Assert.Equal("llm.failed", failed.EventType);
+            return failed.Payload!;
+        }
+
+        var expired = Guid.CreateVersion7();
+        var byDeadline = await TerminalAsync(new JsonObject { ["raw_message_id"] = ingested.RawMessageId, ["request_id"] = expired.ToString(), ["deadline_at"] = FactMapper.Iso(now.AddMinutes(-1)) });
+        Valid(LlmFailed, byDeadline);
+        Assert.Equal("deadline_exceeded", byDeadline["error"]!["code"]!.GetValue<string>());
+        Assert.Equal(1, byDeadline["attempts"]!.GetValue<int>());
+        Assert.Equal(1, byDeadline["fencing_token"]!.GetValue<int>());
+        Assert.Equal(1, await f.CountAsync("processing.attempts", $"job_key = '{LlmWorkerHandler.JobKey(expired)}' AND state = 'failed' AND fencing_token = 1"));
+
+        var drifted = Guid.CreateVersion7();
+        var byDrift = await TerminalAsync(new JsonObject
+        {
+            ["raw_message_id"] = ingested.RawMessageId,
+            ["request_id"] = drifted.ToString(),
+            ["input"] = new JsonObject { ["normalization_version"] = Puluj.Processing.Text.Normalizer.Version, ["normalized_text_hash"] = new string('0', 64) },
+        });
+        Valid(LlmFailed, byDrift);
+        Assert.Equal("normalization_drift", byDrift["error"]!["code"]!.GetValue<string>());
+        Assert.Equal(1, byDrift["attempts"]!.GetValue<int>());
+        Assert.Empty(f.Llm.Calls);
+        f.Evidence.Record("P06-F10", new { deadline_exceeded = "token 1, attempts 1, schema valid", normalization_drift = "token 1, attempts 1, schema valid", provider_calls = 0 });
     }
 
     [Fact]

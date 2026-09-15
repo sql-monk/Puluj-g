@@ -21,7 +21,7 @@ public interface ILlmCompletion
 /// <summary>A provider failure: status code when the provider answered, `Retryable` decides between another attempt and a terminal `llm.failed`.</summary>
 public sealed class LlmCompletionException(string code, string message, bool retryable, HttpStatusCode? statusCode = null, Exception? inner = null) : Exception(message, inner)
 {
-    /// <summary>provider_timeout | rate_limited | provider_error | invalid_response | budget_unavailable | no_api_key</summary>
+    /// <summary>provider_timeout | rate_limited | provider_error | invalid_response | no_api_key (the worker adds its own terminal codes: budget_unavailable, deadline_exceeded, normalization_drift, attempts_exhausted)</summary>
     public string Code { get; } = code;
     public bool Retryable { get; } = retryable;
     public HttpStatusCode? StatusCode { get; } = statusCode;

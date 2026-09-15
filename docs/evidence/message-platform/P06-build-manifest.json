@@ -1,0 +1,140 @@
+{
+  "task": "P06",
+  "baseCommit": "dfb81f67e29dcbc1b90a0f5ad5b56fc086cb9206",
+  "generatedAt": "2026-09-15T21:07:48.052225+00:00",
+  "configuration": "Debug/net10.0",
+  "sdk": "10.0.401",
+  "broker": {
+    "image": "rabbitmq:4.3-management",
+    "server": "4.3.5",
+    "client": "RabbitMQ.Client 7.2.2",
+    "testcontainers": "Testcontainers.RabbitMq 4.15.0"
+  },
+  "database": {
+    "image": "postgis/postgis:17-3.5",
+    "migration": "AddExtractions (processing.extractions, processing.observations, llm_requests columns, ux_processing_attempts_job_token)"
+  },
+  "productionSourcesChanged": true,
+  "files": [
+    {
+      "path": "contracts/messaging/README.md",
+      "status": "M",
+      "sha256": "5e8651c81e9b4987a430a69344bc0d81b3fb0fdd786723fb20ac36fb173179ad"
+    },
+    {
+      "path": "docs/adr/ADR-0004-delivery-guarantees.md",
+      "status": "M",
+      "sha256": "9e8554e15720ea4ab327a44ac6c9f8fe08f2ca01c47321fe20c05723d16d47af"
+    },
+    {
+      "path": "docs/adr/ADR-0005-runs-completion.md",
+      "status": "M",
+      "sha256": "29ea89bdfaf94cfd19db16071c9f80e005bfbca1b0dd52613e554e69df3b8fb8"
+    },
+    {
+      "path": "docs/adr/ADR-0006-data-model.md",
+      "status": "M",
+      "sha256": "9764c4da9de8faca09d85dd15c86c616b54807d376eb8416ee7d1ba746cb83a4"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "status": "M",
+      "sha256": "f681a57ebcf821573b8b7c1a98fbc8c8e5361257150676a86d66fd56d15cfaff"
+    },
+    {
+      "path": "docs/evidence/message-platform/P06-finalizer-evidence.md",
+      "status": "M",
+      "sha256": "13c76e6afbd8ef65c6f0299e9340fd828d4ba1166df49f15c1f2e309a4f8130e"
+    },
+    {
+      "path": "docs/evidence/message-platform/messaging-crash-evidence.json",
+      "status": "M",
+      "sha256": "e5e6d2b7fabce4ebc82cbd7f82de258ebce0f5cdb6e066d1fe2a6bb03a4aecda"
+    },
+    {
+      "path": "docs/fork-deployment.md",
+      "status": "M",
+      "sha256": "b2bb0e789075707fd842d3e69b080fd5e6df4a8efabcb31880292b5b00b446d7"
+    },
+    {
+      "path": "docs/plan-message-platform.md",
+      "status": "M",
+      "sha256": "2eaba0c412b096b7e02edb0cfce7c07ae3452904e69b4cad1ae3edba8dc5ef5b"
+    },
+    {
+      "path": "src/Puluj.Messaging/IDeliveryHandler.cs",
+      "status": "M",
+      "sha256": "056d098f6b0174b3b61674e80e457872badcd0b96fdb45d92ad97d79d5be4c61"
+    },
+    {
+      "path": "src/Puluj.Messaging/SubscriptionConsumer.cs",
+      "status": "M",
+      "sha256": "4646377a7ec027e2420d873f4a5e5fbee9de6ca6d9c2c9adca040732906df886"
+    },
+    {
+      "path": "src/Puluj.Processing/Llm/ILlmCompletion.cs",
+      "status": "M",
+      "sha256": "09c9e4a7937d82bc7b142850b3a7787a1d74fde15d1af9e1e41da4608a16845c"
+    },
+    {
+      "path": "src/Puluj.Processing/Stages/FinalizerHandler.cs",
+      "status": "M",
+      "sha256": "3ed4232c1968c8ad2a48951d2fba122c5a59487ae495eb4235a08d8acf901589"
+    },
+    {
+      "path": "src/Puluj.Processing/Stages/LlmWorkerHandler.cs",
+      "status": "M",
+      "sha256": "8ded901a5b45b4a9f33ffa42d7a120828784f7a969adadfdfda63a9d9a8ab1cd"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/TopologyRegistryTests.cs",
+      "status": "M",
+      "sha256": "7bd78214bad061de0829e3dfb73d4790ac1a104ae19848af2b71fd016bf63a42"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Tests/Integration/FinalizerTests.cs",
+      "status": "M",
+      "sha256": "a799fbd22c8d7ac27035adfcf5c55b75929deed39da9577b1db1fa4cf94df87d"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Tests/Integration/MessagingFixture.cs",
+      "status": "M",
+      "sha256": "8ae0f5e2df4bd27cd1e4ba44f1b57108ecd6e643e891c64ec1cf0a1f350d67c6"
+    },
+    {
+      "path": "docs/evidence/message-platform/P06-handoff.md",
+      "status": "??",
+      "sha256": "6a75578595a5f1873edc98c25d48d420b7b04ea014331e2807293263fc525ef5"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-Puluj.Integration.Tests-run2.trx",
+      "status": "??",
+      "sha256": "e88e6fbcfe3baf0f976767b6c86adde5c38ff9155e11f8ba0bf9af12ba947020"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-Puluj.Messaging.Contracts.Tests-run2.trx",
+      "status": "??",
+      "sha256": "83cd37b444cb84c8c0866966c6f9a3356539f1ae6eb9872d687a8d839f8b9323"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-Puluj.Processing.Tests-run2.trx",
+      "status": "??",
+      "sha256": "5357655102a42ea09549b6a84d312764a7893765e4f33d79d9e770e5f176f477"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-finalizer-run5.trx",
+      "status": "??",
+      "sha256": "ae800c6489daafe27be082c973fd9192f8d70676f71337df0973485e1cc56ef8"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-finalizer-run6.trx",
+      "status": "??",
+      "sha256": "664ffebdc862d7e8cfb8ee51c68b385f84ead049eb8d7762863488beb2cbe2ef"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p06-messaging-run7.trx",
+      "status": "??",
+      "sha256": "2bad47a252250ef859469d5bdf29be60d7a64f1e2d908aad6338904c5dd3cec5"
+    }
+  ]
+}

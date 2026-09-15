@@ -102,7 +102,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             Assert.All(ContractFiles.Strings(subscription["lanes"]), lane => Assert.Contains(lane, lanes));
             Assert.Matches("^P[0-9]{2}$", subscription["owner_task"]!.GetValue<string>());
             // P03 archive, P04 raw-writer, P05 normalizer/parser — active (runtime реалізовано); finalizer/llm-worker — paused
-            // (черги для parse.completed/llm.requested існують до P06); решта — planned до своїх задач.
+            // (черги для parse.completed/llm.requested існують з P05; active з P06); решта — planned до своїх задач.
             var expectedStatus = subscriptionId switch
             {
                 "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" => "active",

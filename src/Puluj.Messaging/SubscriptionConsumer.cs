@@ -244,6 +244,16 @@ public sealed class SubscriptionConsumer : BackgroundService
                 await FinishAttemptAsync(conn, attemptId, "failed", ex.Message, ct);
                 await QuarantineAsync(channel, ea, eventId, envelope, body, ex.Reason, ex.Message, attemptId, ct);
             }
+            catch (DeliveryDeferredException ex)
+            {
+                // Not a failure: the outcome belongs to another delivery of the same command; requeue without counting.
+                await FinishAttemptAsync(conn, attemptId, "superseded", ex.Message, ct);
+                _logger.LogInformation("Delivery {EventId} to {Subscription} deferred: {Reason}", eventId, SubscriptionId, ex.Message);
+                _metrics.Delivered(SubscriptionId, "deferred");
+                await Task.Delay(_options.Consumer.MinBackoff, ct);
+                Interlocked.Increment(ref _requeued);
+                await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, ct);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 await FinishAttemptAsync(conn, attemptId, "failed", ex.ToString(), ct);

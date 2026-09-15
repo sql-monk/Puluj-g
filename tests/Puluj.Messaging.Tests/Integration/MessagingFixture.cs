@@ -105,6 +105,7 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["Llm:LeaseSeconds"] = "3",
             ["Llm:TimeoutSeconds"] = "2",
             ["Llm:FailurePause"] = "00:00:02",
+            ["Messaging:Consumer:PrefetchBySubscription:llm-worker"] = "1", // a blocked replica has no credit → a duplicate command lands on the other one (F04b)
             ["Messaging:Enabled"] = "true",
             ["Messaging:Outbox:Enabled"] = "true",
             ["Messaging:Outbox:PipelineVersion"] = Options.Outbox.PipelineVersion,

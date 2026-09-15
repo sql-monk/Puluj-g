@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-15T18:05:15.8709429+00:00",
+  "generated_at": "2026-09-15T21:02:42.8537437+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.185577,
+      "outbox_age_seen_s": 1.144532,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0a63e-7037-78b6-b1ea-33848b036716"
+      "event_id": "01a0a6e0-e375-73fb-a81e-671715c8df73"
     },
     "P03-C05": {
       "window": "W6b",
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T18:05:15.0715226\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T21:02:41.9780615\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -307,10 +307,19 @@
     },
     "P06-F04": {
       "window": "W8",
-      "worker_late_noop": 1,
+      "worker_late": "deferred \u2192 noop",
       "audit_outcome": "late",
       "finalizer_late_noop": 1,
-      "extractions": 0
+      "extractions": 0,
+      "provider_calls": 1
+    },
+    "P06-F04b": {
+      "window": "W8",
+      "takeover": "lease expiry \u2192 token 2 via AcquireLeaseAsync",
+      "provider_calls": 2,
+      "published_token": 2,
+      "old_result": "late (audit) while holder running \u2192 delivery deferred \u2192 inbox duplicate",
+      "extractions": 1
     },
     "P06-F05": {
       "provider_calls": 2,
@@ -324,8 +333,8 @@
       "finalizer_noops": 3,
       "extractions": 1,
       "replicas": {
-        "r1": 3,
-        "r2": 1
+        "r1": 2,
+        "r2": 2
       }
     },
     "P06-F07": {
@@ -336,6 +345,20 @@
       "order": "llm.completed before parse.completed{needs_llm}",
       "extractions": 1,
       "late_parse": "noop"
+    },
+    "P06-F09": {
+      "window": "W4",
+      "crash": "after audit, before commit",
+      "audit_rows": 2,
+      "orphaned_answered": 1,
+      "provider_calls": 2,
+      "second_call": "after lease expiry",
+      "extractions": 1
+    },
+    "P06-F10": {
+      "deadline_exceeded": "token 1, attempts 1, schema valid",
+      "normalization_drift": "token 1, attempts 1, schema valid",
+      "provider_calls": 0
     }
   }
 }

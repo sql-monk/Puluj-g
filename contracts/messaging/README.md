@@ -87,15 +87,18 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 
 - `llm.completed` (`LlmWorkerHandler`): `fencing_token` = токен lease з `processing.attempts` (job `llm:{request_id}`), `facts[]` за тим самим
   `FactMapper`, що й parser (evidence `rule_id = llm`, `rule_version = llm-{model}-p{prompt}`), `usage` + `cost_usd`, `audit_id` (additive) → `llm_requests`;
-  `outcome needs_review` = відмова моделі. `llm.failed` публікується **лише** `final:true` (attempts = кількість спроб провайдера; коди `provider_timeout`,
-  `rate_limited`, `provider_error`, `invalid_response`, `no_api_key`, `budget_unavailable`, `deadline_exceeded`, `normalization_drift`, `attempts_exhausted`);
-  non-final повтори — transient redelivery без події.
+  `outcome needs_review` = відмова моделі; `usage` = `input_tokens`, `output_tokens`, `cache_read_tokens`, `cost_usd` (cache-creation токени — лише в audit).
+  `llm.failed` публікується **лише** `final:true` (`attempts` ≥ 1 = job-рядки `failed`, включно з terminal без виклику; коди `provider_timeout`,
+  `rate_limited`, `provider_error`, `invalid_response` (також відповідь, яку mapper не приймає), `no_api_key`, `budget_unavailable`, `deadline_exceeded`,
+  `normalization_drift`, `attempts_exhausted`); non-final повтори — transient redelivery без події. Кожна terminal подія несе `fencing_token` власного
+  job-рядка (актуальний максимум), тож finalizer її не відкидає.
 - `observations.recorded` (`FinalizerHandler`): `extraction_result_id` = `processing.extractions.extraction_id`, `extraction_version` 1, `observations[]` =
   факти з `observation_id` (UUIDv7, рядки `processing.observations`), `legacy_target_id` відсутній у compat window, `expected_branches` за manifest
   (`domain_branches_by_observation_category`). Публікується лише для outcome `completed` з фактами.
-- `message.analysis.completed`: для кожного terminal outcome (`completed | no_facts | unsupported | needs_review | failed`); `timings` з raw
-  (`received_at`), outbox `raw.stored` (`stored_at`), `stage_results` (`normalized_at`, `parsed_at`) і `finalized_at`; `llm_request_ids` для method `llm`;
-  `versions.model/prompt` — з `llm.completed`. Пізній результат (fencing) і будь-який вхід після extraction → receipt `noop`.
+- `message.analysis.completed`: для кожного terminal outcome (`completed | no_facts | unsupported | needs_review | failed`); `timings` — лише наявні
+  значення: raw (`received_at`), архів `raw.stored` (`stored_at`, відсутній, якщо archive відстає), `stage_results` (`normalized_at`, `parsed_at`),
+  `llm_completed_at` (`occurred_at` події worker'а) і `finalized_at`; `llm_request_ids` для method `llm`; `versions` = normalization/rules зі стадії
+  `awaiting_llm` + `model/prompt` з `llm.completed`. Пізній результат (fencing) і будь-який вхід після extraction → receipt `noop`.
 
 ## Правила сумісності
 

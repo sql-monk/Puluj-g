@@ -61,7 +61,8 @@ llm.requested» читається як «команда додатково до
 1..n, `lease_until`), takeover після закінчення lease, `llm.failed{final:true}` після `Llm:MaxAttempts` або одразу для non-retryable/deadline/breaker/drift;
 `final:false` не публікується. Finalizer: `llm.completed{needs_review}` (відмова моделі) → analysis `needs_review` без observations; `llm.failed{final}` →
 `failed` з error; пізній результат зі старим `fencing_token` → `noop`; після `llm.failed{final}` пізніший takeover з фактами — теж `noop` (extraction
-immutable; оплачений виклик видно в `llm_requests.outcome = late`).
+immutable; оплачений виклик видно в `llm_requests.outcome = late`). `versions` extraction для LLM-шляху = `versions` стадії `awaiting_llm`
+(normalization/rules) + `model`/`prompt` з `llm.completed`; рядки `processing.observations` — лише для `completed`.
 
 ### Completion manifest
 

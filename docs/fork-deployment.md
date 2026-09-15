@@ -56,6 +56,8 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 Ролі `llm-worker`, `finalizer` сервісу `messaging`. Finalizer працює без ключа; llm-worker викликає модель лише з `Llm__Enabled=true` і
 `ANTHROPIC_API_KEY`/`Llm__ApiKey` (без ключа — `llm.failed{no_api_key}` → analysis `failed`, видимо). Бюджет: `Llm__MaxCallsPerMinute` і breaker — на
 репліку (N реплік × ліміт), `Llm__MaxAttempts` (3) спроб провайдера на запит, lease `Llm__LeaseSeconds` (90 с) > `Llm__TimeoutSeconds`. Кожен оплачений
-виклик — рядок `llm_requests` з `request_id`/`fencing_token`/`provider_request_id`; пізній результат після takeover — `outcome = late`.
+виклик — рядок `llm_requests` з `request_id`/`fencing_token`/`provider_request_id`; пізній результат після takeover — `outcome = late`; `answered` без
+`applied/late` — результат втрачено з crash'ем holder'а (оплачено, повтор після `LeaseSeconds`). Відкритий breaker (429/4xx) — worker чекає паузу в
+межах `deadline_at` команди, інакше `llm.failed{budget_unavailable}`.
 Міграція `AddExtractions` додає `processing.extractions`/`observations` і колонки `llm_requests`; rollback — `Down` (дані extractions втрачаються,
 `targets` legacy не залежать).

@@ -15,7 +15,7 @@ ADR фіксують рішення програми [`plan-message-platform.md`
 | [0002](ADR-0002-topology-subscriptions.md) | Topology, registry підписок, «видалити після всіх», DLQ, waiver | accepted (P02; runtime P03; v4 P05) | P01, P02, P03, P05 | Management API bindings check, health — P13 |
 | [0003](ADR-0003-identities-versioning.md) | Identities (event, raw, run), timestamps, schema/topology versions, сумісність | accepted (P04) | P01, P03, P04 | Analytics на нових колонках — P15 |
 | [0004](ADR-0004-delivery-guarantees.md) | Outbox/inbox, ACK після commit, crash windows W1–W14 | accepted (P03; W1 — P04; W8 — P06) | P01–P04, P06 | W1c spool — за потребою; quarantine safety net — P13/P16 |
-| [0005](ADR-0005-runs-completion.md) | Runs/generations/lanes, completion manifest, terminal outcomes, workflow status | accepted для completion (receipts P03, stage_results P05, finalizer/extraction P06); runs/generations — proposed | P01, P03, P05, P06 | Orchestration/generations — P14 |
+| [0005](ADR-0005-runs-completion.md) | Runs/generations/lanes, completion manifest, terminal outcomes, workflow status | proposed (реалізовано: receipts P03, stage_results P05, finalizer/extraction P06; формальний accept — owner ADR) | P01, P03, P05, P06 | Orchestration/generations — P14 |
 | [0006](ADR-0006-data-model.md) | Логічна модель `messaging.*`, `processing.*`, `analytics.message_*` | accepted (messaging/processing — P03; extractions/observations — P06) | P01, P03, P05, P06 | Analytics DDL — P15; партиціювання — P16 |
 | [0007](ADR-0007-slo-retention-proposal.md) | SLO орієнтири з P00 baseline, quota, retention, deletion eligibility | proposed | P01 | Абсолютні SLO — P16; outbox/inbox cleanup — P03, решта retention — P16/Ops |
 

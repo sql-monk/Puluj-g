@@ -32,6 +32,14 @@ public sealed record DeliveryResult(string Outcome, string? Reason = null, IRead
     public long? StageResultId { get; init; }
 }
 
+/// <summary>
+/// The delivery must not complete now and must not count as a failed attempt: the handler found (inside the transaction)
+/// that another delivery of the same command owns the outcome. The transaction is rolled back, the attempt is marked
+/// `superseded` and the message is requeued after the minimum backoff; the redelivery normally ends on the inbox fast
+/// path or as a noop.
+/// </summary>
+public sealed class DeliveryDeferredException(string message) : Exception(message);
+
 /// <summary>The delivery cannot succeed however often it is retried: invalid payload, unknown reference — straight to quarantine.</summary>
 public sealed class PermanentDeliveryException(string reason, string message) : Exception(message)
 {
