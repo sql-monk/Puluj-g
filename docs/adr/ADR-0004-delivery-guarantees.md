@@ -1,6 +1,7 @@
 # ADR-0004 — Гарантії доставки: outbox/inbox, ACK після commit, crash windows
 
-Статус: **proposed** (P01). Вимоги: plan §6, §13 «Надійність», §15.2, §16.2 п.2. Реалізація/тести — P02 (spike), P03 (inbox/outbox/relay).
+Статус: **accepted** (P03, 2026-09-15: outbox/inbox/relay/receipts/quarantine реалізовано в `Puluj.Infrastructure.Messaging` + `Puluj.Messaging`, вікна W2/W3/W6/W9/W11/W12/W14 доведені crash tests P03-C01…C10 на реальних PostGIS + RabbitMQ; W4/W5/W7/W10/W13 — P02 spike). Запропоновано P01. Вимоги: plan §6, §13 «Надійність», §15.2, §16.2 п.2.
+Evidence: [`P03-handoff.md`](../evidence/message-platform/P03-handoff.md), [`P03-crash-evidence.md`](../evidence/message-platform/P03-crash-evidence.md).
 
 ## Рішення (коротко)
 
@@ -154,7 +155,22 @@ sequenceDiagram
 
 | Питання | Задача |
 |---|---|
-| Реальні crash tests W4/W5/W7/W10/W11/W13 на Testcontainers RabbitMQ | P02 |
-| Outbox relay (lease, batch, confirm timeout), inbox, receipts, reconciliation, W2/W3/W6/W9/W12/W14a | P03 |
-| Collector outbox/checkpoint, W1 | P04 |
-| Fencing tokens у attempts, W8 | P06 |
+| ~~Реальні crash tests W4/W5/W7/W10/W11/W13 на Testcontainers RabbitMQ~~ — done, P02 spike | P02 |
+| ~~Outbox relay (lease, batch, confirm timeout), inbox, receipts, reconciliation, W2/W3/W6/W9/W12/W14a~~ — done, P03 (див. «Реалізація») | P03 |
+| Collector outbox/checkpoint, W1; `raw.stored{is_new:false}` при повторі (bridge зараз нічого не публікує для дубля) | P04 |
+| Fencing tokens у attempts (колонка є, завжди 0), lease takeover, W8 | P06 |
+| Readiness bindings через management API (зараз — idempotent re-declare у reconciliation) | P13/P16 |
+
+## Реалізація (P03)
+
+| Рішення ADR | Код | Перевірка |
+|---|---|---|
+| Transactional outbox (§2) | `OutboxWriter.EnqueueAsync` на відкритому `NpgsqlTransaction` викликача: outbox row + expected `processing.deliveries`; bridge — `RawMessageIngestor` (raw + outbox в одній tx, `Messaging:Outbox:Enabled`) | P03-C01, G04 (trigger-fail → raw rollback) |
+| Relay (§2): lease `FOR UPDATE SKIP LOCKED`, паралельні confirms батчем, mark після confirm, unroutable без гарячого циклу | `Puluj.Messaging.OutboxRelay` | P03-C02 (lease), C03 (crash після confirm до mark → republish тим самим `event_id`), C08 (basic.return), G01 (200 у батчі) |
+| Inbox (§3) + ACK після commit (§4) | `SubscriptionConsumer`: fast path → attempt → робота → tx(inbox insert re-check, ефект, receipt, outbox, attempt) → commit → ACK | C03, C09, C10, G01 |
+| Retry у БД (§5): `basic.nack(requeue=true)` після bounded backoff; ліміт `max_delivery_attempts` → receipt `quarantined` → nack → DLQ | `SubscriptionConsumer` + `processing.attempts`/`quarantine`, `DlqConsumer` для crash-loop dead-letters | C04 (W6a-1/2), C05 (W6b admin retry через outbox redelivery), G05 (schema/unknown/invalid → quarantine без attempts) |
+| Receipts та expected set за версією (ADR-0002) | `processing.deliveries` пишуться при публікації; `TopologyRegistrar` реєструє версію/статуси | C06 (W9a), C07 (W9b waiver) |
+| Reconciliation + cleanup лише після archive receipt (§15.2) | `ReconciliationService` | G02, G03, C08 (re-declare відновлює binding) |
+
+Bridge-специфіка (до P04): `causation_id = event_id` для `raw.stored` без `ingress.received` (ADR-0003); дубль `ON CONFLICT`
+не публікує нічого; live-пости під час history load отримують lane `history` (`TelegramCollector` `enqueue: !_loadingHistory`).

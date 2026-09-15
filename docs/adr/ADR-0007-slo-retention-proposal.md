@@ -77,6 +77,6 @@ Required черги: **без** message TTL і drop-oldest. При ліміті 
 | Питання | Задача |
 |---|---|
 | Абсолютні SLO після baseline нової платформи на цільовому середовищі; canary thresholds | P16 |
-| Retention/disk, backup, deletion eligibility, партиціювання | P03 (Data + Ops) |
+| Retention: P03 реалізував лише outbox cleanup (confirmed + `Messaging:Reconciliation:OutboxGrace` 7 днів; `replay_source` — лише після archive receipt) та inbox cleanup (`InboxRetention` 30 днів, quarantined лишаються); `events`/`deliveries`/`attempts`/`quarantine` без автоматичного видалення — deletion job, backup-перевірка, партиціювання | P16 / Ops |
 | LLM budget/rate limits per lane | P06 |
 | Quality thresholds (precision/recall) — не в цьому ADR | P08 |

@@ -378,6 +378,327 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("llm_requests", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.ArchivedEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<Guid?>("CausationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("causation_id");
+
+                    b.Property<Guid>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<JsonDocument>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("envelope");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Lane")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("ProcessingRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("processing_run_id");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<long?>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<int>("TopologyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("topology_version");
+
+                    b.HasKey("EventId")
+                        .HasName("pk_events");
+
+                    b.HasIndex("CorrelationId")
+                        .HasDatabaseName("ix_events_correlation_id");
+
+                    b.HasIndex("PublishedAt")
+                        .HasDatabaseName("ix_events_published_at");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PublishedAt"), "brin");
+
+                    b.HasIndex("EventType", "PublishedAt")
+                        .HasDatabaseName("ix_events_event_type_published_at");
+
+                    b.HasIndex("RawMessageId", "ProcessingRunId")
+                        .HasDatabaseName("ix_events_raw_message_id_processing_run_id");
+
+                    b.ToTable("events", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.EventLink", b =>
+                {
+                    b.Property<Guid>("OutputEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("output_event_id");
+
+                    b.Property<Guid>("InputEventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("input_event_id");
+
+                    b.HasKey("OutputEventId", "InputEventId")
+                        .HasName("pk_event_links");
+
+                    b.HasIndex("InputEventId")
+                        .HasDatabaseName("ix_event_links_input_event_id");
+
+                    b.ToTable("event_links", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.InboxEntry", b =>
+                {
+                    b.Property<string>("SubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.HasKey("SubscriptionId", "EventId")
+                        .HasName("pk_inbox");
+
+                    b.HasIndex("CompletedAt")
+                        .HasDatabaseName("ix_inbox_completed_at");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CompletedAt"), "brin");
+
+                    b.ToTable("inbox", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.OutboxMessage", b =>
+                {
+                    b.Property<long>("OutboxId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("outbox_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("OutboxId"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<JsonDocument>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("envelope");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_type");
+
+                    b.Property<string>("Lane")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("LeaseOwner")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("lease_owner");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<bool>("ReplaySource")
+                        .HasColumnType("boolean")
+                        .HasColumnName("replay_source");
+
+                    b.Property<string>("RoutingKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("routing_key");
+
+                    b.Property<string>("TargetQueue")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("target_queue");
+
+                    b.HasKey("OutboxId")
+                        .HasName("pk_outbox");
+
+                    b.HasIndex(new[] { "ConfirmedAt" }, "ix_messaging_outbox_confirmed_at")
+                        .HasDatabaseName("ix_messaging_outbox_confirmed_at")
+                        .HasFilter("confirmed_at IS NOT NULL");
+
+                    b.HasIndex(new[] { "EventId" }, "ix_messaging_outbox_event_id_fanout")
+                        .IsUnique()
+                        .HasDatabaseName("ix_messaging_outbox_event_id_fanout")
+                        .HasFilter("target_queue IS NULL");
+
+                    b.HasIndex(new[] { "NextAttemptAt" }, "ix_messaging_outbox_unconfirmed")
+                        .HasDatabaseName("ix_messaging_outbox_unconfirmed")
+                        .HasFilter("confirmed_at IS NULL");
+
+                    b.ToTable("outbox", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.SubscriptionRegistration", b =>
+                {
+                    b.Property<string>("SubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<int>("TopologyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("topology_version");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at");
+
+                    b.Property<JsonDocument>("Bindings")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("bindings");
+
+                    b.Property<JsonDocument>("Lanes")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lanes");
+
+                    b.Property<string>("OwnerTask")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("owner_task");
+
+                    b.Property<DateTimeOffset?>("PausedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paused_at");
+
+                    b.Property<string>("QueuePolicy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("queue_policy");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("boolean")
+                        .HasColumnName("required");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<JsonDocument>("Waiver")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("waiver");
+
+                    b.HasKey("SubscriptionId", "TopologyVersion")
+                        .HasName("pk_subscriptions");
+
+                    b.ToTable("subscriptions", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.TopologyVersionRecord", b =>
+                {
+                    b.Property<int>("TopologyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("topology_version");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("applied_at");
+
+                    b.Property<string>("AppliedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("applied_by");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.HasKey("TopologyVersion")
+                        .HasName("pk_topology_versions");
+
+                    b.ToTable("topology_versions", "messaging");
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.Place", b =>
                 {
                     b.Property<int>("PlaceId")
@@ -475,6 +796,424 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_places_level_country_code");
 
                     b.ToTable("places", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.Delivery", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<string>("SubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("Actor")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<long?>("AttemptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("ExpectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expected_at");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("reason");
+
+                    b.Property<int>("TopologyVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("topology_version");
+
+                    b.HasKey("EventId", "SubscriptionId")
+                        .HasName("pk_deliveries");
+
+                    b.HasIndex("SubscriptionId", "Outcome")
+                        .HasDatabaseName("ix_deliveries_subscription_id_outcome");
+
+                    b.HasIndex(new[] { "ExpectedAt" }, "ix_processing_deliveries_pending")
+                        .HasDatabaseName("ix_processing_deliveries_pending")
+                        .HasFilter("outcome IS NULL");
+
+                    b.ToTable("deliveries", "processing");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.ProcessingAttempt", b =>
+                {
+                    b.Property<long>("AttemptId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempt_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AttemptId"));
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("error");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<int>("FencingToken")
+                        .HasColumnType("integer")
+                        .HasColumnName("fencing_token");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("JobKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("job_key");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<long?>("RetryOfAttemptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("retry_of_attempt_id");
+
+                    b.Property<string>("RetryReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("retry_reason");
+
+                    b.Property<long?>("StageResultId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stage_result_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("SubscriptionId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("Worker")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("worker");
+
+                    b.HasKey("AttemptId")
+                        .HasName("pk_attempts");
+
+                    b.HasIndex("StageResultId")
+                        .HasDatabaseName("ix_attempts_stage_result_id");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_attempts_started_at");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("StartedAt"), "brin");
+
+                    b.HasIndex("JobKey", "FencingToken")
+                        .HasDatabaseName("ix_attempts_job_key_fencing_token");
+
+                    b.HasIndex("SubscriptionId", "EventId")
+                        .HasDatabaseName("ix_attempts_subscription_id_event_id");
+
+                    b.ToTable("attempts", "processing");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.ProcessingGeneration", b =>
+                {
+                    b.Property<Guid>("GenerationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("PromotedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("promoted_at");
+
+                    b.Property<DateTimeOffset?>("RolledBackAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rolled_back_at");
+
+                    b.Property<string>("VerifiedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("verified_by");
+
+                    b.HasKey("GenerationId")
+                        .HasName("pk_generations");
+
+                    b.HasIndex(new[] { "IsActive" }, "ux_processing_generations_active")
+                        .IsUnique()
+                        .HasDatabaseName("ux_processing_generations_active")
+                        .HasFilter("is_active");
+
+                    b.ToTable("generations", "processing");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.ProcessingRun", b =>
+                {
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<JsonDocument>("Checkpoint")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("checkpoint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<Guid?>("GenerationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Lane")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<Guid?>("ReplaysRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replays_run_id");
+
+                    b.Property<JsonDocument>("Scope")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("scope");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid?>("SupersedesRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("supersedes_run_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<JsonDocument>("Versions")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("versions");
+
+                    b.HasKey("RunId")
+                        .HasName("pk_runs");
+
+                    b.HasIndex("Lane", "State")
+                        .HasDatabaseName("ix_runs_lane_state");
+
+                    b.HasIndex(new[] { "Lane" }, "ux_processing_runs_open_per_lane")
+                        .IsUnique()
+                        .HasDatabaseName("ux_processing_runs_open_per_lane")
+                        .HasFilter("state = 'running' AND kind IN ('live', 'history')");
+
+                    b.ToTable("runs", "processing");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.QuarantineEntry", b =>
+                {
+                    b.Property<long>("QuarantineId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("quarantine_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("QuarantineId"));
+
+                    b.Property<JsonDocument>("Envelope")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("envelope");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("error");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<JsonDocument>("Headers")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("headers");
+
+                    b.Property<string>("Lane")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<long?>("LastAttemptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_attempt_id");
+
+                    b.Property<DateTimeOffset>("QuarantinedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("quarantined_at");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("resolution");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("ResolvedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("resolved_by");
+
+                    b.Property<long?>("RetryOutboxId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("retry_outbox_id");
+
+                    b.Property<string>("SubscriptionId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.HasKey("QuarantineId")
+                        .HasName("pk_quarantine");
+
+                    b.HasIndex("SubscriptionId", "EventId")
+                        .HasDatabaseName("ix_quarantine_subscription_id_event_id");
+
+                    b.HasIndex(new[] { "SubscriptionId", "EventId" }, "ux_processing_quarantine_open")
+                        .IsUnique()
+                        .HasDatabaseName("ux_processing_quarantine_open")
+                        .HasFilter("resolved_at IS NULL");
+
+                    b.ToTable("quarantine", "processing");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Processing.StageResult", b =>
+                {
+                    b.Property<long>("StageResultId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("stage_result_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("StageResultId"));
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<JsonDocument>("Outputs")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("outputs");
+
+                    b.Property<long>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("stage");
+
+                    b.Property<string>("StageVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("stage_version");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<JsonDocument>("Versions")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("versions");
+
+                    b.Property<string>("Worker")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("worker");
+
+                    b.HasKey("StageResultId")
+                        .HasName("pk_stage_results");
+
+                    b.HasIndex("RunId", "Stage", "Outcome")
+                        .HasDatabaseName("ix_stage_results_run_id_stage_outcome");
+
+                    b.HasIndex("RawMessageId", "RunId", "Stage", "StageVersion")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stage_results_raw_message_id_run_id_stage_stage_version");
+
+                    b.ToTable("stage_results", "processing");
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.ProcessingError", b =>

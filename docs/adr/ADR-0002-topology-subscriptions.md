@@ -31,7 +31,9 @@ concurrency quotas (ADR-0007), а `projection` не має replay-черги (sh
   (`message` | `aggregate`), `replay_source`, `required_subscriptions`, `optional_subscriptions`,
   для `observations.recorded` — `conditional_subscriptions.by_manifest` (ADR-0005), для команд — `owner`.
 - `subscriptions.{id}`: `bindings`, `lanes`, `emits`, `required`, `queue_policy`, `idempotency`,
-  `owner_task`, `status` (`planned` → `active` після реалізації; `paused`/`retired` — з audit).
+  `owner_task`, `status` (`planned` → `active` після реалізації; `paused`/`retired` — з audit). З P03 (`topology_version` 2)
+  `archive` — `active`; черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
+  (статус після першого insert належить БД — `messaging.subscriptions`, команди `SubscriptionAdmin`).
 - `producer_roles`: collectors, watchdog, outbox-relay, reconciliation — публікують через outbox, черг не мають.
 - Правила консистентності (тести T03–T09 у `tests/Puluj.Messaging.Contracts.Tests`): кожен event має
   producer, schema і ≥1 required підписку; команда — рівно одного owner; кожен binding/emit — на відомий тип;
@@ -119,9 +121,10 @@ arguments лишати лише `x-queue-type` і DLX routing, або мігру
 
 | Питання | Задача |
 |---|---|
-| Prefetch за роллю (за вимірами), batch confirms у relay | P03 |
-| Relay розрізняє `PublishException`: return (`IsReturn`/`PublishReturnException`, unroutable → alarm missing binding, без retry) vs nack брокера (→ retry) | P03 |
-| Readiness bindings через management API/reconciliation; policies замість `x-*` arguments для змінюваних параметрів | P03 |
-| Runtime registry loader, readiness/health, reconciliation job, receipts | P03 |
+| ~~Prefetch за роллю, batch confirms у relay~~ — done P03: `Messaging:Consumer:Prefetch` (default 10), relay публікує батч паралельно з confirmation tracking (200/батч у G01) | P03 |
+| ~~Relay розрізняє `PublishException`~~ — done P03: `IsReturn` → `last_error = basic.return …`, retry лише через `UnroutableRetry` після re-declare; nack/timeout → backoff/lease | P03 |
+| Readiness: required queues — passive declare (`TopologyDeclarer.MissingRequiredQueuesAsync`); drift bindings — **idempotent re-declare** у кожному проході reconciliation (P03-C08), не management API; policies не використовуються — усі параметри в `x-*` arguments, зміна = нова назва черги + transfer | P03 → P13/P16 (management API check) |
+| ~~Runtime registry loader, reconciliation job, receipts~~ — done P03: `TopologyRegistry` (embedded `topology.json`), `TopologyRegistrar` (`messaging.topology_versions`/`subscriptions`), `ReconciliationService`, `processing.deliveries` | P03 |
+| Health endpoint / heartbeat-інтеграція readiness брокера (зараз — логи + метрики) | P13 |
 | Чи потрібна окрема `history` черга для `projection` (зараз так) чи достатньо live з event-time | P11 |
 | Retire NOTIFY bridge | P11 |

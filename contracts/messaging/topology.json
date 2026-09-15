@@ -1,6 +1,6 @@
 {
-  "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для майбутнього runtime (P02/P03). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закриває P02.",
-  "topology_version": 1,
+  "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
+  "topology_version": 2,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -227,7 +227,7 @@
       "idempotency": "upsert(raw_message_id, run_id) + reconciliation"
     },
     "archive": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P03",
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P03",
       "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed"],
       "lanes": ["live", "history", "replay"],
       "emits": [], "queue_policy": "required",

@@ -778,6 +778,7 @@ dotnet test tests/Puluj.Integration.Tests/Puluj.Integration.Tests.csproj
 dotnet test tests/Puluj.Analytics.Tests/Puluj.Analytics.Tests.csproj
 dotnet test tests/Puluj.Messaging.Contracts.Tests/Puluj.Messaging.Contracts.Tests.csproj
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Transport.Spike.Tests/Puluj.Transport.Spike.Tests.csproj  # P02: Testcontainers RabbitMQ, ~3.5 хв
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj  # P03: unit + crash tests C01–C10 на Testcontainers PostGIS + RabbitMQ, ~1.5 хв
 dotnet test Puluj.sln
 ```
 
@@ -859,7 +860,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P00 | done | Codex | p00_review: approved | [GitHub P00](https://github.com/sql-monk/Puluj-g/issues/1); [handoff, tests, baseline](evidence/message-platform/P00-handoff.md); локальні зміни, rollout не виконувався |
 | P01 | done | Claude Code | p01_review: approved | [GitHub P01](https://github.com/sql-monk/Puluj-g/issues/3); [handoff, tests, review](evidence/message-platform/P01-handoff.md); `docs/adr/`, `contracts/messaging/`; локальні зміни, commit не виконувався |
 | P02 | done | p02 (Claude Code) | p02_review: approved | [GitHub P02](https://github.com/sql-monk/Puluj-g/issues/2); [handoff, crash evidence, metrics](evidence/message-platform/P02-handoff.md); рішення **go**, ADR-0001/0002 accepted; локальні зміни, commit не виконувався |
-| P03 | planned | — | — | [GitHub P03](https://github.com/sql-monk/Puluj-g/issues/4); — |
+| P03 | done | Claude Code (p03) | p03_review: approve after fixes → виправлено → re-run зелений | [GitHub P03](https://github.com/sql-monk/Puluj-g/issues/4); [handoff, crash evidence](evidence/message-platform/P03-handoff.md); схеми `messaging`/`processing`, `Puluj.Messaging`, bridge під flag; ADR-0004/0006 accepted; локальні зміни, commit не виконувався |
 | P04 | planned | — | — | [GitHub P04](https://github.com/sql-monk/Puluj-g/issues/5); — |
 | P05 | planned | — | — | [GitHub P05](https://github.com/sql-monk/Puluj-g/issues/6); — |
 | P06 | planned | — | — | [GitHub P06](https://github.com/sql-monk/Puluj-g/issues/8); — |

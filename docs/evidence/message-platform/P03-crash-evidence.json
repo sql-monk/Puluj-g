@@ -1,0 +1,158 @@
+{
+  "task": "P03",
+  "generated_at": "2026-09-15T15:44:31.0324751+00:00",
+  "environment": {
+    "broker_image": "rabbitmq:4.3-management",
+    "broker_version": "4.3.5",
+    "postgres_image": "postgis/postgis:17-3.5",
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "dotnet": "10.0.12"
+  },
+  "tests": {
+    "G01-competing-consumers": {
+      "published": 200,
+      "replica_1": 100,
+      "replica_2": 100,
+      "events": 200,
+      "duplicates": 0,
+      "batch_confirm": {
+        "Leased": 200,
+        "Confirmed": 200,
+        "Unroutable": 0,
+        "Failed": 0,
+        "TimedOut": 0
+      }
+    },
+    "G02-archive-independent-of-outbox": {
+      "confirmed": 3,
+      "archived": 2,
+      "outbox_deleted": 2,
+      "outbox_kept_unarchived": 1,
+      "inbox_deleted": 2
+    },
+    "G03-reconciliation": {
+      "overdue": 1,
+      "unknown": [
+        "ghost-subscription"
+      ],
+      "quarantine_open": 1,
+      "outbox_unconfirmed": 1
+    },
+    "G04-bridge-atomicity": {
+      "duplicate_outbox_rows": 0,
+      "failed_outbox_rolls_back_raw": true,
+      "history_lane": true
+    },
+    "G05-schema-quarantine": {
+      "quarantined": 3,
+      "attempts": 0,
+      "dlq": 3
+    },
+    "P03-C01": {
+      "window": "W1b/W2",
+      "raw": 1,
+      "outbox_unconfirmed_before_relay": 1,
+      "expected_deliveries": [
+        "archive"
+      ],
+      "outbox_age_seen_s": 1.124051,
+      "relay": {
+        "Leased": 1,
+        "Confirmed": 1,
+        "Unroutable": 0,
+        "Failed": 0,
+        "TimedOut": 0
+      },
+      "events": 1,
+      "receipt": "completed"
+    },
+    "P03-C02": {
+      "window": "W2 \u002B lease",
+      "leased_while_lease_held": 0,
+      "published_after_lease": 1,
+      "same_event_id": true,
+      "transport_attempts": 2,
+      "events": 1
+    },
+    "P03-C03": {
+      "window": "W3/W12b",
+      "publishes": 2,
+      "deliveries_seen": 2,
+      "inbox_rows": 1,
+      "events": 1,
+      "duplicates_suppressed": 1
+    },
+    "P03-C04": {
+      "window": "W6a-1/W6a-2",
+      "max_attempts": 3,
+      "attempts_failed": 3,
+      "crashes": [
+        "BeforeQuarantineCommit",
+        "AfterQuarantineCommitBeforeNack"
+      ],
+      "deliveries_seen": 5,
+      "receipt": "quarantined",
+      "quarantine_rows": 1,
+      "dlq_after_consumer": 0,
+      "events": 0,
+      "event_id": "01a0a5bd-9d74-7dfa-9081-31e0d4f9bd61"
+    },
+    "P03-C05": {
+      "window": "W6b",
+      "max_attempts": 2,
+      "outbox_deleted_before_retry": true,
+      "events_before_retry": 0,
+      "retry_outbox_id": 2,
+      "retry_of_attempt_id": 2,
+      "receipt": "completed",
+      "quarantine_resolution": "retried",
+      "quarantine_rows": 1
+    },
+    "P03-C06": {
+      "window": "W9a",
+      "v1_event_expected": 0,
+      "v2_event_expected": [
+        "archive"
+      ],
+      "overdue_reported": 1,
+      "registry_versions": [
+        1,
+        2
+      ]
+    },
+    "P03-C07": {
+      "window": "W9b",
+      "paused_expected": 3,
+      "backlog_kept": 3,
+      "waived": 3,
+      "overdue_after_waiver": 0,
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T15:44:30.6096146\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+    },
+    "P03-C08": {
+      "window": "W11",
+      "unroutable_first_pass": 1,
+      "last_error": "basic.return 312 NO_ROUTE (puluj.events/puluj.live.raw.stored)",
+      "confirmed_after_redeclare": 1,
+      "events": 1
+    },
+    "P03-C09": {
+      "window": "W12a",
+      "transient_failures": 1,
+      "requeued": 1,
+      "attempts": {
+        "failed": 1,
+        "succeeded": 1
+      },
+      "events": 1
+    },
+    "P03-C10": {
+      "window": "W14a",
+      "published": 3,
+      "delivered": 3,
+      "duplicates_suppressed": 2,
+      "inbox": 1,
+      "events": 1,
+      "attempts": 1
+    }
+  }
+}

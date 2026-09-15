@@ -25,3 +25,11 @@ pwsh scripts/deploy.ps1 -InitializeDatabase # лише для першої, по
 Для перебудови й перевірок використовуйте `pwsh scripts/deploy.ps1`. За замовчуванням він використовує наявний том `puluj-g-pgdata`, застосовує до нього лише потрібні EF-міграції та не перезаписує налаштування в БД. Якщо том розміщено під іншим іменем, передайте `-DatabaseVolume <ім’я>`. Новий порожній том створюється тільки з `-InitializeDatabase`. Скрипт визначає контейнерні ID через Compose, а не припускає конкретні суфікси контейнерів; тому коректно працює і при іншій кількості реплік `processor`.
 
 `deploy/docker-compose.override.yml` у цьому робочому дереві вказує окремий том `puluj-g-pgdata`. Не підміняйте його томом `Puluj`: це змішає дані двох інсталяцій.
+
+## Профіль `broker` (P02/P03)
+
+`docker compose --profile broker up -d` додає RabbitMQ (`rabbitmq:4.3-management`, single node) і воркер `messaging` (ролі `relay,archive`:
+declare topology, outbox relay, reconciliation/cleanup, архів `messaging.events`, DLQ consumer). Default deploy без профілю не змінюється.
+`MESSAGING_OUTBOX_ENABLED=true` у `deploy/.env` вмикає DB-first bridge у collectors: `raw.stored` комітиться в `messaging.outbox` разом із raw
+(plan §11); без запущеного `messaging` outbox лише росте, reconciliation пише alarm. Rollback: `MESSAGING_OUTBOX_ENABLED=false` і зупинити
+профіль; схеми `messaging`/`processing` additive і не читаються legacy-шляхом.

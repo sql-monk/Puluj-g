@@ -1,7 +1,9 @@
 # ADR-0005 — Runs, generations, lanes і completion semantics
 
-Статус: **proposed** (P01). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
-Вимоги: plan §4, §5.2, §11, §15.1 «Completion semantics», §15.2. Реалізація orchestration — P14; receipts — P03.
+Статус: **proposed** (P01); частково реалізовано P03 — receipts `processing.deliveries` з terminal `completed/noop/quarantined/waived`
+(`SubscriptionConsumer`, `DlqConsumer`, `SubscriptionAdmin.WaiveAsync`) і мінімальні `processing.runs` (один відкритий run на lane
+`live`/`history`, `ProcessingRuns`). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
+Вимоги: plan §4, §5.2, §11, §15.1 «Completion semantics», §15.2. Orchestration/generations/state machine — P14.
 
 ## Контекст
 

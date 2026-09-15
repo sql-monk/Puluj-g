@@ -14,4 +14,8 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Registry of expected subscriptions (ADR-0002): the runtime reads the contract file itself, not a copy. -->
+    <EmbeddedResource Include="..\..\contracts\messaging\topology.json" Link="Messaging\Topology\topology.json" LogicalName="Puluj.Infrastructure.Messaging.topology.json" />
+  </ItemGroup>
 </Project>

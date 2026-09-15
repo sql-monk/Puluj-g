@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(1, contracts.Topology["topology_version"]!.GetValue<int>());
+        Assert.Equal(2, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 (P03): archive активовано
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -101,7 +101,8 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             }
             Assert.All(ContractFiles.Strings(subscription["lanes"]), lane => Assert.Contains(lane, lanes));
             Assert.Matches("^P[0-9]{2}$", subscription["owner_task"]!.GetValue<string>());
-            Assert.Equal("planned", subscription["status"]!.GetValue<string>()); // жодна не active до P02/P03
+            // P03 активував лише archive (runtime реалізовано); решта — planned до своїх задач.
+            Assert.Equal(subscriptionId == "archive" ? "active" : "planned", subscription["status"]!.GetValue<string>());
         }
     }
 

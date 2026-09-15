@@ -12,8 +12,14 @@ public sealed class WorkerOptions
     public const string Telegram = "telegram";
     public const string Alerts = "alerts";
     public const string Processing = "processing";
+    /// <summary>Outbox relay + topology declare + reconciliation/cleanup (P03); needs Messaging:Enabled and a broker.</summary>
+    public const string Relay = "relay";
+    /// <summary>Archive subscription consumer + DLQ consumer (P03); needs Messaging:Enabled and a broker.</summary>
+    public const string Archive = "archive";
 
-    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing];
+    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive];
+    /// <summary>Roles that talk to the broker: skipped with a warning unless Messaging:Enabled (a plain local run has no RabbitMQ).</summary>
+    public static readonly string[] BrokerRoles = [Relay, Archive];
 
     /// <summary>Instance name for the heartbeat, logs, telemetry and claims (`worker`, `processor`, `collector-telegram`…); see <see cref="InstanceName"/>.</summary>
     public string Name { get; set; } = "worker";

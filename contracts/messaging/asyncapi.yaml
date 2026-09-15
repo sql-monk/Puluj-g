@@ -3,11 +3,11 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '1.0.0'
+  version: '2.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
-    Status: accepted (ADR-0001/0002 accepted у P02); жодна підписка не active до P03.
+    Status: accepted (ADR-0001/0002 accepted у P02); з P03 підписка archive active (topology v2), решта — planned.
 defaultContentType: application/json
 servers:
   local:
@@ -630,7 +630,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/ingress_received'
-    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/ingress_received/messages/ingress_received'
     bindings:
@@ -643,7 +643,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/raw_stored'
-    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/raw_stored/messages/raw_stored'
     bindings:
@@ -656,7 +656,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/observations_recorded'
-    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/observations_recorded/messages/observations_recorded'
     bindings:
@@ -669,7 +669,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/message_analysis_completed'
-    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
     bindings:

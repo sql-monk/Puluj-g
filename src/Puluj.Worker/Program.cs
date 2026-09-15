@@ -3,7 +3,9 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Puluj.Collectors;
 using Puluj.Infrastructure;
+using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Settings;
+using Puluj.Messaging;
 using Puluj.Processing;
 using Puluj.Worker.Hosting;
 using Serilog;
@@ -28,7 +30,7 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(m => m.AddHttpClientInstrumentation().AddRuntimeInstrumentation().AddMeter(PulujMetrics.MeterName).AddOtlpExporter());
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.Section));
-builder.Services.AddPulujInfrastructure(builder.Configuration);
+builder.Services.AddPulujInfrastructure(builder.Configuration, worker.InstanceName);
 if (roles.Contains(WorkerOptions.Migrate))
 {
     builder.Services.AddHostedService<DatabaseInitializer>(); // first: the others need the schema and the seed data
@@ -41,6 +43,13 @@ if (!worker.MigrateOnly)
 if (roles.Contains(WorkerOptions.Processing))
 {
     builder.Services.AddPulujProcessing(builder.Configuration, worker.InstanceName);
+}
+// Broker roles (P03): only with Messaging:Enabled — a plain local run has no RabbitMQ and must keep working.
+var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
+var brokerRoles = roles.Intersect(WorkerOptions.BrokerRoles).ToHashSet();
+if (brokerRoles.Count > 0 && messaging.Enabled)
+{
+    builder.Services.AddPulujMessaging(brokerRoles, worker.InstanceName);
 }
 var collectors = new List<string>();
 if (roles.Contains(WorkerOptions.Telegram))
@@ -57,5 +66,14 @@ if (collectors.Count > 0)
 }
 
 var host = builder.Build();
-host.Services.GetRequiredService<ILogger<Program>>().LogInformation("{App} starting with roles: {Roles}", appName, string.Join(", ", roles.Order()));
+var startupLog = host.Services.GetRequiredService<ILogger<Program>>();
+startupLog.LogInformation("{App} starting with roles: {Roles}", appName, string.Join(", ", roles.Order()));
+if (brokerRoles.Count > 0 && !messaging.Enabled && !string.IsNullOrEmpty(worker.Roles))
+{
+    startupLog.LogWarning("Roles {Roles} need Messaging:Enabled=true and a broker; skipped", string.Join(", ", brokerRoles.Order()));
+}
+if (messaging.Outbox.Enabled)
+{
+    startupLog.LogInformation("Outbox bridge enabled: raw.stored is committed to messaging.outbox; a `relay` role must run somewhere or the outbox only grows");
+}
 await host.RunAsync();

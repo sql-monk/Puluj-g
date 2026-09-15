@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Puluj.Infrastructure.Messaging.Topology;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Seeding;
 
@@ -12,6 +13,7 @@ namespace Puluj.Worker.Hosting;
 public sealed class DatabaseInitializer(
     IDbContextFactory<PulujDbContext> factory,
     IEnumerable<ISeeder> seeders,
+    TopologyRegistrar topology,
     IOptions<WorkerOptions> options,
     IHostApplicationLifetime lifetime,
     ILogger<DatabaseInitializer> logger) : IHostedService
@@ -39,6 +41,9 @@ public sealed class DatabaseInitializer(
                 logger.LogInformation("Seeding: {Seeder}", seeder.GetType().Name);
                 await seeder.SeedAsync(db, ct);
             }
+            // Registry of expected subscriptions for this build's topology version (P03): collectors that start next
+            // record expected deliveries from it, whether or not a broker role is running yet.
+            await topology.EnsureRegisteredAsync(ct);
         }
         finally
         {

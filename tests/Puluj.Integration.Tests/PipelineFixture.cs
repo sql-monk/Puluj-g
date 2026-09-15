@@ -74,6 +74,8 @@ public sealed class PipelineFixture : IAsyncLifetime
         await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS postgis");
         await db.Database.MigrateAsync();
         await db.Database.ExecuteSqlRawAsync("TRUNCATE track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE");
+        // P03 schemas (no FK to raw_messages): the bridge is off here (Messaging:Outbox:Enabled=false) but a leftover row must not survive a rerun.
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, processing.runs, processing.attempts, processing.deliveries, processing.quarantine, processing.stage_results RESTART IDENTITY CASCADE");
         foreach (var seeder in Services.GetServices<ISeeder>().OrderBy(s => s.Order))
         {
             await seeder.SeedAsync(db, CancellationToken.None);

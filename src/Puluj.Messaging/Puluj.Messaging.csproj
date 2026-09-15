@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Broker runtime (P03, ADR-0001/0002/0004): topology declare, outbox relay, inbox consumers, archive, DLQ, reconciliation.
+       Only the Worker references it; Api/Admin stay free of the RabbitMQ client. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Puluj.Infrastructure\Puluj.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+</Project>

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Puluj.Domain.Entities;
+using Puluj.Domain.Entities.Messaging;
+using Puluj.Domain.Entities.Processing;
 
 namespace Puluj.Infrastructure.Persistence;
 
@@ -31,6 +33,21 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<ProcessingError> ProcessingErrors => Set<ProcessingError>();
     public DbSet<UserLocation> UserLocations => Set<UserLocation>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+
+    // Message platform (P03, ADR-0006): schemas `messaging` and `processing`; written with plain SQL in the same
+    // transaction as the business result, read through EF for reconciliation, admin and tests.
+    public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
+    public DbSet<InboxEntry> Inbox => Set<InboxEntry>();
+    public DbSet<ArchivedEvent> ArchivedEvents => Set<ArchivedEvent>();
+    public DbSet<EventLink> EventLinks => Set<EventLink>();
+    public DbSet<SubscriptionRegistration> Subscriptions => Set<SubscriptionRegistration>();
+    public DbSet<TopologyVersionRecord> TopologyVersions => Set<TopologyVersionRecord>();
+    public DbSet<ProcessingRun> ProcessingRuns => Set<ProcessingRun>();
+    public DbSet<ProcessingGeneration> ProcessingGenerations => Set<ProcessingGeneration>();
+    public DbSet<StageResult> StageResults => Set<StageResult>();
+    public DbSet<ProcessingAttempt> ProcessingAttempts => Set<ProcessingAttempt>();
+    public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<QuarantineEntry> Quarantine => Set<QuarantineEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

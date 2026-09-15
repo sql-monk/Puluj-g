@@ -1,8 +1,9 @@
 # ADR-0006 — Логічна модель даних `messaging.*`, `processing.*`, `analytics.message_*`
 
-Статус: **proposed** (P01). Рівень — **логічний**: таблиці, natural/unique keys, ownership, retention class.
-Колонки — proposal; типи, індекси (за `EXPLAIN` на production-shaped даних), міграції — власники P03 (messaging/processing)
-і P15 (analytics). Вимоги: plan §5.2, §10, §12 (analytics lifecycle schema у хвилі 1), §15.2.
+Статус: **accepted** для `messaging.*`/`processing.*` (P03, міграція `20260915150214_AddMessagingSchema`, entities
+`Puluj.Domain.Entities.{Messaging,Processing}`, конфігурації `Persistence/Configurations/{Messaging,Processing}Configuration.cs`);
+`analytics.message_*` — proposed до P15. Запропоновано P01. Рівень цього документа — логічний; фізичні відхилення P03 — у розділі
+«Фізична модель (P03)». Індекси обрані за access paths коду, не за `EXPLAIN` на production-shaped даних (це лишається для P16). Вимоги: plan §5.2, §10, §12 (analytics lifecycle schema у хвилі 1), §15.2.
 
 ## Принципи
 
@@ -90,6 +91,31 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
 
 | Питання | Задача |
 |---|---|
-| Типи колонок, індекси, партиціювання `events`/`deliveries` за часом | P03 |
+| ~~Типи колонок, індекси~~ — done P03; партиціювання `events`/`deliveries` за часом і `EXPLAIN` на production-shaped даних | P16 |
 | Analytics DDL, backfill з legacy `raw_messages`/`processing_errors`, позначення `unavailable` | P15 |
 | Розмір `payload` в `events` vs `payload_ref` до blob | P04 |
+
+## Фізична модель (P03)
+
+Відхилення від логічної таблиці вище, усі additive:
+
+- `messaging.outbox`: surrogate PK `outbox_id` (identity) замість `event_id`, бо admin retry (ADR-0004 W6b) додає **redelivery-рядок**
+  того самого `event_id` з `target_queue` (publish через default exchange у чергу підписки). Unique `(event_id) WHERE target_queue IS NULL`;
+  partial index `(next_attempt_at) WHERE confirmed_at IS NULL` для relay; `(confirmed_at) WHERE confirmed_at IS NOT NULL` для cleanup;
+  колонка `replay_source` (копія з registry) — cleanup чекає archive receipt лише для таких рядків.
+- `messaging.inbox`: PK `(subscription_id, event_id)`, `outcome` ∈ `processing | completed | noop | quarantined` (`processing` видно лише
+  всередині транзакції consumer); brin `(completed_at)` для retention.
+- `messaging.events`: PK `event_id`; `envelope` — **тіло як отримано** (додаткові поля новішого MINOR зберігаються); індекси
+  `(correlation_id)`, `(raw_message_id, processing_run_id)`, `(event_type, published_at)`, brin `(published_at)`.
+- `messaging.subscriptions`: PK `(subscription_id, topology_version)`; `status` — джерело істини після першого insert (pause/waiver/activate
+  через `SubscriptionAdmin`), `bindings`/`lanes` jsonb — копія файлу; `waiver` jsonb — останній audit-запис.
+- `messaging.topology_versions`: PK `topology_version`, `hash` (SHA-256 канонічного JSON) — інший файл під тією самою версією → помилка старту.
+- `processing.runs`: partial unique `(lane) WHERE state = 'running' AND kind IN ('live','history')` — один відкритий run на lane (P14 знімає для replay).
+- `processing.generations`: partial unique `(is_active) WHERE is_active`; рядки з'являться в P14.
+- `processing.attempts`: `job_key = "{subscription_id}:{event_id}"`, `fencing_token` = 0 до P06, `retry_of_attempt_id`/`retry_reason='admin_retry'`
+  після retry з quarantine, `state` ∈ `running | succeeded | failed | interrupted | superseded`; індекси `(subscription_id, event_id)`, `(job_key, fencing_token)`.
+- `processing.deliveries`: PK `(event_id, subscription_id)`; expected рядок = `outcome IS NULL`; partial index `(expected_at) WHERE outcome IS NULL`;
+  `completed` ніколи не понижується (upsert лише з `NULL`/`quarantined`).
+- `processing.quarantine`: partial unique `(subscription_id, event_id) WHERE resolved_at IS NULL`; зберігає **повний envelope + headers** —
+  єдине джерело для redelivery після outbox cleanup; `resolution` ∈ `retried | waived`, `retry_outbox_id`.
+- Ролі `puluj_reader`/`puluj_admin` отримують на обидві схеми ті самі права, що на `public` (міграція).

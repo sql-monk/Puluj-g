@@ -47,8 +47,9 @@ services:
       retries: 20
 
   # RabbitMQ dev profile (ADR-0001, P02 spike): single node, quorum queues, management UI on 15672.
-  # Not part of the default deploy: no service consumes it until P03 (`docker compose --profile broker up -d rabbitmq`).
-  # HA (3 fault domains) is not provided by this profile.
+  # Opt-in (`docker compose --profile broker up -d`): the default deploy is unchanged. With the profile, `messaging` runs
+  # the outbox relay + archive consumer, and MESSAGING_OUTBOX_ENABLED=true makes the collectors commit `raw.stored` to
+  # messaging.outbox next to the raw row (P03 bridge, plan §11). HA (3 fault domains) is not provided by this profile.
   rabbitmq:
     image: rabbitmq:4.3-management
     profiles: ["broker"]
@@ -68,6 +69,31 @@ services:
       timeout: 10s
       retries: 12
     restart: unless-stopped
+
+  # P03 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`) and the archive subscription with
+  # its DLQ consumer (`archive`). Scale with more replicas (relay leases rows with SKIP LOCKED; consumers share the queue).
+  messaging:
+    <<: *worker
+    profiles: ["broker"]
+    environment:
+      <<: *worker-env
+      Worker__Name: messaging
+      Worker__AppendHostName: "true"
+      Worker__Roles: relay,archive
+      Messaging__Enabled: "true"
+      Messaging__Broker__Host: rabbitmq
+      Messaging__Broker__Port: "5672"
+      Messaging__Broker__VirtualHost: ${RABBITMQ_VHOST:-/}
+      Messaging__Broker__User: ${RABBITMQ_USER:-puluj}
+      Messaging__Broker__Password: ${RABBITMQ_PASSWORD:-puluj}
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-messaging-.log
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
 
   # Applies migrations (including the puluj_reader / puluj_admin roles) and the seed data, then exits.
   # Every other service waits for it, so a schema change is applied exactly once before anything starts.
@@ -89,6 +115,7 @@ services:
     environment:
       <<: *worker-env
       Worker__Name: collector-telegram
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
       Worker__Roles: telegram
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-telegram-.log
     volumes:
@@ -101,6 +128,7 @@ services:
     environment:
       <<: *worker-env
       Worker__Name: collector-alerts
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
       Worker__Roles: alerts
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-alerts-.log
 

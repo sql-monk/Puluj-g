@@ -48,6 +48,13 @@
 - `correlation_id` — один на джерельний пост (усі результати одного raw). Для aggregate-scoped подій —
   correlation повідомлення-причини; повний граф багатьох входів → `messaging.event_links` (ADR-0006).
 - `causation_id` — `event_id` події, що безпосередньо запустила крок; `null` лише для `ingress.received`.
+  **Bridge (P03, до P04):** `raw.stored`, який collector комітить напряму без `ingress.received`, є коренем ланцюга і
+  має `causation_id = event_id` (self-causation, resolvable в архіві; правило «causation == event_id ⇔ bridge root»).
+  `correlation_id` bridge — детермінований UUIDv5 від `(source_id, source_message_key)` (`SourceIdentity.CorrelationId`), тож
+  оригінал і його редакції ділять correlation без lookup; `source_message_key`/`source_revision` виводяться з legacy
+  `source_message_id` за таблицею вище (`SourceIdentity.FromLegacy`).
+- `published_at` — момент запису в outbox (перша публікація з боку producer); transport-повтори relay видно в
+  `messaging.outbox.attempts/last_attempt_at`, envelope не змінюється.
 - `traceparent` — W3C Trace Context; новий span на кожен consumer, той самий trace на ланцюг.
 - Replay: **новий** `processing_run_id`, нові `event_id`; зв'язок з оригіналом — через `raw_message_id`,
   `correlation_id` і `processing.runs.replays_run_id` (ADR-0005).
@@ -101,5 +108,6 @@ Envelope містить `payload` **або** `payload_ref` (`uri`, sha256 `check
 |---|---|
 | Unique hash migration, backfill, `IngestResult` при повторі, hash-derived revision для нових джерел | P04 |
 | Payload/attachment storage і поріг | P04 |
-| Fencing token у `processing.attempts`, lease takeover | P03/P06 |
+| Fencing token у `processing.attempts` (колонка є з P03, значення 0), lease takeover | P06 |
+| Заміна bridge-правила `causation_id = event_id` на справжній `ingress.received` causation | P04 |
 | Формат `aggregate_id` (`track:5501`) vs окремі поля — узгодити з read-side | P09/P11 |
