@@ -16,6 +16,7 @@ using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Seeding;
 using Puluj.Processing;
 using Puluj.Processing.Indexes;
+using Puluj.Processing.Llm;
 using Puluj.Processing.Pipeline;
 using Puluj.Processing.Stages;
 using RabbitMQ.Client;
@@ -54,6 +55,9 @@ public sealed class MessagingFixture : IAsyncLifetime
     public SubscriptionConsumer RawWriter => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == RawWriterHandler.Subscription);
     public SubscriptionConsumer Normalizer => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == NormalizerHandler.Subscription);
     public SubscriptionConsumer Parser => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ParserHandler.Subscription);
+    public SubscriptionConsumer LlmWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == LlmWorkerHandler.Subscription);
+    public SubscriptionConsumer Finalizer => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == FinalizerHandler.Subscription);
+    public FakeLlmCompletion Llm { get; } = new();
     public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
     public IndexProvider Indexes => Services.GetRequiredService<IndexProvider>();
     public IngressWriter IngressWriter => Services.GetRequiredService<IngressWriter>();
@@ -95,8 +99,12 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["ConnectionStrings:Puluj"] = _postgres.GetConnectionString(),
             ["Seed:DataDirectory"] = Path.Combine(repoRoot, "data"),
             ["Seed:SeedGazetteer"] = "true", // the parser stage needs the gazetteer (P05)
-            ["Llm:Enabled"] = "true", // the fallback decision only (no API key, no call): parse.completed{needs_llm} + llm.requested
+            ["Llm:Enabled"] = "true", // the fallback decision (no API key): parse.completed{needs_llm} + llm.requested; the llm-worker talks to FakeLlmCompletion
             ["Llm:MaxMessageAgeHours"] = "72",
+            ["Llm:MaxAttempts"] = "2",
+            ["Llm:LeaseSeconds"] = "3",
+            ["Llm:TimeoutSeconds"] = "2",
+            ["Llm:FailurePause"] = "00:00:02",
             ["Messaging:Enabled"] = "true",
             ["Messaging:Outbox:Enabled"] = "true",
             ["Messaging:Outbox:PipelineVersion"] = Options.Outbox.PipelineVersion,
@@ -131,8 +139,9 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddSingleton<IHostEnvironment>(new TestEnvironment(repoRoot));
         services.AddPulujInfrastructure(config, "p03-test");
         services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole, DependencyInjection.RawWriterRole }, "p03-test");
+        services.AddSingleton<ILlmCompletion>(Llm); // before AddPulujParsing: the real Anthropic completion is TryAdd'ed
         services.AddPulujProcessing(config, "p03-test"); // legacy processor for the parity test (hosted loop is never started here)
-        services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser }, "p03-test");
+        services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser, StageRoles.LlmWorker, StageRoles.Finalizer }, "p03-test");
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -168,6 +177,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         await ExecAsync("""
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
+                     processing.observations, processing.extractions, llm_requests,
                      collector_states, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
             """);
         Registrar.Reset();
@@ -176,6 +186,10 @@ public sealed class MessagingFixture : IAsyncLifetime
         RawWriter.ResetCounters();
         Normalizer.ResetCounters();
         Parser.ResetCounters();
+        LlmWorker.ResetCounters();
+        Finalizer.ResetCounters();
+        Llm.Reset();
+        Services.GetRequiredService<LlmBreaker>().Reset(); // a 429 in one test must not pause the model for the next
         await Registrar.EnsureRegisteredAsync(CancellationToken.None);
         await Declarer.DeclareAsync(CancellationToken.None);
         await PurgeQueuesAsync();
@@ -185,7 +199,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, "finalizer", "llm-worker" })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {

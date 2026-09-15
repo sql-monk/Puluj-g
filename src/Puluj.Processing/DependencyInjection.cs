@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Puluj.Processing.Correlation;
@@ -25,7 +26,7 @@ public static class DependencyInjection
         services.AddSingleton<RawMessageClaims>();
         services.AddSingleton<ProcessingStats>();
         services.AddPulujParsing(configuration);
-        services.AddSingleton<IParser, LlmParser>(); // rules first, model only as a fallback
+        services.AddSingleton<IParser>(sp => sp.GetRequiredService<LlmParser>()); // rules first, model only as a fallback
         services.AddSingleton<RawMessageProcessor>();
         services.AddHostedService<ProcessingLoop>();
 
@@ -52,6 +53,8 @@ public static class DependencyInjection
         services.AddSingleton<RuleParser>();
         services.AddSingleton<TargetBuilder>();
         services.AddSingleton<AlertsInUaHandler>();
+        services.AddSingleton<LlmParser>(); // the mapping/prompt owner; also the legacy IParser (registered separately by AddPulujProcessing)
+        services.TryAddSingleton<ILlmCompletion, AnthropicCompletion>();
         return services;
     }
 
@@ -84,6 +87,26 @@ public static class DependencyInjection
             });
             services.AddSubscriptionConsumer<ParserHandler>(instanceName);
         }
+        if (roles.Contains(StageRoles.LlmWorker))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<LlmWorkerHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(LlmWorkerHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<LlmWorkerHandler>(instanceName);
+        }
+        if (roles.Contains(StageRoles.Finalizer))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<FinalizerHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(FinalizerHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<FinalizerHandler>(instanceName);
+        }
         return services;
     }
 }
@@ -93,4 +116,6 @@ public static class StageRoles
 {
     public const string Normalizer = "normalizer";
     public const string Parser = "parser";
+    public const string LlmWorker = "llm-worker";
+    public const string Finalizer = "finalizer";
 }

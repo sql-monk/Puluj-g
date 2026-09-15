@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(4, Registry.TopologyVersion);
+        Assert.Equal(5, Registry.TopologyVersion);
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -37,7 +37,9 @@ public sealed class TopologyRegistryTests
         var expected = Registry.ExpectedSubscriptions("raw.stored", "live");
         Assert.Equal(["normalizer", "archive"], expected.Select(s => s.Id));
         Assert.Equal(["parser"], Registry.ExpectedSubscriptions("message.normalized", "live").Select(s => s.Id));
-        Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // paused = still interested (P06)
+        Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // active since v5 (P06)
+        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "live").Select(s => s.Id)); // domain workers still planned
+        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("message.analysis.completed", "live").Select(s => s.Id));
         Assert.Equal(["llm-worker"], Registry.ExpectedSubscriptions("llm.requested", "live").Select(s => s.Id));
         Assert.Equal(["raw-writer", "archive"], Registry.ExpectedSubscriptions("ingress.received", "history").Select(s => s.Id));
 

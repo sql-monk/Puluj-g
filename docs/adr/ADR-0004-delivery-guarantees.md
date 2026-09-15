@@ -64,7 +64,7 @@ sequenceDiagram
 | **W7a** | Broker restart / втрата вузла quorum під час publish | outbox unconfirmed (confirm не прийшов) | Relay після reconnect | `event_id` | broker health, confirms latency | P02-C03 |
 | **W7b** | Delayed confirm: relay timeout, потім confirm приходить | Повідомлення в черзі; outbox unconfirmed | Relay публікує вдруге | Inbox | duplicate counter | P02-C04 |
 | **W7c** | Broker restart під час consume (unacked) | Нічого | Redelivery після reconnect | = W4/W5 | redelivered flag | P02-C05 |
-| **W8** | LLM job: lease минув, takeover іншим виконавцем; старий виконавець повертає результат пізніше | `processing.attempts` з `fencing_token` n; новий lease n+1 | Новий виконавець | Finalizer приймає результат лише з актуальним токеном; старий → `noop` receipt + audit | late-result counter, LLM cost audit (оплачений повтор) | P06-C01 |
+| **W8** | LLM job: lease минув, takeover іншим виконавцем; старий виконавець повертає результат пізніше | `processing.attempts` з `fencing_token` n; новий lease n+1 | Новий виконавець | Finalizer приймає результат лише з актуальним токеном; старий → `noop` receipt + audit | late-result counter, LLM cost audit (оплачений повтор) | P06-F04 (worker Apply і finalizer), F03 |
 | **W9a** | Зміна `topology_version` з backlog у старій підписці | Старі events з `topology_version=n` | — | Expected set береться з версії події; нова підписка отримує лише нові події | reconciliation gap | P03-C06 |
 | **W9b** | Paused/removed required subscription з backlog | Черга є; consumer немає | Drain/transfer/waiver (ADR-0002) | receipt `waived{reason,actor}` на кожну expected delivery | «required consumer відсутній», waiver audit | P03-C07, P13 |
 | **W10a** | Публікація до запуску consumer | Durable queue існує (pre-declared), повідомлення накопичуються | Consumer стартує | Порядок не гарантується між підписками | backlog/oldest age | P02-C06 |
@@ -159,7 +159,8 @@ sequenceDiagram
 | ~~Outbox relay (lease, batch, confirm timeout), inbox, receipts, reconciliation, W2/W3/W6/W9/W12/W14a~~ — done, P03 (див. «Реалізація») | P03 |
 | ~~Collector outbox/checkpoint, W1a/W1b; `raw.stored{is_new:false}` при повторі~~ — done P04 (`IngressWriter`, `RawWriterHandler`; bridge-шлях для дубля так само нічого не публікує — fallback) | P04 |
 | W1c (Telegram edit до commit) — durable spool для джерел без re-read | P16 / за потребою |
-| Fencing tokens у attempts (колонка є, завжди 0), lease takeover, W8 | P06 |
+| ~~Fencing tokens у attempts, lease takeover, W8~~ — done P06: `LlmWorkerHandler` lease під `pg_advisory_xact_lock(hashtext(job_key))`, partial unique `(job_key, fencing_token) WHERE fencing_token > 0`, job-рядки `subscription_id = llm-worker:job`; audit до result-tx | P06 |
+| Quarantine `llm.requested`/`llm.completed` (5 delivery attempts) без terminal `llm.failed` → finalizer лишається `awaiting_llm`: safety net через reconciliation/admin | P13/P16 |
 | Readiness bindings через management API (зараз — idempotent re-declare у reconciliation) | P13/P16 |
 
 ## Реалізація (P03)
@@ -185,3 +186,12 @@ Bridge-специфіка (до P04): `causation_id = event_id` для `raw.stor
 | Raw insert чекає `ReprocessService.ResetAsync` lock, не падає | `Messaging:RawWriter:InsertTimeout` (25 хв). Межа: rebuild довший за timeout → перша доставка рахується як attempt, наступні prefetched чекають далі (unacked до 30 хв → broker закриває канал); після 5 спроб — quarantine + admin retry | P04-C07 |
 | Drain перед rebuild рахує лише expected без receipt | quarantined/waived доставки raw-writer не блокують drain — rebuild стартує без цих raw (видно в `processing.quarantine`) | P04-C05 |
 | History load → drain перед rebuild | `IngressWriter.WaitForDrainAsync`, `TelegramCollector.LoadHistoryAsync` | P04-C05 |
+
+## Реалізація (P06)
+
+| Рішення ADR | Код | Перевірка |
+|---|---|---|
+| LLM-виклик поза tx; request id, audit, budget (§6 п.6) | `LlmWorkerHandler.PrepareAsync` — виклик `ILlmCompletion` після lease; audit `llm_requests` **autocommit одразу після відповіді** (request_id, fencing_token, run_id, attempt_id, provider_request_id, usage, cost, тексти); `ApplyAsync` лише `outcome applied/late` + подія | P06-F03 (audit `applied`), F04 (audit `late` при пізньому результаті), F05 (2 записи помилок) |
+| Lease + fencing (§6 п.6, W8) | job-рядки `processing.attempts` (`llm-worker:job`, `job_key = llm:{request_id}`), takeover = token+1 після `lease_until`; чужий живий lease → очікування (bounded), не throw; finalizer відкидає token < current | F04 (обидві сторони), F03 |
+| Retry у БД, terminal до delivery-limit (§6.3) | retryable помилка провайдера → job attempt `failed` + transient redelivery до `Llm:MaxAttempts`, потім `llm.failed{final:true}`; non-retryable/deadline/breaker/drift → final одразу; `final:false` не публікується | F05 (2 спроби → final), F07 (1 спроба) |
+| Один канонічний extraction | `processing.extractions` unique `(raw, run)` + `ON CONFLICT DO NOTHING`; повтор/пізній вхід → `noop` | F06 (3 дублі + 2 репліки → 1), F08 (порядок черг) |

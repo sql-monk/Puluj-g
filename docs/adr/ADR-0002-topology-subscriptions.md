@@ -32,9 +32,8 @@ concurrency quotas (ADR-0007), а `projection` не має replay-черги (sh
   для `observations.recorded` — `conditional_subscriptions.by_manifest` (ADR-0005), для команд — `owner`.
 - `subscriptions.{id}`: `bindings`, `lanes`, `emits`, `required`, `queue_policy`, `idempotency`,
   `owner_task`, `status` (`planned` → `active` після реалізації; `paused`/`retired` — з audit). З P03 (`topology_version` 2)
-  `archive` — `active`, з P04 (`topology_version` 3) — `raw-writer`, з P05 (`topology_version` 4) — `normalizer` і `parser`, а `finalizer` і
-  `llm-worker` — **`paused`** ще до реалізації (P06): їхні черги існують і копять `parse.completed`/`llm.requested`, deliveries очікуються і
-  reconciliation показує overdue («required consumer відсутній»); без цього команди parser'а були б unroutable. Черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
+  `archive` — `active`, з P04 (`topology_version` 3) — `raw-writer`, з P05 (`topology_version` 4) — `normalizer` і `parser` (тоді `finalizer` і
+  `llm-worker` були `paused`, щоб черги існували до реалізації), з P06 (`topology_version` 5) — `finalizer` і `llm-worker` `active`. Черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
   (статус після першого insert належить БД — `messaging.subscriptions`, команди `SubscriptionAdmin`).
 - `producer_roles`: collectors, watchdog, outbox-relay, reconciliation — публікують через outbox, черг не мають.
 - Правила консистентності (тести T03–T09 у `tests/Puluj.Messaging.Contracts.Tests`): кожен event має

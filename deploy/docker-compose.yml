@@ -70,8 +70,9 @@ services:
       retries: 12
     restart: unless-stopped
 
-  # P03–P05 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive (`archive`), raw-writer
-  # (`raw-writer`), normalizer and rules/structured parser (`normalizer`, `parser`) subscriptions with one DLQ consumer for all.
+  # P03–P06 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive (`archive`), raw-writer
+  # (`raw-writer`), normalizer and rules/structured parser (`normalizer`, `parser`), the LLM worker (`llm-worker`, needs Llm__Enabled +
+  # ANTHROPIC_API_KEY to actually call the model) and the extraction finalizer (`finalizer`) with one DLQ consumer for all.
   # The stages run next to the legacy `processor` (shadow: stage results and events only, no domain writes) until the cutover.
   # Scale with more replicas (relay leases rows with SKIP LOCKED; consumers share the queues).
   messaging:
@@ -81,7 +82,7 @@ services:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
-      Worker__Roles: relay,archive,raw-writer,normalizer,parser
+      Worker__Roles: relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"

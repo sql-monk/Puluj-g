@@ -3,7 +3,11 @@
 Статус: **proposed** (P01); частково реалізовано P03 — receipts `processing.deliveries` з terminal `completed/noop/quarantined/waived`
 (`SubscriptionConsumer`, `DlqConsumer`, `SubscriptionAdmin.WaiveAsync`) і мінімальні `processing.runs` (один відкритий run на lane
 `live`/`history`, `ProcessingRuns`); P05 — стадії `normalize`/`parse` у `processing.stage_results` (unique `(raw, run, stage, stage_version)`,
-повтор → `noop`) і outcomes parser'а `facts | no_facts | unsupported | needs_llm | failed` у `parse.completed`. Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
+повтор → `noop`) і outcomes parser'а `facts | no_facts | unsupported | needs_llm | failed` у `parse.completed`; P06 — **finalizer** (`FinalizerHandler`):
+state machine на (raw, run) з terminal outcomes `completed | no_facts | unsupported | needs_review | failed`, канонічний extraction у
+`processing.extractions` (unique (raw, run), immutable) + `processing.observations`, `message.analysis.completed` для кожного outcome,
+`observations.recorded` лише для `completed`; **llm-worker** (`LlmWorkerHandler`) з lease/fencing (ADR-0004 W8). Workflow stage `analyzed` тепер
+задовольняється; `domain_completed` у compat window не настає для planned гілок (track/alert/incident — P09/P10). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
 Вимоги: plan §4, §5.2, §11, §15.1 «Completion semantics», §15.2. Orchestration/generations/state machine — P14.
 
 ## Контекст
@@ -53,7 +57,11 @@ lane `live` і пост свіжий (`Llm:MaxMessageAgeHours`), parser публ
 fallback_reason}` (finalizer бачить, що правила відпрацювали, і переходить у `awaiting_llm`) і команду `llm.requested` (`request_id`,
 `fencing_token: 1`, `deadline_at`, `input.normalized_text_hash`, `rules_context.attempt_id`). Інакше — `no_facts` з `fallback_reason`
 `llm_disabled | llm_skipped_lane | llm_skipped_stale` (або без причини, якщо текст не схожий на звіт). Формулювання §4 «parse.completed або
-llm.requested» читається як «команда додатково до факту спроби». Lease/attempt LLM-job створює llm-worker (P06).
+llm.requested» читається як «команда додатково до факту спроби». Lease/attempt LLM-job створює llm-worker (P06): job-рядки `processing.attempts` (`subscription_id = llm-worker:job`, `job_key = llm:{request_id}`, `fencing_token`
+1..n, `lease_until`), takeover після закінчення lease, `llm.failed{final:true}` після `Llm:MaxAttempts` або одразу для non-retryable/deadline/breaker/drift;
+`final:false` не публікується. Finalizer: `llm.completed{needs_review}` (відмова моделі) → analysis `needs_review` без observations; `llm.failed{final}` →
+`failed` з error; пізній результат зі старим `fencing_token` → `noop`; після `llm.failed{final}` пізніший takeover з фактами — теж `noop` (extraction
+immutable; оплачений виклик видно в `llm_requests.outcome = late`).
 
 ### Completion manifest
 

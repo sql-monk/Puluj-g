@@ -125,7 +125,8 @@ public sealed class SubscriptionConsumer : BackgroundService
         {
             var queue = Registry.QueueName(SubscriptionId, lane);
             var channel = await connection.CreateChannelAsync(cancellationToken: ct);
-            await channel.BasicQosAsync(0, _options.Consumer.Prefetch, false, ct);
+            var prefetch = _options.Consumer.PrefetchBySubscription.TryGetValue(SubscriptionId, out var own) ? own : _options.Consumer.Prefetch;
+            await channel.BasicQosAsync(0, prefetch, false, ct);
             var consumer = new AsyncEventingBasicConsumer(channel);
             consumer.ReceivedAsync += (_, ea) => OnReceivedAsync(channel, ea, ct);
             await channel.BasicConsumeAsync(queue, autoAck: false, consumerTag: $"{_worker}:{lane}", consumer, cancellationToken: ct);
@@ -134,7 +135,7 @@ public sealed class SubscriptionConsumer : BackgroundService
                 _channels.Add(channel);
             }
         }
-        _logger.LogInformation("Consumer {Subscription} ({Worker}) consuming lanes {Lanes}, prefetch {Prefetch}", SubscriptionId, _worker, string.Join(",", lanes), _options.Consumer.Prefetch);
+        _logger.LogInformation("Consumer {Subscription} ({Worker}) consuming lanes {Lanes}, prefetch {Prefetch}", SubscriptionId, _worker, string.Join(",", lanes), _options.Consumer.PrefetchBySubscription.TryGetValue(SubscriptionId, out var p) ? p : _options.Consumer.Prefetch);
     }
 
     private async Task OnReceivedAsync(IChannel channel, BasicDeliverEventArgs ea, CancellationToken ct)

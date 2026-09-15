@@ -21,6 +21,13 @@ public sealed class LlmOptions
     public TimeSpan FailurePause { get; set; } = TimeSpan.FromMinutes(15);
     /// <summary>Bumped whenever the prompt changes; stored with every LLM-derived target.</summary>
     public string PromptVersion { get; set; } = "1";
+
+    /// <summary>llm-worker (P06): provider attempts per request before `llm.failed{final:true}`; must stay below the queue's delivery limit.</summary>
+    public int MaxAttempts { get; set; } = 3;
+    /// <summary>llm-worker lease per request (ADR-0004 W8): another replica takes the job over once it expires; keep it above the provider timeout.</summary>
+    public int LeaseSeconds { get; set; } = 90;
+    /// <summary>Default `budget.max_output_tokens` of a request when the command carries none.</summary>
+    public int MaxOutputTokens { get; set; } = 1024;
     /// <summary>USD per million tokens. These defaults are Claude Opus 5 list prices; store the snapshot with every request.</summary>
     public decimal InputUsdPerMillionTokens { get; set; } = 5m;
     public decimal OutputUsdPerMillionTokens { get; set; } = 25m;

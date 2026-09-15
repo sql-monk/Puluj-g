@@ -22,10 +22,14 @@ public sealed class WorkerOptions
     public const string Normalizer = "normalizer";
     /// <summary>Rules/structured parser stage subscription (P05): `message.normalized` → `parse.completed` / `llm.requested`.</summary>
     public const string Parser = "parser";
+    /// <summary>LLM worker subscription (P06): `llm.requested` → `llm.completed`/`llm.failed` with lease/fencing and request audit.</summary>
+    public const string LlmWorker = "llm-worker";
+    /// <summary>Extraction finalizer subscription (P06): one canonical extraction per raw/run, `observations.recorded`, `message.analysis.completed`.</summary>
+    public const string Finalizer = "finalizer";
 
-    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser];
+    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer];
     /// <summary>Roles that talk to the broker: skipped with a warning unless Messaging:Enabled (a plain local run has no RabbitMQ).</summary>
-    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser];
+    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer];
 
     /// <summary>Instance name for the heartbeat, logs, telemetry and claims (`worker`, `processor`, `collector-telegram`…); see <see cref="InstanceName"/>.</summary>
     public string Name { get; set; } = "worker";

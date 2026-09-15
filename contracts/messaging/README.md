@@ -3,8 +3,8 @@
 Machine-readable частина ADR-0002…0005 ([`docs/adr/`](../../docs/adr/README.md)). Статус: **accepted** (P02 spike підтвердив topology на RabbitMQ 4.3;
 P03 runtime). `topology.json` **вбудовується** у `Puluj.Infrastructure` як embedded resource (`Puluj.Infrastructure.csproj`), тож runtime
 (`TopologyRegistry`, `TopologyRegistrar`, `TopologyDeclarer`) читає той самий файл, що й контрактні тести; `tests/Puluj.Messaging.Tests`
-перевіряє, що embedded копія збігається з файлом. Поточна версія — **4** (P03: `archive` → `active`; P04: `raw-writer`; P05: `normalizer`, `parser` →
-`active`, `finalizer`/`llm-worker` → `paused` до P06). Зміни — лише разом із тестами
+перевіряє, що embedded копія збігається з файлом. Поточна версія — **5** (P03: `archive`; P04: `raw-writer`; P05: `normalizer`, `parser`; P06:
+`finalizer`, `llm-worker` → `active`). Зміни — лише разом із тестами
 `tests/Puluj.Messaging.Contracts.Tests` і, за потреби, новим `topology_version`.
 
 | Файл | Що це |
@@ -82,6 +82,20 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
   переписує її (successful стадії лишаються ідемпотентними).
 - Shadow-режим: стадії працюють поруч із legacy `ProcessingLoop` (той далі пише `targets`/`air_alerts`/`ProcessingStatus`); `parse.completed`/`llm.requested`
   чекають у paused-чергах finalizer/llm-worker до P06.
+
+## Runtime (P06): llm-worker і finalizer
+
+- `llm.completed` (`LlmWorkerHandler`): `fencing_token` = токен lease з `processing.attempts` (job `llm:{request_id}`), `facts[]` за тим самим
+  `FactMapper`, що й parser (evidence `rule_id = llm`, `rule_version = llm-{model}-p{prompt}`), `usage` + `cost_usd`, `audit_id` (additive) → `llm_requests`;
+  `outcome needs_review` = відмова моделі. `llm.failed` публікується **лише** `final:true` (attempts = кількість спроб провайдера; коди `provider_timeout`,
+  `rate_limited`, `provider_error`, `invalid_response`, `no_api_key`, `budget_unavailable`, `deadline_exceeded`, `normalization_drift`, `attempts_exhausted`);
+  non-final повтори — transient redelivery без події.
+- `observations.recorded` (`FinalizerHandler`): `extraction_result_id` = `processing.extractions.extraction_id`, `extraction_version` 1, `observations[]` =
+  факти з `observation_id` (UUIDv7, рядки `processing.observations`), `legacy_target_id` відсутній у compat window, `expected_branches` за manifest
+  (`domain_branches_by_observation_category`). Публікується лише для outcome `completed` з фактами.
+- `message.analysis.completed`: для кожного terminal outcome (`completed | no_facts | unsupported | needs_review | failed`); `timings` з raw
+  (`received_at`), outbox `raw.stored` (`stored_at`), `stage_results` (`normalized_at`, `parsed_at`) і `finalized_at`; `llm_request_ids` для method `llm`;
+  `versions.model/prompt` — з `llm.completed`. Пізній результат (fencing) і будь-який вхід після extraction → receipt `noop`.
 
 ## Правила сумісності
 

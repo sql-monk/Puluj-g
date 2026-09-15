@@ -85,6 +85,8 @@ public sealed class MessagingOptions
     public sealed class ConsumerOptions
     {
         public ushort Prefetch { get; set; } = 10;
+        /// <summary>Per-subscription prefetch override (a slow subscription such as llm-worker keeps fewer deliveries unacked during a long call).</summary>
+        public Dictionary<string, ushort> PrefetchBySubscription { get; set; } = new(StringComparer.Ordinal) { ["llm-worker"] = 2 };
         /// <summary>Lanes this process consumes for each of its subscriptions; empty = every lane of the subscription.</summary>
         public string[] Lanes { get; set; } = [];
         public TimeSpan MinBackoff { get; set; } = TimeSpan.FromSeconds(1);

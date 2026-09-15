@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(4, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser (+ finalizer/llm-worker paused)
+        Assert.Equal(5, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser; v5 finalizer/llm-worker
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -105,8 +105,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             // (черги для parse.completed/llm.requested існують до P06); решта — planned до своїх задач.
             var expectedStatus = subscriptionId switch
             {
-                "archive" or "raw-writer" or "normalizer" or "parser" => "active",
-                "finalizer" or "llm-worker" => "paused",
+                "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" => "active",
                 _ => "planned",
             };
             Assert.Equal(expectedStatus, subscription["status"]!.GetValue<string>());

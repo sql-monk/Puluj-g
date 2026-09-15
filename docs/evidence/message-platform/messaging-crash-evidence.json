@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-15T17:30:17.5981169+00:00",
+  "generated_at": "2026-09-15T18:05:15.8709429+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.139197,
+      "outbox_age_seen_s": 1.185577,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0a61e-6dbb-7168-8037-9b57d7c02907"
+      "event_id": "01a0a63e-7037-78b6-b1ea-33848b036716"
     },
     "P03-C05": {
       "window": "W6b",
@@ -118,7 +118,7 @@
       "overdue_reported": 2,
       "registry_versions": [
         1,
-        4
+        5
       ]
     },
     "P03-C07": {
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T17:30:16.7371318\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T18:05:15.0715226\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -220,8 +220,8 @@
         "noop": 2
       },
       "replicas": {
-        "r1": 0,
-        "r2": 3,
+        "r1": 3,
+        "r2": 0,
         "raw_total": 2,
         "is_new_true": 2
       }
@@ -274,6 +274,68 @@
       "facts": 2,
       "legacy_targets": 2,
       "field_differences": 0
+    },
+    "P06-F01": {
+      "extraction": "completed/rules",
+      "facts": 1,
+      "observations": 1,
+      "targets": 0,
+      "expected_branches": [
+        "track-worker"
+      ],
+      "events": {
+        "recorded": 1,
+        "analysis": 1
+      }
+    },
+    "P06-F02": {
+      "no_facts": "analysis only",
+      "unsupported": "analysis only",
+      "observations_recorded": 0
+    },
+    "P06-F03": {
+      "llm_calls": 1,
+      "extraction": "completed/llm",
+      "audit": {
+        "request_id": true,
+        "fencing_token": 1,
+        "run_id": true,
+        "outcome": "applied",
+        "provider_request_id": true
+      },
+      "observations": 1
+    },
+    "P06-F04": {
+      "window": "W8",
+      "worker_late_noop": 1,
+      "audit_outcome": "late",
+      "finalizer_late_noop": 1,
+      "extractions": 0
+    },
+    "P06-F05": {
+      "provider_calls": 2,
+      "llm_failed_final": true,
+      "attempts": 2,
+      "extraction": "failed",
+      "quarantine": 0
+    },
+    "P06-F06": {
+      "duplicate_inputs": 3,
+      "finalizer_noops": 3,
+      "extractions": 1,
+      "replicas": {
+        "r1": 3,
+        "r2": 1
+      }
+    },
+    "P06-F07": {
+      "non_retryable": "final after 1 call",
+      "refusal": "needs_review, no observations"
+    },
+    "P06-F08": {
+      "order": "llm.completed before parse.completed{needs_llm}",
+      "extractions": 1,
+      "late_parse": "noop"
     }
   }
 }

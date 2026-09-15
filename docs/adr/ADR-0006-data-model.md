@@ -118,7 +118,16 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
 - `processing.stage_results` (writers з P05: `normalize` — `NormalizerHandler`, `parse` — `ParserHandler`): `stage_version` = `Normalizer.Version` /
   `RuleParser.Version` / `AlertsInUaStructuredAdapter.Version` / `empty`; `outputs` jsonb (text_kind, hash, outcome, facts_count, attempt_id (uuid спроби
   парсингу з `parse.completed`), event ids), `versions` jsonb; insert `ON CONFLICT DO NOTHING` — повтор того самого raw/run/stage → `noop` без другої події.
-  `ReprocessService.ResetAsync` (legacy) стадій не чіпає; replay (P14) — інший run.
+  `ReprocessService.ResetAsync` (legacy) стадій не чіпає; replay (P14) — інший run. Стадія `finalize` (P06) має проміжний outcome `awaiting_llm`, який
+  оновлюється до terminal (guard: лише з `awaiting_llm`/`failed`, terminal не понижується).
+- **`processing.extractions`** (P06, замість `stage_results (raw, run, 'extraction', version)` з логічної моделі): `extraction_id` uuid PK, unique
+  `(raw_message_id, run_id)` — рівно один канонічний immutable extraction на run (`extraction_version` = 1; повторний розрахунок = новий run), `method`,
+  `outcome`, `versions`/`facts`/`error` jsonb, `llm_request_ids uuid[]`, `finalized_by`; **`processing.observations`**: `observation_id` uuid PK, FK extraction
+  (cascade), `raw_message_id`, `run_id`, `event_kind_code`, `category`, `effective_at`, `payload` jsonb (факт за `$defs/observation`), `legacy_target_id`
+  null у compat window (P09/P14 зв'язують із `targets`, які далі пише legacy loop).
+- `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; `outcome` ∈ `answered → applied | late`, коди помилок
+  провайдера; рядок пишеться autocommit до result-tx. `processing.attempts`: partial unique `(job_key, fencing_token) WHERE fencing_token > 0`
+  (lease takeover), job-рядки llm-worker під `subscription_id = 'llm-worker:job'` (не рахуються consumer'ом).
 - `processing.deliveries`: PK `(event_id, subscription_id)`; expected рядок = `outcome IS NULL`; partial index `(expected_at) WHERE outcome IS NULL`;
   `completed` ніколи не понижується (upsert лише з `NULL`/`quarantined`).
 - `processing.quarantine`: partial unique `(subscription_id, event_id) WHERE resolved_at IS NULL`; зберігає **повний envelope + headers** —

@@ -68,6 +68,8 @@ public class ProcessingAttemptConfiguration : IEntityTypeConfiguration<Processin
         b.Property(x => x.RetryReason).HasMaxLength(64);
         b.HasIndex(x => new { x.SubscriptionId, x.EventId });
         b.HasIndex(x => new { x.JobKey, x.FencingToken });
+        // Lease takeover (ADR-0004 W8): one row per (job, token) — two replicas cannot both hold token n+1 (0 = plain delivery attempts).
+        b.HasIndex(x => new { x.JobKey, x.FencingToken }, "ux_processing_attempts_job_token").HasDatabaseName("ux_processing_attempts_job_token").IsUnique().HasFilter("fencing_token > 0");
         b.HasIndex(x => x.StageResultId);
         b.HasIndex(x => x.StartedAt).HasMethod("brin");
     }
@@ -106,5 +108,41 @@ public class QuarantineEntryConfiguration : IEntityTypeConfiguration<QuarantineE
         b.HasIndex(x => new { x.SubscriptionId, x.EventId });
         // At most one open quarantine per delivery; a retry resolves it and a later failure opens a new one.
         b.HasIndex(x => new { x.SubscriptionId, x.EventId }, "ux_processing_quarantine_open").HasDatabaseName("ux_processing_quarantine_open").IsUnique().HasFilter("resolved_at IS NULL");
+    }
+}
+
+public class ExtractionConfiguration : IEntityTypeConfiguration<Extraction>
+{
+    public void Configure(EntityTypeBuilder<Extraction> b)
+    {
+        b.ToTable("extractions", "processing");
+        b.HasKey(x => x.ExtractionId);
+        b.Property(x => x.ExtractionId).ValueGeneratedNever();
+        b.Property(x => x.Method).HasMaxLength(16);
+        b.Property(x => x.Outcome).HasMaxLength(16);
+        b.Property(x => x.FinalizedBy).HasMaxLength(128);
+        b.Property(x => x.Versions).HasColumnType("jsonb");
+        b.Property(x => x.Facts).HasColumnType("jsonb");
+        b.Property(x => x.Error).HasColumnType("jsonb");
+        // Exactly one canonical extraction per raw message and run (ADR-0005): the finalizer inserts ON CONFLICT DO NOTHING.
+        b.HasIndex(x => new { x.RawMessageId, x.RunId }).IsUnique();
+        b.HasIndex(x => x.CreatedAt).HasMethod("brin");
+    }
+}
+
+public class ObservationConfiguration : IEntityTypeConfiguration<Observation>
+{
+    public void Configure(EntityTypeBuilder<Observation> b)
+    {
+        b.ToTable("observations", "processing");
+        b.HasKey(x => x.ObservationId);
+        b.Property(x => x.ObservationId).ValueGeneratedNever();
+        b.Property(x => x.EventKindCode).HasMaxLength(96);
+        b.Property(x => x.Category).HasMaxLength(16);
+        b.Property(x => x.Payload).HasColumnType("jsonb");
+        b.HasOne(x => x.Extraction).WithMany().HasForeignKey(x => x.ExtractionId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.RawMessageId, x.RunId });
+        b.HasIndex(x => new { x.EventKindCode, x.EffectiveAt });
+        b.HasIndex(x => x.LegacyTargetId);
     }
 }

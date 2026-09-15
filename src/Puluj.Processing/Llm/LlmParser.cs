@@ -270,9 +270,14 @@ public sealed class LlmParser : IParser
         }
     }
 
-    /// <summary>Maps a raw model answer (JSON per <see cref="Schema"/>) to facts. Internal so the mapping is testable without an API key.</summary>
-    internal IReadOnlyList<ParsedFact> MapJson(string json, NormalizedMessage message) =>
+    /// <summary>Maps a raw model answer (JSON per <see cref="Schema"/>) to facts. Public so the llm-worker (P06) and tests map answers without an API key.</summary>
+    public IReadOnlyList<ParsedFact> MapJson(string json, NormalizedMessage message) =>
         Map(JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]), message);
+
+    /// <summary>The system prompt (taxonomy codes included) and the JSON output schema, shared with <see cref="AnthropicCompletion"/> so the worker asks the same question as the in-process fallback.</summary>
+    internal string SystemPrompt => _systemPrompt.Value;
+    internal static Dictionary<string, JsonElement> OutputSchema() => Schema();
+    internal static string ProviderErrorMessage(AnthropicApiException ex) => ErrorMessage(ex);
 
     private IReadOnlyList<ParsedFact> Map(LlmResponse response, NormalizedMessage message)
     {
