@@ -38,6 +38,8 @@ public static partial class OpsEndpoints
         ops.MapGet("/ops/workers", WorkersAsync);
         ops.MapGet("/ops/collectors", CollectorsAsync);
         ops.MapGet("/ops/pipeline", PipelineAsync);
+        ops.MapGet("/ops/llm", LlmAsync);
+        ops.MapGet("/ops/llm/requests/{id:long}", LlmRequestAsync);
         ops.MapGet("/ops/db", DbAsync);
         ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
         ops.MapPost("/ops/db/query", DbQueryAsync);
@@ -122,6 +124,71 @@ public static partial class OpsEndpoints
         });
 
         return app;
+    }
+
+    private static async Task<IResult> LlmAsync(int? hours, IDbContextFactory<PulujDbContext> factory, TimeProvider clock, CancellationToken ct)
+    {
+        var span = hours ?? 168;
+        if (!PipelineBuckets.AllowedHours.Contains(span))
+        {
+            return Results.BadRequest(new { error = "Період має бути 24, 168 або 720 годин." });
+        }
+        var to = clock.GetUtcNow();
+        var from = to - TimeSpan.FromHours(span);
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var query = db.LlmRequests.AsNoTracking().Where(x => x.OccurredAt >= from && x.OccurredAt <= to);
+        var totals = await query.GroupBy(_ => 1).Select(g => new
+        {
+            Calls = g.LongCount(),
+            WithFacts = g.LongCount(x => x.Outcome == "facts"),
+            Empty = g.LongCount(x => x.Outcome == "empty"),
+            Refusals = g.LongCount(x => x.Outcome == "refusal"),
+            Failures = g.LongCount(x => x.Outcome == "429" || x.Outcome == "api_error" || x.Outcome == "error"),
+            Input = g.Sum(x => x.InputTokens ?? 0),
+            CacheWrite = g.Sum(x => x.CacheCreationInputTokens ?? 0),
+            CacheRead = g.Sum(x => x.CacheReadInputTokens ?? 0),
+            Output = g.Sum(x => x.OutputTokens ?? 0),
+            Cost = g.Sum(x => x.EstimatedCostUsd ?? 0m),
+            MeanDuration = g.Average(x => (double?)x.DurationMs),
+        }).FirstOrDefaultAsync(ct);
+        var timeline = await query.GroupBy(x => x.OccurredAt.Date).OrderBy(g => g.Key).Select(g => new
+        {
+            At = g.Key,
+            Calls = g.LongCount(),
+            Input = g.Sum(x => x.InputTokens ?? 0),
+            Output = g.Sum(x => x.OutputTokens ?? 0),
+            Cost = g.Sum(x => x.EstimatedCostUsd ?? 0m),
+        }).ToListAsync(ct);
+        var recentRows = await query.OrderByDescending(x => x.LlmRequestId).Take(100).Select(x => new
+        {
+            x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, SourceCode = x.Source!.Code, x.Worker, x.Model, x.PromptVersion,
+            x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens,
+            x.EstimatedCostUsd, x.FactsCount, x.Error,
+        }).ToListAsync(ct);
+        return Results.Ok(new LlmUsageReportDto(from, to,
+            totals?.Calls ?? 0, totals?.WithFacts ?? 0, totals?.Empty ?? 0, totals?.Refusals ?? 0, totals?.Failures ?? 0,
+            totals?.Input ?? 0, totals?.CacheWrite ?? 0, totals?.CacheRead ?? 0, totals?.Output ?? 0, totals?.Cost ?? 0m, totals?.MeanDuration,
+            timeline.Select(x => new LlmUsageBucketDto(new DateTimeOffset(x.At, TimeSpan.Zero), x.Calls, x.Input, x.Output, x.Cost)).ToList(),
+            recentRows.Select(x => new LlmRequestDto(x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, x.SourceCode, x.Worker, x.Model, x.PromptVersion,
+                x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens, x.EstimatedCostUsd, x.FactsCount, x.Error)).ToList()));
+    }
+
+    private static async Task<IResult> LlmRequestAsync(long id, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var x = await db.LlmRequests.AsNoTracking().Where(x => x.LlmRequestId == id).Select(x => new
+        {
+            x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, SourceCode = x.Source!.Code, x.Worker, x.Model, x.PromptVersion,
+            x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens,
+            x.EstimatedCostUsd, x.FactsCount, x.Error, x.RequestText, x.SystemPrompt, x.ResponseText,
+        }).FirstOrDefaultAsync(ct);
+        if (x is null)
+        {
+            return Results.NotFound();
+        }
+        var row = new LlmRequestDto(x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, x.SourceCode, x.Worker, x.Model, x.PromptVersion,
+            x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens, x.EstimatedCostUsd, x.FactsCount, x.Error);
+        return Results.Ok(new LlmRequestDetailDto(row, x.RequestText, x.SystemPrompt, x.ResponseText));
     }
 
     private static async Task<IResult> OverviewAsync(

@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public static class AdminEndpoints
         "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit",
     ];
     private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
+    private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly string[] OtherKeys = ["Correlation:AttachThreshold", "Correlation:CandidateWindowMinutes", "Correlation:AmbiguityMargin", "Admin:Token"];
 
     /// <summary>Defaults baked into the option classes, shown when neither the DB nor configuration sets the key.</summary>
@@ -83,6 +85,13 @@ public static class AdminEndpoints
             if (req.Values.TryGetValue("Collectors:Telegram:ApiId", out var apiId) && !string.IsNullOrEmpty(apiId) && !int.TryParse(apiId.Trim(), out _))
             {
                 return Results.BadRequest(new { error = "api_id має бути числом" });
+            }
+            foreach (var (key, value) in req.Values.Where(x => LlmPriceKeys.Contains(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
+            {
+                if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var price) || price < 0)
+                {
+                    return Results.BadRequest(new { error = $"{key} має бути невід'ємним числом у USD за мільйон токенів." });
+                }
             }
             var values = req.Values.ToDictionary(kv => kv.Key, kv => kv.Value?.Trim());
             await store.SetAsync(values, ct);

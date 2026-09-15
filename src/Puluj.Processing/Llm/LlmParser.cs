@@ -237,9 +237,7 @@ public sealed class LlmParser : IParser
             var cacheWrite = answer?.CacheCreationInputTokens;
             var cacheRead = answer?.CacheReadInputTokens;
             var output = answer?.OutputTokens;
-            decimal? cost = input is null ? null : Math.Round(
-                (input.Value * o.InputUsdPerMillionTokens + cacheWrite!.Value * o.CacheWriteUsdPerMillionTokens + cacheRead!.Value * o.CacheReadUsdPerMillionTokens + output!.Value * o.OutputUsdPerMillionTokens) / 1_000_000m,
-                9, MidpointRounding.AwayFromZero);
+            decimal? cost = input is null ? null : LlmCost.Calculate(o, input.Value, cacheWrite!.Value, cacheRead!.Value, output!.Value);
             await using var db = await _auditFactory.CreateDbContextAsync(ct);
             db.LlmRequests.Add(new LlmRequest
             {

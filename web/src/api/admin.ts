@@ -290,6 +290,57 @@ export interface DbReportDto {
     deadRows: number
   }
 }
+
+export interface LlmUsageBucketDto {
+  at: string
+  calls: number
+  inputTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+}
+export interface LlmRequestDto {
+  id: number
+  occurredAt: string
+  rawMessageId?: number
+  sourceId: number
+  sourceCode: string
+  worker: string
+  model: string
+  promptVersion: string
+  outcome: string
+  statusCode?: number
+  durationMs: number
+  inputTokens?: number
+  cacheWriteTokens?: number
+  cacheReadTokens?: number
+  outputTokens?: number
+  estimatedCostUsd?: number
+  factsCount: number
+  error?: string
+}
+export interface LlmUsageReportDto {
+  from: string
+  to: string
+  calls: number
+  withFacts: number
+  empty: number
+  refusals: number
+  failures: number
+  inputTokens: number
+  cacheWriteTokens: number
+  cacheReadTokens: number
+  outputTokens: number
+  estimatedCostUsd: number
+  meanDurationMs?: number
+  timeline: LlmUsageBucketDto[]
+  recent: LlmRequestDto[]
+}
+export interface LlmRequestDetailDto {
+  request: LlmRequestDto
+  requestText: string
+  systemPrompt: string
+  responseText?: string
+}
 export interface DbQueryResultDto {
   columns: string[]
   rows: (string | null)[][]
@@ -388,6 +439,8 @@ export const admin = {
     containerAction: (id: string, verb: 'restart' | 'stop' | 'start') => call<ContainerActionResultDto>('POST', `/api/admin/ops/containers/${encodeURIComponent(id)}/${verb}`, {}),
     scale: (replicas: number) => call<ScaleResultDto>('POST', '/api/admin/ops/processors/scale', { replicas }),
     pipeline: (hours: 24 | 168 | 720) => call<PipelineReportDto>('GET', `/api/admin/ops/pipeline?hours=${hours}`),
+    llm: (hours: 24 | 168 | 720 = 168) => call<LlmUsageReportDto>('GET', `/api/admin/ops/llm?hours=${hours}`),
+    llmRequest: (id: number) => call<LlmRequestDetailDto>('GET', `/api/admin/ops/llm/requests/${id}`),
     db: () => call<DbReportDto>('GET', '/api/admin/ops/db'),
     dbTableRows: (name: string, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}`),
     dbQuery: (sql: string) => call<DbQueryResultDto>('POST', '/api/admin/ops/db/query', { sql }),

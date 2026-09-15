@@ -5,6 +5,12 @@ export function fmtNum(n: number | null | undefined): string {
   return n.toLocaleString('uk-UA')
 }
 
+/** USD cost. More precision is useful below one cent, which is normal for individual LLM calls. */
+export function fmtUsd(n: number | null | undefined): string {
+  if (n === null || n === undefined || Number.isNaN(n)) return '—'
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: n > 0 && n < 0.01 ? 4 : 2, maximumFractionDigits: 6 })}`
+}
+
 export function fmtBytes(b: number | null | undefined): string {
   if (b === null || b === undefined) return '—'
   if (b < 1024) return `${b} Б`

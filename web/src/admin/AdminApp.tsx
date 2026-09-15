@@ -3,6 +3,7 @@ import { admin, AdminError, getAdminToken, setAdminToken, type AdminSourceDto, t
 import { Badge, Field, findSetting, Section, Toggle, type Draft } from '../components/settings/fields'
 import SourceRatingPanel from '../components/settings/SourceRatingPanel'
 import AnalyticsPanel from '../components/analytics/AnalyticsPanel'
+import LlmUsagePanel from './LlmUsagePanel'
 import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
 import { WorkersPanel } from './WorkersPanel'
@@ -313,12 +314,19 @@ function TelegramSection({ status, draft, change, s, notify, reload }: TabProps)
 
 function LlmSection({ status, draft, change, s }: TabProps) {
   return (
-    <Section title="LLM fallback (Anthropic)" badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? 'увімкнено' : 'вимкнено'} />}>
-      <p className="text-xs text-slate-500">Викликається лише коли правила не знайшли нічого в тексті, схожому на повідомлення про загрозу. Модель може повертати лише коди з таксономії; невідомі місця відкидаються.</p>
-      <Toggle label="Увімкнути" setting={s('Llm:Enabled')} draft={draft} onChange={change} />
-      <Field label="Модель" setting={s('Llm:Model')} draft={draft} onChange={change} placeholder="claude-opus-5" />
-      <Field label="API key" setting={s('Llm:ApiKey')} draft={draft} onChange={change} type="password" hint="або змінна середовища ANTHROPIC_API_KEY" />
-    </Section>
+    <>
+      <Section title="LLM fallback (Anthropic)" badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? 'увімкнено' : 'вимкнено'} />}>
+        <p className="text-xs text-slate-500">Викликається лише коли правила не знайшли нічого в тексті, схожому на повідомлення про загрозу. Модель може повертати лише коди з таксономії; невідомі місця відкидаються.</p>
+        <Toggle label="Увімкнути" setting={s('Llm:Enabled')} draft={draft} onChange={change} />
+        <Field label="Модель" setting={s('Llm:Model')} draft={draft} onChange={change} placeholder="claude-opus-5" />
+        <Field label="API key" setting={s('Llm:ApiKey')} draft={draft} onChange={change} type="password" hint="або змінна середовища ANTHROPIC_API_KEY" />
+        <Field label="Input, $ / млн токенів" setting={s('Llm:InputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
+        <Field label="Output, $ / млн токенів" setting={s('Llm:OutputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
+        <Field label="Cache write, $ / млн" setting={s('Llm:CacheWriteUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
+        <Field label="Cache read, $ / млн" setting={s('Llm:CacheReadUsdPerMillionTokens')} draft={draft} onChange={change} type="number" hint="Зміна ціни впливає лише на наступні виклики." />
+      </Section>
+      <LlmUsagePanel />
+    </>
   )
 }
 
