@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/track.changed.schema.json",
+  "title": "track.changed payload",
+  "description": "Зміна агрегату рухомої цілі (§4). Статичні події не мають ETA/курсу (§8.5).",
+  "type": "object",
+  "required": [
+    "track_id",
+    "change",
+    "revision",
+    "effective_at",
+    "recorded_at",
+    "observation_ids",
+    "category"
+  ],
+  "properties": {
+    "track_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "type": "string",
+      "enum": [
+        "created",
+        "updated",
+        "closed",
+        "cancelled",
+        "expired"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Дорівнює envelope.aggregate_revision; client ігнорує старі revisions (§8.6)"
+    },
+    "effective_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "recorded_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "observation_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+      },
+      "description": "Observations, що спричинили зміну (evidence links)"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "closed",
+        "cancelled"
+      ]
+    },
+    "generation_id": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+    }
+  }
+}

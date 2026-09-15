@@ -1,0 +1,447 @@
+{
+  "task": "P01",
+  "baseCommit": "682254139ea495a99f4b15a8bd29e9b60be9a992",
+  "configuration": "Debug/net10.0",
+  "sdk": "10.0.401",
+  "productionSourcesChanged": false,
+  "files": [
+    {
+      "path": "Directory.Packages.props",
+      "status": "M",
+      "sha256": "9968e36ab911e3d9ab7d1fe838e0eb8cfb6990569329e45b1b0597bb299f7b15"
+    },
+    {
+      "path": "Puluj.sln",
+      "status": "M",
+      "sha256": "bc536a40e320b313fcd94bc0bd9cf35a230462a044849be72ebdb273a0b3f7b4"
+    },
+    {
+      "path": "contracts/messaging/README.md",
+      "status": "??",
+      "sha256": "f7d7cde355f2d589937c252e893283f738e0a6185d89e5537a6daf6b7c65d77b"
+    },
+    {
+      "path": "contracts/messaging/asyncapi.yaml",
+      "status": "??",
+      "sha256": "db36608214b4553c12a23e9f21fae82df2bde8eaa6745837b4a8f11a22f87b3d"
+    },
+    {
+      "path": "contracts/messaging/completion-manifest.json",
+      "status": "??",
+      "sha256": "a474a90f569af93458fff0423c188e341cb459204925060e3474fbea8cd971ce"
+    },
+    {
+      "path": "contracts/messaging/fixtures/compatibility.json",
+      "status": "??",
+      "sha256": "ad64270fd8e0d86d980e7cfa598f37fe52954696c0657a0880d3e3d4aaada166"
+    },
+    {
+      "path": "contracts/messaging/fixtures/identity-cases.json",
+      "status": "??",
+      "sha256": "7db05b3ad7e26ed781dbc3d08d3ff16e0b17527bb59f00fced8196a6a8ac1ad7"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/bad-lane.json",
+      "status": "??",
+      "sha256": "d21976a19637d27b22b439cc3de5276303f8da5985c19d7fe868d12bf8f8bd17"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/bad-schema-version.json",
+      "status": "??",
+      "sha256": "9c5ca7154807e8b2d6ecdd49da983d6471538bbb104bb6f01081c26200982186"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/bad-traceparent.json",
+      "status": "??",
+      "sha256": "a92de91afb3402b26fdc9a23140fda020705fad45a322b11a9e17b61ea96bb57"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/breaking-type-change.json",
+      "status": "??",
+      "sha256": "aeff8579191347ef7fb9ed0f2c87651098f302e1ed716d5ac478cbea797b247c"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/changed-without-aggregate-revision.json",
+      "status": "??",
+      "sha256": "50bf383d74b82d17b023a00f30004c3e2ba495c6d3bba9d5d0fceaf9fdb936ed"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/ingress-with-raw-id.json",
+      "status": "??",
+      "sha256": "8343fc70105cd55b36c8d986f18cf15ecf632d1d908b2ad8d80e618f5431cac8"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/llm-requested-without-request-id.json",
+      "status": "??",
+      "sha256": "b032c068d5f6d902f56aa2aa410498142617be2a1fe868e0216ac7a40d222cd1"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/missing-event-id.json",
+      "status": "??",
+      "sha256": "7d42fa4cce2ca65d36829f2b8aca5997ddac21b177e9fae5488679ff5e09631b"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/neither-payload-nor-ref.json",
+      "status": "??",
+      "sha256": "18f1ad1de5acf9a82f9284a9b2d23c3e13796c27e357fd2f74347d8cb0930a3b"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/non-root-null-causation.json",
+      "status": "??",
+      "sha256": "dec18c985d1d6133c5fd86f1bb2310efccefe6af6fe5d064ff6d551d91e191a9"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/observations-empty.json",
+      "status": "??",
+      "sha256": "1cd5139b8679dea85ecbee8b9f34bc3bb0443edf3696fa9b69857d6e32083d22"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/payload-and-payload-ref.json",
+      "status": "??",
+      "sha256": "fdd52c45ee70b4c8c5f65ce13de3b9b18c5a98a030065327dd96b66ac65ab6ff"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/raw-stored-without-raw-id.json",
+      "status": "??",
+      "sha256": "2dcae5fe991533906738b80a1e050754fb6fd89cc565b0c2c3833d0d79b20476"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/unknown-analysis-outcome.json",
+      "status": "??",
+      "sha256": "199a92e30d99d28d9492824ab7fc23e8937cca582e46c60467b019eef53ffe22"
+    },
+    {
+      "path": "contracts/messaging/fixtures/invalid/unknown-event-type.json",
+      "status": "??",
+      "sha256": "2e9de3d14a56ca57697c0449b73d9bf2c88fa1335b192e5081c06f35b3679c8e"
+    },
+    {
+      "path": "contracts/messaging/fixtures/sequences/analytics-out-of-order.json",
+      "status": "??",
+      "sha256": "d83b9449a93bbb6de64754d589dfb541662f5f993a9051fd5e90d1359e29b51f"
+    },
+    {
+      "path": "contracts/messaging/fixtures/sequences/republish-same-event.json",
+      "status": "??",
+      "sha256": "471e25eb7926d234ef6b536bc7ee96175ade02c4117b8ec1ce3fdcf92aac68b8"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/alert.changed.json",
+      "status": "??",
+      "sha256": "0af2210d54bbc4b15ac01fc1b004ae4dbe85e59e718592b33750c89e2032d4a4"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/alert.expiry.requested.json",
+      "status": "??",
+      "sha256": "970a63700326573bff495413059e11000fc1239c0d3a58a01055bbadd597f7df"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/incident.changed.json",
+      "status": "??",
+      "sha256": "5bf4500d246d2f68fedaa243c29b6a8571d75e3bdb33e37796f995a75a14197e"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/ingress.received.alerts-end.json",
+      "status": "??",
+      "sha256": "8ed1d6d6d3fdd42913cc16114381d58ed2f2d6a2847fac261d1bb728491f37de"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/ingress.received.alerts-start.json",
+      "status": "??",
+      "sha256": "32ab3d9b14e5e49dc605f940a2466c4609f0c1f5d4e00aba059be3f1776b4a3e"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/ingress.received.json",
+      "status": "??",
+      "sha256": "f6b5183ff4f2b457e05f48681a7d322f22d56f349c5915a226c2e192f6a243a2"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/ingress.received.payload-ref.json",
+      "status": "??",
+      "sha256": "a671489cc8fbbd3bd938e05136935ea51abf89f4e57d0bea47dcc587787a2ad2"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/ingress.received.telegram-edit.json",
+      "status": "??",
+      "sha256": "d8405c5191be515ac34700a025c0b5dec70a8901a3a3fe0896e779164dafb5ca"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/llm.completed.json",
+      "status": "??",
+      "sha256": "9d3450243549b906c593f5f4da13fe9a519c72ccfef9e68dc2fd32f0b5b600cd"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/llm.failed.json",
+      "status": "??",
+      "sha256": "9c67fe2a1cc8e0cacb0dc54c4c6e0fe3dad97516783ba02636487cc123d44305"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/llm.requested.json",
+      "status": "??",
+      "sha256": "48fb9fe014133e57c783c93f233eae427182415ba37d2968ea086cb9bd8c54b3"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/message.analysis.completed.json",
+      "status": "??",
+      "sha256": "aac8133393044559af0447092cd7b8089d2964dff7176dfe1392658c8698d82a"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/message.analysis.completed.no-facts.json",
+      "status": "??",
+      "sha256": "3679aceb290aed666dee6661537bb7dd49324e6e36d3a9b7f29fb01019135063"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/message.analysis.completed.replay-lane.json",
+      "status": "??",
+      "sha256": "221f62c0a8f8376329b1ded8a5025679df8096172271ebad965ca17cec57eaed"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/message.normalized.json",
+      "status": "??",
+      "sha256": "7e6f3e248693d5577c983fbeac39a6450c3be0df41bec9204eea530c1b94bb17"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/observations.recorded.alerts-start.json",
+      "status": "??",
+      "sha256": "ae268b791fe0f22d9133b5d9c19183ef37826f01be9051de93bd3f9ab07d05c0"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/observations.recorded.json",
+      "status": "??",
+      "sha256": "762431273670f60db0f9f339234fe8eedde6a583de0040346560b00627ae76ca"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/parse.completed.json",
+      "status": "??",
+      "sha256": "6226c5e2ed4b5cf4da27c39b5f6277c13caba93265def6dbc9b7daaa4482702a"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/raw.stored.additive-1.1.json",
+      "status": "??",
+      "sha256": "0ee77b3f4f777e8a7d83a82bbdac17577853a1e5616d8946f2ca29d991a7e677"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/raw.stored.history-lane.json",
+      "status": "??",
+      "sha256": "b8f7950f3553a0f3fcadd58a1bf67a340fbfb1d9a41aa27376fa893bea455a77"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/raw.stored.json",
+      "status": "??",
+      "sha256": "6e76d1fd8c9f0798724fa31670ed2c32a006f83dba1b0b689b6622258ea7644a"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/track.changed.json",
+      "status": "??",
+      "sha256": "73b80ff53b4953c52a37d3c4a8555023a0bbdb4ba811c447c68ef06b55ab5cbb"
+    },
+    {
+      "path": "contracts/messaging/fixtures/valid/track.expiry.requested.json",
+      "status": "??",
+      "sha256": "3fcc3bad0dcad5e66d84e66c652996821d7b0ca854bb828d7ce0d1bf5d7f9931"
+    },
+    {
+      "path": "contracts/messaging/schemas/common.schema.json",
+      "status": "??",
+      "sha256": "383466b53d00e3ce5f3faeb3235dbd292108336c68b0a98ebf6d36d822f4ec89"
+    },
+    {
+      "path": "contracts/messaging/schemas/envelope.schema.json",
+      "status": "??",
+      "sha256": "33462071661cbe3ae93ba723d4dad8e341ca7b4cdde8a5f8b594150184925c0a"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/alert.changed.schema.json",
+      "status": "??",
+      "sha256": "0021959d007311a5819790ef80e51f24892c6c01a9edeb87b80d997bb6dd8f30"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/alert.expiry.requested.schema.json",
+      "status": "??",
+      "sha256": "f12c148930aaf36e1eb312d6c846e6ced2705e16297eeb2fcc2a287591a84101"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/incident.changed.schema.json",
+      "status": "??",
+      "sha256": "16abf1b7756bb517b3cfe66c51ced0c347b462d19878ab432fbc875e736c080d"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/ingress.received.schema.json",
+      "status": "??",
+      "sha256": "014ef3bb208a8f89ea1a915e9a799a7901b6e4223cba459b8336623a0759abea"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/llm.completed.schema.json",
+      "status": "??",
+      "sha256": "6c7ae9a4d85670c699c9c4996a29ae31d1bd66a29ce45e39e3aa74fb1d3bd580"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/llm.failed.schema.json",
+      "status": "??",
+      "sha256": "c3d8be25f4dadf2dc1ea94bd1375e2ea7d1ebaea6e6fe0460ef3a4864431776f"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/llm.requested.schema.json",
+      "status": "??",
+      "sha256": "82dc9ebd50531db67f7bbfd1bf96bd418a53887d6ed3a3b70e9a7a7e1be87d58"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/message.analysis.completed.schema.json",
+      "status": "??",
+      "sha256": "e1560566ea7e4adde3646e716848f08111e142799950eae3bdc8c43670af2afc"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/message.normalized.schema.json",
+      "status": "??",
+      "sha256": "89f76dcd2d9ad3f78f749ab595d9cd8cb769a060454156286e3dac72049addf6"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/observations.recorded.schema.json",
+      "status": "??",
+      "sha256": "566913439166e23c3d4c4c38a93a8f7b50f78ea779d4fdafb74732423066125d"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/parse.completed.schema.json",
+      "status": "??",
+      "sha256": "af3a336a4e515c27090bd21cdd64e499702a257e2ac8791058b9855daab3c9fa"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/raw.stored.schema.json",
+      "status": "??",
+      "sha256": "db3ae8fa36571358d80df5069d53951b1131ceb844abb00a383d38af9051ce7b"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/track.changed.schema.json",
+      "status": "??",
+      "sha256": "b7b0e18961ee7be40d5a5c4ab553e811c99d2ca70c3a6dc05cc47551a811ae20"
+    },
+    {
+      "path": "contracts/messaging/schemas/events/track.expiry.requested.schema.json",
+      "status": "??",
+      "sha256": "e1f65e3a24e4f6e31969cf213c87a1357b77db386630ad0cc32737375f3ab0a4"
+    },
+    {
+      "path": "contracts/messaging/tools/gen-asyncapi.py",
+      "status": "??",
+      "sha256": "83f72c91e3f702c5fa908513f8f2b55928e8f4a510cac7992efe4b5ae65b5b36"
+    },
+    {
+      "path": "contracts/messaging/topology.json",
+      "status": "??",
+      "sha256": "4a7ddf7ce5181ba8d0d41d49e36a0376c4dc036ce55b5f1abc0502c7e98d153d"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "M",
+      "sha256": "d4630ed1eb9b472a5e584ef877c72f1aedf473e17b87b840684c40ed603e4c54"
+    },
+    {
+      "path": "docs/adr/ADR-0001-transport.md",
+      "status": "??",
+      "sha256": "3296e8856df09a5c01f18af6f7b3cc646aef215bd1dd8f09f802d17e672c355a"
+    },
+    {
+      "path": "docs/adr/ADR-0002-topology-subscriptions.md",
+      "status": "??",
+      "sha256": "8576ae80529cb38d7ef256e1c2be9235d3481bb5186e1e89ea0b6812ad106c9b"
+    },
+    {
+      "path": "docs/adr/ADR-0003-identities-versioning.md",
+      "status": "??",
+      "sha256": "08054a7b2ffb9ac7c8936783ff3f786d84ade321a68fa7695601cc79fb8dbc57"
+    },
+    {
+      "path": "docs/adr/ADR-0004-delivery-guarantees.md",
+      "status": "??",
+      "sha256": "44628cd1deb9252794f8787c6f98f7cb1dce7d38cd33a9519b41511435f3c1a8"
+    },
+    {
+      "path": "docs/adr/ADR-0005-runs-completion.md",
+      "status": "??",
+      "sha256": "2687df00c9ce35cb24a4bed55fdc24b89fc97c48d706c551d07323c5734e97af"
+    },
+    {
+      "path": "docs/adr/ADR-0006-data-model.md",
+      "status": "??",
+      "sha256": "77fdde5d22b1c1af5e49696b05521dac10cdc2e39fc94d2fe262647e78f31632"
+    },
+    {
+      "path": "docs/adr/ADR-0007-slo-retention-proposal.md",
+      "status": "??",
+      "sha256": "0b11411cad0e9f14319e56f2d983958f087441f5021dff770fe4f7437d31492c"
+    },
+    {
+      "path": "docs/adr/README.md",
+      "status": "??",
+      "sha256": "6d169e70d76ed8679634758a46eae8c25c86510964d03d321718e614e20635e3"
+    },
+    {
+      "path": "docs/evidence/message-platform/P01-handoff.md",
+      "status": "??",
+      "sha256": "5fb127289a7bbc606841b681ebb10693f2fe4eb8f4439e63185861c38c22f6fb"
+    },
+    {
+      "path": "docs/evidence/message-platform/P01-plan.md",
+      "status": "??",
+      "sha256": "c3459b0822e80cb7aecf6c5fa8e724b8f7c89a452c7e4d6abdd41cd5f7b51528"
+    },
+    {
+      "path": "docs/plan-message-platform.md",
+      "status": "M",
+      "sha256": "a29703c57539ebdc2eb83b3650f94ab047166c2d0404c97f6c0f2bdf5803e694"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/CompatibilityTests.cs",
+      "status": "??",
+      "sha256": "bf66e8f8de9778bdee05bd65e93ff6772eae3b904b2555148e10bf1848b8c5b8"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/ContractFiles.cs",
+      "status": "??",
+      "sha256": "5833b99e9677af57a0c7c20df722c64ca9e4526d1c6d1123ad30e7e1825b8e9e"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/FixtureSchemaTests.cs",
+      "status": "??",
+      "sha256": "ae5c2796a7fb87444015e2d85583de2b9ddb0a4adbd4d121525f9a14f037d339"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/Puluj.Messaging.Contracts.Tests.csproj",
+      "status": "??",
+      "sha256": "16f19f949d90f2e8d95a21389b5cf23768677106014f9e955202e3423bb6a3e2"
+    },
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/TopologyRegistryTests.cs",
+      "status": "??",
+      "sha256": "f6319f5da092695181db2bd5e1befddcd6abd8f0f4219b96563f92bfb2e8c2dc"
+    }
+  ],
+  "assemblies": [
+    {
+      "path": "tests/Puluj.Messaging.Contracts.Tests/bin/Debug/net10.0/Puluj.Messaging.Contracts.Tests.dll",
+      "sha256": "bd7249fa1480097c107b9c0306058882f018dcc2d37f594b2303a6398e4d61c3"
+    },
+    {
+      "path": "src/Puluj.Processing/bin/Debug/net10.0/Puluj.Processing.dll",
+      "sha256": "a7861d067e99ad8ff47510e1a0fa58b4882141f4076c16f74c2b2f703e3f2c35"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/bin/Debug/net10.0/Puluj.Infrastructure.dll",
+      "sha256": "1ab1d05c19a37ca86d07cb9c8eea5dc84971e9b833649b9642226697159b9898"
+    },
+    {
+      "path": "src/Puluj.Collectors/bin/Debug/net10.0/Puluj.Collectors.dll",
+      "sha256": "d8a4116228180d3085c9062207612f8ffdad6b0ec3622d2de7a69721578955bc"
+    }
+  ],
+  "testResults": [
+    "p01-Puluj.Admin.Tests.trx",
+    "p01-Puluj.Analytics.Tests.trx",
+    "p01-Puluj.Api.Tests.trx",
+    "p01-Puluj.Integration.Tests.trx",
+    "p01-Puluj.Messaging.Contracts.Tests.trx",
+    "p01-Puluj.Processing.Tests.trx",
+    "p01-contracts-run1.trx"
+  ],
+  "note": "P01 змінює лише docs/, contracts/, tests/Puluj.Messaging.Contracts.Tests, Directory.Packages.props (тестовий пакет JsonSchema.Net) і Puluj.sln. src/ без змін; production assemblies перелічені для звірки з майбутнім build, їхній hash не порівнюється з P00 (недетермінований build)."
+}

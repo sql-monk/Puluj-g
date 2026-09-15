@@ -1,0 +1,85 @@
+{
+  "event_id": "019957a0-0008-7000-8000-000000000108",
+  "event_type": "observations.recorded",
+  "schema_version": "1.0",
+  "producer": "finalizer",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": "019957a0-0004-7000-8000-000000000104",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90208-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 1,
+  "lane": "live",
+  "source_id": 3,
+  "source_message_key": "48213",
+  "source_revision": "0",
+  "partition_key": "uav",
+  "raw_message_id": 4711,
+  "payload": {
+    "raw_message_id": 4711,
+    "extraction_result_id": "019957a0-0200-7000-8000-000000000301",
+    "extraction_version": 1,
+    "method": "rules",
+    "versions": {
+      "normalization": "norm-3",
+      "rules": "12",
+      "ruleset_id": "default"
+    },
+    "observations": [
+      {
+        "observation_id": "019957a0-0100-7000-8000-000000000201",
+        "legacy_target_id": 90001,
+        "event_kind_code": "target.observed",
+        "category": "target",
+        "effective_at": "2026-09-15T09:59:40Z",
+        "location": {
+          "kind": "city",
+          "place_id": 1201,
+          "accuracy_km": 5
+        },
+        "confidence": "medium",
+        "evidence": {
+          "span": {
+            "start": 0,
+            "end": 33
+          },
+          "rule_id": "shahed-course-city",
+          "rule_version": "12"
+        },
+        "attributes": {
+          "category": "uav",
+          "direction": {
+            "kind": "towards_place",
+            "place_id": 1201
+          }
+        }
+      },
+      {
+        "observation_id": "019957a0-0100-7000-8000-000000000202",
+        "event_kind_code": "air_defence.activity",
+        "category": "incident",
+        "effective_at": "2026-09-15T09:59:40Z",
+        "location": {
+          "kind": "region",
+          "place_id": 12,
+          "accuracy_km": 60
+        },
+        "confidence": "low",
+        "evidence": {
+          "span": {
+            "start": 0,
+            "end": 33
+          },
+          "rule_id": "ad-activity",
+          "rule_version": "3"
+        }
+      }
+    ],
+    "expected_branches": [
+      "track-worker",
+      "incident-worker"
+    ]
+  }
+}

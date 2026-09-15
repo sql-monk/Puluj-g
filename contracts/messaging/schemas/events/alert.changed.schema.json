@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/alert.changed.schema.json",
+  "title": "alert.changed payload",
+  "description": "Зміна інтервалу тривоги; власник alert-стану — alert-worker, не parser (§4).",
+  "type": "object",
+  "required": [
+    "alert_id",
+    "change",
+    "revision",
+    "effective_at",
+    "recorded_at",
+    "observation_ids",
+    "scope"
+  ],
+  "properties": {
+    "alert_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "type": "string",
+      "enum": [
+        "started",
+        "ended",
+        "updated",
+        "expired",
+        "cancelled"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Дорівнює envelope.aggregate_revision; client ігнорує старі revisions (§8.6)"
+    },
+    "effective_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "recorded_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "observation_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+      },
+      "description": "Observations, що спричинили зміну (evidence links)"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object",
+      "required": [
+        "place_id"
+      ],
+      "properties": {
+        "place_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "external_alert_id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "yellow",
+            "red"
+          ]
+        }
+      }
+    },
+    "started_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "ended_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    }
+  }
+}

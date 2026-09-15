@@ -1,0 +1,41 @@
+{
+  "event_id": "019957a0-0001-7000-8000-000000000101",
+  "event_type": "ingress.received",
+  "schema_version": "1.0",
+  "producer": "collectors@telegram-1",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": null,
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90201-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 1,
+  "lane": "live",
+  "source_id": 3,
+  "source_message_key": "48213",
+  "source_revision": "0",
+  "payload": {
+    "source_code": "tg_monitoringwar",
+    "source_message_key": "48213",
+    "source_revision": "0",
+    "legacy_source_message_id": "48213",
+    "source_published_at": "2026-09-15T09:59:40Z",
+    "received_at": "2026-09-15T10:00:00Z",
+    "url": "https://t.me/monitoringwar/48213",
+    "text": "Шахеди курсом на Бровари з півдня",
+    "raw_payload": {
+      "id": 48213,
+      "date": 1789466380,
+      "channel": "monitoringwar"
+    },
+    "collector": {
+      "name": "telegram",
+      "version": "2026.09.15+6822541",
+      "instance": "telegram-1"
+    },
+    "checkpoint": {
+      "last_source_message_id": "48213"
+    }
+  }
+}

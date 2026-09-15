@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/observations.recorded.schema.json",
+  "title": "observations.recorded payload",
+  "description": "Канонічний immutable extraction result → один або кілька observations (§8.1).",
+  "type": "object",
+  "required": [
+    "raw_message_id",
+    "extraction_result_id",
+    "extraction_version",
+    "observations",
+    "expected_branches"
+  ],
+  "properties": {
+    "raw_message_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "extraction_result_id": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+    },
+    "extraction_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "method": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/analysisMethod"
+    },
+    "versions": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/versions"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/observation"
+      }
+    },
+    "expected_branches": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "track-worker",
+          "alert-worker",
+          "incident-worker"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Очікувані доменні гілки за completion-manifest.json; receipts для них — required"
+    }
+  }
+}

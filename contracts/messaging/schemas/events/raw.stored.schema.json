@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/raw.stored.schema.json",
+  "title": "raw.stored payload",
+  "type": "object",
+  "required": [
+    "raw_message_id",
+    "source_code",
+    "source_published_at",
+    "received_at",
+    "stored_at",
+    "content_hash",
+    "is_new",
+    "has_text",
+    "has_payload"
+  ],
+  "properties": {
+    "raw_message_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_code": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/sourceCode"
+    },
+    "source_published_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "received_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "stored_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "content_hash": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/sha256"
+    },
+    "is_new": {
+      "type": "boolean",
+      "description": "false — повторна доставка того самого (source, key, revision): існуючий raw id повернуто без дубля"
+    },
+    "has_text": {
+      "type": "boolean"
+    },
+    "has_payload": {
+      "type": "boolean"
+    },
+    "text_length": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "url": {
+      "type": "string"
+    }
+  }
+}

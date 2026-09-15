@@ -1,0 +1,27 @@
+{
+  "event_id": "019957a0-0003-7000-8000-000000000103",
+  "event_type": "message.normalized",
+  "schema_version": "1.0",
+  "producer": "normalizer",
+  "occurred_at": "2026-09-15T10:00:00Z",
+  "published_at": "2026-09-15T10:00:01.250Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000001",
+  "causation_id": "019957a0-0002-7000-8000-000000000102",
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90203-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 1,
+  "lane": "live",
+  "source_id": 3,
+  "source_message_key": "48213",
+  "source_revision": "0",
+  "raw_message_id": 4711,
+  "payload": {
+    "raw_message_id": 4711,
+    "normalization_version": "norm-3",
+    "text_kind": "text",
+    "language": "uk",
+    "normalized_text": "шахеди курсом на бровари з півдня",
+    "normalized_text_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+  }
+}

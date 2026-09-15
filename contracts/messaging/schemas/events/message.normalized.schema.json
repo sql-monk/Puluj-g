@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/message.normalized.schema.json",
+  "title": "message.normalized payload",
+  "type": "object",
+  "required": [
+    "raw_message_id",
+    "normalization_version",
+    "text_kind"
+  ],
+  "properties": {
+    "raw_message_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "normalization_version": {
+      "type": "string"
+    },
+    "text_kind": {
+      "type": "string",
+      "enum": [
+        "text",
+        "structured",
+        "empty"
+      ]
+    },
+    "structured_kind": {
+      "type": "string",
+      "description": "напр. alerts_in_ua.alert.started; structured adapter не змінює alerts (§4)"
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+    },
+    "normalized_text": {
+      "type": "string"
+    },
+    "normalized_text_hash": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/sha256"
+    }
+  }
+}

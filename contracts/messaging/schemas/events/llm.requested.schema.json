@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/llm.requested.schema.json",
+  "title": "llm.requested payload (command)",
+  "type": "object",
+  "required": [
+    "raw_message_id",
+    "request_id",
+    "model",
+    "prompt_version",
+    "fencing_token",
+    "deadline_at",
+    "budget",
+    "input"
+  ],
+  "properties": {
+    "raw_message_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "request_id": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+    },
+    "model": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "fencing_token": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/fencingToken"
+    },
+    "deadline_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "max_output_tokens"
+      ],
+      "properties": {
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_usd": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "normalized_text_hash": {
+          "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/sha256"
+        },
+        "normalization_version": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "normalized_text_hash",
+        "normalization_version"
+      ]
+    },
+    "rules_context": {
+      "type": "object",
+      "description": "Що вже знайшли правила (для fallback)"
+    }
+  }
+}

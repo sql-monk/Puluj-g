@@ -677,8 +677,13 @@ no-op без Docker/DB, не є доказом надійності: required CI
 
 - ADR: transport, consumer groups/retention, identities/versioning, delivery guarantees, aggregate
   ownership/partition boundaries, replay generations, content-dedup policy, analytics semantics.
+  P01: `docs/adr/ADR-0001…0007` (transport, topology/subscriptions, identities/versioning, delivery
+  guarantees + crash windows, runs/completion, data model, SLO/retention proposal); aggregate ownership/partition
+  boundaries — P09, content-dedup migration — P04.
 - AsyncAPI або еквівалентний machine-readable registry: envelopes, payload schemas, bindings,
   producer/consumer ownership, compatibility tests, приклади повідомлень.
+  P01: `contracts/messaging/` (asyncapi.yaml, schemas, topology.json, completion-manifest.json, fixtures) +
+  `tests/Puluj.Messaging.Contracts.Tests`.
 - ERD, sequence diagrams crash windows, інструкція додавання джерела, воркера, event kind і правила.
 - Runbooks: queue growth, broker/DB down, outbox stuck, DLQ/retry, pause/drain/scale, history/replay,
   loss of quorum, backup/restore, subscription removal, promote/rollback.
@@ -771,6 +776,7 @@ dotnet build Puluj.sln
 dotnet test tests/Puluj.Processing.Tests/Puluj.Processing.Tests.csproj
 dotnet test tests/Puluj.Integration.Tests/Puluj.Integration.Tests.csproj
 dotnet test tests/Puluj.Analytics.Tests/Puluj.Analytics.Tests.csproj
+dotnet test tests/Puluj.Messaging.Contracts.Tests/Puluj.Messaging.Contracts.Tests.csproj
 dotnet test Puluj.sln
 ```
 
@@ -850,13 +856,13 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | Task | Status | Owner | Reviewer | Commit / evidence / наступний крок |
 |---|---|---|---|---|
 | P00 | done | Codex | p00_review: approved | [GitHub P00](https://github.com/sql-monk/Puluj-g/issues/1); [handoff, tests, baseline](evidence/message-platform/P00-handoff.md); локальні зміни, rollout не виконувався |
-| P01 | planned | — | — | [GitHub P01](https://github.com/sql-monk/Puluj-g/issues/3); Після P00 зафіксувати contracts/ADR |
-| P02 | planned | — | — | [GitHub P02](https://github.com/sql-monk/Puluj-g/issues/2); — |
+| P01 | done | Claude Code | p01_review: approved | [GitHub P01](https://github.com/sql-monk/Puluj-g/issues/3); [handoff, tests, review](evidence/message-platform/P01-handoff.md); `docs/adr/`, `contracts/messaging/`; локальні зміни, commit не виконувався |
+| P02 | in_progress | p02 (Claude Code) | p02_review | [GitHub P02](https://github.com/sql-monk/Puluj-g/issues/2); [план](evidence/message-platform/P02-plan.md); spike на Testcontainers RabbitMQ у роботі |
 | P03 | planned | — | — | [GitHub P03](https://github.com/sql-monk/Puluj-g/issues/4); — |
 | P04 | planned | — | — | [GitHub P04](https://github.com/sql-monk/Puluj-g/issues/5); — |
 | P05 | planned | — | — | [GitHub P05](https://github.com/sql-monk/Puluj-g/issues/6); — |
 | P06 | planned | — | — | [GitHub P06](https://github.com/sql-monk/Puluj-g/issues/8); — |
-| P07 | planned | — | — | [GitHub P07](https://github.com/sql-monk/Puluj-g/issues/7); — |
+| P07 | in_progress | Claude Code (p07) | p07_review | [GitHub P07](https://github.com/sql-monk/Puluj-g/issues/7); [план](evidence/message-platform/P07-plan.md); event_kinds catalog у роботі |
 | P08 | planned | — | — | [GitHub P08](https://github.com/sql-monk/Puluj-g/issues/9); — |
 | P09 | planned | — | — | [GitHub P09](https://github.com/sql-monk/Puluj-g/issues/10); — |
 | P10 | planned | — | — | [GitHub P10](https://github.com/sql-monk/Puluj-g/issues/12); — |

@@ -1,0 +1,249 @@
+{
+  "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для майбутнього runtime (P02/P03). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закриває P02.",
+  "topology_version": 1,
+  "status": "proposed",
+  "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
+  "routing_key_pattern": "puluj.{lane}.{event_type}",
+  "queue_name_pattern": "puluj.{subscription_id}.{lane}",
+  "dlq_name_pattern": "puluj.{subscription_id}.{lane}.dlq",
+  "lanes": ["live", "history", "replay"],
+  "events": {
+    "ingress.received": {
+      "kind": "event",
+      "schema": "schemas/events/ingress.received.schema.json",
+      "schema_version": "1.0",
+      "producer": "collectors",
+      "scope": "message",
+      "replay_source": true,
+      "required_subscriptions": ["raw-writer", "archive"],
+      "optional_subscriptions": []
+    },
+    "raw.stored": {
+      "kind": "event",
+      "schema": "schemas/events/raw.stored.schema.json",
+      "schema_version": "1.0",
+      "producer": "raw-writer",
+      "scope": "message",
+      "replay_source": true,
+      "required_subscriptions": ["normalizer", "message-analytics", "archive"],
+      "optional_subscriptions": []
+    },
+    "message.normalized": {
+      "kind": "event",
+      "schema": "schemas/events/message.normalized.schema.json",
+      "schema_version": "1.0",
+      "producer": "normalizer",
+      "scope": "message",
+      "replay_source": false,
+      "required_subscriptions": ["parser"],
+      "optional_subscriptions": []
+    },
+    "parse.completed": {
+      "kind": "event",
+      "schema": "schemas/events/parse.completed.schema.json",
+      "schema_version": "1.0",
+      "producer": "parser",
+      "scope": "message",
+      "replay_source": false,
+      "required_subscriptions": ["finalizer"],
+      "optional_subscriptions": []
+    },
+    "llm.requested": {
+      "kind": "command",
+      "schema": "schemas/events/llm.requested.schema.json",
+      "schema_version": "1.0",
+      "producer": "parser",
+      "scope": "message",
+      "replay_source": false,
+      "owner": "llm-worker",
+      "required_subscriptions": ["llm-worker"],
+      "optional_subscriptions": []
+    },
+    "llm.completed": {
+      "kind": "event",
+      "schema": "schemas/events/llm.completed.schema.json",
+      "schema_version": "1.0",
+      "producer": "llm-worker",
+      "scope": "message",
+      "replay_source": false,
+      "required_subscriptions": ["finalizer"],
+      "optional_subscriptions": []
+    },
+    "llm.failed": {
+      "kind": "event",
+      "schema": "schemas/events/llm.failed.schema.json",
+      "schema_version": "1.0",
+      "producer": "llm-worker",
+      "scope": "message",
+      "replay_source": false,
+      "required_subscriptions": ["finalizer"],
+      "optional_subscriptions": []
+    },
+    "observations.recorded": {
+      "kind": "event",
+      "schema": "schemas/events/observations.recorded.schema.json",
+      "schema_version": "1.0",
+      "producer": "finalizer",
+      "scope": "message",
+      "replay_source": true,
+      "required_subscriptions": ["archive"],
+      "conditional_subscriptions": {
+        "$comment": "Очікувані доменні гілки визначає completion-manifest.json за категорією observations; кожна очікувана гілка є required для конкретного повідомлення.",
+        "by_manifest": ["track-worker", "alert-worker", "incident-worker"]
+      },
+      "optional_subscriptions": []
+    },
+    "message.analysis.completed": {
+      "kind": "event",
+      "schema": "schemas/events/message.analysis.completed.schema.json",
+      "schema_version": "1.0",
+      "producer": "finalizer",
+      "scope": "message",
+      "replay_source": true,
+      "required_subscriptions": ["message-analytics", "archive"],
+      "optional_subscriptions": []
+    },
+    "track.changed": {
+      "kind": "event",
+      "schema": "schemas/events/track.changed.schema.json",
+      "schema_version": "1.0",
+      "producer": "track-worker",
+      "scope": "aggregate",
+      "replay_source": false,
+      "required_subscriptions": ["projection", "message-analytics"],
+      "optional_subscriptions": []
+    },
+    "alert.changed": {
+      "kind": "event",
+      "schema": "schemas/events/alert.changed.schema.json",
+      "schema_version": "1.0",
+      "producer": "alert-worker",
+      "scope": "aggregate",
+      "replay_source": false,
+      "required_subscriptions": ["projection", "message-analytics"],
+      "optional_subscriptions": []
+    },
+    "incident.changed": {
+      "kind": "event",
+      "schema": "schemas/events/incident.changed.schema.json",
+      "schema_version": "1.0",
+      "producer": "incident-worker",
+      "scope": "aggregate",
+      "replay_source": false,
+      "required_subscriptions": ["projection", "message-analytics"],
+      "optional_subscriptions": []
+    },
+    "track.expiry.requested": {
+      "kind": "command",
+      "schema": "schemas/events/track.expiry.requested.schema.json",
+      "schema_version": "1.0",
+      "producer": "watchdog",
+      "scope": "aggregate",
+      "replay_source": false,
+      "owner": "track-worker",
+      "required_subscriptions": ["track-worker"],
+      "optional_subscriptions": []
+    },
+    "alert.expiry.requested": {
+      "kind": "command",
+      "schema": "schemas/events/alert.expiry.requested.schema.json",
+      "schema_version": "1.0",
+      "producer": "watchdog",
+      "scope": "aggregate",
+      "replay_source": false,
+      "owner": "alert-worker",
+      "required_subscriptions": ["alert-worker"],
+      "optional_subscriptions": []
+    }
+  },
+  "queue_policies": {
+    "$comment": "Абстрактні політики; відображення на broker arguments закриває P02. ttl:none і drop_oldest:false обов'язкові для required.",
+    "required": { "durable": true, "ttl": "none", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5 },
+    "optional": { "durable": true, "ttl": "bounded", "drop_oldest": false, "dlq": true, "max_delivery_attempts": 5 }
+  },
+  "subscriptions": {
+    "raw-writer": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P04",
+      "bindings": ["ingress.received"], "lanes": ["live", "history", "replay"],
+      "emits": ["raw.stored"], "queue_policy": "required",
+      "idempotency": "inbox + unique(source_id, source_message_key, source_revision)"
+    },
+    "normalizer": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P05",
+      "bindings": ["raw.stored"], "lanes": ["live", "history", "replay"],
+      "emits": ["message.normalized"], "queue_policy": "required",
+      "idempotency": "inbox + stage_results"
+    },
+    "parser": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P05",
+      "bindings": ["message.normalized"], "lanes": ["live", "history", "replay"],
+      "emits": ["parse.completed", "llm.requested"], "queue_policy": "required",
+      "idempotency": "inbox + stage_results"
+    },
+    "llm-worker": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P06",
+      "bindings": ["llm.requested"], "lanes": ["live", "history", "replay"],
+      "emits": ["llm.completed", "llm.failed"], "queue_policy": "required",
+      "idempotency": "inbox + request_id + fencing_token"
+    },
+    "finalizer": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P06",
+      "bindings": ["parse.completed", "llm.completed", "llm.failed"], "lanes": ["live", "history", "replay"],
+      "emits": ["observations.recorded", "message.analysis.completed"], "queue_policy": "required",
+      "idempotency": "inbox + unique(raw_message_id, run_id, stage, stage_version)"
+    },
+    "track-worker": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P09",
+      "bindings": ["observations.recorded", "track.expiry.requested"], "lanes": ["live", "history", "replay"],
+      "emits": ["track.changed"], "queue_policy": "required",
+      "idempotency": "inbox + aggregate_revision"
+    },
+    "alert-worker": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P09",
+      "bindings": ["observations.recorded", "alert.expiry.requested"], "lanes": ["live", "history", "replay"],
+      "emits": ["alert.changed"], "queue_policy": "required",
+      "idempotency": "inbox + aggregate_revision"
+    },
+    "incident-worker": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P10",
+      "bindings": ["observations.recorded"], "lanes": ["live", "history", "replay"],
+      "emits": ["incident.changed"], "queue_policy": "required",
+      "idempotency": "inbox + aggregate_revision + generation"
+    },
+    "projection": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P11",
+      "bindings": ["track.changed", "alert.changed", "incident.changed"], "lanes": ["live", "history"],
+      "emits": [], "queue_policy": "required",
+      "idempotency": "revision-aware upsert",
+      "$comment": "Replay lane не досягає live projection: shadow generation має окремі проєкції (§11). Realtime bridge — на роль, не на браузер (§8.6)."
+    },
+    "message-analytics": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P15",
+      "bindings": ["raw.stored", "message.analysis.completed", "track.changed", "alert.changed", "incident.changed"],
+      "lanes": ["live", "history", "replay"],
+      "emits": [], "queue_policy": "required",
+      "idempotency": "upsert(raw_message_id, run_id) + reconciliation"
+    },
+    "archive": {
+      "role": "consumer", "required": true, "status": "planned", "owner_task": "P03",
+      "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed"],
+      "lanes": ["live", "history", "replay"],
+      "emits": [], "queue_policy": "required",
+      "idempotency": "append-only unique(event_id)",
+      "$comment": "Required для всіх replay_source подій (§15.2). Outbox cleanup дозволений лише після archive receipt."
+    }
+  },
+  "producer_roles": {
+    "collectors": { "emits": ["ingress.received"], "durability": "producer outbox + source checkpoint в одній транзакції (§6.1)", "owner_task": "P04" },
+    "watchdog": { "emits": ["track.expiry.requested", "alert.expiry.requested"], "durability": "outbox", "owner_task": "P09" },
+    "outbox-relay": { "emits": [], "durability": "публікує outbox rows; publisher confirms; позначає confirmed_at", "owner_task": "P03" },
+    "reconciliation": { "emits": [], "durability": "звіряє processing.deliveries з topology; не публікує lifecycle подій", "owner_task": "P03" }
+  },
+  "bridge": {
+    "$comment": "Тимчасовий mapping на legacy NOTIFY PulujEvent для API/SignalR під час bridge (§11). NOTIFY не є transport event.",
+    "track.changed": ["TrackUpserted", "TrackClosed"],
+    "alert.changed": ["AlertChanged"],
+    "observations.recorded": ["TargetCreated"],
+    "raw.stored": ["RawMessageStored"]
+  }
+}

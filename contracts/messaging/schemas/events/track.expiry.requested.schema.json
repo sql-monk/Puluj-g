@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/track.expiry.requested.schema.json",
+  "title": "track.expiry.requested payload (command)",
+  "type": "object",
+  "description": "Ідемпотентна команда watchdog власнику стану (§7): власник перевіряє revision і час; сама команда нічого не змінює.",
+  "required": [
+    "track_id",
+    "expected_revision",
+    "expire_at",
+    "watermark",
+    "reason"
+  ],
+  "properties": {
+    "track_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expected_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expire_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "watermark": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "reason": {
+      "type": "string"
+    }
+  }
+}

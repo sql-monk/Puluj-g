@@ -1,0 +1,41 @@
+{
+  "event_id": "019957a0-0001-7000-8000-000000000122",
+  "event_type": "ingress.received",
+  "schema_version": "1.0",
+  "producer": "collectors@alertsinua-1",
+  "occurred_at": "2026-09-15T10:41:00Z",
+  "published_at": "2026-09-15T10:41:00Z",
+  "correlation_id": "019957a0-0000-7000-8000-000000000022",
+  "causation_id": null,
+  "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba90201-01",
+  "processing_run_id": "019957a0-0000-7000-8000-00000000a001",
+  "pipeline_version": "2026.09.15+6822541",
+  "topology_version": 1,
+  "lane": "live",
+  "source_id": 1,
+  "source_message_key": "31:end",
+  "source_revision": "0",
+  "payload": {
+    "source_code": "alerts_in_ua",
+    "source_message_key": "31:end",
+    "source_revision": "0",
+    "legacy_source_message_id": "31:end",
+    "source_published_at": "2026-09-15T10:41:00Z",
+    "received_at": "2026-09-15T10:41:00Z",
+    "url": "https://alerts.in.ua/",
+    "raw_payload": {
+      "kind": "alert.finished",
+      "at": "2026-09-15T10:41:00Z",
+      "alert": {
+        "id": 31,
+        "location_uid": "12",
+        "alert_type": "air_raid",
+        "started_at": "2026-09-15T09:58:00Z"
+      }
+    },
+    "collector": {
+      "name": "alerts_in_ua",
+      "version": "2026.09.15+6822541"
+    }
+  }
+}

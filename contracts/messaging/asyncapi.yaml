@@ -1,0 +1,937 @@
+# AsyncAPI 3.0 registry шини Puluj (P01, ADR-0002). Генерується з topology.json (scripts у contracts/messaging/README.md);
+# рукописні правки — лише через topology.json + повторну генерацію. Broker bindings (quorum, DLX) закриває P02.
+asyncapi: 3.0.0
+info:
+  title: Puluj message platform
+  version: '1.0.0'
+  description: |
+    Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
+    Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
+    Status: proposed; жодна підписка не active до P02/P03.
+defaultContentType: application/json
+servers:
+  local:
+    host: localhost:5672
+    protocol: amqp
+    description: Один RabbitMQ контейнер для розробки (ADR-0001, deployment profile — початкове припущення до P02).
+channels:
+  ingress_received:
+    address: puluj.{lane}.ingress.received
+    title: ingress.received
+    description: kind=event; producer=collectors; replay_source=true
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      ingress_received:
+        $ref: '#/components/messages/ingress_received'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  raw_stored:
+    address: puluj.{lane}.raw.stored
+    title: raw.stored
+    description: kind=event; producer=raw-writer; replay_source=true
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      raw_stored:
+        $ref: '#/components/messages/raw_stored'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  message_normalized:
+    address: puluj.{lane}.message.normalized
+    title: message.normalized
+    description: kind=event; producer=normalizer; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      message_normalized:
+        $ref: '#/components/messages/message_normalized'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  parse_completed:
+    address: puluj.{lane}.parse.completed
+    title: parse.completed
+    description: kind=event; producer=parser; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      parse_completed:
+        $ref: '#/components/messages/parse_completed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  llm_requested:
+    address: puluj.{lane}.llm.requested
+    title: llm.requested
+    description: kind=command; producer=parser; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      llm_requested:
+        $ref: '#/components/messages/llm_requested'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  llm_completed:
+    address: puluj.{lane}.llm.completed
+    title: llm.completed
+    description: kind=event; producer=llm-worker; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      llm_completed:
+        $ref: '#/components/messages/llm_completed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  llm_failed:
+    address: puluj.{lane}.llm.failed
+    title: llm.failed
+    description: kind=event; producer=llm-worker; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      llm_failed:
+        $ref: '#/components/messages/llm_failed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  observations_recorded:
+    address: puluj.{lane}.observations.recorded
+    title: observations.recorded
+    description: kind=event; producer=finalizer; replay_source=true
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      observations_recorded:
+        $ref: '#/components/messages/observations_recorded'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  message_analysis_completed:
+    address: puluj.{lane}.message.analysis.completed
+    title: message.analysis.completed
+    description: kind=event; producer=finalizer; replay_source=true
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      message_analysis_completed:
+        $ref: '#/components/messages/message_analysis_completed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  track_changed:
+    address: puluj.{lane}.track.changed
+    title: track.changed
+    description: kind=event; producer=track-worker; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      track_changed:
+        $ref: '#/components/messages/track_changed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  alert_changed:
+    address: puluj.{lane}.alert.changed
+    title: alert.changed
+    description: kind=event; producer=alert-worker; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      alert_changed:
+        $ref: '#/components/messages/alert_changed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  incident_changed:
+    address: puluj.{lane}.incident.changed
+    title: incident.changed
+    description: kind=event; producer=incident-worker; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      incident_changed:
+        $ref: '#/components/messages/incident_changed'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  track_expiry_requested:
+    address: puluj.{lane}.track.expiry.requested
+    title: track.expiry.requested
+    description: kind=command; producer=watchdog; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      track_expiry_requested:
+        $ref: '#/components/messages/track_expiry_requested'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+  alert_expiry_requested:
+    address: puluj.{lane}.alert.expiry.requested
+    title: alert.expiry.requested
+    description: kind=command; producer=watchdog; replay_source=false
+    parameters:
+      lane:
+        enum: [live, history, replay]
+    messages:
+      alert_expiry_requested:
+        $ref: '#/components/messages/alert_expiry_requested'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: puluj.events
+          type: topic
+          durable: true
+          autoDelete: false
+operations:
+  send_ingress_received:
+    action: send
+    channel:
+      $ref: '#/channels/ingress_received'
+    summary: producer collectors
+    messages:
+      - $ref: '#/channels/ingress_received/messages/ingress_received'
+  send_raw_stored:
+    action: send
+    channel:
+      $ref: '#/channels/raw_stored'
+    summary: producer raw-writer
+    messages:
+      - $ref: '#/channels/raw_stored/messages/raw_stored'
+  send_message_normalized:
+    action: send
+    channel:
+      $ref: '#/channels/message_normalized'
+    summary: producer normalizer
+    messages:
+      - $ref: '#/channels/message_normalized/messages/message_normalized'
+  send_parse_completed:
+    action: send
+    channel:
+      $ref: '#/channels/parse_completed'
+    summary: producer parser
+    messages:
+      - $ref: '#/channels/parse_completed/messages/parse_completed'
+  send_llm_requested:
+    action: send
+    channel:
+      $ref: '#/channels/llm_requested'
+    summary: producer parser
+    messages:
+      - $ref: '#/channels/llm_requested/messages/llm_requested'
+  send_llm_completed:
+    action: send
+    channel:
+      $ref: '#/channels/llm_completed'
+    summary: producer llm-worker
+    messages:
+      - $ref: '#/channels/llm_completed/messages/llm_completed'
+  send_llm_failed:
+    action: send
+    channel:
+      $ref: '#/channels/llm_failed'
+    summary: producer llm-worker
+    messages:
+      - $ref: '#/channels/llm_failed/messages/llm_failed'
+  send_observations_recorded:
+    action: send
+    channel:
+      $ref: '#/channels/observations_recorded'
+    summary: producer finalizer
+    messages:
+      - $ref: '#/channels/observations_recorded/messages/observations_recorded'
+  send_message_analysis_completed:
+    action: send
+    channel:
+      $ref: '#/channels/message_analysis_completed'
+    summary: producer finalizer
+    messages:
+      - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
+  send_track_changed:
+    action: send
+    channel:
+      $ref: '#/channels/track_changed'
+    summary: producer track-worker
+    messages:
+      - $ref: '#/channels/track_changed/messages/track_changed'
+  send_alert_changed:
+    action: send
+    channel:
+      $ref: '#/channels/alert_changed'
+    summary: producer alert-worker
+    messages:
+      - $ref: '#/channels/alert_changed/messages/alert_changed'
+  send_incident_changed:
+    action: send
+    channel:
+      $ref: '#/channels/incident_changed'
+    summary: producer incident-worker
+    messages:
+      - $ref: '#/channels/incident_changed/messages/incident_changed'
+  send_track_expiry_requested:
+    action: send
+    channel:
+      $ref: '#/channels/track_expiry_requested'
+    summary: producer watchdog
+    messages:
+      - $ref: '#/channels/track_expiry_requested/messages/track_expiry_requested'
+  send_alert_expiry_requested:
+    action: send
+    channel:
+      $ref: '#/channels/alert_expiry_requested'
+    summary: producer watchdog
+    messages:
+      - $ref: '#/channels/alert_expiry_requested/messages/alert_expiry_requested'
+  receive_raw_writer_ingress_received:
+    action: receive
+    channel:
+      $ref: '#/channels/ingress_received'
+    summary: subscription raw-writer (required=true, owner_task=P04, status=planned)
+    messages:
+      - $ref: '#/channels/ingress_received/messages/ingress_received'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.raw-writer.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_normalizer_raw_stored:
+    action: receive
+    channel:
+      $ref: '#/channels/raw_stored'
+    summary: subscription normalizer (required=true, owner_task=P05, status=planned)
+    messages:
+      - $ref: '#/channels/raw_stored/messages/raw_stored'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.normalizer.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_parser_message_normalized:
+    action: receive
+    channel:
+      $ref: '#/channels/message_normalized'
+    summary: subscription parser (required=true, owner_task=P05, status=planned)
+    messages:
+      - $ref: '#/channels/message_normalized/messages/message_normalized'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.parser.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_llm_worker_llm_requested:
+    action: receive
+    channel:
+      $ref: '#/channels/llm_requested'
+    summary: subscription llm-worker (required=true, owner_task=P06, status=planned)
+    messages:
+      - $ref: '#/channels/llm_requested/messages/llm_requested'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.llm-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_finalizer_parse_completed:
+    action: receive
+    channel:
+      $ref: '#/channels/parse_completed'
+    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    messages:
+      - $ref: '#/channels/parse_completed/messages/parse_completed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.finalizer.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_finalizer_llm_completed:
+    action: receive
+    channel:
+      $ref: '#/channels/llm_completed'
+    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    messages:
+      - $ref: '#/channels/llm_completed/messages/llm_completed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.finalizer.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_finalizer_llm_failed:
+    action: receive
+    channel:
+      $ref: '#/channels/llm_failed'
+    summary: subscription finalizer (required=true, owner_task=P06, status=planned)
+    messages:
+      - $ref: '#/channels/llm_failed/messages/llm_failed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.finalizer.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_track_worker_observations_recorded:
+    action: receive
+    channel:
+      $ref: '#/channels/observations_recorded'
+    summary: subscription track-worker (required=true, owner_task=P09, status=planned)
+    messages:
+      - $ref: '#/channels/observations_recorded/messages/observations_recorded'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.track-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_track_worker_track_expiry_requested:
+    action: receive
+    channel:
+      $ref: '#/channels/track_expiry_requested'
+    summary: subscription track-worker (required=true, owner_task=P09, status=planned)
+    messages:
+      - $ref: '#/channels/track_expiry_requested/messages/track_expiry_requested'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.track-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_alert_worker_observations_recorded:
+    action: receive
+    channel:
+      $ref: '#/channels/observations_recorded'
+    summary: subscription alert-worker (required=true, owner_task=P09, status=planned)
+    messages:
+      - $ref: '#/channels/observations_recorded/messages/observations_recorded'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.alert-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_alert_worker_alert_expiry_requested:
+    action: receive
+    channel:
+      $ref: '#/channels/alert_expiry_requested'
+    summary: subscription alert-worker (required=true, owner_task=P09, status=planned)
+    messages:
+      - $ref: '#/channels/alert_expiry_requested/messages/alert_expiry_requested'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.alert-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_incident_worker_observations_recorded:
+    action: receive
+    channel:
+      $ref: '#/channels/observations_recorded'
+    summary: subscription incident-worker (required=true, owner_task=P10, status=planned)
+    messages:
+      - $ref: '#/channels/observations_recorded/messages/observations_recorded'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.incident-worker.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_projection_track_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/track_changed'
+    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    messages:
+      - $ref: '#/channels/track_changed/messages/track_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.projection.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history]
+  receive_projection_alert_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/alert_changed'
+    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    messages:
+      - $ref: '#/channels/alert_changed/messages/alert_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.projection.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history]
+  receive_projection_incident_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/incident_changed'
+    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    messages:
+      - $ref: '#/channels/incident_changed/messages/incident_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.projection.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history]
+  receive_message_analytics_raw_stored:
+    action: receive
+    channel:
+      $ref: '#/channels/raw_stored'
+    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    messages:
+      - $ref: '#/channels/raw_stored/messages/raw_stored'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.message-analytics.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_message_analytics_message_analysis_completed:
+    action: receive
+    channel:
+      $ref: '#/channels/message_analysis_completed'
+    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    messages:
+      - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.message-analytics.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_message_analytics_track_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/track_changed'
+    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    messages:
+      - $ref: '#/channels/track_changed/messages/track_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.message-analytics.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_message_analytics_alert_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/alert_changed'
+    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    messages:
+      - $ref: '#/channels/alert_changed/messages/alert_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.message-analytics.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_message_analytics_incident_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/incident_changed'
+    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    messages:
+      - $ref: '#/channels/incident_changed/messages/incident_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.message-analytics.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_ingress_received:
+    action: receive
+    channel:
+      $ref: '#/channels/ingress_received'
+    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    messages:
+      - $ref: '#/channels/ingress_received/messages/ingress_received'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_raw_stored:
+    action: receive
+    channel:
+      $ref: '#/channels/raw_stored'
+    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    messages:
+      - $ref: '#/channels/raw_stored/messages/raw_stored'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_observations_recorded:
+    action: receive
+    channel:
+      $ref: '#/channels/observations_recorded'
+    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    messages:
+      - $ref: '#/channels/observations_recorded/messages/observations_recorded'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_message_analysis_completed:
+    action: receive
+    channel:
+      $ref: '#/channels/message_analysis_completed'
+    summary: subscription archive (required=true, owner_task=P03, status=planned)
+    messages:
+      - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+components:
+  messages:
+    ingress_received:
+      name: ingress.received
+      title: ingress.received
+      contentType: application/json
+      x-event-type: ingress.received
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: collectors
+      x-required-subscriptions: [raw-writer, archive]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: ingress.received
+              payload:
+                $ref: 'schemas/events/ingress.received.schema.json'
+    raw_stored:
+      name: raw.stored
+      title: raw.stored
+      contentType: application/json
+      x-event-type: raw.stored
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: raw-writer
+      x-required-subscriptions: [normalizer, message-analytics, archive]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: raw.stored
+              payload:
+                $ref: 'schemas/events/raw.stored.schema.json'
+    message_normalized:
+      name: message.normalized
+      title: message.normalized
+      contentType: application/json
+      x-event-type: message.normalized
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: normalizer
+      x-required-subscriptions: [parser]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: message.normalized
+              payload:
+                $ref: 'schemas/events/message.normalized.schema.json'
+    parse_completed:
+      name: parse.completed
+      title: parse.completed
+      contentType: application/json
+      x-event-type: parse.completed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: parser
+      x-required-subscriptions: [finalizer]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: parse.completed
+              payload:
+                $ref: 'schemas/events/parse.completed.schema.json'
+    llm_requested:
+      name: llm.requested
+      title: llm.requested
+      contentType: application/json
+      x-event-type: llm.requested
+      x-kind: command
+      x-schema-version: '1.0'
+      x-producer: parser
+      x-required-subscriptions: [llm-worker]
+      x-owner: llm-worker
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: llm.requested
+              payload:
+                $ref: 'schemas/events/llm.requested.schema.json'
+    llm_completed:
+      name: llm.completed
+      title: llm.completed
+      contentType: application/json
+      x-event-type: llm.completed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: llm-worker
+      x-required-subscriptions: [finalizer]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: llm.completed
+              payload:
+                $ref: 'schemas/events/llm.completed.schema.json'
+    llm_failed:
+      name: llm.failed
+      title: llm.failed
+      contentType: application/json
+      x-event-type: llm.failed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: llm-worker
+      x-required-subscriptions: [finalizer]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: llm.failed
+              payload:
+                $ref: 'schemas/events/llm.failed.schema.json'
+    observations_recorded:
+      name: observations.recorded
+      title: observations.recorded
+      contentType: application/json
+      x-event-type: observations.recorded
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: finalizer
+      x-required-subscriptions: [archive]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: observations.recorded
+              payload:
+                $ref: 'schemas/events/observations.recorded.schema.json'
+    message_analysis_completed:
+      name: message.analysis.completed
+      title: message.analysis.completed
+      contentType: application/json
+      x-event-type: message.analysis.completed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: finalizer
+      x-required-subscriptions: [message-analytics, archive]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: message.analysis.completed
+              payload:
+                $ref: 'schemas/events/message.analysis.completed.schema.json'
+    track_changed:
+      name: track.changed
+      title: track.changed
+      contentType: application/json
+      x-event-type: track.changed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: track-worker
+      x-required-subscriptions: [projection, message-analytics]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: track.changed
+              payload:
+                $ref: 'schemas/events/track.changed.schema.json'
+    alert_changed:
+      name: alert.changed
+      title: alert.changed
+      contentType: application/json
+      x-event-type: alert.changed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: alert-worker
+      x-required-subscriptions: [projection, message-analytics]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: alert.changed
+              payload:
+                $ref: 'schemas/events/alert.changed.schema.json'
+    incident_changed:
+      name: incident.changed
+      title: incident.changed
+      contentType: application/json
+      x-event-type: incident.changed
+      x-kind: event
+      x-schema-version: '1.0'
+      x-producer: incident-worker
+      x-required-subscriptions: [projection, message-analytics]
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: incident.changed
+              payload:
+                $ref: 'schemas/events/incident.changed.schema.json'
+    track_expiry_requested:
+      name: track.expiry.requested
+      title: track.expiry.requested
+      contentType: application/json
+      x-event-type: track.expiry.requested
+      x-kind: command
+      x-schema-version: '1.0'
+      x-producer: watchdog
+      x-required-subscriptions: [track-worker]
+      x-owner: track-worker
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: track.expiry.requested
+              payload:
+                $ref: 'schemas/events/track.expiry.requested.schema.json'
+    alert_expiry_requested:
+      name: alert.expiry.requested
+      title: alert.expiry.requested
+      contentType: application/json
+      x-event-type: alert.expiry.requested
+      x-kind: command
+      x-schema-version: '1.0'
+      x-producer: watchdog
+      x-required-subscriptions: [alert-worker]
+      x-owner: alert-worker
+      payload:
+        allOf:
+          - $ref: 'schemas/envelope.schema.json'
+          - type: object
+            properties:
+              event_type:
+                const: alert.expiry.requested
+              payload:
+                $ref: 'schemas/events/alert.expiry.requested.schema.json'

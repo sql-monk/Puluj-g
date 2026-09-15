@@ -1,0 +1,42 @@
+{
+  "$comment": "Відображення legacy raw_messages.source_message_id → (source_message_key, source_revision). Джерела без revisions і hash migration — P04.",
+  "cases": [
+    {
+      "source_code": "tg_monitoringwar",
+      "legacy_source_message_id": "48213",
+      "source_message_key": "48213",
+      "source_revision": "0",
+      "fixture": "valid/ingress.received.json",
+      "note": "оригінал поста"
+    },
+    {
+      "source_code": "tg_monitoringwar",
+      "legacy_source_message_id": "48213:e1789466500",
+      "source_message_key": "48213",
+      "source_revision": "e1789466500",
+      "fixture": "valid/ingress.received.telegram-edit.json",
+      "note": "редакція того самого поста; окремий raw, той самий key"
+    },
+    {
+      "source_code": "alerts_in_ua",
+      "legacy_source_message_id": "31:start",
+      "source_message_key": "31:start",
+      "source_revision": "0",
+      "fixture": "valid/ingress.received.alerts-start.json",
+      "note": "фаза start — окреме джерельне повідомлення, не ревізія"
+    },
+    {
+      "source_code": "alerts_in_ua",
+      "legacy_source_message_id": "31:end",
+      "source_message_key": "31:end",
+      "source_revision": "0",
+      "fixture": "valid/ingress.received.alerts-end.json",
+      "note": "фаза end; payload містить час спостереження collector, не джерела"
+    }
+  ],
+  "rules": {
+    "telegram": "key = message id; revision = \"0\" для оригіналу, \"e{edit_unix}\" для кожної редакції",
+    "alerts_in_ua": "key = \"{alert_id}:{phase}\"; revision = \"0\"; повторний :end ідемпотентний за key",
+    "unknown_source": "revision = \"0\"; за наявності явної ревізії джерела — її стабільний рядок; hash-derived revision лише за рішенням P04"
+  }
+}

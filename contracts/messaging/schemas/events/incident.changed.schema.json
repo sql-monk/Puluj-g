@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/incident.changed.schema.json",
+  "title": "incident.changed payload",
+  "description": "Зміна статичного incident (§8.4). Source echo не підвищує state автоматично.",
+  "type": "object",
+  "required": [
+    "incident_id",
+    "change",
+    "revision",
+    "effective_at",
+    "recorded_at",
+    "observation_ids",
+    "event_kind_code",
+    "state",
+    "generation_id"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "change": {
+      "type": "string",
+      "enum": [
+        "created",
+        "updated",
+        "merged",
+        "split",
+        "resolved",
+        "retracted",
+        "suppressed"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Дорівнює envelope.aggregate_revision; client ігнорує старі revisions (§8.6)"
+    },
+    "effective_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "recorded_at": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/dateTime"
+    },
+    "observation_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+      },
+      "description": "Observations, що спричинили зміну (evidence links)"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "event_kind_code": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/eventKindCode"
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "reported",
+        "confirmed",
+        "resolved",
+        "retracted"
+      ]
+    },
+    "generation_id": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+    },
+    "location": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/location"
+    },
+    "merged_into_incident_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "policy_version": {
+      "type": "string"
+    }
+  }
+}

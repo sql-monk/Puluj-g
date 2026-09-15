@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/envelope.schema.json",
+  "title": "Puluj transport event envelope",
+  "description": "Мінімальні поля кожної події шини (plan §5.1, ADR-0003). Додаткові optional поля — сумісна зміна, тому additionalProperties не заборонено (ADR-0003 §compat).",
+  "type": "object",
+  "required": [
+    "event_id", "event_type", "schema_version", "producer", "occurred_at", "published_at",
+    "correlation_id", "causation_id", "traceparent",
+    "processing_run_id", "pipeline_version", "topology_version", "lane"
+  ],
+  "properties": {
+    "event_id": { "$ref": "#/$defs/uuid", "description": "UUIDv7, генерується один раз при записі в outbox; стабільний при повторній публікації (republish того самого запису = той самий event_id)." },
+    "event_type": { "$ref": "#/$defs/eventType" },
+    "schema_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$", "description": "MAJOR.MINOR payload schema. Той самий MAJOR — сумісно; інший MAJOR — quarantine (ADR-0003)." },
+    "producer": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(@[A-Za-z0-9._-]+)?$", "description": "Роль producer з topology.json, опційно @instance." },
+    "occurred_at": { "$ref": "#/$defs/dateTime", "description": "Business/event time факту, який описує подія (не час транспорту)." },
+    "published_at": { "$ref": "#/$defs/dateTime", "description": "Перша публікація цього event_id (§15.2). Повторна публікація не змінює; transport retry timestamps — у headers/outbox attempts." },
+    "source_id": { "type": "integer", "minimum": 1, "description": "sources.source_id джерельного повідомлення (для aggregate-scoped подій — повідомлення-причини, якщо є)." },
+    "source_message_key": { "type": "string", "minLength": 1, "maxLength": 512, "description": "Стабільний ключ повідомлення всередині джерела без ревізії (ADR-0003)." },
+    "source_revision": { "type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$", "description": "Ревізія того самого key: \"0\" — оригінал; Telegram edit — \"e{editUnix}\"." },
+    "raw_message_id": { "type": "integer", "minimum": 1, "description": "raw_messages.raw_message_id. Заборонено до raw persistence (ingress.received)." },
+    "correlation_id": { "$ref": "#/$defs/uuid", "description": "Один на джерельний пост (усі результати одного raw поділяють correlation_id)." },
+    "causation_id": { "oneOf": [ { "$ref": "#/$defs/uuid" }, { "type": "null" } ], "description": "event_id події, що безпосередньо запустила цей крок; null лише для root (ingress.received)." },
+    "traceparent": { "type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", "description": "W3C Trace Context." },
+    "processing_run_id": { "$ref": "#/$defs/uuid", "description": "processing.runs.run_id (ADR-0005). Replay — новий run, пов'язаний з оригіналом." },
+    "pipeline_version": { "type": "string", "minLength": 1, "maxLength": 64, "description": "Версія збірки/конвеєра, що опублікував подію (build identity)." },
+    "topology_version": { "type": "integer", "minimum": 1, "description": "topology.json.topology_version на момент публікації; фіксує набір очікуваних підписок." },
+    "lane": { "type": "string", "enum": ["live", "history", "replay"] },
+    "partition_key": { "type": "string", "minLength": 1, "maxLength": 128, "description": "Ключ упорядкування/шардування для consumer (напр. category, alert scope). Межі partition — P09." },
+    "aggregate_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "aggregate_revision": { "type": "integer", "minimum": 0 },
+    "payload": { "type": "object" },
+    "payload_ref": {
+      "type": "object",
+      "required": ["uri", "checksum", "size_bytes", "content_type"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1 },
+        "checksum": {
+          "type": "object",
+          "required": ["algorithm", "value"],
+          "properties": {
+            "algorithm": { "type": "string", "enum": ["sha256"] },
+            "value": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "oneOf": [
+    { "required": ["payload"] },
+    { "required": ["payload_ref"] }
+  ],
+  "allOf": [
+    {
+      "$comment": "Root події не мають raw_message_id (посилання на ще не створений raw неприпустиме, §5.1) і мають causation_id = null.",
+      "if": { "properties": { "event_type": { "const": "ingress.received" } } },
+      "then": {
+        "required": ["source_id", "source_message_key", "source_revision"],
+        "properties": { "raw_message_id": false, "causation_id": { "type": "null" } }
+      }
+    },
+    {
+      "$comment": "Message-scoped події після raw persistence: raw_message_id і source identity обов'язкові; causation_id не null.",
+      "if": { "properties": { "event_type": { "enum": [
+        "raw.stored", "message.normalized", "parse.completed", "llm.requested", "llm.completed", "llm.failed",
+        "observations.recorded", "message.analysis.completed"
+      ] } } },
+      "then": {
+        "required": ["raw_message_id", "source_id", "source_message_key", "source_revision"],
+        "properties": { "causation_id": { "$ref": "#/$defs/uuid" } }
+      }
+    },
+    {
+      "$comment": "Aggregate-scoped події та команди: aggregate_id і aggregate_revision обов'язкові.",
+      "if": { "properties": { "event_type": { "enum": [
+        "track.changed", "alert.changed", "incident.changed", "track.expiry.requested", "alert.expiry.requested"
+      ] } } },
+      "then": {
+        "required": ["aggregate_id", "aggregate_revision"],
+        "properties": { "causation_id": { "$ref": "#/$defs/uuid" } }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "dateTime": { "type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$" },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "ingress.received", "raw.stored", "message.normalized", "parse.completed",
+        "llm.requested", "llm.completed", "llm.failed",
+        "observations.recorded", "message.analysis.completed",
+        "track.changed", "alert.changed", "incident.changed",
+        "track.expiry.requested", "alert.expiry.requested"
+      ]
+    }
+  }
+}

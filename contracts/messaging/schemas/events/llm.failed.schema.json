@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://puluj.local/contracts/messaging/schemas/events/llm.failed.schema.json",
+  "title": "llm.failed payload",
+  "type": "object",
+  "required": [
+    "raw_message_id",
+    "request_id",
+    "fencing_token",
+    "error",
+    "attempts",
+    "final"
+  ],
+  "properties": {
+    "raw_message_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "request_id": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/uuid"
+    },
+    "fencing_token": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/fencingToken"
+    },
+    "error": {
+      "$ref": "https://puluj.local/contracts/messaging/schemas/common.schema.json#/$defs/error"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "final": {
+      "type": "boolean",
+      "description": "true — retries вичерпано, finalizer завершує outcome failed/needs_review"
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "input_tokens",
+        "output_tokens"
+      ],
+      "properties": {
+        "input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_read_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_usd": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
