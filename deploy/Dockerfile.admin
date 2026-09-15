@@ -29,6 +29,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=web /src/Puluj.Admin/wwwroot ./wwwroot
+COPY data/corpus/ /app/data/corpus/
 ENV ASPNETCORE_ENVIRONMENT=Production
 EXPOSE 8081
 ENTRYPOINT ["dotnet", "Puluj.Admin.dll"]

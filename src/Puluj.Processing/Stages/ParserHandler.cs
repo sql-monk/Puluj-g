@@ -30,6 +30,7 @@ public sealed class ParserHandler(
     AlertsInUaStructuredAdapter structured,
     IndexProvider indexes,
     IOptionsMonitor<LlmOptions> llm,
+    IOptionsMonitor<Rules.RulesetOptions> rulesetOptions,
     TimeProvider clock) : IDeliveryHandler
 {
     public const string Subscription = "parser";
@@ -37,13 +38,17 @@ public sealed class ParserHandler(
     public const string EventType = "parse.completed";
     public const string LlmEventType = "llm.requested";
     public const string SchemaVersion = "1.0";
-    public const string RulesetId = "default";
 
     public string SubscriptionId => Subscription;
     public string Producer { get; set; } = Subscription;
 
     private sealed record Prepared(RawMessage Raw, Guid AttemptId, string Outcome, string Method, string StageVersion, JsonArray Facts, string? FallbackReason,
-        JsonObject? Error, JsonObject Versions, string? Hash, long DurationMs, DateTimeOffset StartedAt, int LegacyTargets);
+        JsonObject? Error, JsonObject Versions, string? Hash, long DurationMs, DateTimeOffset StartedAt, int LegacyTargets, Shadow? Shadow = null);
+
+    /// <summary>Shadow comparison (P08): per-segment disagreements of the shadow rule set with the live one, computed outside the transaction.</summary>
+    private sealed record Shadow(int LiveVersion, int ShadowVersion, int Segments, IReadOnlyList<ShadowRow> Disagreements, string? Error);
+
+    private sealed record ShadowRow(int SegmentIndex, string? LiveKind, string? ShadowKind, string? LiveRule, string? ShadowRule);
 
     public async Task<object?> PrepareAsync(Envelope envelope, CancellationToken ct)
     {
@@ -63,11 +68,12 @@ public sealed class ParserHandler(
         var source = raw.Source!;
         var attemptId = Guid.CreateVersion7();
         var kinds = indexes.EventKinds;
+        var ruleset = indexes.Rules; // one snapshot per job (pinned); the same one is cited in versions and used for every segment
         var versions = new JsonObject
         {
             ["normalization"] = Normalizer.Version,
             ["rules"] = RuleParser.Version,
-            ["ruleset_id"] = RulesetId,
+            ["ruleset_id"] = ruleset.Id,
             ["catalog_policy"] = kinds.PolicyVersion.ToString(),
         };
 
@@ -91,20 +97,102 @@ public sealed class ParserHandler(
                     var error = new JsonObject { ["code"] = "normalization_drift", ["message"] = $"normalized text hash {hash} differs from message.normalized {expected}", ["retryable"] = false };
                     return new Prepared(raw, attemptId, "failed", "rules", RuleParser.Version, [], null, error, versions, hash, sw.ElapsedMilliseconds, startedAt, 0);
                 }
-                var ctx = new ParseContext(source.SourceId, normalized.Language, RawMessageProcessor.HomeRegionOf(source, normalizer, indexes), raw.PublishedAt, raw.RawMessageId);
-                var parsed = rules.Parse(normalized, ctx);
+                var ctx = new ParseContext(source.SourceId, normalized.Language, RawMessageProcessor.HomeRegionOf(source, normalizer, indexes), raw.PublishedAt, raw.RawMessageId, source.Code);
+                var parsed = rules.Parse(normalized, ctx, ruleset).Facts;
                 var targets = parsed.Select(f => (Fact: f, Target: builder.Build(f, raw, source, f.ParserVersion, f.Method, normalized.Language))).ToList();
                 kinds.Stamp(targets.Select(t => t.Target));
                 var facts = new JsonArray(targets.Select(t => (JsonNode)FactMapper.ToFact(t.Target, kinds, indexes.Gazetteer, t.Fact, normalized.Language, RuleParser.Version)).ToArray());
+                var shadow = ShadowCompare(ruleset, normalized, ctx, parsed);
                 if (facts.Count > 0)
                 {
-                    return new Prepared(raw, attemptId, "facts", "rules", RuleParser.Version, facts, null, null, versions, hash, sw.ElapsedMilliseconds, startedAt, targets.Count);
+                    return new Prepared(raw, attemptId, "facts", "rules", RuleParser.Version, facts, null, null, versions, hash, sw.ElapsedMilliseconds, startedAt, targets.Count, shadow);
                 }
                 var (outcome, reason) = FallbackDecision(normalized, envelope.Lane, raw.PublishedAt);
-                return new Prepared(raw, attemptId, outcome, "rules", RuleParser.Version, facts, reason, null, versions, hash, sw.ElapsedMilliseconds, startedAt, 0);
+                return new Prepared(raw, attemptId, outcome, "rules", RuleParser.Version, facts, reason, null, versions, hash, sw.ElapsedMilliseconds, startedAt, 0, shadow);
             }
             default:
                 return new Prepared(raw, attemptId, "unsupported", "none", "empty", [], "no_text_no_payload", null, versions, null, sw.ElapsedMilliseconds, startedAt, 0);
+        }
+    }
+
+    /// <summary>
+    /// Runs the shadow rule set (state `shadow`) over the same segments and keeps only the segments where the kind or the
+    /// rule differs. Never throws: an error is reported in the stage outputs and the live result is unaffected.
+    /// </summary>
+    private Shadow? ShadowCompare(Rules.RulesetIndex live, NormalizedMessage normalized, ParseContext ctx, IReadOnlyList<ParsedFact> liveFacts)
+    {
+        var shadowSet = indexes.ShadowRules;
+        if (shadowSet is null || !rulesetOptions.CurrentValue.ShadowEnabled || live.Version is not int liveVersion || shadowSet.Version is not int shadowVersion)
+        {
+            return null;
+        }
+        try
+        {
+            var shadowFacts = rules.Parse(normalized, ctx, shadowSet).Facts;
+            var liveBySegment = liveFacts.GroupBy(f => f.SegmentIndex).ToDictionary(g => g.Key, g => g.First());
+            var shadowBySegment = shadowFacts.GroupBy(f => f.SegmentIndex).ToDictionary(g => g.Key, g => g.First());
+            var rows = new List<ShadowRow>();
+            foreach (var segment in normalized.Segments)
+            {
+                var l = liveBySegment.GetValueOrDefault(segment.Index);
+                var s = shadowBySegment.GetValueOrDefault(segment.Index);
+                var liveKind = l is null ? null : l.EventKindCode ?? Puluj.Domain.EventKindLegacyMap.ToCode(l.EventType);
+                var shadowKind = s is null ? null : s.EventKindCode ?? Puluj.Domain.EventKindLegacyMap.ToCode(s.EventType);
+                if (liveKind != shadowKind || l?.RuleCode != s?.RuleCode)
+                {
+                    rows.Add(new ShadowRow(segment.Index, liveKind, shadowKind, l?.RuleCode, s?.RuleCode));
+                }
+            }
+            return new Shadow(liveVersion, shadowVersion, normalized.Segments.Count, rows, null);
+        }
+        catch (Exception ex)
+        {
+            return new Shadow(liveVersion, shadowVersion, normalized.Segments.Count, [], ex.GetType().Name + ": " + ex.Message);
+        }
+    }
+
+    private async Task RecordShadowAsync(NpgsqlConnection conn, NpgsqlTransaction tx, long rawId, Guid runId, Shadow shadow, CancellationToken ct)
+    {
+        try
+        {
+            await using (var sp = new NpgsqlCommand("SAVEPOINT shadow", conn, tx))
+            {
+                await sp.ExecuteNonQueryAsync(ct);
+            }
+            var cap = rulesetOptions.CurrentValue.ShadowMaxRowsPerHour;
+            await using (var count = new NpgsqlCommand("SELECT count(*) FROM event_kind_rule_shadow WHERE shadow_version = @v AND created_at > now() - interval '1 hour'", conn, tx))
+            {
+                count.Parameters.AddWithValue("v", shadow.ShadowVersion);
+                if ((long)(await count.ExecuteScalarAsync(ct))! >= cap)
+                {
+                    return; // bounded: the counters in the stage outputs remain
+                }
+            }
+            foreach (var row in shadow.Disagreements)
+            {
+                await using var insert = new NpgsqlCommand(
+                    """
+                    INSERT INTO event_kind_rule_shadow (raw_message_id, run_id, live_version, shadow_version, segment_index, live_kind, shadow_kind, live_rule, shadow_rule, created_at)
+                    VALUES (@raw, @run, @live, @shadow, @segment, @lk, @sk, @lr, @sr, now())
+                    """, conn, tx);
+                insert.Parameters.AddWithValue("raw", rawId);
+                insert.Parameters.AddWithValue("run", runId);
+                insert.Parameters.AddWithValue("live", shadow.LiveVersion);
+                insert.Parameters.AddWithValue("shadow", shadow.ShadowVersion);
+                insert.Parameters.AddWithValue("segment", row.SegmentIndex);
+                insert.Parameters.AddWithValue("lk", (object?)row.LiveKind ?? DBNull.Value);
+                insert.Parameters.AddWithValue("sk", (object?)row.ShadowKind ?? DBNull.Value);
+                insert.Parameters.AddWithValue("lr", (object?)row.LiveRule ?? DBNull.Value);
+                insert.Parameters.AddWithValue("sr", (object?)row.ShadowRule ?? DBNull.Value);
+                await insert.ExecuteNonQueryAsync(ct);
+            }
+            await using var release = new NpgsqlCommand("RELEASE SAVEPOINT shadow", conn, tx);
+            await release.ExecuteNonQueryAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            await using var rollback = new NpgsqlCommand("ROLLBACK TO SAVEPOINT shadow", conn, tx);
+            await rollback.ExecuteNonQueryAsync(CancellationToken.None);
         }
     }
 
@@ -153,10 +241,27 @@ public sealed class ParserHandler(
             ["parse_completed_event_id"] = completedId.ToString(),
             ["llm_request_id"] = llmRequestId?.ToString(),
         };
+        if (p.Shadow is { } shadowInfo)
+        {
+            outputs["shadow"] = new JsonObject
+            {
+                ["live_version"] = shadowInfo.LiveVersion,
+                ["shadow_version"] = shadowInfo.ShadowVersion,
+                ["segments"] = shadowInfo.Segments,
+                ["disagreements"] = shadowInfo.Disagreements.Count,
+                ["error"] = shadowInfo.Error,
+            };
+        }
         var stageId = await StageSupport.InsertStageResultAsync(conn, tx, p.Raw.RawMessageId, envelope.ProcessingRunId, Stage, p.StageVersion, p.Outcome, outputs, p.Versions, p.StartedAt, Producer, ct);
         if (stageId is null)
         {
             return DeliveryResult.Noop("stage already recorded for this raw/run");
+        }
+        if (p.Shadow is { Disagreements.Count: > 0 } shadowRows)
+        {
+            // Shadow rows never endanger the live result (P08 review B3): a savepoint isolates their insert, and the cap
+            // bounds a draft that disagrees on everything; only the first recording of the stage writes them (stageId above).
+            await RecordShadowAsync(conn, tx, p.Raw.RawMessageId, envelope.ProcessingRunId, shadowRows, ct);
         }
 
         var payload = new JsonObject

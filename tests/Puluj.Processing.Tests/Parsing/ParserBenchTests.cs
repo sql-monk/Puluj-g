@@ -23,6 +23,8 @@ public sealed class ParserBenchTests(ITestOutputHelper output)
         public TaxonomyIndex Taxonomy => taxonomy;
         public GazetteerIndex Gazetteer => gazetteer;
         public EventKindIndex EventKinds => EventKindIndex.Empty;
+        public Puluj.Processing.Rules.RulesetIndex Rules => Puluj.Processing.Rules.RulesetIndex.Builtin;
+        public Puluj.Processing.Rules.RulesetIndex? ShadowRules => null;
     }
 
     [Fact]

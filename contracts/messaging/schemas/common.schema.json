@@ -34,7 +34,11 @@
         "prompt_version": { "type": "string" },
         "structured_field": { "type": "string" },
         "segment_index": { "type": "integer", "minimum": 0, "description": "Сегмент нормалізованого тексту, з якого факт (P05)" },
-        "rules": { "type": "array", "items": { "type": "string" }, "description": "Правила, що спрацювали (P05); rule_id — їх join" }
+        "rules": { "type": "array", "items": { "type": "string" }, "description": "Правила, що спрацювали (P05); rule_id — їх join" },
+        "ruleset_version": { "type": "string", "pattern": "^(v[0-9]+|builtin)$", "description": "Версія набору правил, закріплена на job (P08): v{n} або builtin" },
+        "rule_code": { "type": "string", "description": "Стабільний код правила виду події, що спрацювало (P08); rules[] і rule_id — без змін" },
+        "rule_code_version": { "type": "integer", "minimum": 1, "description": "rule_version правила в наборі (P08)" },
+        "rule_span": { "type": "object", "required": ["start", "end"], "properties": { "start": { "type": "integer", "minimum": 0 }, "end": { "type": "integer", "minimum": 0 } }, "description": "Символьний діапазон збігу правила в сегменті (P08); span лишається цілим сегментом" }
       }
     },
     "observation": {

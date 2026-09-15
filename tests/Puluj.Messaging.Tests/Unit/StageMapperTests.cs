@@ -17,6 +17,8 @@ public sealed class StageMapperTests
         public TaxonomyIndex Taxonomy => TaxonomyIndex.Empty;
         public GazetteerIndex Gazetteer => GazetteerIndex.Empty;
         public EventKindIndex EventKinds => EventKindIndex.Empty;
+        public Puluj.Processing.Rules.RulesetIndex Rules => Puluj.Processing.Rules.RulesetIndex.Builtin;
+        public Puluj.Processing.Rules.RulesetIndex? ShadowRules => null;
     }
 
     private static Target SampleTarget() => new()

@@ -1,5 +1,6 @@
 using Puluj.Domain.Enums;
 using Puluj.Processing.Indexes;
+using Puluj.Processing.Rules;
 using Puluj.Processing.Text;
 
 namespace Puluj.Processing.Parsing;
@@ -14,7 +15,11 @@ public sealed class RuleParser(IIndexes indexes) : IParser
 
     public Task<IReadOnlyList<ParsedFact>> ParseAsync(NormalizedMessage message, ParseContext ctx, CancellationToken ct) => Task.FromResult(Parse(message, ctx));
 
-    public IReadOnlyList<ParsedFact> Parse(NormalizedMessage message, ParseContext ctx)
+    /// <summary>Parses with the rule set the indexes currently pin (taken once for the whole message).</summary>
+    public IReadOnlyList<ParsedFact> Parse(NormalizedMessage message, ParseContext ctx) => Parse(message, ctx, indexes.Rules).Facts;
+
+    /// <summary>Parses with an explicit rule set (the stage worker pins one snapshot per job; preview/shadow use another version).</summary>
+    public ParseResult Parse(NormalizedMessage message, ParseContext ctx, RulesetIndex ruleset)
     {
         var taxonomy = indexes.Taxonomy;
         var gazetteer = indexes.Gazetteer;
@@ -63,36 +68,38 @@ public sealed class RuleParser(IIndexes indexes) : IParser
                 sectionRules.Add("section_region");
             }
             var direction = DirectionExtractor.Extract(segment);
-            var (eventType, eventRule, launch) = EventTypeMatcher.Match(segment, targets.Count > 0);
             var alertLevel = AlertLevelExtractor.Extract(segment);
-            if (eventRule is not null)
+            // "повітряна тривога, жовтий рівень: дронова загроза" is an alert whose cause is named, not a sighting.
+            var resolution = EventKindResolver.Resolve(ruleset, segment, targets.Count > 0, alertLevel != AirAlertLevel.Unknown, message.Language, ctx.SourceCode);
+            var launch = LaunchDetector.Detect(segment.Tokens);
+            if (resolution is not null)
             {
-                rules.Add(eventRule);
+                rules.Add(resolution.RuleCode);
             }
             rules.AddRange(sectionRules);
 
+            // Control flow keys on "a rule fired", not on the legacy enum (P08 review B1): a kind without an enum member
+            // (fire.reported → legacy Unknown) is a fact in its own right, never a header or an inherited sighting.
             var isHeader = segment.Text.TrimEnd().EndsWith(':');
             if (targets.Count > 0 && isHeader && places.Count == 0)
             {
                 headerTarget = targets[0];
                 rules.Add("header_target");
-                if (eventType is EventType.TargetObserved or EventType.Unknown)
+                if (resolution is null)
                 {
                     continue; // "Шахеди:" — facts come from the lines below
                 }
             }
-            if (targets.Count == 0 && (places.Count > 0 || direction is not null) && eventType is EventType.Unknown or EventType.TargetObserved)
+            if (targets.Count == 0 && (places.Count > 0 || direction is not null) && resolution is null)
             {
                 if (carryTarget is not null)
                 {
                     targets = [carryTarget];
-                    eventType = EventType.TargetObserved;
                     rules.Add("inherit_previous_target");
                 }
                 else if (headerTarget is not null)
                 {
                     targets = [headerTarget];
-                    eventType = EventType.TargetObserved;
                     rules.Add("inherit_header_target");
                 }
             }
@@ -102,24 +109,24 @@ public sealed class RuleParser(IIndexes indexes) : IParser
             }
             carryTarget = targets.Count > 0 && places.Count == 0 && !rules.Contains("inherit_previous_target") ? targets[0] : null;
             carryFactIndex = carryTarget is null ? null : facts.Count;
-            if (targets.Count == 0 && eventType == EventType.Unknown)
+            if (targets.Count == 0 && resolution is null)
             {
                 continue;
             }
 
             if (targets.Count == 0)
             {
-                facts.Add(new ParsedFact
+                facts.Add(WithProvenance(new ParsedFact
                 {
                     SegmentIndex = segment.Index,
                     SegmentText = segment.Text,
-                    EventType = eventType,
+                    EventType = resolution!.Legacy,
                     AlertLevel = alertLevel,
                     Places = places,
                     Direction = direction,
                     IsLaunch = launch,
                     Rules = rules,
-                });
+                }, resolution, ruleset, segment));
                 continue;
             }
 
@@ -131,11 +138,13 @@ public sealed class RuleParser(IIndexes indexes) : IParser
                 {
                     factRules.Add("hedged");
                 }
-                facts.Add(new ParsedFact
+                facts.Add(WithProvenance(new ParsedFact
                 {
                     SegmentIndex = segment.Index,
                     SegmentText = segment.Text,
-                    EventType = eventType == EventType.Unknown ? EventType.TargetObserved : eventType,
+                    // The legacy column keeps its meaning: a target sighting unless a rule names an enum-backed kind (a new
+                    // kind without an enum member stays TargetObserved there; the catalog kind carries the fact).
+                    EventType = resolution is null || resolution.Legacy == EventType.Unknown ? EventType.TargetObserved : resolution.Legacy,
                     AlertLevel = alertLevel,
                     Target = target,
                     Count = count,
@@ -144,10 +153,28 @@ public sealed class RuleParser(IIndexes indexes) : IParser
                     Direction = direction,
                     IsLaunch = launch,
                     Rules = factRules,
-                });
+                }, resolution, ruleset, segment));
             }
         }
-        return facts;
+        return new ParseResult(facts, ruleset);
+    }
+
+    /// <summary>Kind and rule provenance of the fact (P08); a plain sighting names no kind here and no rule — the legacy enum decides downstream.</summary>
+    private static ParsedFact WithProvenance(ParsedFact fact, Resolution? resolution, RulesetIndex ruleset, Segment segment)
+    {
+        if (resolution is null)
+        {
+            return fact with { RulesetId = ruleset.Id };
+        }
+        var tokens = segment.Tokens;
+        return fact with
+        {
+            EventKindCode = resolution.KindCode,
+            RulesetId = ruleset.Id,
+            RuleCode = resolution.RuleCode,
+            RuleVersion = resolution.RuleVersion,
+            RuleSpan = ruleset.IsBuiltin || tokens.Count == 0 ? null : (tokens[resolution.TokenStart].Start, tokens[Math.Min(resolution.TokenEnd, tokens.Count - 1)].End),
+        };
     }
 
     /// <summary>Drops duplicate mentions ("🛵 ... шахеди") and generic ones covered by a more specific mention of the same category ("БпЛА ... шахеди").</summary>

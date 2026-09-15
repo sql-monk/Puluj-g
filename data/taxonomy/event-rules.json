@@ -1,0 +1,466 @@
+{
+  "_comment": "P08 bootstrap of event_kind_rulesets v1: the 24 phrases of the frozen EventTypeMatcher, in its order (priority = 1000 - 10*index), language * and no source scope so live behaviour is identical (parity gate). The database owns the rules after the first seed; this file is never re-applied.",
+  "rulesetVersion": 1,
+  "reason": "bootstrap: parity with EventTypeMatcher (P08)",
+  "rules": [
+    {
+      "ruleCode": "event:відбій_тривог",
+      "eventKindCode": "alert.air_raid.ended",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "відбій",
+            "тривог"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 1000,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:відбій_повітрян",
+      "eventKindCode": "alert.air_raid.ended",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "відбій",
+            "повітрян"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 990,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:отбой_тревог",
+      "eventKindCode": "alert.air_raid.ended",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "отбой",
+            "тревог"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 980,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:відбій",
+      "eventKindCode": "alert.air_raid.ended",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "відбій"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 970,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:загроз_минул",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "загроз",
+            "минул"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 960,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:загрозу_знято",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "загрозу",
+            "знято"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 950,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:відбій_загроз",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "відбій",
+            "загроз"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 940,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:загроз_відсутн",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "загроз",
+            "відсутн"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 930,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:не_фіксу",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "не",
+            "фіксу"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 920,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:чисто",
+      "eventKindCode": "target.cancelled",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "чисто"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 910,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:повітрян_тривог",
+      "eventKindCode": "alert.air_raid.started",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "повітрян",
+            "тривог"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 900,
+      "ruleVersion": 1,
+      "enabled": true,
+      "extractionHints": {
+        "header_if_target_without_level": true
+      }
+    },
+    {
+      "ruleCode": "event:оголошен_тривог",
+      "eventKindCode": "alert.air_raid.started",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "оголошен",
+            "тривог"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 890,
+      "ruleVersion": 1,
+      "enabled": true,
+      "extractionHints": {
+        "header_if_target_without_level": true
+      }
+    },
+    {
+      "ruleCode": "event:воздушн_тревог",
+      "eventKindCode": "alert.air_raid.started",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "воздушн",
+            "тревог"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 880,
+      "ruleVersion": 1,
+      "enabled": true,
+      "extractionHints": {
+        "header_if_target_without_level": true
+      }
+    },
+    {
+      "ruleCode": "event:тривога",
+      "eventKindCode": "alert.air_raid.started",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "тривога"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 870,
+      "ruleVersion": 1,
+      "enabled": true,
+      "extractionHints": {
+        "header_if_target_without_level": true
+      }
+    },
+    {
+      "ruleCode": "event:робот_ппо",
+      "eventKindCode": "air_defence.activity",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "робот",
+            "ппо"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 860,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:працю_ппо",
+      "eventKindCode": "air_defence.activity",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "працю",
+            "ппо"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 850,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:ппо_працю",
+      "eventKindCode": "air_defence.activity",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "ппо",
+            "працю"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 840,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:сил_ппо",
+      "eventKindCode": "air_defence.activity",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "сил",
+            "ппо"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 830,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:збит",
+      "eventKindCode": "air_defence.activity",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "збит"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 820,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:вибух",
+      "eventKindCode": "impact.explosion.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "вибух"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 810,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:взрыв",
+      "eventKindCode": "impact.explosion.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "взрыв"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 800,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:прильот",
+      "eventKindCode": "impact.explosion.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "прильот"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 790,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:приліт",
+      "eventKindCode": "impact.explosion.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "приліт"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 780,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "event:влучанн",
+      "eventKindCode": "impact.explosion.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "влучанн"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [],
+      "priority": 770,
+      "ruleVersion": 1,
+      "enabled": true
+    }
+  ]
+}

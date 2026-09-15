@@ -1,0 +1,160 @@
+{
+  "_comment": "P08 sample draft (not seeded): rules for three new kinds on top of v1, meant for validate/preview/corpus/shadow through the admin API. 'збит' stays air_defence.activity in v1; the interception rule outranks it only in this draft.",
+  "parentVersion": 1,
+  "reason": "draft v2: fire.reported, infrastructure.outage, air_defence.interception.reported",
+  "rules": [
+    {
+      "ruleCode": "fire.pozhezh",
+      "eventKindCode": "fire.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "пожеж"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "горить"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "займанн"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "пожежн",
+            "небезпек"
+          ],
+          "window": 3
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "ліквідован"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "загашен"
+          ],
+          "window": 5
+        }
+      ],
+      "priority": 500,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "outage.znestrum",
+      "eventKindCode": "infrastructure.outage",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "знеструм"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "відключен",
+            "світл"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "без",
+            "світл"
+          ],
+          "window": 3
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "відключен",
+            "електро"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "відновлен"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "графік"
+          ],
+          "window": 5
+        }
+      ],
+      "priority": 480,
+      "ruleVersion": 1,
+      "enabled": true
+    },
+    {
+      "ruleCode": "interception.zbyto",
+      "eventKindCode": "air_defence.interception.reported",
+      "language": "*",
+      "positivePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "збит"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "знищен"
+          ],
+          "window": 5
+        },
+        {
+          "type": "stems",
+          "stems": [
+            "перехоплен"
+          ],
+          "window": 5
+        }
+      ],
+      "negativePatterns": [
+        {
+          "type": "stems",
+          "stems": [
+            "не",
+            "збит"
+          ],
+          "window": 2
+        }
+      ],
+      "priority": 1100,
+      "ruleVersion": 1,
+      "enabled": true
+    }
+  ]
+}

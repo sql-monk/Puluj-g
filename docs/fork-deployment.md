@@ -61,3 +61,13 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 межах `deadline_at` команди, інакше `llm.failed{budget_unavailable}`.
 Міграція `AddExtractions` додає `processing.extractions`/`observations` і колонки `llm_requests`; rollback — `Down` (дані extractions втрачаються,
 `targets` legacy не залежать).
+
+### Правила видів подій (P08)
+
+Перший старт після міграції `AddEventKindRules` створює v1 з `data/taxonomy/event-rules.json` (parity з попереднім матчером) — далі правила
+живуть у БД і змінюються лише через `/api/admin/rulesets` (draft → validate → preview/corpus → shadow → publish; rollback = активація старішої
+версії). `Seed__SeedEventKindRules=false` вимикає bootstrap (тоді `ruleset_id = builtin`). `Parsing__RulesetPin=<n>` — canary-пін версії на репліку
+(неопублікована — warning і active, якщо не `Parsing__RulesetPinAllowDraft=true`); `Parsing__ShadowEnabled` (true), `Parsing__ShadowMaxRowsPerHour` (5000),
+`Parsing__RulesetPollSeconds` (30 — лаг publish/rollback). Rollback міграції — `Down` (таблиці правил зникають, resolver повертається до builtin;
+`parse.completed`/`stage_results` з `ruleset_id = v{n}` лишаються як історія). Admin-сервіс для preview вантажить індекси парсера на запит (TTL 10 хв; вказівники active/shadow — на кожен запит) і містить `data/corpus/` в образі
+(`Dockerfile.admin`) для `POST /rulesets/{v}/corpus`; без файлу — 404, порожній корпус — 400 (ніколи «accuracy 1.0 на нулі»).

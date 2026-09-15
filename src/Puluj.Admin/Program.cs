@@ -40,6 +40,16 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<ReferenceCache>())
 builder.Services.AddSingleton<DtoMapper>();
 builder.Services.AddSingleton<SnapshotService>();
 builder.Services.AddSingleton<LogReader>();
+// P08 rule authoring: the parser and its indexes without the worker's background refresh (AdminIndexes refreshes on demand).
+builder.Services.Configure<Puluj.Processing.Rules.RulesetOptions>(builder.Configuration.GetSection(Puluj.Processing.Rules.RulesetOptions.Section));
+builder.Services.AddSingleton<Puluj.Processing.Indexes.IndexProvider>();
+builder.Services.AddSingleton<Puluj.Processing.Indexes.IIndexes>(sp => sp.GetRequiredService<Puluj.Processing.Indexes.IndexProvider>());
+builder.Services.AddSingleton<Puluj.Processing.Text.INormalizer, Puluj.Processing.Text.Normalizer>();
+builder.Services.AddSingleton<Puluj.Processing.Parsing.RuleParser>();
+builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetEvaluator>();
+builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetPreview>();
+builder.Services.AddSingleton<Puluj.Admin.Endpoints.AdminIndexes>();
+builder.Services.AddSingleton<Puluj.Admin.Endpoints.KindCorpus>();
 // Container management through the docker CLI and the mounted socket; off unless Docker__Enabled (the compose stack sets it).
 builder.Services.AddOptions<DockerOptions>().Bind(builder.Configuration.GetSection(DockerOptions.Section));
 builder.Services.AddSingleton<DockerService>();
@@ -61,6 +71,7 @@ if (app.Environment.IsDevelopment())
 app.MapHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = HealthResponseWriter.WriteAsync });
 app.MapAdminEndpoints();
 app.MapOpsEndpoints();
+Puluj.Admin.Endpoints.RulesetEndpoints.MapRulesetEndpoints(app);
 app.MapAnalyticsEndpoints();
 
 // The admin SPA is built as admin.html (second Vite entry of the shared web/ code base).

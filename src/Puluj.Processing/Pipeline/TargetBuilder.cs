@@ -31,6 +31,8 @@ public sealed class TargetBuilder(IIndexes indexes)
             ParserVersion = parserVersion,
             ObjectCount = fact.Count,
             ObjectCountIsApproximate = fact.CountIsApproximate,
+            // The catalog kind named by the rule (P08) — also for kinds without a legacy enum member; the legacy stamp fills the rest.
+            EventKindId = fact.EventKindCode is { } kindCode ? indexes.EventKinds.ByCode(kindCode)?.EventKindId : null,
         };
 
         var trustCap = source.TrustLevel switch { >= 0.85 => ConfidenceLevel.High, >= 0.6 => ConfidenceLevel.Medium, _ => ConfidenceLevel.Low };
@@ -166,7 +168,7 @@ public sealed class TargetBuilder(IIndexes indexes)
 
     private static ConfidenceLevel Lower(ConfidenceLevel c) => c == ConfidenceLevel.Unknown ? c : (ConfidenceLevel)Math.Max((int)ConfidenceLevel.Low, (int)c - 1);
 
-    private static JsonDocument Metadata(ParsedFact fact, string language, GazetteerIndex gazetteer)
+    private JsonDocument Metadata(ParsedFact fact, string language, GazetteerIndex gazetteer)
     {
         var o = new JsonObject
         {
@@ -177,6 +179,20 @@ public sealed class TargetBuilder(IIndexes indexes)
         if (fact.Target is { } t)
         {
             o["target"] = new JsonObject { ["code"] = t.Ref.Code, ["level"] = t.Ref.Level.ToString(), ["text"] = t.MatchedText, ["hedged"] = t.Hedged };
+        }
+        if (fact.RulesetId is { } rulesetId)
+        {
+            o["rulesetVersion"] = rulesetId; // P08 provenance: which rule-set snapshot resolved the kind
+        }
+        if (fact.EventKindCode is not null && !indexes.EventKinds.IsEmpty)
+        {
+            o["eventKindPolicyVersion"] = indexes.EventKinds.PolicyVersion; // the kind came from the rule, not the legacy stamp (P07 provenance kept)
+        }
+        if (fact.RuleCode is { } ruleCode)
+        {
+            o["ruleCode"] = ruleCode;
+            o["ruleVersion"] = fact.RuleVersion;
+            o["eventKindCode"] = fact.EventKindCode;
         }
         o["places"] = new JsonArray(fact.Places.Select(p => (JsonNode)new JsonObject
         {

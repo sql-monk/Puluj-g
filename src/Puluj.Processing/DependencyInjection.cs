@@ -44,6 +44,7 @@ public static class DependencyInjection
         {
             return services;
         }
+        services.Configure<Rules.RulesetOptions>(configuration.GetSection(Rules.RulesetOptions.Section));
         services.AddSingleton<IndexProvider>();
         services.AddSingleton<IIndexes>(sp => sp.GetRequiredService<IndexProvider>());
         services.AddHostedService(sp => sp.GetRequiredService<IndexProvider>());
@@ -51,6 +52,8 @@ public static class DependencyInjection
         services.Configure<LlmOptions>(configuration.GetSection(LlmOptions.Section));
         services.AddSingleton(sp => new LlmBreaker(sp.GetRequiredService<IOptions<LlmOptions>>().Value.FailurePause));
         services.AddSingleton<RuleParser>();
+        services.AddSingleton<Rules.RulesetEvaluator>();
+        services.AddSingleton<Rules.RulesetPreview>();
         services.AddSingleton<TargetBuilder>();
         services.AddSingleton<AlertsInUaHandler>();
         services.AddSingleton<LlmParser>(); // the mapping/prompt owner; also the legacy IParser (registered separately by AddPulujProcessing)

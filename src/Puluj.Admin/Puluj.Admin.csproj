@@ -12,6 +12,7 @@
     <ProjectReference Include="..\Puluj.Collectors\Puluj.Collectors.csproj" />
     <!-- Read side of the source analytics schema (the Puluj.Analytics.Worker service maintains it). -->
     <ProjectReference Include="..\Puluj.Analytics\Puluj.Analytics.csproj" />
+    <ProjectReference Include="..\Puluj.Processing\Puluj.Processing.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

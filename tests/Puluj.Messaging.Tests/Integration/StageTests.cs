@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Schema;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Puluj.Domain;
 using Puluj.Infrastructure.Messaging;
 using Puluj.Messaging.Tests.Unit;
@@ -42,12 +43,14 @@ public sealed class StageTests(MessagingFixture f)
     }
 
     /// <summary>Publishes through the collectors' ingress, runs every stage and waits for <paramref name="parsed"/> parser receipts.</summary>
-    private async Task RunAsync(int parsed, params (string Id, string? Text, JsonDocument? Payload)[] messages)
+    private Task RunAsync(int parsed, params (string Id, string? Text, JsonDocument? Payload)[] messages) => RunAsync(parsed, null, messages);
+
+    private async Task RunAsync(int parsed, DateTimeOffset? publishedAt, params (string Id, string? Text, JsonDocument? Payload)[] messages)
     {
         var source = await f.SourceAsync();
         foreach (var (id, text, payload) in messages)
         {
-            var msg = f.Message(id, text) with { RawPayload = payload };
+            var msg = f.Message(id, text, publishedAt) with { RawPayload = payload };
             await f.Ingress.PublishAsync(msg, source, "test", null, live: true, None);
         }
         await StartAllAsync();
@@ -323,6 +326,78 @@ public sealed class StageTests(MessagingFixture f)
         Assert.True(differences.Count == 0, string.Join("\n", differences));
         Assert.Equal(EventKindLegacyMap.ToCode(targets[0].EventType), stageByIndex[0]["event_kind_code"]!.GetValue<string>());
         f.Evidence.Record("P05-S08", new { facts = stageFacts.Count, legacy_targets = legacyCount, field_differences = differences.Count });
+    }
+
+    // ---- P08: rule-set provenance and shadow mode ----
+
+    private static readonly Puluj.Infrastructure.Rules.RuleDefinition FireRule = new("fire.pozhezh", "fire.reported", "*",
+        [new Puluj.Infrastructure.Rules.PatternDefinition("stems", ["пожеж"], 5)], null, 900); // above event:вибух (810): the shadow set names the fire, the live set the explosion
+
+    [Fact]
+    public async Task S09_Parse_completed_cites_the_pinned_ruleset_and_the_rule_that_fired()
+    {
+        await f.ResetAsync();
+        await ResetRulesetsAsync();
+        await RunAsync(1, ("s09", "Вибухи у Харкові.", null));
+        var parsed = Assert.Single(await EventsAsync("parse.completed"));
+        Valid(ParseSchema, parsed["payload"]!);
+        Assert.Equal("v1", parsed["payload"]!["versions"]!["ruleset_id"]!.GetValue<string>());
+        var evidence = parsed["payload"]!["facts"]![0]!["evidence"]!;
+        Assert.Equal("v1", evidence["ruleset_version"]!.GetValue<string>());
+        Assert.Equal("event:вибух", evidence["rule_code"]!.GetValue<string>());
+        Assert.Equal(1, evidence["rule_code_version"]!.GetValue<int>());
+        Assert.Equal("event:вибух", evidence["rule_id"]!.GetValue<string>()); // unchanged P05 fields
+        Assert.Equal(0, evidence["rule_span"]!["start"]!.GetValue<int>());
+        Assert.Equal(1, await f.CountAsync("processing.stage_results", "stage = 'parse' AND versions->>'ruleset_id' = 'v1'"));
+        f.Evidence.Record("P08-S09", new { ruleset_id = "v1", rule_code = "event:вибух", evidence_additive = new[] { "ruleset_version", "rule_code", "rule_code_version", "rule_span" } });
+    }
+
+    [Fact]
+    public async Task S10_Shadow_ruleset_records_disagreements_without_changing_the_live_result()
+    {
+        await f.ResetAsync();
+        await ResetRulesetsAsync();
+        var rulesets = f.Services.GetRequiredService<Puluj.Infrastructure.Rules.RulesetService>();
+        // Baseline: the same message with no shadow set.
+        var publishedAt = new DateTimeOffset(2026, 9, 15, 12, 0, 0, TimeSpan.Zero);
+        await RunAsync(1, publishedAt, ("s10-a", "Пожежа на складі у Харкові після вибухів.", null));
+        var baseline = Assert.Single(await EventsAsync("parse.completed"))["payload"]!;
+        var baselineOutputs = JsonNode.Parse(await f.ScalarAsync<string>("SELECT outputs::text FROM processing.stage_results WHERE stage = 'parse'"))!.AsObject();
+        Assert.Null(baselineOutputs["shadow"]);
+
+        await f.ResetAsync();
+        var v2 = await rulesets.CreateDraftAsync(null, "s10", "fire draft", None);
+        await rulesets.ReplaceRulesAsync(v2, (await rulesets.GetAsync(v2, None)).Rules.Append(FireRule).ToList(), "s10", "rules", None);
+        await rulesets.StartShadowAsync(v2, "s10", "shadow", None);
+        await f.Indexes.RefreshAsync(None);
+        Assert.Equal("v2", f.Indexes.ShadowRules!.Id);
+        await RunAsync(1, publishedAt, ("s10-b", "Пожежа на складі у Харкові після вибухів.", null));
+        var shadowed = Assert.Single(await EventsAsync("parse.completed"))["payload"]!;
+        Assert.Equal(baseline["facts"]!.ToJsonString(), shadowed["facts"]!.ToJsonString()); // live facts byte-for-byte as without shadow
+        Assert.Equal(baseline["versions"]!.ToJsonString(), shadowed["versions"]!.ToJsonString());
+        var outputs = JsonNode.Parse(await f.ScalarAsync<string>("SELECT outputs::text FROM processing.stage_results WHERE stage = 'parse'"))!.AsObject();
+        Assert.Equal(1, outputs["shadow"]!["live_version"]!.GetValue<int>());
+        Assert.Equal(2, outputs["shadow"]!["shadow_version"]!.GetValue<int>());
+        Assert.Equal(1, outputs["shadow"]!["disagreements"]!.GetValue<int>());
+        foreach (var key in baselineOutputs.Where(kv => kv.Key is not ("shadow" or "attempt_id" or "caused_by" or "parse_completed_event_id" or "duration_ms")).Select(kv => kv.Key))
+        {
+            Assert.Equal(baselineOutputs[key]?.ToJsonString(), outputs[key]?.ToJsonString());
+        }
+        Assert.Equal(1, await f.CountAsync("event_kind_rule_shadow", "shadow_version = 2 AND live_version = 1 AND live_kind = 'impact.explosion.reported' AND shadow_kind = 'fire.reported' AND shadow_rule = 'fire.pozhezh'"));
+        var report = await rulesets.ShadowReportAsync(v2, null, None);
+        Assert.Equal(1, report.Disagreements);
+        Assert.Equal(("impact.explosion.reported", "fire.reported"), (report.ByKind[0].Live, report.ByKind[0].Shadow));
+        await ResetRulesetsAsync();
+        await f.Indexes.RefreshAsync(None);
+        f.Evidence.Record("P08-S10", new { live = "v1 facts unchanged", shadow = "v2", disagreements = 1, report_by_kind = "impact.explosion.reported → fire.reported" });
+    }
+
+    private async Task ResetRulesetsAsync()
+    {
+        await f.ExecAsync("TRUNCATE event_kind_rule_shadow; DELETE FROM event_kind_ruleset_audit; DELETE FROM event_kind_rulesets");
+        await using var db = await f.Factory.CreateDbContextAsync();
+        await f.Services.GetServices<Puluj.Infrastructure.Seeding.ISeeder>().OfType<Puluj.Infrastructure.Seeding.EventKindRuleSeeder>().Single().SeedAsync(db, None);
+        await f.Indexes.RefreshAsync(None);
     }
 }
 

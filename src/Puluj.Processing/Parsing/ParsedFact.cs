@@ -43,6 +43,13 @@ public sealed record ParsedFact
     public IdentificationMethod Method { get; init; } = IdentificationMethod.Rule;
     /// <summary>Parser that produced the fact (RuleParser.Version or the LLM model + prompt version).</summary>
     public string ParserVersion { get; init; } = RuleParser.Version;
+    /// <summary>Catalog kind named by the rule that fired (P08); null for a plain target sighting or a non-rule fact — the legacy enum decides then.</summary>
+    public string? EventKindCode { get; init; }
+    /// <summary>Provenance of the kind (P08): the rule set the parser was pinned to (<c>v3</c> / <c>builtin</c>), the rule and its version, the matched token span.</summary>
+    public string? RulesetId { get; init; }
+    public string? RuleCode { get; init; }
+    public int? RuleVersion { get; init; }
+    public (int Start, int End)? RuleSpan { get; init; }
 
     /// <summary>The current position: among the places named as current, the most specific one ("Київ: ... над Оболонським районом"
     /// is the district, "Київщина: БпЛА біля Броварів" is the town), then the first one, then a transit place.</summary>
@@ -61,7 +68,11 @@ public sealed record ParsedFact
 }
 
 /// <param name="PublishedAt">When the message was published; the LLM fallback skips messages older than Llm:MaxMessageAgeHours.</param>
-public sealed record ParseContext(int SourceId, string Language, int? HomeRegionPlaceId, DateTimeOffset? PublishedAt = null, long? RawMessageId = null);
+/// <param name="SourceCode">Source code for rule source scopes (P08); null = scoped rules never match.</param>
+public sealed record ParseContext(int SourceId, string Language, int? HomeRegionPlaceId, DateTimeOffset? PublishedAt = null, long? RawMessageId = null, string? SourceCode = null);
+
+/// <summary>Facts plus the rule set they were resolved with (one snapshot per message: "ruleset pinned per job", P08).</summary>
+public sealed record ParseResult(IReadOnlyList<ParsedFact> Facts, Rules.RulesetIndex Ruleset);
 
 public interface IParser
 {

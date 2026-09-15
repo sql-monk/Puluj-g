@@ -1,0 +1,230 @@
+{
+  "_comment": "P08 golden cases for new kinds (§8.3): expected kind per segment of the message, null = no kind. Evaluated by RulesetEvaluator (precision/recall per kind) against a rule-set version; never asserted against the live set.",
+  "cases": [
+    {
+      "id": "fire-p01",
+      "text": "У Харкові після удару виникла пожежа на складі.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "fire.reported"
+        }
+      ]
+    },
+    {
+      "id": "fire-p02",
+      "text": "Горить житловий будинок у Сумах.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "fire.reported"
+        }
+      ]
+    },
+    {
+      "id": "fire-p03",
+      "text": "На Одещині — займання на об'єкті інфраструктури.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "fire.reported"
+        }
+      ]
+    },
+    {
+      "id": "fire-n01",
+      "text": "У регіоні оголошено пожежну небезпеку.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "id": "fire-n02",
+      "text": "Пожежу ліквідовано, постраждалих немає.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "id": "fire-a01",
+      "text": "Вибух у Києві, у районі помітили пожежу.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "impact.explosion.reported"
+        }
+      ],
+      "ambiguous": true
+    },
+    {
+      "id": "outage-p01",
+      "text": "Частина Одеси знеструмлена після атаки.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "infrastructure.outage"
+        }
+      ]
+    },
+    {
+      "id": "outage-p02",
+      "text": "У Полтаві відключення світла в кількох районах.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "infrastructure.outage"
+        }
+      ]
+    },
+    {
+      "id": "outage-p03",
+      "text": "Херсон без світла.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "infrastructure.outage"
+        }
+      ]
+    },
+    {
+      "id": "outage-n01",
+      "text": "Електропостачання відновлено у всіх районах.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "id": "outage-n02",
+      "text": "Графік відключень світла на завтра.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": null
+        }
+      ]
+    },
+    {
+      "id": "outage-a01",
+      "text": "Вибухи у Харкові, частина міста без світла.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "impact.explosion.reported"
+        }
+      ],
+      "ambiguous": true
+    },
+    {
+      "id": "intercept-p01",
+      "text": "Над Київщиною збито 5 шахедів.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "air_defence.interception.reported"
+        }
+      ]
+    },
+    {
+      "id": "intercept-p02",
+      "text": "Ракету знищено силами ППО.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "air_defence.interception.reported"
+        }
+      ]
+    },
+    {
+      "id": "intercept-p03",
+      "text": "Ціль перехоплено на підльоті до міста.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "air_defence.interception.reported"
+        }
+      ]
+    },
+    {
+      "id": "intercept-n01",
+      "text": "Працює ППО, будьте в укриттях.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "air_defence.activity"
+        }
+      ]
+    },
+    {
+      "id": "intercept-n02",
+      "text": "Шахед не збито, летить далі на Полтаву.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "target.observed"
+        }
+      ],
+      "ambiguous": true,
+      "note": "v1 rule event:збит (air_defence.activity) still fires on 'не збито'; the draft's negative pattern vetoes only the interception rule — a v1 rule change (rule_version bump) is an authoring decision, not part of the sample draft"
+    },
+    {
+      "id": "intercept-a01",
+      "text": "Робота ППО, є збиття.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "air_defence.interception.reported"
+        }
+      ],
+      "ambiguous": true
+    },
+    {
+      "id": "legacy-01",
+      "text": "Відбій повітряної тривоги в Київській області.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "alert.air_raid.ended"
+        }
+      ]
+    },
+    {
+      "id": "legacy-02",
+      "text": "Повітряна тривога в Харківській області.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "alert.air_raid.started"
+        }
+      ]
+    },
+    {
+      "id": "legacy-03",
+      "text": "Вибухи у Дніпрі.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "impact.explosion.reported"
+        }
+      ]
+    },
+    {
+      "id": "legacy-04",
+      "text": "БпЛА на Чернігівщині, курсом на Київщину.",
+      "expected": [
+        {
+          "segment": 0,
+          "kind": "target.observed"
+        }
+      ]
+    }
+  ]
+}

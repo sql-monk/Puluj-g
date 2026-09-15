@@ -367,6 +367,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `/api/admin/ops/*` | `overview` (стан сервісів + БД), `collectors`, `processing`, `db`; `/api/admin/logs/files`, `/api/admin/logs?file=&lines=&filter=&level=` |
 | `/api/admin/analytics/*` | `status` (курсор, відставання, прогони), `report?days=` (джерела, пари, зовнішні пересилання, перші по треках), `recent?limit=&sourceId=` (пари з текстами), `POST reset` |
 | `POST /api/admin/dev/ingest` | вкинути повідомлення чи payload тривоги як від колектора (тестування) |
+| `/api/admin/rulesets` (P08) | версії правил видів подій: `GET`, `GET /{v}`, `POST` (draft; `{parentVersion?, actor, reason}`), `PUT /{v}/rules`, `POST /{v}/validate`, `POST /{v}/preview` (`{texts[], baselineVersion?}`), `POST /{v}/corpus`, `POST /{v}/shadow`, `POST /{v}/shadow/stop`, `GET /{v}/shadow/report?since=`, `POST /{v}/publish`, `POST /rollback` (`{version, actor, reason}`); preview/corpus приймають `sourceCode` для scoped-правил; мутації (включно з validate) без `actor`/`reason` → 400; 404/409/422 за станом |
 | SignalR `/hubs/map` | `TrackUpserted`, `TrackClosed`, `AlertChanged` (аргумент — той самий DTO, що й у snapshot) |
 
 `TrackDto`: `target` (коди/назви всіх рівнів, `label` найглибшого, `displayMode`, `fadeMinutes`, `speedProfile`),
@@ -500,7 +501,8 @@ eta_min = (d_edge, або max(0, d − accuracy)) / v_max − elapsed;   eta_max
 | нова назва загрози | `data/taxonomy/aliases*.json`: `{alias (стем), target: "family:SHAHED", lang, confidence, exact?, priority?}` | рестарт Worker + кейс у `data/corpus/cases.json` |
 | нова модель / швидкість / fade / вікно кореляції | `data/taxonomy/models.json`, `taxonomy.json` (`metadata`) | рестарт Worker; клієнт бере з `/api/taxonomy` |
 | розмовна назва області, нова акваторія | `data/gazetteer/regions.json` | рестарт Worker |
-| новий вид події / колір / іконка / час на мапі | `data/taxonomy/event-kinds.json` (`kinds[]`, підняти `policyVersion` для оновлення presentation існуючих кодів; `code` не змінювати) | рестарт Worker; `/api/event-kinds`; правила розпізнавання — окремо (P08) |
+| новий вид події / колір / іконка / час на мапі | `data/taxonomy/event-kinds.json` (`kinds[]`, підняти `policyVersion` для оновлення presentation існуючих кодів; `code` не змінювати) | рестарт Worker; `/api/event-kinds` |
+| правило розпізнавання виду події | **без файлу**: `/api/admin/rulesets` — draft → rules → validate → preview/corpus → shadow → publish (P08); `data/taxonomy/event-rules.json` — лише перший bootstrap v1, `event-rules-v2-draft.json` — зразок payload; golden-кейси нових kinds — `data/corpus/kinds.json` | без рестарту (poll 30 с); rollback — `POST /rulesets/rollback` |
 | емодзі-позначення каналу | `Normalizer.EmojiWords` (єдине місце в коді) | збірка |
 
 Aliases і місця, видалені з seed-файлів, видаляються і з БД при наступному старті; `event_kinds` — ні (БД володіє каталогом, seed лише додає/оновлює presentation). Діаграми — `diagrams/build.py`

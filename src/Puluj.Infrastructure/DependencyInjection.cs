@@ -45,6 +45,8 @@ public static class DependencyInjection
         services.AddSingleton<ISeeder, SourceSeeder>();
         services.AddSingleton<ISeeder, GazetteerSeeder>();
         services.AddSingleton<ISeeder, EventKindSeeder>();
+        services.AddSingleton<Rules.RulesetService>();
+        services.AddSingleton<ISeeder, EventKindRuleSeeder>();
         services.AddSingleton<ISeeder, EventKindBackfill>();
         services.AddSingleton<PgNotifyListener>();
 

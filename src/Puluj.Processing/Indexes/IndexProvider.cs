@@ -1,20 +1,27 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Persistence;
+using Puluj.Infrastructure.Rules;
+using Puluj.Processing.Rules;
 
 namespace Puluj.Processing.Indexes;
 
 /// <summary>Loads taxonomy and gazetteer snapshots from the database and refreshes them periodically (spec §7: taxonomy lives in the DB).</summary>
-public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILogger<IndexProvider> logger) : BackgroundService, IIndexes
+public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, IOptionsMonitor<RulesetOptions> rulesetOptions, ILogger<IndexProvider> logger) : BackgroundService, IIndexes
 {
     private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(10);
     private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int _pinWarned;
 
     public TaxonomyIndex Taxonomy { get; private set; } = TaxonomyIndex.Empty;
     public GazetteerIndex Gazetteer { get; private set; } = GazetteerIndex.Empty;
     public EventKindIndex EventKinds { get; private set; } = EventKindIndex.Empty;
+    public RulesetIndex Rules { get; private set; } = RulesetIndex.Builtin;
+    public RulesetIndex? ShadowRules { get; private set; }
 
     /// <summary>Completes after the first successful load.</summary>
     public Task Ready => _ready.Task;
@@ -25,17 +32,63 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILo
         Taxonomy = await LoadTaxonomyAsync(db, ct);
         Gazetteer = await LoadGazetteerAsync(db, ct);
         EventKinds = await LoadEventKindsAsync(db, ct);
+        await RefreshRulesAsync(db, ct);
         _ready.TrySetResult();
-        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places, {Kinds} event kinds", Taxonomy.Aliases.Count, Gazetteer.Count, EventKinds.Count);
+        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places, {Kinds} event kinds, rules {Ruleset} (shadow {Shadow})", Taxonomy.Aliases.Count, Gazetteer.Count, EventKinds.Count, Rules.Id, ShadowRules?.Id ?? "none");
+    }
+
+    /// <summary>
+    /// Re-reads the active (or pinned) and shadow rule sets when their versions changed. Cheap enough for the short
+    /// poll: a version pointer query, and the rules only when the pointer moved. The pin never crashes the worker:
+    /// an unknown or unpublished pin logs a warning once and the active set is used.
+    /// </summary>
+    public async Task RefreshRulesAsync(PulujDbContext db, CancellationToken ct)
+    {
+        var o = rulesetOptions.CurrentValue;
+        var active = await db.EventKindRulesets.AsNoTracking().Where(r => r.IsActive).Select(r => (int?)r.Version).SingleOrDefaultAsync(ct);
+        var target = active;
+        if (o.RulesetPin is int pin)
+        {
+            var pinned = await db.EventKindRulesets.AsNoTracking().Where(r => r.Version == pin).Select(r => new { r.State }).SingleOrDefaultAsync(ct);
+            if (pinned is not null && (o.RulesetPinAllowDraft || pinned.State is EventKindRuleset.Published or EventKindRuleset.Superseded))
+            {
+                target = pin;
+            }
+            else if (Interlocked.Exchange(ref _pinWarned, 1) == 0)
+            {
+                logger.LogWarning("Parsing:RulesetPin={Pin} is {Why}; using the active rule set {Active}", pin, pinned is null ? "unknown" : pinned.State, active is int a ? $"v{a}" : "builtin");
+            }
+        }
+        if (target != Rules.Version || (target is null && !Rules.IsBuiltin))
+        {
+            Rules = target is int v && await RulesetService.LoadAsync(db, v, ct) is { } data ? RulesetIndex.From(data) : RulesetIndex.Builtin;
+            logger.LogInformation("Rule set pinned: {Ruleset} ({State}, {Rules} rules)", Rules.Id, Rules.State, Rules.Rules.Count);
+        }
+        var shadow = await db.EventKindRulesets.AsNoTracking().Where(r => r.State == EventKindRuleset.Shadow).Select(r => (int?)r.Version).SingleOrDefaultAsync(ct);
+        if (shadow != ShadowRules?.Version)
+        {
+            ShadowRules = shadow is int sv && await RulesetService.LoadAsync(db, sv, ct) is { } sdata ? RulesetIndex.From(sdata) : null;
+            logger.LogInformation("Shadow rule set: {Shadow}", ShadowRules?.Id ?? "none");
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        var lastFull = DateTimeOffset.MinValue;
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await RefreshAsync(ct);
+                if (DateTimeOffset.UtcNow - lastFull >= (EventKinds.IsEmpty ? TimeSpan.FromSeconds(15) : RefreshInterval))
+                {
+                    await RefreshAsync(ct);
+                    lastFull = DateTimeOffset.UtcNow;
+                }
+                else
+                {
+                    await using var db = await factory.CreateDbContextAsync(ct);
+                    await RefreshRulesAsync(db, ct); // publish/rollback propagate within the short poll (P08)
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -46,7 +99,7 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, ILo
                 logger.LogError(ex, "Index refresh failed");
             }
             // Until the seeder has filled the catalog (fresh database) targets would get no kind: poll faster, like ReferenceCache.
-            await Task.Delay(EventKinds.IsEmpty ? TimeSpan.FromSeconds(15) : RefreshInterval, ct);
+            await Task.Delay(TimeSpan.FromSeconds(EventKinds.IsEmpty ? 15 : Math.Max(5, rulesetOptions.CurrentValue.RulesetPollSeconds)), ct);
         }
     }
 

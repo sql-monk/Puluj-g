@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-15T21:02:42.8537437+00:00",
+  "generated_at": "2026-09-15T22:33:56.0352437+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.144532,
+      "outbox_age_seen_s": 1.142349,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0a6e0-e375-73fb-a81e-671715c8df73"
+      "event_id": "01a0a734-6c6a-7b59-b042-8d1c6f2233b1"
     },
     "P03-C05": {
       "window": "W6b",
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T21:02:41.9780615\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T22:33:55.3585448\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -359,6 +359,22 @@
       "deadline_exceeded": "token 1, attempts 1, schema valid",
       "normalization_drift": "token 1, attempts 1, schema valid",
       "provider_calls": 0
+    },
+    "P08-S09": {
+      "ruleset_id": "v1",
+      "rule_code": "event:\u0432\u0438\u0431\u0443\u0445",
+      "evidence_additive": [
+        "ruleset_version",
+        "rule_code",
+        "rule_code_version",
+        "rule_span"
+      ]
+    },
+    "P08-S10": {
+      "live": "v1 facts unchanged",
+      "shadow": "v2",
+      "disagreements": 1,
+      "report_by_kind": "impact.explosion.reported \u2192 fire.reported"
     }
   }
 }

@@ -100,6 +100,15 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
   `llm_completed_at` (`occurred_at` події worker'а) і `finalized_at`; `llm_request_ids` для method `llm`; `versions` = normalization/rules зі стадії
   `awaiting_llm` + `model/prompt` з `llm.completed`. Пізній результат (fencing) і будь-який вхід після extraction → receipt `noop`.
 
+## Runtime (P08): версіоновані правила
+
+- `parse.completed.versions.ruleset_id` = `v{n}` (версія `event_kind_rulesets`, один snapshot на job) або `builtin` (до seed каталогу правил);
+  `versions.rules` лишається `rule-0.1` (stage_version не змінюється).
+- `$defs/evidence` (additive): `ruleset_version` (`v{n}|builtin`), `rule_code` (стабільний код правила, для v1 = `event:<стеми>`), `rule_code_version`,
+  `rule_span {start,end}` (символи збігу в сегменті). `span`, `rule_id`, `rule_version`, `rules[]` — без змін (P05).
+- `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
+  тоді `Unknown` (або `TargetObserved` для факту з ціллю).
+
 ## Правила сумісності
 
 - `schema_version` `MAJOR.MINOR`: той самий MAJOR — сумісно; інший → `quarantined`, не exception.

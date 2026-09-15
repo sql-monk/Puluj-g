@@ -19,7 +19,7 @@ public static class FactMapper
 {
     public static JsonObject ToFact(Target t, EventKindIndex kinds, GazetteerIndex gazetteer, ParsedFact? fact, string? language, string rulesVersion)
     {
-        var code = EventKindLegacyMap.ToCode(t.EventType);
+        var code = fact?.EventKindCode ?? EventKindLegacyMap.ToCode(t.EventType); // the rule's kind (P08), else the legacy enum
         var kind = kinds.ByCode(code);
         var category = kind?.Category ?? CategoryFallback(t.EventType);
         var json = new JsonObject
@@ -85,6 +85,20 @@ public static class FactMapper
             if (fact is { Rules.Count: > 0 })
             {
                 evidence["rules"] = new JsonArray(fact.Rules.Select(r => (JsonNode)r).ToArray());
+            }
+            // P08 provenance (additive): the pinned rule set, the kind rule that fired and where.
+            if (fact?.RulesetId is { } rulesetId)
+            {
+                evidence["ruleset_version"] = rulesetId;
+            }
+            if (fact?.RuleCode is { } ruleCode)
+            {
+                evidence["rule_code"] = ruleCode;
+                evidence["rule_code_version"] = fact.RuleVersion;
+            }
+            if (fact?.RuleSpan is { } span)
+            {
+                evidence["rule_span"] = new JsonObject { ["start"] = span.Start, ["end"] = span.End };
             }
         }
         return evidence;

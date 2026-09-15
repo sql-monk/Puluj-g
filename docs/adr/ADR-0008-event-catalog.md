@@ -74,11 +74,40 @@ state: він пише лише `event_kind_id` і бере Store, як інші
 event_kind_id IS NULL` — Index Only Scan того самого індексу (50 000 heap fetches без visibility map, 3.7 ms).
 Це не production-вимір; індекс лишається кандидатом до перевірки на production-shaped даних (P11/P16).
 
+## Правила розпізнавання (P08, §8.3)
+
+- **Модель.** `event_kind_rulesets` (`version` PK, `state` ∈ `draft | shadow | published | superseded`, `is_active` — partial unique, один shadow —
+  partial unique, `parent_version`, actor/reason, `published_at/by`), `event_kind_rules` (`rule_code` стабільний між версіями, `event_kind_id` FK RESTRICT,
+  `language` `uk|ru|en|*`, `source_scope {sources[]}`, `positive_patterns`/`negative_patterns` — масиви `{type: stems, stems[], window}`,
+  `priority`, `extraction_hints {header_if_target_without_level}`, `confidence_modifier` (зберігається, **не застосовується**), `rule_version`,
+  `enabled`, actor/reason), `event_kind_ruleset_audit` (`created | rules_replaced | validated | shadow_started | shadow_stopped | published | rolled_back`),
+  `event_kind_rule_shadow` (лише розбіжності; без FK на raw). Рядки не-draft версій ніколи не оновлюються — будь-яка зміна = новий draft.
+- **Семантика збігу** — та сама, що у замороженого `EventTypeMatcher`: стеми в порядку, `StemMatch(exact:false)` (≤ 4 літери суфікса), останній стем
+  у вікні `window` токенів від першого; `negative_patterns` — veto правила на сегменті; hint `header_if_target_without_level` — правило пропускається,
+  якщо сегмент називає ціль без рівня тривоги (перебір триває). Tie-break детермінований: `priority DESC` → найраніша позиція збігу → `rule_code ASC`.
+  Правила з `enabled=false` або з вимкненим kind (`event_kinds.enabled=false` — feature flag нових kinds) не спрацьовують. `language` (`uk|ru|en|*`)
+  спирається на евристику `Normalizer.DetectLanguage` (кириличні маркери), тож для правил рекомендовано `*`; `source_scope` у preview/corpus
+  діє лише з переданим `sourceCode`.
+- **Pinned per job.** `IndexProvider.Rules` — immutable snapshot активної (або `Parsing:RulesetPin`) версії; `RuleParser.Parse(…, ruleset)` бере його
+  один раз на повідомлення; `stage_results.versions.ruleset_id = v{n}` (`builtin` до seed), evidence `ruleset_version`, `rule_code`, `rule_code_version`,
+  `rule_span` (additive), legacy `parser_metadata.rulesetVersion/ruleCode/eventKindCode`. Publish/rollback поширюються за `Parsing:RulesetPollSeconds` (30 с).
+- **Kind без enum** (`fire.reported`, …): факт існує (control-flow парсера — «правило спрацювало», не legacy enum), `Target.EventKindId` за кодом,
+  `EventType = Unknown` (з ціллю — `TargetObserved`), `event_kind_code` у `parse.completed` — з правила. Live це стосується лише після publish версії з такими правилами.
+- **Bootstrap.** `data/taxonomy/event-rules.json` → v1 (24 фрази матчера, priority = порядок, `language *`) один раз; далі БД володіє правилами.
+  Parity gate: корпус + конкурентні сегменти + 10k fuzz (`RulesetParityTests`). `EventTypeMatcher` — frozen.
+- **Authoring** (`/api/admin/rulesets`): draft (копія active) → `PUT rules` (rule_version: без змін поведінки — успадковується, інакше +1) → validate →
+  preview (`texts[]`, ≤ 200) / corpus (`data/corpus/kinds.json`, P/R/F1 per kind) → shadow (один; розбіжності в `event_kind_rule_shadow`, cap
+  `Parsing:ShadowMaxRowsPerHour`, insert під savepoint — live не постраждає) → publish (validator виконується знову; попередній active → superseded)
+  → rollback (активує старішу published/superseded; збережені результати не змінюються). Shadow можна зняти (`POST /{v}/shadow/stop` → draft,
+  audit `shadow_stopped`) — єдиний вихід, окрім publish. Усі мутації, включно з validate, — actor + reason (400 без них). `rule_version`
+  рахується відносно **parent**-версії (lineage), не глобально: evidence цитує пару `ruleset_version` + `rule_code_version`. Pin на draft
+  (`RulesetPinAllowDraft`) перечитується лише при зміні номера версії — після `PUT rules` потрібен рестарт репліки.
+- **Поза P08:** regex-патерни, `effective_from/to`, RBAC-ролі, UI адмінки, shadow у legacy `RawMessageProcessor`, pin на рівні run (P14).
+
 ## Відкрите
 
 | Питання | Задача |
 |---|---|
-| Rules/resolver з БД, `event_kind_rules`, shadow/corpus | P08 |
 | Incidents (`creates_incident`, `state_model`) | P10 |
 | Catalog у API/UI: legend/filters з `render_mode`/`map_color`, посилення constraints (NOT NULL) після coverage | P11/P12 |
 | Analytics по `event_kind_id`, `unknown.unclassified` як явний outcome | P15 |

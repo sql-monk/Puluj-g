@@ -265,6 +265,278 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("event_kinds", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRule", b =>
+                {
+                    b.Property<long>("RuleId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("rule_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("RuleId"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<decimal>("ConfidenceModifier")
+                        .HasPrecision(4, 3)
+                        .HasColumnType("numeric(4,3)")
+                        .HasColumnName("confidence_modifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("EventKindId")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_kind_id");
+
+                    b.Property<JsonDocument>("ExtractionHints")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("extraction_hints");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language");
+
+                    b.Property<JsonDocument>("NegativePatterns")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("negative_patterns");
+
+                    b.Property<JsonDocument>("PositivePatterns")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("positive_patterns");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RuleCode")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("rule_code");
+
+                    b.Property<int>("RuleVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("rule_version");
+
+                    b.Property<int>("RulesetVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("ruleset_version");
+
+                    b.Property<JsonDocument>("SourceScope")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("source_scope");
+
+                    b.HasKey("RuleId")
+                        .HasName("pk_event_kind_rules");
+
+                    b.HasIndex("EventKindId")
+                        .HasDatabaseName("ix_event_kind_rules_event_kind_id");
+
+                    b.HasIndex("RulesetVersion", "RuleCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_event_kind_rules_ruleset_version_rule_code");
+
+                    b.ToTable("event_kind_rules", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRuleShadow", b =>
+                {
+                    b.Property<long>("ShadowId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("shadow_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("ShadowId"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LiveKind")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("live_kind");
+
+                    b.Property<string>("LiveRule")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("live_rule");
+
+                    b.Property<int>("LiveVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("live_version");
+
+                    b.Property<long>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<int>("SegmentIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("segment_index");
+
+                    b.Property<string>("ShadowKind")
+                        .HasMaxLength(96)
+                        .HasColumnType("character varying(96)")
+                        .HasColumnName("shadow_kind");
+
+                    b.Property<string>("ShadowRule")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("shadow_rule");
+
+                    b.Property<int>("ShadowVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("shadow_version");
+
+                    b.HasKey("ShadowId")
+                        .HasName("pk_event_kind_rule_shadow");
+
+                    b.HasIndex("RawMessageId", "RunId")
+                        .HasDatabaseName("ix_event_kind_rule_shadow_raw_message_id_run_id");
+
+                    b.HasIndex("ShadowVersion", "CreatedAt")
+                        .HasDatabaseName("ix_event_kind_rule_shadow_shadow_version_created_at");
+
+                    b.ToTable("event_kind_rule_shadow", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRuleset", b =>
+                {
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<JsonDocument>("Notes")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("notes");
+
+                    b.Property<int?>("ParentVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("parent_version");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("PublishedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("published_by");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Version")
+                        .HasName("pk_event_kind_rulesets");
+
+                    b.HasIndex("IsActive")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_kind_rulesets_active")
+                        .HasFilter("is_active");
+
+                    b.HasIndex("State")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_kind_rulesets_shadow")
+                        .HasFilter("state = 'shadow'");
+
+                    b.ToTable("event_kind_rulesets", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_event_kind_rulesets_state", "state IN ('draft', 'shadow', 'published', 'superseded')");
+                        });
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRulesetAudit", b =>
+                {
+                    b.Property<long>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("audit_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AuditId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<JsonDocument>("Details")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("AuditId")
+                        .HasName("pk_event_kind_ruleset_audit");
+
+                    b.HasIndex("Version", "At")
+                        .HasDatabaseName("ix_event_kind_ruleset_audit_version_at");
+
+                    b.ToTable("event_kind_ruleset_audit", (string)null);
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.LlmRequest", b =>
                 {
                     b.Property<long>("LlmRequestId")
@@ -2484,6 +2756,23 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.Navigation("Source");
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRule", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EventKind", null)
+                        .WithMany()
+                        .HasForeignKey("EventKindId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_kind_rules_event_kinds_event_kind_id");
+
+                    b.HasOne("Puluj.Domain.Entities.EventKindRuleset", null)
+                        .WithMany("Rules")
+                        .HasForeignKey("RulesetVersion")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_kind_rules_event_kind_rulesets_ruleset_version");
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.LlmRequest", b =>
                 {
                     b.HasOne("Puluj.Domain.Entities.RawMessage", "RawMessage")
@@ -2740,6 +3029,11 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.Navigation("Target");
 
                     b.Navigation("Track");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindRuleset", b =>
+                {
+                    b.Navigation("Rules");
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.RawMessage", b =>

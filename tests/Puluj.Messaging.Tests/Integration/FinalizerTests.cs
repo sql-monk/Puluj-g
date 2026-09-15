@@ -79,7 +79,6 @@ public sealed class FinalizerTests(MessagingFixture f)
 
     private static void Valid(JsonSchema schema, JsonNode payload)
     {
-        _ = ContractSchemas.Envelope; // registers common.schema.json ($ref targets) on first use
         var result = schema.Evaluate(JsonSerializer.SerializeToElement(payload), ContractSchemas.Options);
         Assert.True(result.IsValid, string.Join("; ", (result.Details ?? []).Where(d => d.Errors is { Count: > 0 }).SelectMany(d => d.Errors!.Select(e => $"{d.InstanceLocation}: {e.Key}: {e.Value}")).Distinct()));
     }

@@ -24,7 +24,7 @@
     "versions": {
       "normalization": "norm-3",
       "rules": "12",
-      "ruleset_id": "default"
+      "ruleset_id": "v3"
     },
     "facts": [
       {
@@ -43,7 +43,14 @@
             "end": 33
           },
           "rule_id": "shahed-course-city",
-          "rule_version": "12"
+          "rule_version": "12",
+          "ruleset_version": "v3",
+          "rule_code": "shahed-course-city",
+          "rule_code_version": 2,
+          "rule_span": {
+            "start": 0,
+            "end": 6
+          }
         },
         "attributes": {
           "category": "uav",

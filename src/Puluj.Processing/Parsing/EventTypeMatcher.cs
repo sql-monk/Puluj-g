@@ -3,7 +3,12 @@ using Puluj.Processing.Text;
 
 namespace Puluj.Processing.Parsing;
 
-/// <summary>Spec §11 event types from key phrases. Target presence is decided elsewhere.</summary>
+/// <summary>
+/// Spec §11 event types from key phrases. Target presence is decided elsewhere.
+/// FROZEN since P08: the phrases live in the database as rule-set v1 (`data/taxonomy/event-rules.json`); this class is
+/// the built-in fallback before the catalog is seeded and the parity oracle of <c>RulesetParityTests</c>. Do not edit
+/// the phrases here — author a new rule-set version instead.
+/// </summary>
 public static class EventTypeMatcher
 {
     private static readonly (string[] Phrase, EventType Type)[] Phrases =

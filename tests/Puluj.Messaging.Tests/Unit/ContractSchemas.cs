@@ -6,7 +6,17 @@ namespace Puluj.Messaging.Tests.Unit;
 public static class ContractSchemas
 {
     public static readonly string Root = Path.Combine(AppContext.BaseDirectory, "contracts", "messaging");
-    public static readonly EvaluationOptions Options = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
+    private static readonly EvaluationOptions OptionsValue = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
+
+    /// <summary>Evaluation options; touching them loads common.schema.json first, so `$ref`s resolve whichever test runs first.</summary>
+    public static EvaluationOptions Options
+    {
+        get
+        {
+            _ = Loaded.Value;
+            return OptionsValue;
+        }
+    }
 
     private static readonly Lazy<(JsonSchema Envelope, JsonSchema RawStored, JsonSchema Ingress)> Loaded = new(() =>
     {
