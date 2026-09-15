@@ -20,3 +20,5 @@ node docs/diagrams/export.mjs     # перегенерувати *.png (потр
 | `03-data-model` | таблиці та provenance chain |
 | `04-correlation` | дублікат / приєднати / новий трек, закриття |
 | `05-realtime-history` | live-події та історичний режим |
+| `06-code-classes` | ключові класи й межі проєктів у коді |
+| `07-deployment` | Docker-оточення, порти та перший запуск порожньої БД |

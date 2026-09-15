@@ -140,7 +140,9 @@ export function compact(n: number): string {
 
 export function hoursText(h: number): string {
   if (h < 1) return `${Math.round(h * 60)} хв`
-  if (h < 48) return `${h.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} год`
+  // Use the same rounding boundary as the day representation below. Without it,
+  // 47.99 was shown as “48 год” instead of the unambiguous “2 д 0 год”.
+  if (Math.round(h) < 48) return `${h.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} год`
   let days = Math.floor(h / 24)
   let rest = Math.round(h % 24)
   if (rest === 24) {

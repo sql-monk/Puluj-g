@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Puluj.Domain.Entities;
+using Puluj.Domain.Enums;
 using Puluj.Analytics.Analysis;
 using Puluj.Analytics.Persistence;
 using Puluj.Analytics.Reporting;
@@ -55,6 +57,7 @@ public sealed class AnalysisRunnerTests : IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS postgis");
             db.Database.SetCommandTimeout(TimeSpan.FromMinutes(5));
             await db.Database.MigrateAsync();
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM targets WHERE source_id IN (SELECT source_id FROM sources WHERE code LIKE 'test_analytics_%')");
             await db.Database.ExecuteSqlRawAsync("DELETE FROM raw_messages WHERE source_id IN (SELECT source_id FROM sources WHERE code LIKE 'test_analytics_%')");
             await db.Database.ExecuteSqlRawAsync("DELETE FROM sources WHERE code LIKE 'test_analytics_%'");
             await db.Database.ExecuteSqlRawAsync("""
@@ -109,8 +112,50 @@ public sealed class AnalysisRunnerTests : IAsyncLifetime
         return await db.Copies.AsNoTracking().OrderBy(c => c.CopyPostKey).ThenBy(c => c.OriginalPostKey).ToListAsync();
     }
 
+    private async Task<int> InsertPlaceAsync()
+    {
+        await using var db = await _services!.GetRequiredService<IDbContextFactory<PulujDbContext>>().CreateDbContextAsync();
+        var point = Geo.Point(34.8, 50.9);
+        var place = new Place
+        {
+            Name = "Analytics test place",
+            ExternalKey = "test:analytics-place:" + Guid.NewGuid().ToString("N"),
+            Level = PlaceLevel.City,
+            Geometry = point,
+            Centroid = point,
+            RadiusKm = 1,
+        };
+        db.Places.Add(place);
+        await db.SaveChangesAsync();
+        return place.PlaceId;
+    }
+
+    private async Task InsertFactAsync(long rawMessageId, int sourceId, DateTimeOffset observedAt, int placeId)
+    {
+        await using var db = await _services!.GetRequiredService<IDbContextFactory<PulujDbContext>>().CreateDbContextAsync();
+        db.Targets.Add(new Target
+        {
+            RawMessageId = rawMessageId,
+            SourceId = sourceId,
+            ObservedAt = observedAt,
+            EventType = EventType.TargetObserved,
+            TargetCategoryId = null, // target type is intentionally unknown in this integration fixture
+            ObjectCount = 3,
+            LocationPlaceId = placeId,
+            Location = Geo.Point(34.8, 50.9),
+            LocationAccuracyKm = 1,
+            LocationKind = LocationKind.City,
+            DirectionDeg = 270,
+            DirectionKind = DirectionKind.Compass,
+            DirectionConfidence = ConfidenceLevel.High,
+            Confidence = ConfidenceLevel.High,
+            ParserVersion = "test",
+        });
+        await db.SaveChangesAsync();
+    }
+
     [Fact]
-    public async Task Finds_copies_forwards_and_late_originals_and_survives_reruns_and_reset()
+    public async Task Does_not_pair_identical_unparsed_posts()
     {
         if (_services is null)
         {
@@ -119,83 +164,38 @@ public sealed class AnalysisRunnerTests : IAsyncLifetime
         var t0 = DateTimeOffset.UtcNow.AddHours(-3);
         await InsertAsync(_a, "1", t0, X, channelId: 111);
         await InsertAsync(_b, "2", t0.AddMinutes(5), "🛵 " + X.ToUpperInvariant(), channelId: 222);
-        await InsertAsync(_b, "3", t0.AddMinutes(40), X + " Додатковий коментар моніторингового каналу про ситуацію в області: слідкуйте за оновленнями, перебувайте в укриттях до відбою.", channelId: 222);
-        await InsertAsync(_a, "4", t0.AddMinutes(10), Y, channelId: 111);
-        await InsertAsync(_b, "5", t0.AddHours(1), X, channelId: 222, forwardedFrom: "channel 111");
-        await InsertAsync(_b, "3:e1789433701", t0.AddMinutes(41), X + " Додатковий коментар моніторингового каналу про ситуацію в області: слідкуйте за оновленнями, перебувайте в укриттях до відбою (оновлено).", channelId: 222);
 
         var first = await Runner.RunOnceAsync(CancellationToken.None);
         Assert.True(first.Locked);
-        Assert.Equal(6, first.Scanned);
-        Assert.Equal(6, first.Fingerprinted);
-
-        var copies = await CopiesAsync();
-        Assert.Equal(3, copies.Count);
-        Assert.All(copies, c => Assert.Equal((_b, _a, "1"), (c.CopySourceId, c.OriginalSourceId, c.OriginalPostKey)));
-        Assert.All(copies, c => Assert.True(c.IsPrimary));
-        Assert.Equal(CopyKind.Verbatim, copies.Single(c => c.CopyPostKey == "2").Kind);
-        Assert.Equal(300, copies.Single(c => c.CopyPostKey == "2").DelaySeconds);
-        var edited = copies.Single(c => c.CopyPostKey == "3");
-        Assert.True(edited.Containment > 0.85 && edited.Jaccard < 0.9);
-        Assert.EndsWith(":e1789433701", await PostKeyOfAsync(edited.CopyRawMessageId)); // the edit updated the row, no second row
-        Assert.Equal(CopyKind.Forward, copies.Single(c => c.CopyPostKey == "5").Kind);
+        Assert.Equal(2, first.Scanned);
+        Assert.Equal(2, first.Fingerprinted);
+        Assert.Empty(await CopiesAsync());
 
         // Nothing new: the second run scans nothing and changes nothing.
         var second = await Runner.RunOnceAsync(CancellationToken.None);
         Assert.Equal(0, second.Scanned);
-        Assert.Equal(3, (await CopiesAsync()).Count);
-
-        // A history load brings in an earlier post of A with the same text: it becomes the primary original of every copy.
-        await InsertAsync(_a, "0", t0.AddMinutes(-20), X, channelId: 111);
-        await Runner.RunOnceAsync(CancellationToken.None);
-        copies = await CopiesAsync();
-        Assert.Equal(6, copies.Count);
-        Assert.All(copies.Where(c => c.OriginalPostKey == "0"), c => Assert.True(c.IsPrimary));
-        Assert.All(copies.Where(c => c.OriginalPostKey == "1"), c => Assert.False(c.IsPrimary));
-
-        var status = await Reports.StatusAsync(CancellationToken.None);
-        Assert.True(status.Initialized);
-        Assert.Equal(0, status.Backlog);
-        Assert.Equal("ok", status.LastRun!.Status);
-        Assert.Equal(7, status.MessagesIndexed);
-
-        var report = await Reports.ReportAsync(14, CancellationToken.None);
-        Assert.NotNull(report);
-        var a = report.Sources.Single(s => s.Id == _a);
-        var b = report.Sources.Single(s => s.Id == _b);
-        Assert.Equal(3, a.Posts);
-        Assert.Equal(3, a.CopiedBy);
-        Assert.Equal(3, b.Posts);
-        Assert.Equal(1, b.Edits);
-        Assert.Equal(3, b.Copies);
-        Assert.Equal(0, b.UniqueShare);
-        Assert.Equal(1, b.ForwardsInternal);
-        var pair = report.Pairs.Single(p => p.Count > 0);
-        Assert.Equal((_b, _a, 3, 6, 1, 1), (pair.CopierId, pair.OriginalId, pair.Count, pair.CountAll, pair.Verbatim, pair.Forwards));
-        var recent = await Reports.RecentAsync(10, _b, null, false, CancellationToken.None);
-        Assert.Equal(6, recent.Count);
-        Assert.All(recent, r => Assert.False(string.IsNullOrEmpty(r.CopyText)));
-        Assert.Equal(3, (await Reports.RecentAsync(10, null, null, true, CancellationToken.None)).Count);
-        Assert.All(await Reports.RecentAsync(10, null, CopyKind.Forward, false, CancellationToken.None), r => Assert.Equal("forward", r.Kind));
-
-        var details = await Reports.PairAsync(_b, _a, 14, CancellationToken.None);
-        Assert.NotNull(details);
-        Assert.Equal((3, 6, 1, 1), (details.Count, details.CountAll, details.Verbatim, details.Forwards));
-        Assert.Equal(3, details.Delays.Sum(d => d.Count));
-        Assert.Equal(6, details.Recent.Count);
-        Assert.Equal(pair.MedianDelaySeconds, details.MedianDelaySeconds);
-
-        // Reset and rebuild from scratch: the same picture.
-        await Reports.ResetAsync(CancellationToken.None);
         Assert.Empty(await CopiesAsync());
-        var rebuilt = await Runner.RunOnceAsync(CancellationToken.None);
-        Assert.Equal(7, rebuilt.Scanned);
-        Assert.Equal(6, (await CopiesAsync()).Count);
     }
 
-    private async Task<string> PostKeyOfAsync(long rawMessageId)
+    [Fact]
+    public async Task Pairs_differently_worded_posts_when_their_parsed_event_matches()
     {
-        await using var db = await Factory.CreateDbContextAsync();
-        return (await db.Database.SqlQuery<string>($"SELECT source_message_id AS \"Value\" FROM raw_messages WHERE raw_message_id = {rawMessageId}").ToListAsync()).Single();
+        if (_services is null)
+        {
+            return;
+        }
+        var t0 = DateTimeOffset.UtcNow.AddHours(-3);
+        var first = await InsertAsync(_a, "semantic-1", t0, "Три шахеди над Сумами курсом на Полтаву.", channelId: 111);
+        var second = await InsertAsync(_b, "semantic-2", t0.AddMinutes(5), "Група БпЛА з Сум рухається на захід.", channelId: 222);
+        var place = await InsertPlaceAsync();
+        await InsertFactAsync(first, _a, t0, place);
+        await InsertFactAsync(second, _b, t0.AddMinutes(5), place);
+
+        await Runner.RunOnceAsync(CancellationToken.None);
+
+        var pair = Assert.Single(await CopiesAsync());
+        Assert.Equal((_a, _b), (pair.OriginalSourceId, pair.CopySourceId));
+        Assert.Equal(CopyKind.Near, pair.Kind);
+        Assert.True(pair.Jaccard < 0.7); // different wording was not used to decide the pair
     }
 }

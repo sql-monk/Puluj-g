@@ -11,10 +11,10 @@ export default defineConfig({
   // pre-bundling would strip that file, so the package is served as-is.
   optimizeDeps: { exclude: ['maplibre-gl'] },
   server: {
-    port: 5173,
+    port: 5183,
     proxy: {
-      '/api': { target: 'http://localhost:5257', changeOrigin: true },
-      '/hubs': { target: 'http://localhost:5257', changeOrigin: true, ws: true },
+      '/api': { target: 'http://localhost:5267', changeOrigin: true },
+      '/hubs': { target: 'http://localhost:5267', changeOrigin: true, ws: true },
     },
   },
   // Built straight into the API's static folder, so `dotnet run` serves the SPA without extra copying.

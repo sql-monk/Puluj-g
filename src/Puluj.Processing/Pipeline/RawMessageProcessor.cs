@@ -177,7 +177,7 @@ public sealed class RawMessageProcessor(
         var sw = Stopwatch.StartNew();
         var normalized = normalizer.Normalize(raw.RawText!);
         var normalizeMs = sw.ElapsedMilliseconds;
-        var ctx = new ParseContext(source.SourceId, normalized.Language, HomeRegionOf(source), raw.PublishedAt);
+        var ctx = new ParseContext(source.SourceId, normalized.Language, HomeRegionOf(source), raw.PublishedAt, raw.RawMessageId);
         var facts = await parser.ParseAsync(normalized, ctx, ct);
         var parseMs = sw.ElapsedMilliseconds - normalizeMs;
         var targets = facts.Select(f => builder.Build(f, raw, source, f.ParserVersion, f.Method, normalized.Language)).ToList();

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { admin, type CollectorStatusDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
+import { admin, type CollectorStatusDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
-import { Bars, Stat, ago, fmtBytes, fmtNum, fmtTime, usePolled } from './shared'
+import { Bars, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 
 const SERVICE_LABEL: Record<string, string> = {
   worker: 'Worker (збір і обробка)',
@@ -146,8 +146,64 @@ export function CollectorsPanel() {
 }
 
 export function DbPanel() {
-  const { data, error } = usePolled(() => admin.ops.db(), 30_000)
+  const { data, error, reload } = usePolled(() => admin.ops.db(), 15_000)
   const d: DbReportDto | null = data
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [tableRows, setTableRows] = useState<DbQueryResultDto | null>(null)
+  const [tableError, setTableError] = useState<string | null>(null)
+  const [loadingTable, setLoadingTable] = useState(false)
+  const [sql, setSql] = useState('')
+  const [queryResult, setQueryResult] = useState<DbQueryResultDto | null>(null)
+  const [queryError, setQueryError] = useState<string | null>(null)
+  const [querying, setQuerying] = useState(false)
+  const [confirmation, setConfirmation] = useState('')
+  const [reprocessing, setReprocessing] = useState(false)
+  const [actionMessage, setActionMessage] = useState<string | null>(null)
+
+  const openTable = async (name: string) => {
+    setSelectedTable(name)
+    setTableRows(null)
+    setTableError(null)
+    setLoadingTable(true)
+    try {
+      setTableRows(await admin.ops.dbTableRows(name))
+    } catch (e) {
+      setTableError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoadingTable(false)
+    }
+  }
+
+  const runQuery = async () => {
+    setQueryError(null)
+    setQueryResult(null)
+    setQuerying(true)
+    try {
+      setQueryResult(await admin.ops.dbQuery(sql))
+    } catch (e) {
+      setQueryError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setQuerying(false)
+    }
+  }
+
+  const reprocess = async () => {
+    if (confirmation !== 'REPROCESS') return
+    if (!window.confirm('Очистити всі похідні дані, зберегти raw_messages і поставити їх у чергу на повторну обробку? Цю дію не можна скасувати.')) return
+    setReprocessing(true)
+    setActionMessage(null)
+    try {
+      const result = await admin.ops.reprocess()
+      setActionMessage(`У чергу поставлено ${fmtNum(result.queued)} повідомлень${result.analyticsReset ? '; аналітику також очищено.' : '.'}`)
+      setConfirmation('')
+      reload()
+    } catch (e) {
+      setActionMessage(`Помилка: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setReprocessing(false)
+    }
+  }
+
   return (
     <>
       <Section title="База даних" badge={d && <Badge ok={true} text={fmtBytes(d.sizeBytes)} />}>
@@ -162,26 +218,80 @@ export function DbPanel() {
                 </span>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
+              <Stat label="Активні" value={fmtNum(d.monitoring.activeConnections)} hint={`idle: ${fmtNum(d.monitoring.idleConnections)}`} tone={d.monitoring.activeConnections > 20 ? 'warn' : 'ok'} />
+              <Stat label="Кеш PostgreSQL" value={fmtPercent(d.monitoring.cacheHitRatio * 100)} tone={d.monitoring.cacheHitRatio < 0.9 ? 'warn' : 'ok'} />
+              <Stat label="Мертві рядки" value={fmtNum(d.monitoring.deadRows)} tone={d.monitoring.deadRows > 100_000 ? 'warn' : undefined} />
+              <Stat label="Транзакції" value={fmtNum(d.monitoring.transactionsCommitted)} hint={`rollback: ${fmtNum(d.monitoring.transactionsRolledBack)}`} />
+              <Stat label="Таблиць" value={fmtNum(d.tables.length)} />
+              <Stat label="Оновлення" value="15 с" hint="автоматично" />
+            </div>
+            <p className="text-[11px] text-slate-500">Лічильники записів і транзакцій — накопичувальні з моменту останнього скидання статистики PostgreSQL. Три риски в «Активності» — insert / update / delete.</p>
+            <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="text-left text-slate-500">
                 <tr>
                   <th className="py-1 pr-2">Таблиця</th>
-                  <th className="pr-2 text-right">Рядків</th>
-                  <th className="pr-2 text-right">Розмір</th>
+                  <th className="pr-2">Дані</th>
+                  <th className="pr-2">Активність</th>
+                  <th className="pr-2">Обслуговування</th>
+                  <th className="pr-2" />
                 </tr>
               </thead>
               <tbody>
                 {d.tables.map((t) => (
                   <tr key={t.name} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="py-1 pr-2 font-mono">{t.name}</td>
-                    <td className="pr-2 text-right font-mono">{t.rows.toLocaleString('uk-UA')}</td>
-                    <td className="pr-2 text-right font-mono">{fmtBytes(t.bytes)}</td>
+                    <td className="min-w-32 pr-2 font-mono">
+                      <div>{fmtNum(t.rows)} рядків</div>
+                      <InlineMeter value={t.bytes} max={Math.max(...d.tables.map((x) => x.bytes), 1)} label={fmtBytes(t.bytes)} />
+                    </td>
+                    <td className="min-w-28 pr-2">
+                      <div className="flex items-center gap-2">
+                        <Bars values={[t.inserts, t.updates, t.deletes]} height={20} width="w-2" title={(i, v) => `${['insert', 'update', 'delete'][i]}: ${fmtNum(v)}`} />
+                        <span className="font-mono text-[10px] text-slate-500">{fmtNum(t.inserts)} / {fmtNum(t.updates)} / {fmtNum(t.deletes)}</span>
+                      </div>
+                    </td>
+                    <td className="min-w-32 pr-2 text-[10px] text-slate-500">
+                      <div>dead: {fmtNum(t.deadRows)}</div>
+                      <div title={t.lastVacuumAt}>{t.lastVacuumAt ? `vacuum ${ago(t.lastVacuumAt)}` : 'vacuum —'}</div>
+                      <div title={t.lastAnalyzeAt}>{t.lastAnalyzeAt ? `analyze ${ago(t.lastAnalyzeAt)}` : 'analyze —'}</div>
+                    </td>
+                    <td className="pr-2 text-right"><button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-600" onClick={() => void openTable(t.name)}>Дані</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           </>
         )}
+      </Section>
+      {selectedTable && (
+        <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={`${fmtNum(tableRows.rows.length)} рядків`} />}>
+          <p className="text-xs text-slate-500">Перші 50 рядків. Значення секретних полів приховано.</p>
+          {loadingTable && <div className="text-xs text-slate-500">Завантаження…</div>}
+          {tableError && <div className="text-xs text-red-600">{tableError}</div>}
+          {tableRows && <QueryResult result={tableRows} />}
+        </Section>
+      )}
+      <Section title="SQL-консоль (лише читання)" badge={<Badge ok={null} text="SELECT / WITH" />}>
+        <p className="text-xs text-slate-500">Виконує один <code>SELECT</code> або <code>WITH … SELECT</code> у read-only транзакції, максимум 200 рядків і 10 секунд. Коментарі, системні pg_* функції та секретні поля заблоковані.</p>
+        <textarea className="min-h-28 w-full rounded border border-slate-300 p-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800" spellCheck={false} placeholder="SELECT raw_message_id, source_id, published_at, processing_status FROM raw_messages ORDER BY raw_message_id DESC LIMIT 50" value={sql} onChange={(e) => setSql(e.target.value)} />
+        <div className="flex items-center gap-2">
+          <button className="rounded bg-slate-800 px-3 py-1 text-xs text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900" onClick={() => void runQuery()} disabled={querying || !sql.trim()}>{querying ? 'Виконую…' : 'Виконати SELECT'}</button>
+          {queryError && <span className="text-xs text-red-600">{queryError}</span>}
+        </div>
+        {queryResult && <QueryResult result={queryResult} />}
+      </Section>
+      <Section title="Повторна обробка повідомлень" badge={<Badge ok={null} text="не запускається автоматично" />}>
+        <p className="text-xs text-slate-500">Збереже <code>raw_messages</code>, а похідні дані (цілі, треки, тривоги, зв’язки, помилки обробки, статистику та аналітику) очистить. Усі збережені повідомлення повернуться в чергу для обробки за часом публікації. Джерела, налаштування та довідники не змінюються.</p>
+        <label className="block text-xs">Введіть <code>REPROCESS</code> для розблокування дії
+          <input className="ml-2 rounded border border-red-300 px-2 py-1 font-mono dark:border-red-800 dark:bg-slate-800" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
+        </label>
+        <div className="flex items-center gap-2">
+          <button className="rounded border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300" disabled={confirmation !== 'REPROCESS' || reprocessing} onClick={() => void reprocess()}>{reprocessing ? 'Очищаю й ставлю в чергу…' : 'Очистити похідні дані та перепроцесити'}</button>
+          {actionMessage && <span className={`text-xs ${actionMessage.startsWith('Помилка:') ? 'text-red-600' : 'text-emerald-600'}`}>{actionMessage}</span>}
+        </div>
       </Section>
       {d && (
         <Section title="Міграції" badge={<Badge ok={null} text={`${d.migrations.length}`} />}>
@@ -195,6 +305,30 @@ export function DbPanel() {
         </Section>
       )}
     </>
+  )
+}
+
+function InlineMeter({ value, max, label }: { value: number; max: number; label: string }) {
+  const percent = Math.max(2, Math.round((value / max) * 100))
+  return <div className="flex items-center gap-1.5" title={label}><div className="h-1.5 w-16 overflow-hidden rounded bg-slate-200 dark:bg-slate-700"><div className="h-full rounded bg-violet-500" style={{ width: `${percent}%` }} /></div><span className="text-[10px]">{label}</span></div>
+}
+
+function QueryResult({ result }: { result: DbQueryResultDto }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] text-slate-500">{fmtNum(result.rows.length)} рядків · {fmtNum(result.elapsedMs)} мс{result.truncated ? ' · показано перші рядки' : ''}</div>
+      <div className="max-h-96 overflow-auto rounded border border-slate-200 dark:border-slate-700">
+        <table className="w-full text-left text-[11px]">
+          <thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-800">
+            <tr>{result.columns.map((c) => <th key={c} className="whitespace-nowrap px-2 py-1 font-mono">{c}</th>)}</tr>
+          </thead>
+          <tbody>
+            {result.rows.map((row, i) => <tr key={i} className="border-t border-slate-100 dark:border-slate-800">{row.map((value, j) => <td key={j} className="max-w-80 truncate px-2 py-1 font-mono" title={value ?? 'NULL'}>{value ?? <span className="text-slate-400">NULL</span>}</td>)}</tr>)}
+          </tbody>
+        </table>
+      </div>
+      {result.rows.length === 0 && <div className="text-xs text-slate-500">Рядків немає.</div>}
+    </div>
   )
 }
 

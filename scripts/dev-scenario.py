@@ -1,6 +1,6 @@
 """Injects a demo situation through POST /api/admin/dev/ingest of the admin service. Usage: python scripts/dev-scenario.py"""
 import json, urllib.request, datetime, sys
-base = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:5258'
+base = sys.argv[1] if len(sys.argv) > 1 else 'http://localhost:5268'
 def post(path, body):
     req = urllib.request.Request(base + path, data=json.dumps(body).encode('utf-8'), headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=20) as r:

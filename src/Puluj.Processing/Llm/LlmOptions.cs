@@ -21,4 +21,9 @@ public sealed class LlmOptions
     public TimeSpan FailurePause { get; set; } = TimeSpan.FromMinutes(15);
     /// <summary>Bumped whenever the prompt changes; stored with every LLM-derived target.</summary>
     public string PromptVersion { get; set; } = "1";
+    /// <summary>USD per million tokens. These defaults are Claude Opus 5 list prices; store the snapshot with every request.</summary>
+    public decimal InputUsdPerMillionTokens { get; set; } = 5m;
+    public decimal OutputUsdPerMillionTokens { get; set; } = 25m;
+    public decimal CacheWriteUsdPerMillionTokens { get; set; } = 6.25m;
+    public decimal CacheReadUsdPerMillionTokens { get; set; } = .5m;
 }

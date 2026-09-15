@@ -17,7 +17,7 @@ public static class ApiDependencyInjection
         services.AddHttpClient("admin-test");
         services.AddOpenApi();
         services.AddCors(o => o.AddPolicy("dev", p => p
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins("http://localhost:5183")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()));

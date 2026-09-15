@@ -268,9 +268,33 @@ export interface PipelineReportDto {
 export interface DbReportDto {
   version: string
   sizeBytes: number
-  tables: { name: string; rows: number; bytes: number }[]
+  tables: {
+    name: string
+    rows: number
+    bytes: number
+    inserts: number
+    updates: number
+    deletes: number
+    deadRows: number
+    lastVacuumAt?: string
+    lastAnalyzeAt?: string
+  }[]
   migrations: string[]
   connections: { role: string; connections: number }[]
+  monitoring: {
+    activeConnections: number
+    idleConnections: number
+    transactionsCommitted: number
+    transactionsRolledBack: number
+    cacheHitRatio: number
+    deadRows: number
+  }
+}
+export interface DbQueryResultDto {
+  columns: string[]
+  rows: (string | null)[][]
+  truncated: boolean
+  elapsedMs: number
 }
 export interface LogFileDto {
   name: string
@@ -365,6 +389,9 @@ export const admin = {
     scale: (replicas: number) => call<ScaleResultDto>('POST', '/api/admin/ops/processors/scale', { replicas }),
     pipeline: (hours: 24 | 168 | 720) => call<PipelineReportDto>('GET', `/api/admin/ops/pipeline?hours=${hours}`),
     db: () => call<DbReportDto>('GET', '/api/admin/ops/db'),
+    dbTableRows: (name: string, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}`),
+    dbQuery: (sql: string) => call<DbQueryResultDto>('POST', '/api/admin/ops/db/query', { sql }),
+    reprocess: () => call<{ queued: number; analyticsReset: boolean }>('POST', '/api/admin/ops/reprocess', { confirmation: 'REPROCESS_DERIVED_DATA' }),
     logFiles: () => call<LogFileDto[]>('GET', '/api/admin/logs/files'),
     logTail: (file: string, lines: number, filter: string, level: string) => {
       const q = new URLSearchParams({ file, lines: String(lines) })

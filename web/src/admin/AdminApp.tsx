@@ -9,7 +9,10 @@ import { WorkersPanel } from './WorkersPanel'
 import { PipelinePanel } from './PipelinePanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
-const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:5257/`
+// The admin build is used both locally (:5268 → map :5267) and through Docker
+// (:8091 → map :8090). An explicit VITE_MAP_URL remains available for reverse proxies.
+const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
+const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
 type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
 
@@ -37,7 +40,7 @@ function sectionFromHash(): SectionId {
 }
 
 /**
- * The admin panel (its own service, port 5258): monitoring of every component (status, workers and containers,
+ * The admin panel (its own service, port 5268): monitoring of every component (status, workers and containers,
  * collectors, pipeline, database, logs) and all the settings. Values go to the app_settings table through /api/admin/*; the Worker
  * picks them up within seconds and restarts its collectors — no process restart, no .env editing.
  */
@@ -332,6 +335,8 @@ function SystemSection({ status, draft, change, s }: TabProps) {
       </Section>
       <Section title="Кореляція">
         <Field label="Поріг приєднання до треку (0–1)" setting={s('Correlation:AttachThreshold')} draft={draft} onChange={change} type="number" hint="0.6 типово; вище — більше окремих треків, нижче — агресивніше злиття" />
+        <Field label="Вікно пошуку кандидатів (хв)" setting={s('Correlation:CandidateWindowMinutes')} draft={draft} onChange={change} type="number" hint="120 типово; межа часу для добору активних треків, перед точним оцінюванням" />
+        <Field label="Запас переваги кандидата (0–1)" setting={s('Correlation:AmbiguityMargin')} draft={draft} onChange={change} type="number" hint="0.05 типово; якщо різниця між двома найкращими балами менша, створюється окремий трек" />
       </Section>
     </>
   )

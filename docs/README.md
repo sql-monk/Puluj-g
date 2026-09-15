@@ -1,4 +1,6 @@
-# Puluj — документація
+# Puluj-G — документація
+
+Цей форк зберігає опис доменної моделі Puluj; для запуску та всіх імен/портів Puluj-G використовуйте [`fork-deployment.md`](fork-deployment.md). Документацію нижче синхронізовано з форком: локальні сервіси слухають `5267`/`5268`/`5269`, а Docker публікує карту й панель на `8090`/`8091` та PostgreSQL на `5442`.
 
 Puluj збирає відкриті повідомлення про повітряні загрози (alerts.in.ua, офіційні та моніторингові Telegram-канали),
 розбирає їх на факти, зв'язує факти у треки об'єктів і показує на карті з напрямком, ETA до точки користувача та
@@ -13,13 +15,15 @@ Puluj збирає відкриті повідомлення про повітр
 
 ![Огляд системи](diagrams/01-overview.png)
 
+Повний набір редагованих діаграм: [алгоритм обробки](diagrams/02-pipeline.drawio), [модель БД](diagrams/03-data-model.drawio), [алгоритм кореляції](diagrams/04-correlation.drawio), [live та історія](diagrams/05-realtime-history.drawio), [основні класи](diagrams/06-code-classes.drawio) і [перший Docker deploy](diagrams/07-deployment.drawio). PNG-прев’ю та інструкція перегенерації — у [каталозі діаграм](diagrams/README.md).
+
 | Частина | Що робить |
 |---|---|
 | **Puluj.Worker** | колектори джерел, розбір тексту, дедуплікація, кореляція треків, закриття треків за таймаутом. Один процес, кілька фонових служб; при старті застосовує міграції і seed |
 | **PostgreSQL + PostGIS** | єдине джерело істини: оригінальні повідомлення, факти, треки з історією, довідники (таксономія, географія) |
-| **Puluj.Api** (:5257) | публічна частина: REST для карти, SignalR для live-подій, роздача зібраного frontend. Ходить у БД роллю `puluj_reader` — лише SELECT і EXECUTE функцій `puluj_*` |
-| **Puluj.Admin** (:5258) | адмін-панель окремим сервісом: усі налаштування (джерела з токенами, alerts.in.ua, Telegram, LLM, кореляція), рейтинг джерел, стан кожного компонента, статистика колекторів/обробки/БД і хвости логів. Роль `puluj_admin` (читання-запис таблиць, без DDL) |
-| **Puluj.Analytics.Worker** (:5259) | аналітика джерел окремим сервісом: порівнює **тексти** повідомлень і пише у власну схему `analytics`, хто кого копіює (дослівно / майже / пересиланням), з якою затримкою, хто першоджерело, активність за годинами, хто перший відкриває треки. Панель показує це в розділі «Аналітика». Власник `puluj` (мігрує свою схему); див. [Аналітика джерел](#аналітика-джерел) |
+| **Puluj.Api** (:5267) | публічна частина: REST для карти, SignalR для live-подій, роздача зібраного frontend. Ходить у БД роллю `puluj_reader` — лише SELECT і EXECUTE функцій `puluj_*` |
+| **Puluj.Admin** (:5268) | адмін-панель окремим сервісом: усі налаштування (джерела з токенами, alerts.in.ua, Telegram, LLM, кореляція), рейтинг джерел, стан кожного компонента, статистика колекторів/обробки/БД і хвости логів. Роль `puluj_admin` (читання-запис таблиць, без DDL) |
+| **Puluj.Analytics.Worker** (:5269) | аналітика джерел окремим сервісом: порівнює **тексти** повідомлень і пише у власну схему `analytics`, хто кого копіює (дослівно / майже / пересиланням), з якою затримкою, хто першоджерело, активність за годинами, хто перший відкриває треки. Панель показує це в розділі «Аналітика». Власник `puluj` (мігрує свою схему); див. [Аналітика джерел](#аналітика-джерел) |
 | **web/** | React + MapLibre, дві точки входу з однієї кодової бази: `index.html` (карта → `Puluj.Api/wwwroot`) і `admin.html` (панель → `Puluj.Admin/wwwroot`). ETA та старіння маркерів рахує сам — сервер не знає, де користувач |
 
 Worker → Api зв'язані через Postgres `LISTEN/NOTIFY`: після коміту повідомлення Worker публікує `{type, id}`, Api дочитує
@@ -36,16 +40,16 @@ Worker → Api зв'язані через Postgres `LISTEN/NOTIFY`: після �
 
 ```powershell
 pwsh scripts/gazetteer/download.ps1   # один раз: області (geoBoundaries), райони і громади (COD-AB, HDX), населені пункти (GeoNames), ~170 MB, не в git
-pwsh scripts/dev-run.ps1 -ResetDb     # build, міграції + seed, Worker, Api :5257, Admin :5258 і Analytics :5259 у фоні (консоль у %TEMP%\puluj-*.log, файли в logs/); -Stop зупиняє
-cd web; npm install; npm run dev      # карта: http://localhost:5173 (проксі на Api); npm run dev:admin — панель: http://localhost:5174 (проксі на Admin)
+pwsh scripts/dev-run.ps1 -ResetDb     # build, міграції + seed, Worker, Api :5267, Admin :5268 і Analytics :5269 у фоні (консоль у %TEMP%\puluj-g-*.log, файли в logs/); -Stop зупиняє
+cd web; npm install; npm run dev      # карта: http://localhost:5183 (проксі на Api); npm run dev:admin — панель: http://localhost:5184 (проксі на Admin)
 python scripts/dev-scenario.py        # демо-ситуація через POST /api/admin/dev/ingest
 ```
 
-Production: `cp .env.example deploy/.env`, заповнити токени, `docker compose -f deploy/docker-compose.yml up --build` → карта http://localhost:8080, панель http://localhost:8081. Кожен сервіс — окремий контейнер: `migrate` (one-shot з образу Worker-а: міграції + seed; `api`, `admin` і колектори чекають `service_completed_successfully`), `collector-telegram` (єдиний з томом `tgsession`), `collector-alerts`, `processor` (обробка; `deploy.replicas: 2`, масштабується горизонтально — див. «Кілька процесорів» нижче), `api`, `admin`, `analytics` (аналітика джерел, власний образ `Dockerfile.analytics`, healthcheck `--healthcheck`); спільний том `logs` (`worker-<ім'я>-<день>.log`). Ролі задає `Worker__Roles` (`migrate,telegram,alerts,processing`; порожньо = усе в одному процесі, так працює `dev-run.ps1`), ім'я інстансу — `Worker__Name` (heartbeat `Runtime:Worker:<ім'я>:Heartbeat`, панель показує кожен окремо; `Worker__AppendHostName=true` додає до імені hostname контейнера, щоб репліки одного сервісу розрізнялись). Колектори будять процесори через NOTIFY `RawMessageStored`; якщо повідомлення губиться, процесори самі забирають Pending-рядки за `Processing:PendingPollInterval`.
+Production: `Copy-Item .env.example deploy/.env`, заповнити токени, `docker compose -p puluj-g -f deploy/docker-compose.yml up --build` → карта http://localhost:8090, панель http://localhost:8091, PostgreSQL для локальних діагностик — `localhost:5442`. Кожен сервіс — окремий контейнер: `migrate` (one-shot з образу Worker-а: міграції + seed; `api`, `admin` і колектори чекають `service_completed_successfully`), `collector-telegram` (єдиний з томом `tgsession`), `collector-alerts`, `processor` (обробка; `deploy.replicas: 2`, масштабується горизонтально — див. «Кілька процесорів» нижче), `api`, `admin`, `analytics` (аналітика джерел, власний образ `Dockerfile.analytics`, healthcheck `--healthcheck`); спільний том `logs` (`worker-<ім'я>-<день>.log`). Порожній том `puluj-g_pgdata` ініціалізується автоматично: `migrate` застосовує EF-міграції та seed, після чого інші сервіси запускаються. Ролі задає `Worker__Roles` (`migrate,telegram,alerts,processing`; порожньо = усе в одному процесі, так працює `dev-run.ps1`), ім'я інстансу — `Worker__Name` (heartbeat `Runtime:Worker:<ім'я>:Heartbeat`, панель показує кожен окремо; `Worker__AppendHostName=true` додає до імені hostname контейнера, щоб репліки одного сервісу розрізнялись). Колектори будять процесори через NOTIFY `RawMessageStored`; якщо повідомлення губиться, процесори самі забирають Pending-рядки за `Processing:PendingPollInterval`.
 
 **Кілька процесорів.** Будь-яка кількість інстансів з роллю `processing` працює над однією БД. Повідомлення забирається claim-ом — одним `UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED)`, що переводить рядок `raw_messages` у `InProgress` (status 4) з `claimed_by` = ім'я інстансу і `claimed_at`; далі обробка йде під замком цього рядка, тож кожне повідомлення обробляється рівно один раз, де б не жили інстанси. Claim інстансу, що впав, повертає в `Pending` будь-який живий (`Processing__ClaimLease`, типово 5 хв; спроба рахується, після `MaxAttempts` — `Failed` з помилкою `lease`). Усередині інстансу `Processing__Concurrency` воркерів (типово 2). Парсинг (правила, LLM) іде паралельно всюди; стадія запису (цілі з тригерами лінкера, дедуплікація, кореляція, тривоги) — під `pg_advisory_xact_lock` по одному повідомленню на всю систему (`AdvisoryLocks.Store`), тому кореляція не гоняється сама з собою; масштабується саме парсинг. Порядок «найстаріше перше» тримається з точністю до вікна в кількість воркерів; для детермінованої перебудови — один інстанс з `Concurrency=1`. `Llm__MaxCallsPerMinute` — ліміт на інстанс. **Усі процесори над однією БД мають бути однієї збірки**: замок запису існує з міграції `AddRawMessageClaims`, і старіший процесор (наприклад, docker-репліка з учорашнього образу поруч із локальним Worker) пише повз нього — 15.09 це дало 31 дедлок за чверть години. При оновленні спершу зупинити старі інстанси; `scripts/dev-run.ps1` попереджає, коли бачить `puluj-processor-*` / `puluj-collector-telegram-*` (`-Force` пропускає).
 `npm run build` кладе обидва бандли у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot` (`build:user` / `build:admin` — окремо).
-`dev-run.ps1 -Public` збирає обидва SPA і біндить Api на `0.0.0.0:5257`, Admin на `0.0.0.0:5258` (доступ з LAN, друкує адреси); правила firewall додаються один раз, потрібні права адміністратора. Панель ззовні працює лише після того, як задати `Admin:Token` з localhost.
+`dev-run.ps1 -Public` збирає обидва SPA і біндить Api на `0.0.0.0:5267`, Admin на `0.0.0.0:5268` (доступ з LAN, друкує адреси); правила firewall додаються один раз, потрібні права адміністратора. Панель ззовні працює лише після того, як задати `Admin:Token` з localhost.
 
 **Ролі БД.** Міграція `AddDbRoles` створює `puluj_reader` (SELECT на всі таблиці, EXECUTE функцій) і `puluj_admin` (SELECT/INSERT/UPDATE/DELETE, послідовності, функції; без DDL) з початковими паролями = ім'я ролі, і `ALTER DEFAULT PRIVILEGES`, щоб права переходили на таблиці наступних міграцій. Owner `puluj` лишається лише Worker-у (він мігрує). Паролі міняються `ALTER ROLE … PASSWORD` і в connection string відповідного сервісу (`appsettings.json` / `PULUJ_READER_PASSWORD`, `PULUJ_ADMIN_PASSWORD` у `.env`).
 
@@ -67,7 +71,7 @@ Production: `cp .env.example deploy/.env`, заповнити токени, `doc
 у сховище момент потрапляє раз на секунду — звідти тривоги (`GET /api/snapshot?at=`) і стрічка, яка показує лише те, що
 вже було повідомлено на момент курсора, останні 3 хв підсвічені. Події SignalR у цьому режимі ігноруються.
 
-**Адмін-панель** — окремий сервіс `Puluj.Admin` (кнопка ⚙ на карті веде на `http://<host>:5258/`, `VITE_ADMIN_URL` перевизначає). Розділ «Налаштування»: токен alerts.in.ua з перевіркою (зберігається на
+**Адмін-панель** — окремий сервіс `Puluj.Admin` (кнопка ⚙ на карті веде на `http://<host>:5268/`, `VITE_ADMIN_URL` перевизначає). Розділ «Налаштування»: токен alerts.in.ua з перевіркою (зберігається на
 самому джерелі, колонка `sources.secrets`, у браузер ніколи не повертається — лише «збережено/не задано»), Telegram
 (api_id/api_hash/телефон, код входу вводиться там само), LLM-ключ, джерела (увімкнути/вимкнути, додати канал, довіра,
 пріоритет, інтервал, домашній регіон), адмін-токен, поріг кореляції. Значення зберігаються в таблиці `app_settings` і
@@ -84,7 +88,7 @@ Production: `cp .env.example deploy/.env`, заповнити токени, `doc
 | `Collectors__AlertsInUa__{Enabled,Token,PollingInterval}` | off, —, 30 с | alerts.in.ua (`Token` — лише запасний, якщо на джерелі немає свого) |
 | `Collectors__Telegram__{Enabled,ApiId,ApiHash,Phone,Password,VerificationCode,SessionPath,AutoJoin,BackfillLimit}` | off | MTProto-сесія |
 | `Llm__{Enabled,Model,TimeoutSeconds,MaxCallsPerMinute}` + `ANTHROPIC_API_KEY` | off, claude-opus-5, 20, 20 | LLM fallback парсера |
-| `Correlation__{AttachThreshold,SlackKm,DuplicateWindow,CloseAfterWindows}` | 0.6, 30, 3 хв, 2 | кореляція (див. нижче) |
+| `Correlation__{CandidateWindowMinutes,AttachThreshold,AmbiguityMargin,SlackKm,DuplicateWindow,CloseAfterWindows}` | 120 хв, 0.6, 0.05, 30, 3 хв, 2 | кореляція (див. нижче) |
 | `Processing__{MaxAttempts,PendingPollInterval,Concurrency,ClaimLease}` | 3, 10 с, 2, 5 хв | повтори обробки; інтервал добору Pending без NOTIFY; воркерів на інстанс; ліз claim-у |
 | `Processing__MaxTransientRetries` | 10 | скільки разів дедлок / serialization failure повертає повідомлення в `Pending` без зарахованої спроби |
 | `Collectors__Telegram__BackfillSince` | — | одноразове дочитування всієї історії каналів від дати з перебудовою похідного |
@@ -92,7 +96,7 @@ Production: `cp .env.example deploy/.env`, заповнити токени, `doc
 | `Llm__MaxMessageAgeHours` | 72 | старіші повідомлення до моделі не йдуть (перебудова історії — лише правила) |
 | `Llm__FailurePause` | 15 хв | пауза моделі після 400/401/403 (баланс, ключ, відхилений запит); після 429 — 1 хв |
 | `Seed__DataDirectory` | `data` | шукається вгору від content root |
-| `Analytics__{Interval,BatchSize,SafetyLag,PairWindow,MinTextLength,JaccardThreshold,ContainmentThreshold,ContainmentMinLength,VerbatimThreshold,TrackFirstsDays}` (сервіс analytics) | 1 хв, 500, 30 с, 6 год, 40, 0.7, 0.85, 80, 0.9, 30 | див. [Аналітика джерел](#аналітика-джерел) |
+| `Analytics__{Interval,BatchSize,SafetyLag,EventWindow,CandidateScan,TrackFirstsDays}` (сервіс analytics) | 1 хв, 500, 30 с, 30 хв, 200, 30 | див. [Аналітика джерел](#аналітика-джерел) |
 
 ## Джерела
 
@@ -252,18 +256,15 @@ PL/pgSQL + PostGIS (`puluj_link_target`, тригер `trg_targets_insert_kinema
 
 ## Аналітика джерел
 
-Окремий сервіс `Puluj.Analytics.Worker` (контейнер `analytics`, локально :5259) відповідає на питання «хто кого
-копіює» на рівні **тексту**, а не фактів парсера (рейтинг джерел вище рахує повтори фактів за ±3 хв і залежить від
-того, що парсер розібрав). Раз на хвилину він бере нові `raw_messages` (за курсором `raw_message_id`, лише рядки,
-отримані понад 30 с тому, щоб не проскочити ще не закомічену вставку), нормалізує текст (NFC, нижній регістр, без
-посилань, згадок, хештегів, емодзі, пунктуації і рядків-підписів каналу), рахує символьні 4-грами → MinHash (64 хеші)
-→ 16 LSH-смуг і зберігає їх у `analytics.messages` (GIN-індекс по смугах). Кандидати — пости **інших** джерел з
-хоча б однією спільною смугою у вікні ±6 год (в обидва боки: дочитана історія може виявитись оригіналом для вже
-проіндексованого поста); для топ-50 за спільними смугами тексти дочитуються і рахуються точні Жаккар і вкладення
-(|A∩B|/min). Пара приймається при J ≥ 0.7, або при вкладенні ≥ 0.85, якщо коротший текст ≥ 80 символів (коротке
-«Київщина: БпЛА курсом на Обухів» міститься в кожному списку з цим пунктом — це шаблон, не копія; тексти коротші
-за 40 символів відбитка не отримують узагалі). Раніший `published_at` — оригінал, різниця — затримка; вид: `forward`
-(payload копії має `forwardedFrom = channel N`, і N — канал джерела оригіналу), `verbatim` (J ≥ 0.9) або `near`.
+Окремий сервіс `Puluj.Analytics.Worker` (контейнер `analytics`, локально :5259) зіставляє повідомлення різних
+каналів за **подіями**, а не дослівністю тексту. Раз на хвилину він бере нові `raw_messages` (за курсором
+`raw_message_id`, лише рядки, отримані понад 30 с тому, щоб не проскочити ще не закомічену вставку) і використовує
+факти, які конвеєр уже виділив у `targets`. Пара можлива лише у вікні `EventWindow` (типово ±30 хв) і коли збігаються
+тип події та категорія цілі, сумісні уточнення класу/сімейства/моделі, є спільне місце (позиція, початок або напрямок),
+а кількість і напрямок не суперечать одне одному. Два однакові, але непарсовані тексти не утворюють пари. Жаккар і
+вкладення зберігаються лише як діагностичні показники вже знайденої подієвої пари. Раніший `published_at` — оригінал,
+різниця — затримка; `forward` означає явне пересилання з каналу джерела оригіналу, а `near` — незалежне повідомлення
+про ту саму подію.
 Редагування поста (`{id}:e{ts}`) належать тому самому логічному посту: пара `(копія, оригінал)` унікальна на пару
 постів і оновлюється, а не дублюється. Серед оригіналів однієї копії найраніший — `is_primary` (першоджерело); решта
 лишаються як «у кого читає». Пересилання з каналів, яких ми не збираємо, рахуються окремо (кандидати на джерела).
@@ -288,7 +289,7 @@ PL/pgSQL + PostGIS (`puluj_link_target`, тригер `trg_targets_insert_kinema
 (0, якщо вони перетинаються), а не між центроїдами мінус радіуси: місто за 30 км від межі області не «всередині» неї лише тому,
 що радіус, який покриває область, — 150 км.
 
-**Кореляція**: кандидати — активні треки тієї ж категорії з сумісним класом, `last_seen` ±2 год. Бал кожного:
+**Кореляція**: кандидати — активні треки тієї ж категорії з сумісним класом, `last_seen` у межах ±`CandidateWindowMinutes` (типово 120 хв). Дві різні явно визначені моделі несумісні; відсутня модель лишається неконкретною. Бал кожного:
 
 ```
 time      = 1 − Δt / вікно класу                     (БпЛА 60 хв, крилаті 25, балістика 10)
@@ -299,8 +300,7 @@ class     = 1 та сама модель · 0.9 те саме сімейство
 total     = 0.30·time + 0.35·space + 0.15·direction + 0.20·class
 ```
 `total ≤ 0.3` (не приєднувати), якщо `space = 0` або **те саме джерело** за < 8 хв назвало інший пункт (район чи призначення),
-до якого об'єкт не міг долетіти — джерело перелічує різні об'єкти. Приєднання при `total ≥ 0.6` (`AttachThreshold`), інакше
-новий трек. Розклад балів (`gapKm`, `maxDistanceKm` = reach) зберігається в `target_track_targets.association_reason`.
+до якого об'єкт не міг долетіти — джерело перелічує різні об'єкти. Приєднання при `total ≥ 0.6` (`AttachThreshold`) можливе лише коли найкращий бал строго більший за другий на `AmbiguityMargin` (типово 0.05); за вилки відкривається новий трек. Розклад балів (`gapKm`, `maxDistanceKm` = reach) зберігається в `target_track_targets.association_reason`.
 
 **Оновлення треку**: класифікація лише уточнюється (сімейство → модель), новіший факт рухає останній район, шлях і напрямок,
 старіший (out-of-order) лише додає provenance. `track_confidence` = найкраща впевненість факту, +1 за ≥ 2 джерела,
@@ -354,7 +354,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `GET /api/stats?from&to` | сторінка «Статистика»: усі графіки одного періоду одним payload (`StatsDto`: KPI, динаміка за категоріями, класи, області, маршрути «звідки → куди», година × день тижня, зрізи, тривоги по областях і тривалості, джерела). Без параметрів — 24 год; кінець обрізається до «зараз», довжина — до 366 днів; крок `hour`/`day`/`week` (≤ 3 дні / ≤ 120 днів / далі), бакети в `Europe/Kyiv`. Кеш 2 хв на період, клієнт округлює кінець до 5 хв. Лише агрегати — нічого про глядача |
 | `GET /api/places/search?q=`, `/api/places/regions`, `/api/places/{id}/geometry` | пошук пункту (лише центроїд), полігони регіонів і районів Києва (кеш 1 год) |
 | `GET /api/health` | БД + свіжість колекторів: `ok` / `stale` (немає успіху > 3× інтервалу → `Degraded`) / `idle` (колектор вимкнено) |
-| `/api/admin/*` (сервіс Admin, :5258) | `settings` (GET/PUT), `status`, `sources` (GET/POST/PUT/DELETE), `sources/rating?days=` (рейтинг за днями, пари копіювань, групи), `telegram/code`, `test/alerts`; заголовок `X-Admin-Token` |
+| `/api/admin/*` (сервіс Admin, :5268) | `settings` (GET/PUT), `status`, `sources` (GET/POST/PUT/DELETE), `sources/rating?days=` (рейтинг за днями, пари копіювань, групи), `telegram/code`, `test/alerts`; заголовок `X-Admin-Token` |
 | `/api/admin/ops/*` | `overview` (стан сервісів + БД), `collectors`, `processing`, `db`; `/api/admin/logs/files`, `/api/admin/logs?file=&lines=&filter=&level=` |
 | `/api/admin/analytics/*` | `status` (курсор, відставання, прогони), `report?days=` (джерела, пари, зовнішні пересилання, перші по треках), `recent?limit=&sourceId=` (пари з текстами), `POST reset` |
 | `POST /api/admin/dev/ingest` | вкинути повідомлення чи payload тривоги як від колектора (тестування) |
@@ -470,7 +470,7 @@ eta_min = (d_edge, або max(0, d − accuracy)) / v_max − elapsed;   eta_max
 | Симптом | Куди дивитись |
 |---|---|
 | повідомлення є, маркера нема | `raw_messages.processing_status`, `processing_errors`, лог `no facts` → додати alias / кейс у корпус |
-| об'єкти злилися або розпалися | `target_track_targets.association_reason`; `Correlation__AttachThreshold`, `SlackKm` |
+| об'єкти злилися або розпалися | `target_track_targets.association_reason`; `Correlation__CandidateWindowMinutes`, `AttachThreshold`, `AmbiguityMargin`, `SlackKm` |
 | модель визначена надто впевнено | `targets.identification_source` — який alias; його `confidence` у seed |
 | тривога не з'являється / не зникає | `air_alerts`, `collector_states`, `/api/health`; лог `unknown location` → `regions.json` |
 | порожня карта після рестарту | геодані не завантажені (`Gazetteer: 0 settlements`); Api стартував раніше за seed — перечитає за 15 с |

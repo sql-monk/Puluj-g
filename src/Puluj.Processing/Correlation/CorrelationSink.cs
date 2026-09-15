@@ -21,8 +21,6 @@ public sealed class CorrelationSink(
     TimeProvider clock,
     ILogger<CorrelationSink> logger) : ITargetSink
 {
-    private const int CandidateWindowMinutes = 120;
-
     public async Task OnTargetsAsync(PulujDbContext db, IReadOnlyList<Target> targets, Source source, ICollection<PulujEvent> events, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -101,26 +99,25 @@ public sealed class CorrelationSink(
         var approach = destination is null ? null : indexes.Gazetteer.ApproachBearingTo(destination.Centroid.Coordinate);
 
         // Candidate window is generous; the per-pair class profile (target class, else track class) drives the score.
-        var since = o.ObservedAt.AddMinutes(-CandidateWindowMinutes);
-        var until = o.ObservedAt.AddMinutes(CandidateWindowMinutes);
+        var candidateWindowMinutes = Math.Max(1, options.CurrentValue.CandidateWindowMinutes);
+        var since = o.ObservedAt.AddMinutes(-candidateWindowMinutes);
+        var until = o.ObservedAt.AddMinutes(candidateWindowMinutes);
         // A track closed by the watchdog's timeout is still a candidate while its last report is inside the window:
         // the object reported again is the same object (out-of-order delivery, a rebuild racing the watchdog).
         var candidates = await db.TargetTracks
             .Where(t => (t.Status == TrackStatus.Active || t.ClosedReason == "timeout") && t.TargetCategoryId == o.TargetCategoryId && t.LastSeenAt >= since && t.LastSeenAt <= until)
             .ToListAsync(ct);
 
-        TargetTrack? best = null;
-        AssociationScore? bestScore = null;
+        var scoredCandidates = new List<ScoredTrack>();
         foreach (var t in candidates.Where(t => Correlator.ClassCompatible(o, t) && !usedTracks.Contains(t.TargetTrackId)))
         {
             var profile = indexes.Taxonomy.ClassProfile(o.TargetClassId ?? t.TargetClassId);
             var score = Correlator.Score(o, t, profile, options.CurrentValue.SlackKm, oAnchor, Correlator.AnchorOf(t, indexes.Gazetteer));
-            if (score.Total >= options.CurrentValue.AttachThreshold && (bestScore is null || score.Total > bestScore.Total))
-            {
-                best = t;
-                bestScore = score;
-            }
+            scoredCandidates.Add(new ScoredTrack(t, score));
         }
+        var chosen = Correlator.SelectBestTrack(scoredCandidates, options.CurrentValue.AttachThreshold, options.CurrentValue.AmbiguityMargin);
+        var best = chosen?.Track;
+        var bestScore = chosen?.Score;
 
         if (best is null)
         {

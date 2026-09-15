@@ -61,7 +61,7 @@ public sealed record ParsedFact
 }
 
 /// <param name="PublishedAt">When the message was published; the LLM fallback skips messages older than Llm:MaxMessageAgeHours.</param>
-public sealed record ParseContext(int SourceId, string Language, int? HomeRegionPlaceId, DateTimeOffset? PublishedAt = null);
+public sealed record ParseContext(int SourceId, string Language, int? HomeRegionPlaceId, DateTimeOffset? PublishedAt = null, long? RawMessageId = null);
 
 public interface IParser
 {

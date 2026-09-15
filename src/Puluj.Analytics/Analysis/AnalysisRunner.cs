@@ -160,14 +160,15 @@ public sealed class AnalysisRunner(
             if (message.Fingerprint.Indexed)
             {
                 fingerprinted++;
-                foreach (var match in await detector.FindAsync(db, message.Row, message.Fingerprint, ct))
-                {
-                    var pair = detector.Pair(message.Row, match, now);
-                    await UpsertPairAsync(db, pair, ct);
-                    metrics.PairFound(pair.Kind);
-                    touched.Add((pair.CopySourceId, pair.CopyPostKey));
-                    pairs++;
-                }
+            }
+            // Parsed events are correlatable even when there is no text at all.
+            foreach (var match in await detector.FindAsync(db, message.Row, message.Fingerprint, ct))
+            {
+                var pair = detector.Pair(message.Row, match, now);
+                await UpsertPairAsync(db, pair, ct);
+                metrics.PairFound(pair.Kind);
+                touched.Add((pair.CopySourceId, pair.CopyPostKey));
+                pairs++;
             }
         }
         foreach (var (sourceId, postKey) in touched)
@@ -222,8 +223,9 @@ public sealed class AnalysisRunner(
             ForwardedExternal = row.ForwardedFrom is not null && forwardedSource is null && !ownForward,
             TextLength = fp.Canonical.Length,
             ShingleCount = fp.Shingles.Count,
-            MinHash = fp.Signature is null ? null : MinHasher.ToBytes(fp.Signature),
-            Bands = fp.Bands,
+            // Legacy columns stay null. Semantic candidates are read from parsed targets, never text LSH bands.
+            MinHash = null,
+            Bands = null,
             IndexedAt = now,
         };
         await db.Database.ExecuteSqlAsync($"""

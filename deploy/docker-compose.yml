@@ -9,10 +9,10 @@
 #            │                                          ├─ admin  (settings, status, logs)
 #            │                                          └─ analytics (source analytics: who copies whom; own schema)
 
-name: puluj
+name: puluj-g
 
 x-worker: &worker
-  image: puluj-worker
+  image: puluj-g-worker
   build:
     context: ..
     dockerfile: deploy/Dockerfile.worker
@@ -37,7 +37,7 @@ services:
       POSTGRES_USER: puluj
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-puluj}
     ports:
-      - "5432:5432"
+      - "5442:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -108,7 +108,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     ports:
-      - "8080:8080"
+      - "8090:8080"
     volumes:
       - logs:/app/logs
     depends_on:
@@ -140,10 +140,10 @@ services:
       Logs__Directory: /app/logs
       Docker__Enabled: "true"
       Docker__ComposeDir: /deploy
-      Docker__Project: puluj
+      Docker__Project: puluj-g
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
     ports:
-      - "8081:8081"
+      - "8091:8081"
     volumes:
       - logs:/app/logs
       - /var/run/docker.sock:/var/run/docker.sock

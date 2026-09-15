@@ -24,8 +24,8 @@ public static class AdminEndpoints
         "Collectors:Telegram:Enabled", "Collectors:Telegram:ApiId", "Collectors:Telegram:ApiHash", "Collectors:Telegram:Phone",
         "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit",
     ];
-    private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey"];
-    private static readonly string[] OtherKeys = ["Correlation:AttachThreshold", "Admin:Token"];
+    private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
+    private static readonly string[] OtherKeys = ["Correlation:AttachThreshold", "Correlation:CandidateWindowMinutes", "Correlation:AmbiguityMargin", "Admin:Token"];
 
     /// <summary>Defaults baked into the option classes, shown when neither the DB nor configuration sets the key.</summary>
     private static readonly Dictionary<string, string> Defaults = new(StringComparer.OrdinalIgnoreCase)
@@ -36,7 +36,13 @@ public static class AdminEndpoints
         ["Collectors:Telegram:BackfillLimit"] = "30",
         ["Llm:Enabled"] = "false",
         ["Llm:Model"] = "claude-opus-5",
+        ["Llm:InputUsdPerMillionTokens"] = "5",
+        ["Llm:OutputUsdPerMillionTokens"] = "25",
+        ["Llm:CacheWriteUsdPerMillionTokens"] = "6.25",
+        ["Llm:CacheReadUsdPerMillionTokens"] = "0.5",
         ["Correlation:AttachThreshold"] = "0.6",
+        ["Correlation:CandidateWindowMinutes"] = "120",
+        ["Correlation:AmbiguityMargin"] = "0.05",
     };
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)

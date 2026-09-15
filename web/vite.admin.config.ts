@@ -15,15 +15,15 @@ function adminRoot(): Plugin {
   }
 }
 
-// Second entry of the same code base: the admin panel. Served by Puluj.Admin (port 5258), talks only to /api/admin/*.
+// Second entry of the same code base: the admin panel. Served by Puluj.Admin (port 5268), talks only to /api/admin/*.
 // Shares components, styles and the api/ clients with the user app (vite.config.ts).
 export default defineConfig({
   plugins: [react(), tailwindcss(), adminRoot()],
   optimizeDeps: { exclude: ['maplibre-gl'] },
   server: {
-    port: 5174,
+    port: 5184,
     proxy: {
-      '/api': { target: 'http://localhost:5258', changeOrigin: true },
+      '/api': { target: 'http://localhost:5268', changeOrigin: true },
     },
   },
   build: {

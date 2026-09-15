@@ -1,6 +1,11 @@
+using System.Data;
+using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Puluj.Analytics.Reporting;
 using Puluj.Admin.Docker;
 using Puluj.Api.Services;
 using Puluj.Domain.Entities;
@@ -17,7 +22,7 @@ namespace Puluj.Admin;
 /// holds, and the tail of every service's log. Statistics come from SQL, statuses from `app_settings`, containers from
 /// the docker CLI (<see cref="DockerService"/>); the only writes are the container actions and the reprocess request.
 /// </summary>
-public static class OpsEndpoints
+public static partial class OpsEndpoints
 {
     private static readonly TimeSpan WorkerStale = TimeSpan.FromSeconds(90);
     private static readonly TimeSpan WorkerForgotten = TimeSpan.FromMinutes(15); // a killed dev process leaves its key behind
@@ -34,6 +39,8 @@ public static class OpsEndpoints
         ops.MapGet("/ops/collectors", CollectorsAsync);
         ops.MapGet("/ops/pipeline", PipelineAsync);
         ops.MapGet("/ops/db", DbAsync);
+        ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
+        ops.MapPost("/ops/db/query", DbQueryAsync);
 
         // Containers of the compose stack (docs/plan-admin-ops.md §2.3): list, restart / stop / start, scale the processors.
         ops.MapGet("/ops/containers", async (DockerService docker, CancellationToken ct) => Results.Ok(await docker.ListAsync(ct)));
@@ -72,14 +79,24 @@ public static class OpsEndpoints
 
         // Rebuild everything derived from the raw messages (after a parser / linker change): the Worker re-runs the
         // pipeline over all of them in publication order. Refused while a history load holds processing.
-        ops.MapPost("/ops/reprocess", async (ReprocessService reprocess, CancellationToken ct) =>
+        ops.MapPost("/ops/reprocess", async (DbReprocessRequest request, ReprocessService reprocess, AnalyticsReportService analytics, CancellationToken ct) =>
         {
+            if (!string.Equals(request.Confirmation, "REPROCESS_DERIVED_DATA", StringComparison.Ordinal))
+            {
+                return Results.BadRequest(new { error = "Для цієї операції потрібне точне підтвердження." });
+            }
             if (await reprocess.PausedAsync(ct) is { } paused)
             {
                 return Results.Conflict(new { error = $"Обробку призупинено: {paused}" });
             }
             var queued = await reprocess.ResetAsync(ct);
-            return Results.Ok(new { queued });
+            // The analytics schema is another derived view of raw_messages. It can be absent before its worker first starts.
+            var analyticsStatus = await analytics.StatusAsync(ct);
+            if (analyticsStatus.Initialized)
+            {
+                await analytics.ResetAsync(ct);
+            }
+            return Results.Ok(new { queued, analyticsReset = analyticsStatus.Initialized });
         });
 
         // Testing without real sources: inject a message as if a collector had received it.
@@ -133,7 +150,7 @@ public static class OpsEndpoints
         }
 
         // Api: its own health endpoint over HTTP.
-        var apiUrl = (config["Admin:ApiUrl"] ?? "http://localhost:5257").TrimEnd('/');
+        var apiUrl = (config["Admin:ApiUrl"] ?? "http://localhost:5267").TrimEnd('/');
         try
         {
             var client = http.CreateClient("api-probe");
@@ -305,8 +322,11 @@ public static class OpsEndpoints
         return Results.Ok(list);
     }
 
-    private sealed record TableRow(string Name, long Rows, long Bytes);
+    private sealed record TableRow(
+        string Name, long Rows, long Bytes, long Inserts, long Updates, long Deletes, long DeadRows,
+        DateTimeOffset? LastVacuumAt, DateTimeOffset? LastAnalyzeAt);
     private sealed record RoleRow(string Role, int Connections);
+    private sealed record MonitoringRow(int ActiveConnections, int IdleConnections, long TransactionsCommitted, long TransactionsRolledBack, double CacheHitRatio, long DeadRows);
 
     private static async Task<IResult> DbAsync(IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
     {
@@ -314,17 +334,119 @@ public static class OpsEndpoints
         var version = (await db.Database.SqlQueryRaw<string>("SELECT version() AS \"Value\"").ToListAsync(ct)).FirstOrDefault() ?? "?";
         var size = (await db.Database.SqlQueryRaw<long>("SELECT pg_database_size(current_database()) AS \"Value\"").ToListAsync(ct)).FirstOrDefault();
         var tables = await db.Database.SqlQueryRaw<TableRow>("""
-            SELECT relname AS name, n_live_tup AS rows, pg_total_relation_size(relid) AS bytes
+            SELECT relname AS name, n_live_tup AS rows, pg_total_relation_size(relid) AS bytes,
+                   n_tup_ins AS inserts, n_tup_upd AS updates, n_tup_del AS deletes, n_dead_tup AS dead_rows,
+                   coalesce(last_autovacuum, last_vacuum) AS last_vacuum_at,
+                   coalesce(last_autoanalyze, last_analyze) AS last_analyze_at
             FROM pg_stat_user_tables WHERE schemaname = 'public' ORDER BY bytes DESC
             """).ToListAsync(ct);
         var roles = await db.Database.SqlQueryRaw<RoleRow>("""
             SELECT coalesce(usename, '?') AS role, count(*)::int AS connections
             FROM pg_stat_activity WHERE datname = current_database() GROUP BY 1 ORDER BY 2 DESC
             """).ToListAsync(ct);
+        var monitoring = (await db.Database.SqlQueryRaw<MonitoringRow>("""
+            SELECT
+              count(*) FILTER (WHERE state = 'active')::int AS active_connections,
+              count(*) FILTER (WHERE state = 'idle')::int AS idle_connections,
+              coalesce((SELECT xact_commit FROM pg_stat_database WHERE datname = current_database()), 0) AS transactions_committed,
+              coalesce((SELECT xact_rollback FROM pg_stat_database WHERE datname = current_database()), 0) AS transactions_rolled_back,
+              coalesce((SELECT blks_hit::double precision / nullif(blks_hit + blks_read, 0) FROM pg_stat_database WHERE datname = current_database()), 1) AS cache_hit_ratio,
+              (SELECT coalesce(sum(n_dead_tup), 0) FROM pg_stat_user_tables WHERE schemaname = 'public') AS dead_rows
+            FROM pg_stat_activity WHERE datname = current_database()
+            """).ToListAsync(ct)).Single();
         var migrations = (await db.Database.GetAppliedMigrationsAsync(ct)).ToList();
         return Results.Ok(new DbReportDto(version, size,
-            tables.Select(t => new DbTableDto(t.Name, t.Rows, t.Bytes)).ToList(),
+            tables.Select(t => new DbTableDto(t.Name, t.Rows, t.Bytes, t.Inserts, t.Updates, t.Deletes, t.DeadRows, t.LastVacuumAt, t.LastAnalyzeAt)).ToList(),
             migrations,
-            roles.Select(r => new DbRoleConnectionsDto(r.Role, r.Connections)).ToList()));
+            roles.Select(r => new DbRoleConnectionsDto(r.Role, r.Connections)).ToList(),
+            new DbMonitoringDto(monitoring.ActiveConnections, monitoring.IdleConnections, monitoring.TransactionsCommitted,
+                monitoring.TransactionsRolledBack, monitoring.CacheHitRatio, monitoring.DeadRows)));
     }
+
+    private static async Task<IResult> DbTableRowsAsync(string name, int? limit, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        if (!TableName().IsMatch(name))
+        {
+            return Results.BadRequest(new { error = "Некоректна назва таблиці." });
+        }
+        var take = Math.Clamp(limit ?? 50, 1, 200);
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var exists = await db.Database.SqlQueryRaw<string>("""
+            SELECT relname AS "Value" FROM pg_stat_user_tables
+            WHERE schemaname = 'public' AND relname = {0}
+            """, name).AnyAsync(ct);
+        if (!exists)
+        {
+            return Results.NotFound(new { error = "Таблицю не знайдено." });
+        }
+        return Results.Ok(await ReadQueryAsync(db, $"SELECT * FROM public.\"{name}\" LIMIT {take + 1}", take, redactSensitiveColumns: true, ct));
+    }
+
+    private static async Task<IResult> DbQueryAsync(DbQueryRequest request, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        if (!DatabaseQueryGuard.TryValidate(request.Sql, out var error))
+        {
+            return Results.BadRequest(new { error });
+        }
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return Results.Ok(await ReadQueryAsync(db, request.Sql, 200, redactSensitiveColumns: false, ct));
+    }
+
+    private static async Task<DbQueryResultDto> ReadQueryAsync(PulujDbContext db, string sql, int maxRows, bool redactSensitiveColumns, CancellationToken ct)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        await db.Database.OpenConnectionAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
+        await db.Database.ExecuteSqlRawAsync("SET TRANSACTION READ ONLY", ct);
+        await db.Database.ExecuteSqlRawAsync("SET LOCAL statement_timeout = '10s'", ct);
+        var connection = db.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
+        command.CommandText = sql;
+        command.CommandTimeout = 10;
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        var columns = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName).ToList();
+        var sensitive = redactSensitiveColumns
+            ? columns.Select(IsSensitiveColumn).ToArray()
+            : new bool[columns.Count];
+        var rows = new List<IReadOnlyList<string?>>();
+        var truncated = false;
+        while (await reader.ReadAsync(ct))
+        {
+            if (rows.Count >= maxRows)
+            {
+                truncated = true;
+                break;
+            }
+            var row = new string?[columns.Count];
+            for (var i = 0; i < columns.Count; i++)
+            {
+                row[i] = sensitive[i] ? "••••••" : DbValue(reader, i);
+            }
+            rows.Add(row);
+        }
+        await transaction.RollbackAsync(ct);
+        stopwatch.Stop();
+        return new DbQueryResultDto(columns, rows, truncated, stopwatch.ElapsedMilliseconds);
+    }
+
+    private static string? DbValue(IDataRecord record, int ordinal)
+    {
+        if (record.IsDBNull(ordinal))
+        {
+            return null;
+        }
+        var value = Convert.ToString(record.GetValue(ordinal), CultureInfo.InvariantCulture) ?? string.Empty;
+        // Browsing a JSON payload or long message must not turn an admin request into a multi-megabyte response.
+        return value.Length <= 4_000 ? value : $"{value[..4_000]}…";
+    }
+
+    private static bool IsSensitiveColumn(string name) => name.Contains("secret", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("token", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("password", StringComparison.OrdinalIgnoreCase)
+        || name.Contains("api_key", StringComparison.OrdinalIgnoreCase)
+        || name.Equals("config", StringComparison.OrdinalIgnoreCase);
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex TableName();
 }

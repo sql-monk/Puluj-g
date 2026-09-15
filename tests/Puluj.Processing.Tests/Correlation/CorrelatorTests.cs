@@ -59,6 +59,53 @@ public class CorrelatorTests
     }
 
     [Fact]
+    public void Different_explicit_models_are_not_compatible()
+    {
+        var track = TrackUpdater.CreateTrack(Obs(34.8, 50.9, 0, model: 10), T0);
+        var other = Obs(34.8, 50.9, 5, model: 11);
+
+        Assert.False(Correlator.ClassCompatible(other, track));
+        other.TargetModelId = null;
+        Assert.True(Correlator.ClassCompatible(other, track));
+    }
+
+    [Fact]
+    public void Unique_best_candidate_is_selected()
+    {
+        var best = new TargetTrack { TargetTrackId = 10 };
+        var runnerUp = new TargetTrack { TargetTrackId = 20 };
+
+        var selected = Correlator.SelectBestTrack(
+            [new ScoredTrack(best, Score(0.82)), new ScoredTrack(runnerUp, Score(0.70))], 0.6, 0.05);
+
+        Assert.Same(best, selected?.Track);
+    }
+
+    [Fact]
+    public void Ambiguous_candidates_are_not_selected()
+    {
+        var first = new TargetTrack { TargetTrackId = 10 };
+        var second = new TargetTrack { TargetTrackId = 20 };
+
+        var selected = Correlator.SelectBestTrack(
+            [new ScoredTrack(first, Score(0.82)), new ScoredTrack(second, Score(0.78))], 0.6, 0.05);
+
+        Assert.Null(selected);
+    }
+
+    [Fact]
+    public void Near_threshold_runner_up_still_makes_the_choice_ambiguous()
+    {
+        var first = new TargetTrack { TargetTrackId = 10 };
+        var second = new TargetTrack { TargetTrackId = 20 };
+
+        var selected = Correlator.SelectBestTrack(
+            [new ScoredTrack(first, Score(0.62)), new ScoredTrack(second, Score(0.59))], 0.6, 0.05);
+
+        Assert.Null(selected);
+    }
+
+    [Fact]
     public void Opposite_direction_lowers_score()
     {
         var track = TrackUpdater.CreateTrack(Obs(34.8, 50.9, 0, dir: 180), T0);
@@ -207,6 +254,8 @@ public class CorrelatorTests
         first.LocationAccuracyKm = 146;
         return TrackUpdater.CreateTrack(first, T0);
     }
+
+    private static AssociationScore Score(double total) => new(total, 0, 0, 0, 0, 0, 0, 0, 0);
 
     [Fact]
     public void Destination_only_report_is_anchored_on_the_approach_to_the_place()

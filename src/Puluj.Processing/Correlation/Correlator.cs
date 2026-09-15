@@ -28,6 +28,9 @@ public sealed record AssociationScore(double Total, double Time, double Space, d
     }));
 }
 
+/// <summary>A track together with its correlation score.</summary>
+public sealed record ScoredTrack(TargetTrack Track, AssociationScore Score);
+
 /// <summary>
 /// Where an target or a track "is" for correlation purposes. A located report anchors at its place; a report that
 /// only names a destination ("1 БпЛА на Конотоп") anchors at the approach to that place. Admin areas carry their polygon,
@@ -70,7 +73,36 @@ public static class Correlator
         {
             return false;
         }
-        return o.TargetClassId is null || t.TargetClassId is null || o.TargetClassId == t.TargetClassId;
+        if (o.TargetClassId is not null && t.TargetClassId is not null && o.TargetClassId != t.TargetClassId)
+        {
+            return false;
+        }
+        // A model is a positive identification: two different explicit models must never be joined just because
+        // time and location happen to be compatible. A missing model remains intentionally unspecific.
+        return o.TargetModelId is null || t.TargetModelId is null || o.TargetModelId == t.TargetModelId;
+    }
+
+    /// <summary>
+    /// Selects a qualifying candidate only when it is unambiguously better than the runner-up. Ordering by track id
+    /// makes diagnostics deterministic, while the strict margin still rejects equal or near-equal scores.
+    /// </summary>
+    public static ScoredTrack? SelectBestTrack(IEnumerable<ScoredTrack> candidates, double attachThreshold, double ambiguityMargin)
+    {
+        var ranked = candidates
+            .OrderByDescending(candidate => candidate.Score.Total)
+            .ThenBy(candidate => candidate.Track.TargetTrackId)
+            .ToList();
+        if (ranked.Count == 0 || ranked[0].Score.Total < attachThreshold)
+        {
+            return null;
+        }
+        if (ranked.Count == 1)
+        {
+            return ranked[0];
+        }
+        return ranked[0].Score.Total - ranked[1].Score.Total > Math.Max(0, ambiguityMargin)
+            ? ranked[0]
+            : null;
     }
 
     public static SpatialAnchor? AnchorOf(Target o, GazetteerIndex? gazetteer = null)

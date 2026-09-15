@@ -17,7 +17,7 @@ public sealed class DockerOptions
     public string ComposeDir { get; set; } = "/deploy";
 
     /// <summary>Compose project name: only containers labelled `com.docker.compose.project=&lt;Project&gt;` are listed or touched.</summary>
-    public string Project { get; set; } = "puluj";
+    public string Project { get; set; } = "puluj-g";
 
     /// <summary>Compose files relative to ComposeDir; empty = docker-compose.yml plus docker-compose.override.yml if it exists.</summary>
     public List<string> ComposeFiles { get; set; } = [];

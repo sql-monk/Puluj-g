@@ -1,20 +1,15 @@
 namespace Puluj.Analytics.Text;
 
-/// <summary>Everything the index keeps about one text: canonical form, its shingles, and (when long enough) the MinHash signature with its LSH band keys.</summary>
-public sealed record TextFingerprint(string Canonical, HashSet<ulong> Shingles, uint[]? Signature, long[]? Bands)
+/// <summary>Canonical text and shingles retained as diagnostic evidence for an event pair; they never choose candidates.</summary>
+public sealed record TextFingerprint(string Canonical, HashSet<ulong> Shingles)
 {
-    public bool Indexed => Signature is not null;
+    public bool Indexed => Canonical.Length > 0;
 
-    /// <summary>Texts shorter than <paramref name="minLength"/> canonical characters get shingles (for exact comparison) but no signature (they are never candidates).</summary>
+    /// <summary><paramref name="minLength"/> is retained for configuration compatibility; every non-empty text can be diagnostic evidence.</summary>
     public static TextFingerprint Of(string? raw, int minLength)
     {
         var canonical = TextNormalizer.Canonical(raw);
         var shingles = Shingler.Shingles(canonical);
-        if (canonical.Length < minLength)
-        {
-            return new TextFingerprint(canonical, shingles, null, null);
-        }
-        var signature = MinHasher.Signature(shingles);
-        return new TextFingerprint(canonical, shingles, signature, signature is null ? null : MinHasher.BandKeys(signature));
+        return new TextFingerprint(canonical, shingles);
     }
 }

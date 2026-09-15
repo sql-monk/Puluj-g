@@ -47,7 +47,7 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
             e.HasIndex(x => x.PublishedAt);
             e.HasIndex(x => new { x.SourceId, x.PublishedAt });
             e.HasIndex(x => new { x.SourceId, x.ChannelId });
-            // LSH lookup: `bands && @bands` on the array; texts too short to fingerprint have no bands.
+            // Kept for compatibility with already migrated analytics databases; semantic matching does not query it.
             e.HasIndex(x => x.Bands).HasMethod("gin").HasFilter("bands IS NOT NULL");
         });
 
@@ -88,7 +88,7 @@ public class AnalyticsDesignTimeFactory : IDesignTimeDbContextFactory<AnalyticsD
     public AnalyticsDbContext CreateDbContext(string[] args)
     {
         var cs = Environment.GetEnvironmentVariable("ConnectionStrings__Puluj")
-            ?? "Host=localhost;Port=5432;Database=puluj;Username=puluj;Password=puluj";
+            ?? "Host=localhost;Port=5442;Database=puluj;Username=puluj;Password=puluj";
         var options = new DbContextOptionsBuilder<AnalyticsDbContext>();
         AnalyticsDbContext.Configure(options, cs);
         return new AnalyticsDbContext(options.Options);

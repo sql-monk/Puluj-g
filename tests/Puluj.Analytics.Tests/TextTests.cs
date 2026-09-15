@@ -34,7 +34,6 @@ public class TextNormalizerTests
         Assert.Equal(line, TextNormalizer.Canonical(line));
     }
 }
-
 public class ShinglerTests
 {
     [Fact]
@@ -62,58 +61,5 @@ public class ShinglerTests
     {
         Assert.Single(Shingler.Shingles("бпл"));
         Assert.Empty(Shingler.Shingles(""));
-    }
-}
-
-public class MinHasherTests
-{
-    private static HashSet<ulong> Set(int from, int count) => new(Enumerable.Range(from, count).Select(i => (ulong)i * 2654435761UL));
-
-    [Fact]
-    public void Estimate_tracks_exact_jaccard()
-    {
-        var a = Set(0, 200);
-        var b = Set(100, 200); // overlap 100 of 300 → J = 1/3
-        var sa = MinHasher.Signature(a)!;
-        var sb = MinHasher.Signature(b)!;
-        Assert.InRange(MinHasher.Estimate(sa, sb), 0.18, 0.5);
-        Assert.Equal(1, MinHasher.Estimate(sa, MinHasher.Signature(Set(0, 200))!));
-    }
-
-    [Fact]
-    public void Signature_is_deterministic_and_round_trips()
-    {
-        var sig = MinHasher.Signature(Set(5, 50))!;
-        Assert.Equal(sig, MinHasher.Signature(Set(5, 50)));
-        Assert.Equal(sig, MinHasher.FromBytes(MinHasher.ToBytes(sig)));
-        Assert.Null(MinHasher.Signature([]));
-    }
-
-    [Fact]
-    public void Bands_match_for_similar_texts_only()
-    {
-        var a = TextFingerprint.Of("Групи ударних БпЛА на Сумщині в р-ні н.п. Боромля, Лебедин західним курсом на Полтавщину", 40);
-        var b = TextFingerprint.Of("🛵 Групи ударних БпЛА на Сумщині в р-ні н.п. Боромля, Лебедин та Недригайлів західним курсом на Полтавщину та Черкащину", 40);
-        var c = TextFingerprint.Of("Пуски керованих авіаційних бомб ворожою тактичною авіацією на південь Харківщини.", 40);
-        Assert.True(a.Indexed && b.Indexed && c.Indexed);
-        Assert.Equal(MinHasher.Bands, a.Bands!.Intersect(TextFingerprint.Of(a.Canonical, 40).Bands!).Count());
-        Assert.NotEmpty(a.Bands!.Intersect(b.Bands!));
-        Assert.Empty(a.Bands!.Intersect(c.Bands!));
-    }
-
-    [Fact]
-    public void Band_keys_differ_by_band_index()
-    {
-        var sig = new uint[MinHasher.HashCount]; // all equal values: without the band index every key would collide
-        var keys = MinHasher.BandKeys(sig);
-        Assert.Equal(MinHasher.Bands, keys.Distinct().Count());
-    }
-
-    [Fact]
-    public void Short_text_is_not_indexed()
-    {
-        var fp = TextFingerprint.Of("Відбій тривоги", 40);
-        Assert.False(fp.Indexed);
-        Assert.NotEmpty(fp.Shingles);
     }
 }

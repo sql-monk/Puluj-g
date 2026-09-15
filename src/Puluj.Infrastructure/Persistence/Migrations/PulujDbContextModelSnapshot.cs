@@ -163,6 +163,119 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("collector_states", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.LlmRequest", b =>
+                {
+                    b.Property<long>("LlmRequestId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("llm_request_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("LlmRequestId"));
+
+                    b.Property<long?>("CacheCreationInputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cache_creation_input_tokens");
+
+                    b.Property<long?>("CacheReadInputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cache_read_input_tokens");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<decimal?>("EstimatedCostUsd")
+                        .HasPrecision(18, 9)
+                        .HasColumnType("numeric(18,9)")
+                        .HasColumnName("estimated_cost_usd");
+
+                    b.Property<int>("FactsCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("facts_count");
+
+                    b.Property<long?>("InputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("input_tokens");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("model");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<long?>("OutputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("output_tokens");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("prompt_version");
+
+                    b.Property<long?>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<string>("RequestText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("request_text");
+
+                    b.Property<string>("ResponseText")
+                        .HasColumnType("text")
+                        .HasColumnName("response_text");
+
+                    b.Property<int>("SourceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_id");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.Property<string>("SystemPrompt")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("system_prompt");
+
+                    b.Property<string>("Worker")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("worker");
+
+                    b.HasKey("LlmRequestId")
+                        .HasName("pk_llm_requests");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_llm_requests_occurred_at");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("OccurredAt"), "brin");
+
+                    b.HasIndex("RawMessageId")
+                        .HasDatabaseName("ix_llm_requests_raw_message_id");
+
+                    b.HasIndex("SourceId", "OccurredAt")
+                        .HasDatabaseName("ix_llm_requests_source_id_occurred_at");
+
+                    b.ToTable("llm_requests", (string)null);
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.Place", b =>
                 {
                     b.Property<int>("PlaceId")
@@ -1340,6 +1453,26 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_collector_states_sources_source_id");
+
+                    b.Navigation("Source");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.LlmRequest", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.RawMessage", "RawMessage")
+                        .WithMany()
+                        .HasForeignKey("RawMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_llm_requests_raw_messages_raw_message_id");
+
+                    b.HasOne("Puluj.Domain.Entities.Source", "Source")
+                        .WithMany()
+                        .HasForeignKey("SourceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_llm_requests_sources_source_id");
+
+                    b.Navigation("RawMessage");
 
                     b.Navigation("Source");
                 });

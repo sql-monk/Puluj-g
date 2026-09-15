@@ -1,4 +1,4 @@
-# Puluj
+# Puluj-G
 
 Цивільне ситуаційне оповіщення про повітряні загрози з відкритих джерел: збір повідомлень (alerts.in.ua, Telegram),
 нормалізація → `Target` → `TargetTrack`, карта з напрямком руху, ETA до вашої точки та повним ланцюжком джерел.
@@ -6,7 +6,7 @@
 
 ## Документація
 
-Один документ — [`docs/README.md`](docs/README.md): устрій, запуск, джерела, парсер, треки, дані, API, карта/ETA, експлуатація.
+Базовий устрій описано в [`docs/README.md`](docs/README.md). Редаговані діаграми алгоритмів, БД, коду, live-взаємодій і Docker deploy — у [`docs/diagrams/`](docs/diagrams/README.md). Правила кореляції, її конфігурація та безпечне впровадження змін — у [`docs/correlation.md`](docs/correlation.md). Правила ізоляції цього форку, імена контейнерів та порти — у [`docs/fork-deployment.md`](docs/fork-deployment.md).
 
 ## Архітектура
 
@@ -20,9 +20,9 @@
 | `src/Puluj.Collectors` | `AlertsInUaCollector`, `TelegramCollector` (WTelegramClient), supervisor з backoff |
 | `src/Puluj.Processing` | Normalizer, RuleParser, LlmParser, TargetBuilder, Correlator, TrackWatchdog |
 | `src/Puluj.Worker` | хост збору та обробки; `Worker:Roles` (`migrate`, `telegram`, `alerts`, `processing`) вибирає, що саме запускає процес — у Docker кожна роль у своєму контейнері, без ролей усе разом |
-| `src/Puluj.Api` | публічна частина (:5257): REST (`/api/*`), SignalR (`/hubs/map`), роздача карти; БД лише на читання (роль `puluj_reader`) |
-| `src/Puluj.Admin` | адмін-панель (:5258): налаштування, рейтинг джерел, стан/статистика кожного компонента, логи; роль `puluj_admin` |
-| `src/Puluj.Analytics`, `Puluj.Analytics.Worker` | аналітика джерел окремим сервісом (:5259, контейнер `analytics`): порівнює тексти повідомлень — хто кого копіює, затримки, пересилання, активність, хто перший відкриває треки; власна схема `analytics`, сторінка «Аналітика» в панелі |
+| `src/Puluj.Api` | публічна частина (:5267): REST (`/api/*`), SignalR (`/hubs/map`), роздача карти; БД лише на читання (роль `puluj_reader`) |
+| `src/Puluj.Admin` | адмін-панель (:5268): налаштування, рейтинг джерел, стан/статистика кожного компонента, логи; роль `puluj_admin` |
+| `src/Puluj.Analytics`, `Puluj.Analytics.Worker` | аналітика джерел окремим сервісом (:5269, контейнер `analytics`): порівнює тексти повідомлень — хто кого копіює, затримки, пересилання, активність, хто перший відкриває треки; власна схема `analytics`, сторінка «Аналітика» в панелі |
 | `web/` | React + Vite + MapLibre; дві точки входу (`index.html` карта, `admin.html` панель); ETA рахується в браузері |
 | `data/` | seed: `taxonomy/*.json`, `sources.json`, `gazetteer/regions.json`, `corpus/cases.json` (golden-тести парсера) |
 
@@ -31,14 +31,14 @@
 ```bash
 cp .env.example deploy/.env            # ADMIN_TOKEN обов’язковий (панель у Docker не бачить localhost); токени джерел можна ввести в панелі (⚙) — вони зберігаються в БД
 pwsh scripts/gazetteer/download.ps1   # або scripts/gazetteer/download.sh — геодані (~80 MB, не в git)
-docker compose -f deploy/docker-compose.yml up --build
-# карта http://localhost:8080, адмін-панель http://localhost:8081  (health: /api/health на обох)
+docker compose -p puluj-g -f deploy/docker-compose.yml up --build
+# карта http://localhost:8090, адмін-панель http://localhost:8091  (health: /api/health на обох)
 ```
 
 Контейнери: `postgis`, `migrate` (one-shot: міграції + seed, решта чекає його завершення), `collector-telegram`, `collector-alerts`,
 `processor` (парсинг, кореляція, watchdog — 2 репліки, масштабується), `api`, `admin`. Усі — з одного образу Worker-а з різним `Worker__Roles`;
 між собою спілкуються лише через PostgreSQL (`raw_messages` + NOTIFY), тож будь-який можна перезапустити окремо:
-`docker compose -f deploy/docker-compose.yml restart collector-telegram`.
+`docker compose -p puluj-g -f deploy/docker-compose.yml restart collector-telegram`.
 
 ## Локальна розробка (без Docker)
 
@@ -46,13 +46,13 @@ docker compose -f deploy/docker-compose.yml up --build
 
 ```powershell
 pwsh scripts/gazetteer/download.ps1        # один раз
-pwsh scripts/dev-run.ps1 -ResetDb          # build + міграції/seed + запуск Worker, Api (5257) і Admin (5258) у фоні
-cd web && npm install && npm run dev       # карта http://localhost:5173 (проксі на Api); npm run dev:admin — панель http://localhost:5174
+pwsh scripts/dev-run.ps1 -ResetDb          # build + міграції/seed + запуск Worker, Api (5267) і Admin (5268) у фоні
+cd web && npm install && npm run dev       # карта http://localhost:5183 (проксі на Api); npm run dev:admin — панель http://localhost:5184
 python scripts/dev-scenario.py             # демо-ситуація через POST /api/admin/dev/ingest
 ```
 
-`npm run build` збирає обидва SPA у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`, після чого `http://localhost:5257/` віддає карту, а `http://localhost:5258/` — панель.
-`pwsh scripts/dev-run.ps1 -Public` робить це автоматично і відкриває обидва сервіси на всіх інтерфейсах (`http://<LAN-IP>:5257`, `:5258`) — доступ з інших пристроїв у мережі без Vite; правила firewall для 5257/5258 додаються один раз (потрібен запуск від адміністратора).
+`npm run build` збирає обидва SPA у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`, після чого `http://localhost:5267/` віддає карту, а `http://localhost:5268/` — панель.
+`pwsh scripts/dev-run.ps1 -Public` робить це автоматично і відкриває обидва сервіси на всіх інтерфейсах (`http://<LAN-IP>:5267`, `:5268`) — доступ з інших пристроїв у мережі без Vite; правила firewall для 5267/5268 додаються один раз (потрібен запуск від адміністратора).
 
 Ролі БД: Worker — owner `puluj` (мігрує), Api — `puluj_reader` (лише читання), Admin — `puluj_admin`; обидві службові ролі створює міграція з паролем = ім'я ролі, змінити: `ALTER ROLE puluj_reader PASSWORD '…'` + connection string сервісу.
 
@@ -64,7 +64,7 @@ python scripts/dev-scenario.py             # демо-ситуація чере�
 | `Collectors__AlertsInUa__Enabled`, `…__Token` | alerts.in.ua API (polling 30 с) |
 | `Collectors__Telegram__Enabled`, `…__ApiId`, `…__ApiHash`, `…__Phone`, `…__SessionPath` | MTProto-сесія; код входу — `…__VerificationCode` або файл `<SessionPath>.code` |
 | `Llm__Enabled`, `Llm__Model`, `ANTHROPIC_API_KEY` | LLM fallback парсера (вмикається лише коли правила нічого не знайшли) |
-| `Correlation__AttachThreshold` (0.6), `Correlation__DuplicateWindow` (3 хв) | кореляція/дедуплікація |
+| `Correlation__CandidateWindowMinutes` (120), `Correlation__AttachThreshold` (0.6), `Correlation__AmbiguityMargin` (0.05), `Correlation__DuplicateWindow` (3 хв) | вікно пошуку кандидатів, мінімальний бал, мінімальна перевага над другим кандидатом, дедуплікація |
 | `Seed__DataDirectory` | шлях до `data/` (за замовчуванням шукається вгору від content root) |
 
 Канали Telegram та довіра до джерел задаються у `data/sources.json`; таксономія цілей і aliases — у `data/taxonomy/`
@@ -74,7 +74,7 @@ python scripts/dev-scenario.py             # демо-ситуація чере�
 
 ```powershell
 dotnet test tests/Puluj.Processing.Tests          # парсер (golden corpus), корелятор, LLM-мапінг
-$env:PULUJ_TEST_CONNECTION="Host=localhost;Port=5432;Database=puluj_test;Username=puluj;Password=puluj"
+$env:PULUJ_TEST_CONNECTION="Host=localhost;Port=5442;Database=puluj_test;Username=puluj;Password=puluj"
 dotnet test tests/Puluj.Integration.Tests         # end-to-end на реальній PostGIS (або Testcontainers, якщо є Docker)
 cd web && npm test                                # ETA / fade
 ```

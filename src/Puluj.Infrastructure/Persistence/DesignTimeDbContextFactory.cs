@@ -9,7 +9,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<PulujDbCon
     public PulujDbContext CreateDbContext(string[] args)
     {
         var cs = Environment.GetEnvironmentVariable("ConnectionStrings__Puluj")
-            ?? "Host=localhost;Port=5432;Database=puluj;Username=puluj;Password=puluj";
+            ?? "Host=localhost;Port=5442;Database=puluj;Username=puluj;Password=puluj";
         var options = new DbContextOptionsBuilder<PulujDbContext>();
         DependencyInjection.ConfigureDbContext(options, cs);
         return new PulujDbContext(options.Options);

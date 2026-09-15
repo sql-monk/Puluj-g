@@ -1,0 +1,27 @@
+# Puluj-G: ізольований запуск
+
+`Puluj-G` — робочий форк `Puluj`. Кодові namespace-и, назва бази даних і ролі PostgreSQL навмисно лишилися сумісними з застосунком; ізоляцію забезпечують окремі Docker-проєкт, мережа, томи, образи, локальні порти та mutex збірки.
+
+| Ресурс | Puluj-G |
+|---|---|
+| Compose project | `puluj-g` |
+| Контейнери | `puluj-g-postgis-1`, `puluj-g-api-1`, `puluj-g-admin-1`, `puluj-g-processor-*`, … |
+| Образ Worker | `puluj-g-worker` |
+| Docker network / managed volumes | `puluj-g_default`, `puluj-g_pgdata`, `puluj-g_logs`, `puluj-g_tgsession` |
+| PostgreSQL host port | `5442` → container `5432` |
+| Map host port | `8090` → container `8080` |
+| Admin host port | `8091` → container `8081` |
+| Local API / Admin / Analytics | `5267` / `5268` / `5269` |
+| Vite map / admin | `5183` / `5184` |
+| Build mutex | `Global\PulujG.Build` |
+
+Запуск Docker:
+
+```powershell
+Copy-Item .env.example deploy/.env
+docker compose -p puluj-g -f deploy/docker-compose.yml up -d --build
+```
+
+Для перебудови й перевірок використовуйте `pwsh scripts/deploy.ps1`. Скрипт визначає контейнерні ID через Compose, а не припускає конкретні суфікси контейнерів; тому коректно працює і при іншій кількості реплік `processor`.
+
+`deploy/docker-compose.override.yml` у цьому робочому дереві створює окремий том `puluj-g-pgdata`. Не підміняйте його томом `Puluj`: це змішає дані двох інсталяцій.

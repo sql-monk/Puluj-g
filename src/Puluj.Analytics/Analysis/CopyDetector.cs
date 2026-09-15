@@ -5,17 +5,16 @@ using Puluj.Analytics.Text;
 
 namespace Puluj.Analytics.Analysis;
 
-/// <summary>A row of the `messages` index that shares at least one LSH band with the message under test.</summary>
-public sealed record Candidate(long RawMessageId, int SourceId, string PostKey, DateTime PublishedAt, long[] Bands, int? ForwardedSourceId);
+/// <summary>An indexed post from another source selected as a possible match for the same parsed event.</summary>
+public sealed record Candidate(long RawMessageId, int SourceId, string PostKey, DateTime PublishedAt, int? ForwardedSourceId);
 
 /// <summary>What the exact check decided about one candidate.</summary>
-public sealed record Match(Candidate Other, double Jaccard, double Containment);
+public sealed record Match(Candidate Other, double Jaccard, double Containment, bool IsSemantic = false);
 
 /// <summary>
-/// Finds the posts of other sources that share the content of a message: LSH candidates within the pair window (both
-/// directions in time — a late-arriving history row can be the original of a post indexed earlier), the exact
-/// Jaccard / containment on recomputed shingles, then the direction (earlier published = original) and the kind
-/// (forward / verbatim / near). Pure decisions are static so the tests need no database.
+/// Finds posts from other sources about the same parsed event. Event type, target kind, place, time, direction and
+/// count decide the relation; text similarity is recorded as supporting evidence only. A message without parsed facts
+/// is intentionally not paired: identical boilerplate is not evidence that two channels saw the same event.
 /// </summary>
 public sealed class CopyDetector(IOptions<AnalyticsOptions> options)
 {
@@ -23,58 +22,47 @@ public sealed class CopyDetector(IOptions<AnalyticsOptions> options)
 
     public async Task<List<Match>> FindAsync(AnalyticsDbContext db, MessageFingerprint message, TextFingerprint fingerprint, CancellationToken ct)
     {
-        if (fingerprint.Bands is null)
+        var facts = await RawMessageReader.FactsAsync(db, [message.RawMessageId], ct);
+        if (facts.Count > 0)
         {
-            return [];
+            return await FindSemanticAsync(db, message, fingerprint, facts, ct);
         }
-        var t = message.PublishedAt.UtcDateTime;
-        var from = t - O.PairWindow;
-        var to = t + O.PairWindow;
-        var candidates = await db.Database.SqlQuery<Candidate>($"""
-            SELECT raw_message_id, source_id, post_key, published_at, bands, forwarded_source_id
-            FROM analytics.messages
-            WHERE bands && {fingerprint.Bands} AND source_id <> {message.SourceId}
-              AND published_at BETWEEN {from} AND {to}
-            ORDER BY abs(extract(epoch FROM (published_at - {t}))), raw_message_id
-            LIMIT {O.CandidateScan}
-            """).ToListAsync(ct);
+        return [];
+    }
+
+    private async Task<List<Match>> FindSemanticAsync(AnalyticsDbContext db, MessageFingerprint message, TextFingerprint fingerprint, List<EventFact> facts, CancellationToken ct)
+    {
+        var candidates = new Dictionary<long, Candidate>();
+        foreach (var fact in facts.Select(f => (f.EventType, f.TargetCategoryId)).Distinct())
+        {
+            var representative = facts.First(f => f.EventType == fact.EventType && f.TargetCategoryId == fact.TargetCategoryId);
+            foreach (var candidate in await RawMessageReader.SemanticCandidatesAsync(db, message, representative, O.EventWindow, O.CandidateScan, ct))
+            {
+                candidates[candidate.RawMessageId] = candidate;
+            }
+        }
         if (candidates.Count == 0)
         {
             return [];
         }
-        var top = RankBySharedBands(candidates, fingerprint.Bands).Take(O.CandidateLimit).ToList();
-        var texts = (await RawMessageReader.TextsAsync(db, top.Select(c => c.RawMessageId).ToArray(), ct)).ToDictionary(x => x.RawMessageId, x => x.Text);
+
+        var otherFacts = (await RawMessageReader.FactsAsync(db, candidates.Keys.ToArray(), ct))
+            .GroupBy(f => f.RawMessageId).ToDictionary(g => g.Key, g => g.ToList());
+        var texts = (await RawMessageReader.TextsAsync(db, candidates.Keys.ToArray(), ct))
+            .ToDictionary(x => x.RawMessageId, x => x.Text);
         var matches = new List<Match>();
-        foreach (var c in top)
+        foreach (var (id, candidate) in candidates)
         {
-            if (!texts.TryGetValue(c.RawMessageId, out var text))
+            if (!otherFacts.TryGetValue(id, out var theirs)
+                || !facts.Any(ours => theirs.Any(theirsFact => SemanticEventMatcher.Matches(ours, theirsFact, O.EventWindow))))
             {
                 continue;
             }
-            var canonical = TextNormalizer.Canonical(text);
+            var canonical = TextNormalizer.Canonical(texts.GetValueOrDefault(id));
             var other = Shingler.Shingles(canonical);
-            var jaccard = Shingler.Jaccard(fingerprint.Shingles, other);
-            var containment = Shingler.Containment(fingerprint.Shingles, other);
-            if (Accepts(jaccard, containment, Math.Min(fingerprint.Canonical.Length, canonical.Length)))
-            {
-                matches.Add(new Match(c, jaccard, containment));
-            }
+            matches.Add(new Match(candidate, Shingler.Jaccard(fingerprint.Shingles, other), Shingler.Containment(fingerprint.Shingles, other), IsSemantic: true));
         }
         return matches;
-    }
-
-    /// <summary>Jaccard above the threshold, or — for texts long enough not to be a template — the shorter one contained in the longer.</summary>
-    public bool Accepts(double jaccard, double containment, int shorterLength) =>
-        jaccard >= O.JaccardThreshold || (containment >= O.ContainmentThreshold && shorterLength >= O.ContainmentMinLength);
-
-    /// <summary>Most bands in common first (ties: nearest in time, which is the order the query returned).</summary>
-    public static IEnumerable<Candidate> RankBySharedBands(IReadOnlyList<Candidate> candidates, long[] bands)
-    {
-        var mine = new HashSet<long>(bands);
-        return candidates
-            .Select((c, i) => (c, shared: c.Bands.Count(mine.Contains), i))
-            .OrderByDescending(x => x.shared).ThenBy(x => x.i)
-            .Select(x => x.c);
     }
 
     /// <summary>The pair as it is stored: the earlier post is the original. Same instant — the smaller id was stored first.</summary>
@@ -102,14 +90,13 @@ public sealed class CopyDetector(IOptions<AnalyticsOptions> options)
             DelaySeconds = (copyAt - origAt).TotalSeconds,
             Jaccard = (float)match.Jaccard,
             Containment = (float)match.Containment,
-            Kind = KindOf(match.Jaccard, copyForward, origSource),
+            Kind = KindOf(copyForward, origSource),
             IsPrimary = false,
             FoundAt = now,
         };
     }
 
-    public CopyKind KindOf(double jaccard, int? copyForwardedSourceId, int originalSourceId) =>
+    public CopyKind KindOf(int? copyForwardedSourceId, int originalSourceId) =>
         copyForwardedSourceId == originalSourceId ? CopyKind.Forward
-        : jaccard >= O.VerbatimThreshold ? CopyKind.Verbatim
         : CopyKind.Near;
 }

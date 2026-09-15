@@ -41,11 +41,31 @@ public sealed record CollectorStatusDto(
 
 public sealed record ProcessingErrorDto(long Id, DateTimeOffset OccurredAt, string Stage, string Message, int? SourceId, long? RawMessageId, string? Exception);
 
-public sealed record DbTableDto(string Name, long Rows, long Bytes);
+/// <summary>One application table together with PostgreSQL's cumulative maintenance and write counters.</summary>
+public sealed record DbTableDto(
+    string Name, long Rows, long Bytes, long Inserts, long Updates, long Deletes, long DeadRows,
+    DateTimeOffset? LastVacuumAt, DateTimeOffset? LastAnalyzeAt);
 
 public sealed record DbRoleConnectionsDto(string Role, int Connections);
 
-public sealed record DbReportDto(string Version, long SizeBytes, IReadOnlyList<DbTableDto> Tables, IReadOnlyList<string> Migrations, IReadOnlyList<DbRoleConnectionsDto> Connections);
+/// <summary>Lightweight PostgreSQL health signals. Counters are since the database statistics were last reset.</summary>
+public sealed record DbMonitoringDto(
+    int ActiveConnections, int IdleConnections, long TransactionsCommitted, long TransactionsRolledBack,
+    double CacheHitRatio, long DeadRows);
+
+public sealed record DbReportDto(
+    string Version, long SizeBytes, IReadOnlyList<DbTableDto> Tables, IReadOnlyList<string> Migrations,
+    IReadOnlyList<DbRoleConnectionsDto> Connections, DbMonitoringDto Monitoring);
+
+/// <summary>A bounded, display-safe result of the database browser or read-only SQL console.</summary>
+public sealed record DbQueryResultDto(
+    IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string?>> Rows, bool Truncated, long ElapsedMs);
+
+/// <summary>Body for the read-only SQL console. The server accepts one SELECT or WITH … SELECT statement only.</summary>
+public sealed record DbQueryRequest(string Sql);
+
+/// <summary>Explicit acknowledgement required before clearing derived pipeline data.</summary>
+public sealed record DbReprocessRequest(string Confirmation);
 
 public sealed record LogFileDto(string Name, string Service, long Bytes, DateTimeOffset ModifiedAt);
 

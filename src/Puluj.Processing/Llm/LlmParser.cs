@@ -4,12 +4,16 @@ using System.Threading.RateLimiting;
 using Anthropic;
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Puluj.Domain.Enums;
+using Puluj.Domain.Entities;
 using Puluj.Infrastructure;
+using Puluj.Infrastructure.Persistence;
 using Puluj.Processing.Indexes;
 using Puluj.Processing.Parsing;
+using Puluj.Processing.Pipeline;
 using Puluj.Processing.Text;
 
 namespace Puluj.Processing.Llm;
@@ -34,12 +38,15 @@ public sealed class LlmParser : IParser
     private readonly LlmBreaker _breaker;
     private readonly TimeProvider _clock;
     private readonly Lazy<string> _systemPrompt;
+    private readonly IDbContextFactory<PulujDbContext>? _auditFactory;
+    private readonly string _workerName;
     private readonly object _clientLock = new();
     private AnthropicClient? _client;
     private string? _clientKey;
     private bool _warnedNoKey;
 
-    public LlmParser(RuleParser rules, IIndexes indexes, INormalizer normalizer, IOptionsMonitor<LlmOptions> options, LlmBreaker breaker, PulujMetrics metrics, TimeProvider clock, ILogger<LlmParser> logger)
+    public LlmParser(RuleParser rules, IIndexes indexes, INormalizer normalizer, IOptionsMonitor<LlmOptions> options, LlmBreaker breaker, PulujMetrics metrics, TimeProvider clock, ILogger<LlmParser> logger,
+        IDbContextFactory<PulujDbContext>? auditFactory = null, ProcessorIdentity? identity = null)
     {
         _rules = rules;
         _clock = clock;
@@ -49,6 +56,8 @@ public sealed class LlmParser : IParser
         _monitor = options;
         _metrics = metrics;
         _logger = logger;
+        _auditFactory = auditFactory;
+        _workerName = identity?.Name ?? Environment.MachineName;
         _limiter = new FixedWindowRateLimiter(new FixedWindowRateLimiterOptions
         {
             PermitLimit = Math.Max(1, options.CurrentValue.MaxCallsPerMinute),
@@ -121,12 +130,14 @@ public sealed class LlmParser : IParser
             return facts;
         }
         _breaker.Attempt();
+        var started = _clock.GetUtcNow();
         try
         {
-            var result = await AskAsync(message.Text, ct);
-            var mapped = Map(result, message);
+            var answer = await AskAsync(message.Text, ct);
+            var mapped = Map(answer.Result, message);
             _breaker.Reset();
             _metrics.LlmCall(mapped.Count > 0 ? "facts" : "empty");
+            await AuditAsync(ctx, message.Text, answer, answer.Refused ? "refusal" : mapped.Count > 0 ? "facts" : "empty", null, null, mapped.Count, started, ct);
             return mapped;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -138,6 +149,7 @@ public sealed class LlmParser : IParser
             _metrics.LlmCall(ex is AnthropicRateLimitException ? "429" : "api_error");
             // The API's own message (billing, auth, a rejected schema) says it all; the stack trace would only repeat the SDK.
             var detail = ErrorMessage(ex);
+            await AuditAsync(ctx, message.Text, null, ex is AnthropicRateLimitException ? "429" : "api_error", (int)ex.StatusCode, detail, 0, started, ct);
             if (_breaker.Trip(ex.StatusCode, detail, _clock.GetUtcNow()) is { } pause)
             {
                 _logger.LogWarning("LLM request failed with {Status}: {Detail}; model paused for {Pause}", (int)ex.StatusCode, detail, pause);
@@ -151,6 +163,7 @@ public sealed class LlmParser : IParser
         {
             _metrics.LlmCall("error");
             _breaker.Fail();
+            await AuditAsync(ctx, message.Text, null, "error", null, ex.Message, 0, started, ct);
             _logger.LogWarning(ex, "LLM fallback failed");
         }
         return facts;
@@ -181,7 +194,7 @@ public sealed class LlmParser : IParser
     private static bool LooksLikeTargetReport(NormalizedMessage message) =>
         message.Segments.SelectMany(s => s.Tokens).Any(t => TriggerStems.Any(stem => t.Text.StartsWith(stem, StringComparison.Ordinal)));
 
-    private async Task<LlmResponse> AskAsync(string text, CancellationToken ct)
+    private async Task<LlmAnswer> AskAsync(string text, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
@@ -201,10 +214,61 @@ public sealed class LlmParser : IParser
         if (response.StopReason == "refusal")
         {
             _logger.LogInformation("LLM declined to classify the message");
-            return new LlmResponse([]);
+            return new LlmAnswer(new LlmResponse([]), null, true, response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0,
+                response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens);
         }
         var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(b => b.Text));
-        return JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]);
+        return new LlmAnswer(JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]), json, false,
+            response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0, response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens);
+    }
+
+    /// <summary>Audit must never make an otherwise usable parsing result fail. A cost is an estimate from the exact
+    /// provider usage object and the price card active at this instant, kept with the row for historical accuracy.</summary>
+    private async Task AuditAsync(ParseContext ctx, string requestText, LlmAnswer? answer, string outcome, int? statusCode, string? error, int factsCount, DateTimeOffset started, CancellationToken ct)
+    {
+        if (_auditFactory is null)
+        {
+            return;
+        }
+        try
+        {
+            var o = _options;
+            var input = answer?.InputTokens;
+            var cacheWrite = answer?.CacheCreationInputTokens;
+            var cacheRead = answer?.CacheReadInputTokens;
+            var output = answer?.OutputTokens;
+            decimal? cost = input is null ? null : Math.Round(
+                (input.Value * o.InputUsdPerMillionTokens + cacheWrite!.Value * o.CacheWriteUsdPerMillionTokens + cacheRead!.Value * o.CacheReadUsdPerMillionTokens + output!.Value * o.OutputUsdPerMillionTokens) / 1_000_000m,
+                9, MidpointRounding.AwayFromZero);
+            await using var db = await _auditFactory.CreateDbContextAsync(ct);
+            db.LlmRequests.Add(new LlmRequest
+            {
+                RawMessageId = ctx.RawMessageId,
+                SourceId = ctx.SourceId,
+                OccurredAt = _clock.GetUtcNow(),
+                Worker = _workerName,
+                Model = o.Model,
+                PromptVersion = o.PromptVersion,
+                Outcome = outcome,
+                StatusCode = statusCode,
+                DurationMs = (int)Math.Min((_clock.GetUtcNow() - started).TotalMilliseconds, int.MaxValue),
+                InputTokens = input,
+                CacheCreationInputTokens = cacheWrite,
+                CacheReadInputTokens = cacheRead,
+                OutputTokens = output,
+                EstimatedCostUsd = cost,
+                FactsCount = factsCount,
+                RequestText = requestText,
+                SystemPrompt = _systemPrompt.Value,
+                ResponseText = answer?.ResponseText,
+                Error = error,
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Could not write LLM audit row");
+        }
     }
 
     /// <summary>Maps a raw model answer (JSON per <see cref="Schema"/>) to facts. Internal so the mapping is testable without an API key.</summary>
@@ -363,6 +427,7 @@ public sealed class LlmParser : IParser
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private sealed record LlmResponse(List<LlmFact>? Facts);
+    private sealed record LlmAnswer(LlmResponse Result, string? ResponseText, bool Refused, long InputTokens, long CacheCreationInputTokens, long CacheReadInputTokens, long OutputTokens);
     private sealed record LlmFact(string? EventType, LlmTarget? Target, bool Hedged, int? Count, bool CountApprox, List<LlmPlace>? Places, double? DirectionDeg, bool Launch, int? Segment, string? Quote);
     private sealed record LlmTarget(string? Level, string? Code);
     private sealed record LlmPlace(string? Name, string? Role);

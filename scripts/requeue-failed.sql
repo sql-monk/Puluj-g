@@ -4,7 +4,7 @@
 -- back to the savepoint), so nothing has to be deleted; the processors claim them like any other Pending row.
 -- Since the transient-failure change, a deadlock or serialization failure no longer counts as an attempt.
 --
---   docker exec -i puluj-postgis-1 psql -U puluj -d puluj -f - < scripts/requeue-failed.sql
+--   docker compose -p puluj-g -f deploy/docker-compose.yml exec -T postgis psql -U puluj -d puluj -f - < scripts/requeue-failed.sql
 --
 -- Restrict the WHERE (raw_message_id IN (...), a source, a period) when only some of them deserve another try.
 BEGIN;

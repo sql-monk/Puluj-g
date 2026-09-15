@@ -34,7 +34,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHttpClient("admin-test");
 builder.Services.AddHttpClient("api-probe");
 builder.Services.AddOpenApi();
-builder.Services.AddCors(o => o.AddPolicy("dev", p => p.WithOrigins("http://localhost:5174", "http://127.0.0.1:5174").AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddCors(o => o.AddPolicy("dev", p => p.WithOrigins("http://localhost:5184", "http://127.0.0.1:5184").AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddSingleton<ReferenceCache>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ReferenceCache>());
 builder.Services.AddSingleton<DtoMapper>();

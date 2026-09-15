@@ -7,6 +7,7 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
 {
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<RawMessage> RawMessages => Set<RawMessage>();
+    public DbSet<LlmRequest> LlmRequests => Set<LlmRequest>();
 
     public DbSet<TargetCategory> TargetCategories => Set<TargetCategory>();
     public DbSet<TargetClass> TargetClasses => Set<TargetClass>();

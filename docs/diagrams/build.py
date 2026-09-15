@@ -92,8 +92,8 @@ def overview() -> None:
 
     d.box("db", 640, 120, 220, 330, "PostgreSQL + PostGIS<br><br>raw_messages<br>targets · target_links<br>target_tracks<br>air_alerts · app_settings<br>places · таксономія · sources<br><br><font style='font-size:10px'>єдине джерело істини<br>ролі: puluj (owner, Worker) · puluj_reader (Api) · puluj_admin (Admin)</font>", DB, "db")
 
-    d.group("gA", 920, 40, 240, 300, "Puluj.Api  :5257  (роль puluj_reader — лише читання)", "api")
-    d.box("rest", 940, 80, 200, 50, "REST /api/*<br><font style='font-size:10px'>snapshot, tracks, timeline, places</font>", color="api")
+    d.group("gA", 920, 40, 240, 300, "Puluj.Api (роль puluj_reader — лише читання)", "api")
+    d.box("rest", 940, 80, 200, 50, "REST /api/*<br><font style='font-size:10px'>local :5267 · Docker :8090→8080</font>", color="api")
     d.box("hub", 940, 150, 200, 50, "SignalR /hubs/map<br><font style='font-size:10px'>TrackUpserted, TrackClosed, AlertChanged</font>", color="api")
     d.box("lst", 940, 220, 200, 50, "LISTEN puluj_events<br><font style='font-size:10px'>по події дочитує сутність з БД</font>", color="api")
     d.box("spa", 940, 285, 200, 40, "static: wwwroot (збірка web/)", color="api")
@@ -103,8 +103,8 @@ def overview() -> None:
     d.box("eta", 1240, 160, 160, 60, "ETA / fade<br><font style='font-size:10px'>рахується локально; точка користувача не покидає браузер</font>", color="web")
     d.box("hist", 1240, 240, 160, 50, "Історія / деталі<br><font style='font-size:10px'>replay, джерела</font>", color="web")
 
-    d.group("gM", 920, 370, 240, 210, "Puluj.Admin  :5258  (роль puluj_admin)", "worker")
-    d.box("adm", 940, 410, 200, 50, "REST /api/admin/*<br><font style='font-size:10px'>settings, sources, rating, ops, logs</font>", color="worker")
+    d.group("gM", 920, 370, 240, 210, "Puluj.Admin (роль puluj_admin)", "worker")
+    d.box("adm", 940, 410, 200, 50, "REST /api/admin/*<br><font style='font-size:10px'>local :5268 · Docker :8091→8081</font>", color="worker")
     d.box("ops", 940, 475, 200, 50, "Стан компонентів<br><font style='font-size:10px'>heartbeat Worker, /api/health Api, колектори, БД</font>", color="worker")
     d.box("adms", 940, 535, 200, 35, "static: admin.html (збірка web/)", color="worker")
     d.box("logs", 640, 480, 220, 60, "logs/ (спільна тека)<br><font style='font-size:10px'>worker-, api-, admin-&lt;день&gt;.log (Serilog)</font>", color="grey")
@@ -287,7 +287,92 @@ def realtime() -> None:
     d.write()
 
 
-DIAGRAMS = [overview, pipeline, datamodel, correlation, realtime]
+# ---- 6. code-level building blocks -------------------------------------------------------------------------
+def codeclasses() -> None:
+    d = D("06-code-classes", "Ключові класи та межі проєктів")
+    d.group("host", 30, 30, 245, 590, "Puluj.Worker / hosting", "worker")
+    d.box("init", 50, 75, 205, 65, "DatabaseInitializer : IHostedService<br><font style='font-size:10px'>advisory lock → MigrateAsync → seed → exit для ролі migrate</font>", color="worker")
+    d.box("collect", 50, 165, 205, 55, "Collectors / Supervisor<br><font style='font-size:10px'>Telegram, AlertsInUa → IncomingMessage</font>", color="worker")
+    d.box("claims", 50, 245, 205, 55, "RawMessageClaims<br><font style='font-size:10px'>Pending → InProgress, SKIP LOCKED</font>", color="worker")
+    d.box("proc", 50, 325, 205, 70, "RawMessageProcessor<br><font style='font-size:10px'>одна транзакція; parse поза store-lock, sinks під lock</font>", color="worker")
+    d.box("watch", 50, 425, 205, 65, "TrackWatchdog : BackgroundService<br><font style='font-size:10px'>закриває за class window; revision + event</font>", color="worker")
+    d.box("analytics", 50, 520, 205, 65, "Analytics Worker / AnalysisRunner<br><font style='font-size:10px'>окрема схема analytics, читає raw_messages</font>", color="worker")
+
+    d.group("infra", 335, 30, 255, 590, "Infrastructure", "db")
+    d.box("ingest", 355, 75, 215, 65, "RawMessageIngestor<br><font style='font-size:10px'>idempotent INSERT … ON CONFLICT DO NOTHING</font>", color="db")
+    d.box("context", 355, 170, 215, 65, "PulujDbContext : DbContext<br><font style='font-size:10px'>EF entities, migrations, configurations</font>", color="db")
+    d.box("queue", 355, 265, 215, 55, "RawMessageQueue<br><font style='font-size:10px'>processor polling / wake-up</font>", color="db")
+    d.box("notify", 355, 350, 215, 65, "INotifyPublisher<br><font style='font-size:10px'>NOTIFY puluj_events тільки після COMMIT</font>", color="db")
+    d.box("settings", 355, 445, 215, 55, "SettingsStore<br><font style='font-size:10px'>app_settings перекриває config/env</font>", color="db")
+    d.box("domain", 355, 530, 215, 65, "Domain entities<br><font style='font-size:10px'>RawMessage · Target · TargetTrack · Revision · Source</font>", color="db")
+
+    d.group("processing", 650, 30, 300, 590, "Puluj.Processing", "worker")
+    d.box("norm", 670, 75, 260, 50, "INormalizer / Normalizer", color="worker")
+    d.box("parse", 670, 150, 260, 65, "IParser → RuleParser / LlmParser<br><font style='font-size:10px'>факти з тексту; LLM лише fallback</font>", color="worker")
+    d.box("build", 670, 240, 260, 55, "TargetBuilder<br><font style='font-size:10px'>ParsedFact → Target</font>", color="worker")
+    d.box("sink", 670, 320, 260, 65, "ITargetSink<br><font style='font-size:10px'>DeduplicationSink · CorrelationSink · TextAlertSink</font>", color="worker")
+    d.box("corr", 670, 410, 260, 65, "Correlator (pure static)<br><font style='font-size:10px'>AnchorOf · Score · SelectBestTrack</font>", color="worker")
+    d.box("indexes", 670, 510, 260, 65, "IndexProvider : BackgroundService / IIndexes<br><font style='font-size:10px'>taxonomy + gazetteer кеш</font>", color="worker")
+
+    d.group("edge", 1010, 30, 300, 590, "HTTP / UI", "api")
+    d.box("api", 1030, 85, 260, 65, "Puluj.Api<br><font style='font-size:10px'>REST + LISTEN + SignalR; роль puluj_reader</font>", color="api")
+    d.box("admin", 1030, 185, 260, 65, "Puluj.Admin<br><font style='font-size:10px'>settings / ops / logs; роль puluj_admin</font>", color="api")
+    d.box("web", 1030, 290, 260, 65, "web/ React + MapLibre<br><font style='font-size:10px'>map, history, ETA; admin SPA</font>", color="web")
+    d.note(1030, 400, 260, 105, "Стрілки показують головні runtime-залежності, а не повний DI-граф. Межі проєктів підказують, де розміщувати нову логіку: домен — без інфраструктури; EF/SQL — Infrastructure; текст і кореляція — Processing.")
+
+    # Keep only the local data-flow edges here. Runtime communication across API/UI is documented in diagram 05;
+    # avoiding every DI relation keeps this code-level map legible.
+    d.edge("collect", "ingest", "IncomingMessage", exit=(1, .5), entry=(0, .5))
+    d.edge("ingest", "context", "write", exit=(.5, 1), entry=(.5, 0))
+    d.edge("claims", "queue", "claim", exit=(1, .5), entry=(0, .5))
+    d.edge("queue", "proc", "raw id", exit=(0, .7), entry=(1, .35))
+    d.edge("norm", "parse")
+    d.edge("parse", "build")
+    d.edge("build", "sink")
+    d.edge("sink", "corr")
+    d.write()
+
+
+# ---- 7. Docker ports and first empty-database deploy ---------------------------------------------------------
+def deployment() -> None:
+    d = D("07-deployment", "Puluj-G: Docker-порти та перший запуск порожньої БД")
+    d.group("host", 30, 30, 260, 560, "Host / оператор", "web")
+    d.box("cmd", 55, 80, 210, 65, "docker compose -p puluj-g<br>-f deploy/docker-compose.yml up --build", color="web")
+    d.box("browser", 55, 185, 210, 80, "Браузер<br><font style='font-size:10px'>карта localhost:8090<br>адмінка localhost:8091</font>", color="web")
+    d.box("diag", 55, 310, 210, 70, "Локальна діагностика БД<br><font style='font-size:10px'>localhost:5442 (psql, tests)</font>", color="web")
+    d.note(55, 425, 210, 100, "Ці порти не перетинаються з базовим Puluj на 5432 / 8080 / 8081. Локальний запуск без Docker використовує 5267 / 5268 / 5269.")
+
+    d.group("compose", 350, 30, 700, 560, "Compose project puluj-g (окрема network і managed volumes)", "grey")
+    d.box("db", 380, 95, 235, 95, "postgis<br><font style='font-size:10px'>container :5432<br>volume puluj-g_pgdata<br>healthcheck pg_isready</font>", DB, "db")
+    d.box("mig", 700, 95, 290, 95, "migrate (one-shot)<br><font style='font-size:10px'>DatabaseInitializer: advisory lock → 18+ EF migrations → roles → seed → exit 0</font>", color="worker")
+    d.box("services", 700, 250, 290, 145, "Після migrate = service_completed_successfully<br><br>collector-telegram · collector-alerts<br>processor × N · api · admin · analytics", color="worker")
+    d.box("api", 380, 265, 235, 55, "api: container :8080<br>host :8090", color="api")
+    d.box("admin", 380, 345, 235, 55, "admin: container :8081<br>host :8091", color="api")
+    d.box("intern", 380, 430, 610, 70, "Усі контейнери підключаються як Host=postgis;Port=5432<br><font style='font-size:10px'>внутрішній порт не змінювався; змінено лише host publishing</font>", color="grey")
+
+    d.group("state", 1110, 30, 260, 560, "Стан нової БД", "db")
+    d.box("empty", 1135, 85, 210, 55, "Новий порожній том", color="db")
+    d.box("schema", 1135, 175, 210, 75, "Схема + PostGIS<br><font style='font-size:10px'>__EFMigrationsHistory, таблиці, функції, ролі</font>", color="db")
+    d.box("seed", 1135, 285, 210, 75, "Початкові дані<br><font style='font-size:10px'>таксономія, джерела, газетир</font>", color="db")
+    d.box("ready", 1135, 400, 210, 65, "Готово для сервісів<br><font style='font-size:10px'>api/admin/collectors/processor запускаються</font>", color="db")
+
+    d.edge("cmd", "db", "створює volume", exit=(1, .3), entry=(0, .5))
+    d.edge("db", "mig", "healthy", exit=(1, .5), entry=(0, .5))
+    d.edge("mig", "services", "exit 0")
+    d.edge("db", "api", "SQL", exit=(.5, 1), entry=(.5, 0))
+    d.edge("db", "admin", "SQL", exit=(.5, 1), entry=(.5, 0))
+    d.edge("browser", "api", "HTTP :8090", exit=(1, .3), entry=(0, .5))
+    d.edge("browser", "admin", "HTTP :8091", exit=(1, .7), entry=(0, .5))
+    d.edge("diag", "db", "TCP :5442", exit=(1, .5), entry=(0, .7), dashed=True)
+    d.edge("empty", "schema", "migrations")
+    d.edge("schema", "seed", "seeders")
+    d.edge("seed", "ready", "migrate exits 0")
+    d.edge("mig", "schema", exit=(1, .4), entry=(0, .5), dashed=True)
+    d.edge("services", "ready", exit=(1, .7), entry=(0, .5), dashed=True)
+    d.write()
+
+
+DIAGRAMS = [overview, pipeline, datamodel, correlation, realtime, codeclasses, deployment]
 
 if __name__ == "__main__":
     for fn in DIAGRAMS:

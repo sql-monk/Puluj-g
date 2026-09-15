@@ -1,5 +1,5 @@
 <#
-.SYNOPSIS  Rebuilds and restarts the Docker stack (deploy/docker-compose.yml, project "puluj") from the working tree,
+.SYNOPSIS  Rebuilds and restarts the Docker stack (deploy/docker-compose.yml, project "puluj-g") from the working tree,
            waits for the one-shot migrate service, runs the one-off SQL fixes and then checks that the stack is healthy.
            Everything here needs Docker on the host, which the Claude Code session is not allowed to drive — run it
            yourself from the repo root:  .\scripts\deploy.ps1
@@ -13,6 +13,7 @@ param([switch]$NoBuild, [switch]$SkipSql, [string[]]$Services = @())
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 $deploy = Join-Path $root "deploy"
+$composeProject = "puluj-g"
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not found (Docker Desktop is not installed or not in PATH)" }
@@ -20,8 +21,14 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not
 function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
 function Sql([string]$file) {
     # psql is not installed on the host: the script goes through the postgis container (Cyrillic-safe via stdin).
-    Get-Content -Raw -Encoding UTF8 $file | docker exec -i puluj-postgis-1 psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f -
+    Get-Content -Raw -Encoding UTF8 $file | docker exec -i $postgisContainer psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f -
     if ($LASTEXITCODE -ne 0) { throw "psql failed for $file" }
+}
+
+function ComposeContainerId([string]$service) {
+    $ids = @(& docker compose -p $composeProject ps -aq $service | Where-Object { $_ })
+    if ($ids.Count -ne 1) { throw "Expected exactly one $service container in compose project '$composeProject', found $($ids.Count)." }
+    return $ids[0].Trim()
 }
 
 # A local dev-run Worker next to the Docker processors means two processor versions over one database (the deadlocks
@@ -36,7 +43,7 @@ Step "Building and starting the stack"
 Push-Location $deploy
 try {
     if (-not (Test-Path ".env")) { Write-Warning "deploy/.env is missing: compose will use the defaults from docker-compose.yml (ADMIN_TOKEN empty = panel only from localhost)" }
-    $composeArgs = @("compose", "up", "-d", "--remove-orphans")
+    $composeArgs = @("compose", "-p", $composeProject, "up", "-d", "--remove-orphans")
     if (-not $NoBuild) { $composeArgs += "--build" }
     $composeArgs += $Services
     & docker @composeArgs
@@ -45,16 +52,19 @@ try {
     Step "Waiting for the migrate service (migrations + seed)"
     $deadline = (Get-Date).AddMinutes(30)
     do {
-        $state = docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' puluj-migrate-1 2>$null
+        $migrateContainer = ComposeContainerId "migrate"
+        $state = docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' $migrateContainer 2>$null
         if ($state -like "exited 0*") { break }
-        if ($state -like "exited *") { docker logs --tail 50 puluj-migrate-1; throw "migrate exited with $state" }
+        if ($state -like "exited *") { docker logs --tail 50 $migrateContainer; throw "migrate exited with $state" }
         Start-Sleep 5
     } while ((Get-Date) -lt $deadline)
     Write-Host "migrate: $state"
-    docker logs puluj-migrate-1 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
+    docker logs $migrateContainer 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
 
     Step "Containers"
-    docker compose ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
+    docker compose -p $composeProject ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
+    $postgisContainer = ComposeContainerId "postgis"
+    $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
 } finally { Pop-Location }
 
 if (-not $SkipSql) {
@@ -67,15 +77,15 @@ if (-not $SkipSql) {
 Step "Checks"
 Start-Sleep 20  # let the processors claim a few messages so the new log lines exist
 $since = (Get-Date).AddMinutes(-2).ToUniversalTime().ToString("o")
-$deadlocks = (docker logs --since $since puluj-postgis-1 2>&1 | Select-String "deadlock detected").Count
+$deadlocks = (docker logs --since $since $postgisContainer 2>&1 | Select-String "deadlock detected").Count
 Write-Host ("PostgreSQL deadlocks since restart: {0}" -f $deadlocks) -ForegroundColor ($(if ($deadlocks -eq 0) { "Green" } else { "Red" }))
-foreach ($c in @("puluj-processor-1", "puluj-processor-2")) {
+foreach ($c in $processorContainers) {
     $line = docker logs --tail 200 $c 2>&1 | Select-String "lock wait" | Select-Object -Last 1
     Write-Host ("{0}: {1}" -f $c, $(if ($line) { "new timing format OK (parse / lock wait / store)" } else { "no 'lock wait' line yet (idle, or old image?)" }))
     $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
     if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
 }
-foreach ($u in @("http://localhost:8080/api/health", "http://localhost:8081/api/health")) {
+foreach ($u in @("http://localhost:8090/api/health", "http://localhost:8091/api/health")) {
     try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 10 $u; Write-Host ("{0} -> {1}" -f $u, $r.StatusCode) }
     catch { Write-Warning "$u -> $($_.Exception.Message)" }
 }
@@ -84,5 +94,5 @@ Step "Queue"
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;
 SELECT count(*) AS text_alerts_ended_before_start FROM air_alerts WHERE ended_at < started_at;
 SELECT key, left(value, 60) AS value FROM app_settings WHERE key LIKE 'Runtime:Worker:%' ORDER BY 1;
-"@ | docker exec -i puluj-postgis-1 psql -U puluj -d puluj -f -
-Write-Host "`nDone. Map: http://localhost:8080  Admin: http://localhost:8081" -ForegroundColor Green
+"@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
+Write-Host "`nDone. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green

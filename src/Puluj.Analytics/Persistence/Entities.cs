@@ -9,9 +9,9 @@ public enum RunStatus
 
 public enum CopyKind
 {
-    /// <summary>Similar above the thresholds but not word for word.</summary>
+    /// <summary>A post about the same parsed event, but not an explicit Telegram forward.</summary>
     Near = 1,
-    /// <summary>Jaccard above the verbatim threshold.</summary>
+    /// <summary>Legacy value for text-verbatim pairs created before semantic matching.</summary>
     Verbatim = 2,
     /// <summary>A Telegram forward whose origin channel is the original's source.</summary>
     Forward = 3,
@@ -47,7 +47,7 @@ public class AnalysisRun
 
 /// <summary>
 /// One row per raw message with text: which logical post it belongs to (edits share the `PostKey`), where it was
-/// forwarded from, and the MinHash fingerprint with its LSH bands when the text is long enough to be compared.
+/// forwarded from, plus legacy text-fingerprint columns. Event facts, not these columns, drive matching.
 /// </summary>
 public class MessageFingerprint
 {
