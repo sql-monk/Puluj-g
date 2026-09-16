@@ -1,0 +1,105 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="e8d3e6c3-891e-4cc3-ae50-3bd279c2b840" name="aleks@ASUS-MONK 2026-09-16 21:42:06" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T21:42:06.6949390+03:00" queuing="2026-09-16T21:42:06.6949396+03:00" start="2026-09-16T21:41:12.9465690+03:00" finish="2026-09-16T21:42:22.3480616+03:00" />
+  <TestSettings name="default" id="e48b7ad8-7d1c-4c87-bbec-d4ad197b4931">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_21_42_06" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="27a85a95-005f-402f-ae23-14786efc9ad6" testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" computerName="ASUS-MONK" duration="00:00:02.8209863" startTime="2026-09-16T21:42:18.4894126+03:00" endTime="2026-09-16T21:42:21.3004339+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="27a85a95-005f-402f-ae23-14786efc9ad6" />
+    <UnitTestResult executionId="162eadaf-4d1d-415f-a735-01c7ee62c49e" testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" computerName="ASUS-MONK" duration="00:00:12.2920158" startTime="2026-09-16T21:42:06.2149958+03:00" endTime="2026-09-16T21:42:18.4795267+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="162eadaf-4d1d-415f-a735-01c7ee62c49e">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ&#xD;
+Expected: 6&#xD;
+Actual:   8</Message>
+          <StackTrace>   at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 189&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 237&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 237&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="caebf037-d974-4a0b-a8db-7d245dd84c74" testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" computerName="ASUS-MONK" duration="00:00:01.0044546" startTime="2026-09-16T21:42:05.1653325+03:00" endTime="2026-09-16T21:42:06.1699403+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="caebf037-d974-4a0b-a8db-7d245dd84c74" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb">
+      <Execution id="162eadaf-4d1d-415f-a735-01c7ee62c49e" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="9e9d5be4-ac0a-566d-32e6-aa665e62abdf">
+      <Execution id="27a85a95-005f-402f-ae23-14786efc9ad6" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="c5676cc1-841b-46bb-84c1-b93d09e025e4">
+      <Execution id="caebf037-d974-4a0b-a8db-7d245dd84c74" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R05_A_newer_pipeline_version_supersedes_the_open_live_run" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" executionId="27a85a95-005f-402f-ae23-14786efc9ad6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" executionId="162eadaf-4d1d-415f-a735-01c7ee62c49e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" executionId="caebf037-d974-4a0b-a8db-7d245dd84c74" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="2" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:02.05]   Discovering: Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:02.12]   Discovered:  Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:02.14]   Starting:    Puluj.Messaging.Tests&#xD;
+[testcontainers.org 00:00:00.25] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.67] Docker container b9ae8d665ef9 created&#xD;
+[testcontainers.org 00:00:00.84] Start Docker container b9ae8d665ef9&#xD;
+[testcontainers.org 00:00:01.47] Wait for Docker container b9ae8d665ef9 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.59] Docker container b9ae8d665ef9 ready&#xD;
+[testcontainers.org 00:00:01.77] Docker container d755d1fad20e created&#xD;
+[testcontainers.org 00:00:01.77] Docker container d6fc2a3c389e created&#xD;
+[testcontainers.org 00:00:01.84] Start Docker container d6fc2a3c389e&#xD;
+[testcontainers.org 00:00:01.85] Start Docker container d755d1fad20e&#xD;
+[testcontainers.org 00:00:02.34] Wait for Docker container d755d1fad20e to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.54] Wait for Docker container d6fc2a3c389e to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.61] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d6fc2a3c389e&#xD;
+[testcontainers.org 00:00:03.87] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d6fc2a3c389e&#xD;
+[testcontainers.org 00:00:05.03] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d6fc2a3c389e&#xD;
+[testcontainers.org 00:00:05.17] Docker container d6fc2a3c389e ready&#xD;
+[testcontainers.org 00:00:06.96] Docker container d755d1fad20e ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+[xUnit.net 00:01:04.97]       Assert.Equal() Failure: Values differ&#xD;
+[xUnit.net 00:01:04.97]       Expected: 6&#xD;
+[xUnit.net 00:01:04.97]       Actual:   8&#xD;
+[xUnit.net 00:01:04.97]       Stack Trace:&#xD;
+[xUnit.net 00:01:04.97]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(189,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup()&#xD;
+[xUnit.net 00:01:04.97]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(237,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup()&#xD;
+[xUnit.net 00:01:04.97]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(237,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup()&#xD;
+[xUnit.net 00:01:04.97]         --- End of stack trace from previous location ---&#xD;
+[testcontainers.org 00:01:05.50] Delete Docker container d755d1fad20e&#xD;
+[testcontainers.org 00:01:06.02] Delete Docker container d6fc2a3c389e&#xD;
+[xUnit.net 00:01:08.72]   Finished:    Puluj.Messaging.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T21:42:18.4837156+03:00">
+        <Text>[xUnit.net 00:01:04.97]     Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

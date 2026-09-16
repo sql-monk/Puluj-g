@@ -1,6 +1,6 @@
 {
   "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; версія 4 (P05): normalizer, parser → active, finalizer і llm-worker → paused; версія 5 (P06): finalizer, llm-worker → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
-  "topology_version": 8,
+  "topology_version": 9,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -213,8 +213,9 @@
     },
     "incident-worker": {
       "role": "consumer", "required": true, "status": "active", "owner_task": "P10",
-      "bindings": ["observations.recorded"], "lanes": ["live", "history"],
+      "bindings": ["observations.recorded"], "lanes": ["live", "history", "replay"],
       "emits": ["incident.changed"], "queue_policy": "required",
+      "$comment": "v9 (P14): replay lane — incidents пишуться в generation replay run'а (ізольована, неактивна до promote); track/alert-worker і projection без replay lane (ADR-0005/0012 — shadow без live effects).",
       "idempotency": "inbox + aggregate_revision + generation"
     },
     "projection": {
@@ -243,6 +244,7 @@
   "producer_roles": {
     "collectors": { "emits": ["ingress.received"], "durability": "producer outbox + source checkpoint в одній транзакції (§6.1)", "owner_task": "P04" },
     "watchdog": { "emits": ["track.expiry.requested", "alert.expiry.requested"], "durability": "outbox", "owner_task": "P09" },
+    "replay": { "emits": ["raw.stored"], "durability": "outbox + checkpoint run'а в одній транзакції (ADR-0005, P14); secondary producer raw.stored — лише lane replay, is_new=false, processing_run_id = replay run", "owner_task": "P14" },
     "outbox-relay": { "emits": [], "durability": "публікує outbox rows; publisher confirms; позначає confirmed_at", "owner_task": "P03" },
     "reconciliation": { "emits": [], "durability": "звіряє processing.deliveries з topology; не публікує lifecycle подій", "owner_task": "P03" }
   },

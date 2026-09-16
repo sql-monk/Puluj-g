@@ -109,6 +109,16 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P14): replay runs, generations (topology v9)
+
+- v9: `incident-worker.lanes += replay`; `producer_roles.replay` емітить `raw.stored` (lane `replay`, `is_new:false`, `processing_run_id` = replay run,
+  producer `replay@{instance}`) — secondary producer; `raw.stored.producer` (`raw-writer`) лишається документарним для live/history.
+- `processing.runs` (replay): `scope {source_ids?, from, to, catchup_from?, verification?, promoted_from?}`, `checkpoint {published, total, lastRawMessageId,
+  lastPublishedAt, ingestCeiling, done, error, failures}`; стани `created|running|paused|verified|promoted|rolled_back|cancelled|failed` (+ live `superseded`).
+  Один відкритий replay run. `processing.generations`: рівно одна `is_active`; live writers пишуть в active (advisory lock `generation:active`).
+- Admin DTO — `RunDto`, `RunCheckpointDto`, `ReplayCreateRequest`, `RunActionRequest` (`Puluj.Contracts/MessagingOpsDtos.cs`); `control_audit` дії `run:*`.
+- Shadow: replay lane не досягає track/alert-worker/projection; incident-worker у replay lane пише лише incidents generation run'а (без `targets`, NOTIFY).
+
 ## Runtime (P13): ops controls, worker status, reconciliation report
 
 - `WorkerStatusDto` (additive): `consumers[] {subscription, lane, queue, state active|paused|draining, consuming, inFlight, prefetch, consumerTag,

@@ -22,11 +22,16 @@ public static class IncidentEndpoints
     {
         var g = app.MapGroup("/api/admin/incidents").AddEndpointFilter(AdminEndpoints.AuthorizeAsync);
 
-        g.MapGet("", async (string? state, string? kind, int? hours, int? limit, IDbContextFactory<PulujDbContext> factory, CancellationToken ct) =>
+        // P14: only the active generation by default; `generation=all` shows shadow (replay) incidents too, flagged by `generationActive`.
+        g.MapGet("", async (string? state, string? kind, int? hours, int? limit, string? generation, IDbContextFactory<PulujDbContext> factory, CancellationToken ct) =>
         {
             await using var db = await factory.CreateDbContextAsync(ct);
             var since = DateTimeOffset.UtcNow.AddHours(-Math.Clamp(hours ?? 24, 1, 24 * 30));
             var q = db.Incidents.AsNoTracking().Include(i => i.EventKind).Where(i => i.LastReportedAt >= since);
+            if (generation != "all")
+            {
+                q = q.Where(i => db.ProcessingGenerations.Any(pg => pg.GenerationId == i.GenerationId && pg.IsActive));
+            }
             if (!string.IsNullOrEmpty(state))
             {
                 q = q.Where(i => i.State == state);
@@ -36,7 +41,7 @@ public static class IncidentEndpoints
                 q = q.Where(i => i.EventKind!.Code == kind);
             }
             var rows = await q.OrderByDescending(i => i.LastReportedAt).Take(Math.Clamp(limit ?? 200, 1, 1000))
-                .Select(i => new { i.IncidentId, Kind = i.EventKind!.Code, i.State, i.Suppressed, i.EventAt, i.FirstReportedAt, i.LastReportedAt, i.LocationPlaceId, i.AccuracyKm, i.SourceCount, i.Revision, i.ClosureReason, i.MergedIntoIncidentId })
+                .Select(i => new { i.IncidentId, Kind = i.EventKind!.Code, i.State, i.Suppressed, i.EventAt, i.FirstReportedAt, i.LastReportedAt, i.LocationPlaceId, i.AccuracyKm, i.SourceCount, i.Revision, i.ClosureReason, i.MergedIntoIncidentId, i.GenerationId, GenerationActive = db.ProcessingGenerations.Any(pg => pg.GenerationId == i.GenerationId && pg.IsActive) })
                 .ToListAsync(ct);
             return Results.Ok(rows);
         });
@@ -51,6 +56,7 @@ public static class IncidentEndpoints
             // Incidents first (one row per incident, newest first, one page), then their flagged links — a hot incident with many links cannot crowd out older ones.
             var pageIds = await db.IncidentObservations.AsNoTracking()
                 .Where(ReviewPredicate(since))
+                .Where(o => db.ProcessingGenerations.Any(pg => pg.GenerationId == o.GenerationId && pg.IsActive)) // P14: the review queue is the active generation's
                 .GroupBy(o => o.IncidentId)
                 .Select(g => new { IncidentId = g.Key, Last = g.Max(o => o.Incident!.LastReportedAt) })
                 .OrderByDescending(g => g.Last)

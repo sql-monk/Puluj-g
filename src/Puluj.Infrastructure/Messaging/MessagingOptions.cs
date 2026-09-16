@@ -92,6 +92,8 @@ public sealed class MessagingOptions
         public ushort Prefetch { get; set; } = 10;
         /// <summary>Per-subscription prefetch override (a slow subscription such as llm-worker keeps fewer deliveries unacked during a long call).</summary>
         public Dictionary<string, ushort> PrefetchBySubscription { get; set; } = new(StringComparer.Ordinal) { ["llm-worker"] = 2 };
+        /// <summary>Per-lane prefetch override (P14 quotas): the replay lane keeps fewer deliveries unacked than live, so a replay never fills a consumer's credit. Subscription override wins for the live lane only.</summary>
+        public Dictionary<string, ushort> PrefetchByLane { get; set; } = new(StringComparer.Ordinal) { ["replay"] = 2 };
         /// <summary>Lanes this process consumes for each of its subscriptions; empty = every lane of the subscription.</summary>
         public string[] Lanes { get; set; } = [];
         public TimeSpan MinBackoff { get; set; } = TimeSpan.FromSeconds(1);

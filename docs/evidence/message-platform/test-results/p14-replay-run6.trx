@@ -1,0 +1,167 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="a9a8329b-baca-4981-901b-990fde932140" name="aleks@ASUS-MONK 2026-09-16 22:09:07" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T22:09:07.9318552+03:00" queuing="2026-09-16T22:09:07.9318555+03:00" start="2026-09-16T22:09:05.6039771+03:00" finish="2026-09-16T22:10:10.8528747+03:00" />
+  <TestSettings name="default" id="8a2b82e5-bca2-4cf5-ac3d-ff9212e9343a">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_22_09_07" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="09b6a486-958d-4a01-992e-55c66633a22a" testId="f4aba879-019c-ca29-eed3-546abeb44c32" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Names_follow_the_patterns" computerName="ASUS-MONK" duration="00:00:00.0011180" startTime="2026-09-16T22:09:07.9187446+03:00" endTime="2026-09-16T22:09:07.9187744+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="09b6a486-958d-4a01-992e-55c66633a22a" />
+    <UnitTestResult executionId="72a1485d-d5ce-4556-a5fc-32111de26701" testId="d45f3825-ded3-fe84-a83b-dab1efbc4755" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;2.0&quot;, major: 2)" computerName="ASUS-MONK" duration="00:00:00.0000018" startTime="2026-09-16T22:09:07.9136515+03:00" endTime="2026-09-16T22:09:07.9136896+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="72a1485d-d5ce-4556-a5fc-32111de26701" />
+    <UnitTestResult executionId="1c8ba2a3-75ed-42dc-b2d1-5bf92dc23193" testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" computerName="ASUS-MONK" duration="00:00:16.9731318" startTime="2026-09-16T22:09:48.7364258+03:00" endTime="2026-09-16T22:10:05.7099418+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1c8ba2a3-75ed-42dc-b2d1-5bf92dc23193" />
+    <UnitTestResult executionId="3e863c2b-679f-4167-b371-7a620b7de08a" testId="e8eeb2ab-f916-bdb6-5b21-41d88912a144" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;&quot;, major: null)" computerName="ASUS-MONK" duration="00:00:00.0000010" startTime="2026-09-16T22:09:07.9138554+03:00" endTime="2026-09-16T22:09:07.9138822+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3e863c2b-679f-4167-b371-7a620b7de08a" />
+    <UnitTestResult executionId="2a629bef-6742-4c4c-a9bc-8b70ace726f7" testId="f4003893-0efa-b302-440d-506227265fee" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.0&quot;, major: 1)" computerName="ASUS-MONK" duration="00:00:00.0000200" startTime="2026-09-16T22:09:07.9135086+03:00" endTime="2026-09-16T22:09:07.9135516+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2a629bef-6742-4c4c-a9bc-8b70ace726f7" />
+    <UnitTestResult executionId="ad880e7e-5ddd-4ed6-9956-74d1d54bd748" testId="d5323586-4cc1-9fa9-24fb-dd60809266c1" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;0.9&quot;, major: 0)" computerName="ASUS-MONK" duration="00:00:00.0026423" startTime="2026-09-16T22:09:07.9124820+03:00" endTime="2026-09-16T22:09:07.9125440+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ad880e7e-5ddd-4ed6-9956-74d1d54bd748" />
+    <UnitTestResult executionId="80015686-73af-4b9e-9fb0-cc5e8254bad6" testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" computerName="ASUS-MONK" duration="00:00:01.7814048" startTime="2026-09-16T22:10:08.1361245+03:00" endTime="2026-09-16T22:10:09.9174783+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="80015686-73af-4b9e-9fb0-cc5e8254bad6" />
+    <UnitTestResult executionId="54249ee4-3737-46b4-b146-5e43c5ae00c2" testId="5d0a2501-75a0-5597-6f16-f3082b1a4da0" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1&quot;, major: null)" computerName="ASUS-MONK" duration="00:00:00.0000008" startTime="2026-09-16T22:09:07.9139293+03:00" endTime="2026-09-16T22:09:07.9139530+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="54249ee4-3737-46b4-b146-5e43c5ae00c2" />
+    <UnitTestResult executionId="9341291b-e5ae-449f-9e93-60655620507c" testId="97b3c152-b1af-fbfb-1419-a2659a663884" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.3&quot;, major: 1)" computerName="ASUS-MONK" duration="00:00:00.0000022" startTime="2026-09-16T22:09:07.9137638+03:00" endTime="2026-09-16T22:09:07.9137949+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9341291b-e5ae-449f-9e93-60655620507c" />
+    <UnitTestResult executionId="c8af02b4-ae65-4f61-9c6e-7007172d47b9" testId="f94f1dae-8a9b-316c-9efe-b3188e091949" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Expected_set_is_required_active_or_paused_and_serving_the_lane" computerName="ASUS-MONK" duration="00:00:00.0314995" startTime="2026-09-16T22:09:07.8698288+03:00" endTime="2026-09-16T22:09:07.9006439+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c8af02b4-ae65-4f61-9c6e-7007172d47b9" />
+    <UnitTestResult executionId="ba54a4d3-d2bf-4122-9abf-beb2906388a3" testId="50239189-1e5c-6625-1d58-5ab6b8db3005" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.&quot;, major: null)" computerName="ASUS-MONK" duration="00:00:00.0002495" startTime="2026-09-16T22:09:07.9132598+03:00" endTime="2026-09-16T22:09:07.9133187+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ba54a4d3-d2bf-4122-9abf-beb2906388a3" />
+    <UnitTestResult executionId="2ec596bc-e6f9-4a06-a885-b456b8a70afa" testId="0210a22e-f5a7-49af-a3ee-4cc7d7ab9662" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Embedded_copy_equals_contract_file" computerName="ASUS-MONK" duration="00:00:00.0051875" startTime="2026-09-16T22:09:07.9185522+03:00" endTime="2026-09-16T22:09:07.9186094+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2ec596bc-e6f9-4a06-a885-b456b8a70afa" />
+    <UnitTestResult executionId="5537b55c-1c6b-4fe0-9a50-a1a6a7d69323" testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" computerName="ASUS-MONK" duration="00:00:01.0479185" startTime="2026-09-16T22:09:47.6850827+03:00" endTime="2026-09-16T22:09:48.7346616+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5537b55c-1c6b-4fe0-9a50-a1a6a7d69323" />
+    <UnitTestResult executionId="6aa53bb8-1388-4254-aae9-ecd67d489fb2" testId="e6ed0e50-f83f-af27-3f6e-3550e46b73fb" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Every_replay_source_event_expects_archive" computerName="ASUS-MONK" duration="00:00:00.0011634" startTime="2026-09-16T22:09:07.9188455+03:00" endTime="2026-09-16T22:09:07.9188694+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6aa53bb8-1388-4254-aae9-ecd67d489fb2" />
+    <UnitTestResult executionId="d3344ec1-850b-45e0-a9c8-35aeb2e4ed05" testId="371986aa-c74a-7c1e-7d65-5bb221748912" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" computerName="ASUS-MONK" duration="00:00:02.4252629" startTime="2026-09-16T22:10:05.7107346+03:00" endTime="2026-09-16T22:10:08.1356505+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d3344ec1-850b-45e0-a9c8-35aeb2e4ed05" />
+    <UnitTestResult executionId="2a817ba9-4568-449c-9b3c-d32fff7ffe70" testId="f2c5c313-3827-c333-96df-ab5643954877" testName="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;v1&quot;, major: null)" computerName="ASUS-MONK" duration="00:00:00.0000133" startTime="2026-09-16T22:09:07.9134048+03:00" endTime="2026-09-16T22:09:07.9134454+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2a817ba9-4568-449c-9b3c-d32fff7ffe70" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="c5676cc1-841b-46bb-84c1-b93d09e025e4">
+      <Execution id="5537b55c-1c6b-4fe0-9a50-a1a6a7d69323" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R05_A_newer_pipeline_version_supersedes_the_open_live_run" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.3&quot;, major: 1)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="97b3c152-b1af-fbfb-1419-a2659a663884">
+      <Execution id="9341291b-e5ae-449f-9e93-60655620507c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.0&quot;, major: 1)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="f4003893-0efa-b302-440d-506227265fee">
+      <Execution id="2a629bef-6742-4c4c-a9bc-8b70ace726f7" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="371986aa-c74a-7c1e-7d65-5bb221748912">
+      <Execution id="d3344ec1-850b-45e0-a9c8-35aeb2e4ed05" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;2.0&quot;, major: 2)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="d45f3825-ded3-fe84-a83b-dab1efbc4755">
+      <Execution id="72a1485d-d5ce-4556-a5fc-32111de26701" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Every_replay_source_event_expects_archive" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="e6ed0e50-f83f-af27-3f6e-3550e46b73fb">
+      <Execution id="6aa53bb8-1388-4254-aae9-ecd67d489fb2" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Every_replay_source_event_expects_archive" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Names_follow_the_patterns" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="f4aba879-019c-ca29-eed3-546abeb44c32">
+      <Execution id="09b6a486-958d-4a01-992e-55c66633a22a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Names_follow_the_patterns" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1.&quot;, major: null)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="50239189-1e5c-6625-1d58-5ab6b8db3005">
+      <Execution id="ba54a4d3-d2bf-4122-9abf-beb2906388a3" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;&quot;, major: null)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="e8eeb2ab-f916-bdb6-5b21-41d88912a144">
+      <Execution id="3e863c2b-679f-4167-b371-7a620b7de08a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Embedded_copy_equals_contract_file" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="0210a22e-f5a7-49af-a3ee-4cc7d7ab9662">
+      <Execution id="2ec596bc-e6f9-4a06-a885-b456b8a70afa" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Embedded_copy_equals_contract_file" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;0.9&quot;, major: 0)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="d5323586-4cc1-9fa9-24fb-dd60809266c1">
+      <Execution id="ad880e7e-5ddd-4ed6-9956-74d1d54bd748" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Expected_set_is_required_active_or_paused_and_serving_the_lane" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="f94f1dae-8a9b-316c-9efe-b3188e091949">
+      <Execution id="c8af02b4-ae65-4f61-9c6e-7007172d47b9" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Expected_set_is_required_active_or_paused_and_serving_the_lane" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb">
+      <Execution id="1c8ba2a3-75ed-42dc-b2d1-5bf92dc23193" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;v1&quot;, major: null)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="f2c5c313-3827-c333-96df-ab5643954877">
+      <Execution id="2a817ba9-4568-449c-9b3c-d32fff7ffe70" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="9e9d5be4-ac0a-566d-32e6-aa665e62abdf">
+      <Execution id="80015686-73af-4b9e-9fb0-cc5e8254bad6" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Unit.TopologyRegistryTests.Schema_major_parsing_matches_compatibility_rule(version: &quot;1&quot;, major: null)" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="5d0a2501-75a0-5597-6f16-f3082b1a4da0">
+      <Execution id="54249ee4-3737-46b4-b146-5e43c5ae00c2" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Unit.TopologyRegistryTests" name="Schema_major_parsing_matches_compatibility_rule" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f4aba879-019c-ca29-eed3-546abeb44c32" executionId="09b6a486-958d-4a01-992e-55c66633a22a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d45f3825-ded3-fe84-a83b-dab1efbc4755" executionId="72a1485d-d5ce-4556-a5fc-32111de26701" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" executionId="1c8ba2a3-75ed-42dc-b2d1-5bf92dc23193" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e8eeb2ab-f916-bdb6-5b21-41d88912a144" executionId="3e863c2b-679f-4167-b371-7a620b7de08a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f4003893-0efa-b302-440d-506227265fee" executionId="2a629bef-6742-4c4c-a9bc-8b70ace726f7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d5323586-4cc1-9fa9-24fb-dd60809266c1" executionId="ad880e7e-5ddd-4ed6-9956-74d1d54bd748" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" executionId="80015686-73af-4b9e-9fb0-cc5e8254bad6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5d0a2501-75a0-5597-6f16-f3082b1a4da0" executionId="54249ee4-3737-46b4-b146-5e43c5ae00c2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="97b3c152-b1af-fbfb-1419-a2659a663884" executionId="9341291b-e5ae-449f-9e93-60655620507c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f94f1dae-8a9b-316c-9efe-b3188e091949" executionId="c8af02b4-ae65-4f61-9c6e-7007172d47b9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="50239189-1e5c-6625-1d58-5ab6b8db3005" executionId="ba54a4d3-d2bf-4122-9abf-beb2906388a3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0210a22e-f5a7-49af-a3ee-4cc7d7ab9662" executionId="2ec596bc-e6f9-4a06-a885-b456b8a70afa" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" executionId="5537b55c-1c6b-4fe0-9a50-a1a6a7d69323" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e6ed0e50-f83f-af27-3f6e-3550e46b73fb" executionId="6aa53bb8-1388-4254-aae9-ecd67d489fb2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="371986aa-c74a-7c1e-7d65-5bb221748912" executionId="d3344ec1-850b-45e0-a9c8-35aeb2e4ed05" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f2c5c313-3827-c333-96df-ab5643954877" executionId="2a817ba9-4568-449c-9b3c-d32fff7ffe70" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="16" executed="16" passed="16" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:01.54]   Discovering: Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:01.60]   Discovered:  Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:01.62]   Starting:    Puluj.Messaging.Tests&#xD;
+[testcontainers.org 00:00:00.16] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.41] Docker container 32ef63b48245 created&#xD;
+[testcontainers.org 00:00:00.54] Start Docker container 32ef63b48245&#xD;
+[testcontainers.org 00:00:00.85] Wait for Docker container 32ef63b48245 to complete readiness checks&#xD;
+[testcontainers.org 00:00:00.94] Docker container 32ef63b48245 ready&#xD;
+[testcontainers.org 00:00:01.09] Docker container 36dac613f389 created&#xD;
+[testcontainers.org 00:00:01.12] Docker container c6a587e94226 created&#xD;
+[testcontainers.org 00:00:01.21] Start Docker container 36dac613f389&#xD;
+[testcontainers.org 00:00:01.23] Start Docker container c6a587e94226&#xD;
+[testcontainers.org 00:00:01.47] Wait for Docker container 36dac613f389 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.50] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 36dac613f389&#xD;
+[testcontainers.org 00:00:01.51] Wait for Docker container c6a587e94226 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.64] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 36dac613f389&#xD;
+[testcontainers.org 00:00:03.74] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 36dac613f389&#xD;
+[testcontainers.org 00:00:04.84] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 36dac613f389&#xD;
+[testcontainers.org 00:00:04.93] Docker container 36dac613f389 ready&#xD;
+[testcontainers.org 00:00:06.78] Docker container c6a587e94226 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (9ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+warn: Puluj.Infrastructure.Processing.RunService[0]&#xD;
+      Replay run 01a0aba0-2774-7d57-aa47-caa2f6814c22 promoted by operator:test: active generation 01a0aba0-2774-7eab-a48f-c63fb2437b1b (was 6bb9f959-42f5-5e7c-a384-a325e71fa89b): verified, switching&#xD;
+warn: Puluj.Infrastructure.Processing.RunService[0]&#xD;
+      Replay run 01a0aba0-2774-7d57-aa47-caa2f6814c22 rolled back by operator:test: active generation 6bb9f959-42f5-5e7c-a384-a325e71fa89b again: rehearsal&#xD;
+warn: Puluj.Infrastructure.Processing.RunService[0]&#xD;
+      Replay run 01a0aba0-54c5-716a-b4dc-632a69ffe9c5 promoted by operator:test: active generation 01a0aba0-54c5-7bb4-a3b2-9c495aa4759d (was 6bb9f959-42f5-5e7c-a384-a325e71fa89b): switch&#xD;
+warn: Puluj.Infrastructure.Processing.RunService[0]&#xD;
+      Replay run 01a0aba0-54c5-716a-b4dc-632a69ffe9c5 rolled back by operator:test: active generation 6bb9f959-42f5-5e7c-a384-a325e71fa89b again: cleanup&#xD;
+[testcontainers.org 00:01:01.99] Delete Docker container c6a587e94226&#xD;
+[testcontainers.org 00:01:02.38] Delete Docker container 36dac613f389&#xD;
+[xUnit.net 00:01:04.49]   Finished:    Puluj.Messaging.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

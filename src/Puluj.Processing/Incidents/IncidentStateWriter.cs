@@ -67,14 +67,40 @@ public sealed class IncidentStateWriter(
         return ids.Distinct().Order().ToList();
     }
 
-    /// <summary>Ensures the generation the rows are stamped with exists (`live` until P14 promotes real generations).</summary>
+    /// <summary>Advisory lock key of the active-generation pointer: writers take it shared, promote/rollback exclusive (review B2).</summary>
+    public const string ActiveGenerationLock = "generation:active";
+
+    /// <summary>
+    /// The generation the rows are stamped with (ADR-0005, P14): a run with its own generation (replay) writes there; a live/history
+    /// run writes into the **active** generation — the promoted one after a promote, the initial `live` generation before any. The
+    /// pointer is read under a shared advisory lock held to the end of the transaction; promote/rollback take it exclusively, so a
+    /// write never lands in a generation that is deactivated in the same instant (a row lock would be re-evaluated to «no row»).
+    /// </summary>
     public static async Task<Guid> EnsureGenerationAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid? runGeneration, CancellationToken ct)
     {
-        var generation = runGeneration ?? LiveGeneration;
+        if (runGeneration is { } own)
+        {
+            await using var ensure = new NpgsqlCommand("INSERT INTO processing.generations (generation_id, is_active, created_at) VALUES (@id, false, now()) ON CONFLICT (generation_id) DO NOTHING", conn, tx);
+            ensure.Parameters.AddWithValue("id", own);
+            await ensure.ExecuteNonQueryAsync(ct);
+            return own;
+        }
+        await using (var gate = new NpgsqlCommand("SELECT pg_advisory_xact_lock_shared(hashtext(@k))", conn, tx))
+        {
+            gate.Parameters.AddWithValue("k", ActiveGenerationLock);
+            await gate.ExecuteNonQueryAsync(ct);
+        }
+        await using (var active = new NpgsqlCommand("SELECT generation_id FROM processing.generations WHERE is_active ORDER BY promoted_at DESC NULLS LAST, created_at LIMIT 1", conn, tx))
+        {
+            if (await active.ExecuteScalarAsync(ct) is Guid current)
+            {
+                return current;
+            }
+        }
         await using var cmd = new NpgsqlCommand("INSERT INTO processing.generations (generation_id, is_active, created_at) VALUES (@id, NOT EXISTS (SELECT 1 FROM processing.generations WHERE is_active), now()) ON CONFLICT (generation_id) DO NOTHING", conn, tx);
-        cmd.Parameters.AddWithValue("id", generation);
+        cmd.Parameters.AddWithValue("id", LiveGeneration);
         await cmd.ExecuteNonQueryAsync(ct);
-        return generation;
+        return LiveGeneration;
     }
 
     /// <summary>
@@ -165,7 +191,7 @@ public sealed class IncidentStateWriter(
             Incident = incident,
             ObservationId = input.ObservationId,
             GenerationId = generationId,
-            LegacyTargetId = row.TargetId,
+            LegacyTargetId = row.TargetId == 0 ? null : row.TargetId, // a shadow (replay) fact has no `targets` row (P14)
             SourceId = row.SourceId,
             Relation = decision.Relation,
             Score = decision.Score,

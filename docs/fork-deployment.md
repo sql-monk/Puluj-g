@@ -79,6 +79,21 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `AddIncidentReadIndexes` (індекс keyset для `/api/incidents`) — additive. Налаштування API: `Map:IncidentHours` (24), `Map:IncidentSnapshotLimit` (1000),
 `Map:IncidentMaxWindowDays` (7). Rolling deploy: старий API ігнорує NOTIFY невідомого типу.
 
+### Replay runs і generations (P14)
+
+Міграція `AddReplayRuns` — additive (індекси `ux_processing_runs_open_replay`, `ix_messaging_events_run`); `Down` дропає їх. Topology **v9** (incident-worker
++ replay lane): деплой worker'а реєструє v9 поруч із v8 (registrar відмовляє лише тій самій версії з іншим hash); consumer v8, що відстає, не читає
+чергу `puluj.incident-worker.replay` — replay-доставки чекають, verify лишається червоним (безпечно, без хибних ефектів). Порядок: `messaging` (relay/
+declarer + incident-worker), `admin`, `api` — з одного образу v9.
+Роль `replay` (`ReplayPublisher`) — у дефолтних ролях сервісу `messaging`; без відкритого replay run вона простоює (poll `Replay:PollInterval`). Опції
+`Replay:BatchSize` (200), `PollInterval` (2 с), `MaxInFlight` (1000 pending deliveries lane replay), `WatermarkLag` (60 с), `MaxBatchFailures` (5);
+`Messaging:Consumer:PrefetchByLane:replay` (2). Процедура: панель «Replay» → створити run (scope) → старт → (catchup за потреби) → verify → promote;
+rollback — кнопка «відкотити» (active generation повертається за одну tx). Catchup — лише до promote (після нього generation — live-ова,
+а replay lane не має projection): останній catchup робити безпосередньо перед promote; raw, оброблені live між ними, лишаються в попередній generation.
+Після promote нові live incidents ідуть у promoted generation; після rollback incidents вікна `[promoted_at, rolled_back_at]` невидимі до повторного
+replay. Partial scope: promote відмовляє при `active_incidents_outside_scope > 0` без `force` — на практиці replay всієї історії або свідомий force. Tracks/alerts replay не будує (ADR-0005 «Межі P14»). Під час replay
+`ReprocessService.ResetAsync`/legacy `processing` не запускати (ADR-0009 cutover).
+
 ### Ops-контролі, панелі «Черги»/«Повідомлення» (P13)
 
 Міграція `AddMessagingControls` — additive (`messaging.subscription_lanes`, `messaging.control_audit`, `processing.deliveries.lane/occurred_at`, індекси);

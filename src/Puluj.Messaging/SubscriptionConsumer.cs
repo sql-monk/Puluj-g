@@ -176,7 +176,8 @@ public sealed class SubscriptionConsumer : BackgroundService
             {
                 if (!_lanes.TryGetValue(lane, out runtime!))
                 {
-                    runtime = new LaneRuntime(lane, Registry.QueueName(SubscriptionId, lane), prefetch, $"{_worker}:{lane}");
+                    var lanePrefetch = _options.Consumer.PrefetchByLane.TryGetValue(lane, out var byLane) ? Math.Min(byLane, prefetch) : prefetch;
+                    runtime = new LaneRuntime(lane, Registry.QueueName(SubscriptionId, lane), lanePrefetch, $"{_worker}:{lane}");
                     _lanes[lane] = runtime;
                 }
                 runtime.State = states.GetValueOrDefault(lane, SubscriptionLane.Active);

@@ -149,3 +149,20 @@ public sealed record MessageLifecycleDto(
     IReadOnlyList<LifecycleRefDto> Derived,
     IReadOnlyList<LifecycleQuarantineDto> Quarantine,
     LifecycleSummaryDto Summary);
+
+// ---- P14 (ADR-0005): runs and generations.
+
+public sealed record RunCheckpointDto(long Published, long Total, long LastRawMessageId, DateTimeOffset? LastPublishedAt, bool Done, string? Error);
+
+public sealed record RunDto(
+    Guid RunId, string Lane, string Kind,
+    /// <summary>created | running | paused | verified | promoted | rolled_back | cancelled | failed | completed | superseded</summary>
+    string State,
+    Guid? GenerationId, bool GenerationActive, DateTimeOffset? PromotedAt, DateTimeOffset? RolledBackAt, string? VerifiedBy,
+    Guid? SupersedesRunId, Guid? ReplaysRunId,
+    System.Text.Json.JsonElement? Versions, System.Text.Json.JsonElement? Scope, RunCheckpointDto? Checkpoint,
+    string CreatedBy, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, DateTimeOffset? FinishedAt);
+
+public sealed record ReplayCreateRequest(int[]? SourceIds, DateTimeOffset From, DateTimeOffset To, string Actor, string Reason);
+
+public sealed record RunActionRequest(string Actor, string Reason, DateTimeOffset? Watermark = null);

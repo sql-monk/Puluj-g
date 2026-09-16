@@ -1066,6 +1066,9 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.HasIndex("CorrelationId")
                         .HasDatabaseName("ix_events_correlation_id");
 
+                    b.HasIndex("ProcessingRunId")
+                        .HasDatabaseName("ix_messaging_events_run");
+
                     b.HasIndex("PublishedAt")
                         .HasDatabaseName("ix_events_published_at");
 
@@ -1953,6 +1956,11 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ux_processing_runs_open_per_lane")
                         .HasFilter("state = 'running' AND kind IN ('live', 'history')");
+
+                    b.HasIndex(new[] { "Kind" }, "ux_processing_runs_open_replay")
+                        .IsUnique()
+                        .HasDatabaseName("ux_processing_runs_open_replay")
+                        .HasFilter("kind = 'replay' AND state IN ('created', 'running', 'paused', 'verified')");
 
                     b.ToTable("runs", "processing");
                 });

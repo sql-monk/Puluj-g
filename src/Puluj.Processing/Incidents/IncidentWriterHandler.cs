@@ -36,7 +36,7 @@ public sealed class IncidentWriterHandler(
         set => writer.Instance = value;
     }
 
-    private sealed record Facts(RawMessage Raw, List<(Target Row, Guid ObservationId, string Kind, DateTimeOffset EffectiveAt)> Incidents, List<Guid> Observations, List<int> KindIds, Guid? RunGeneration);
+    private sealed record Facts(RawMessage Raw, List<(Target Row, Guid ObservationId, string Kind, DateTimeOffset EffectiveAt)> Incidents, List<Guid> Observations, List<int> KindIds, Guid? RunGeneration, string? RunState);
 
     public async Task<object?> PrepareAsync(Envelope envelope, CancellationToken ct)
     {
@@ -74,12 +74,15 @@ public sealed class IncidentWriterHandler(
             incidents.Add((target, observationId, kind, target.ObservedAt));
         }
         Guid? generation = null;
+        string? runState = null;
         if (incidents.Count > 0)
         {
             await using var db = await factory.CreateDbContextAsync(ct);
-            generation = await db.ProcessingRuns.AsNoTracking().Where(r => r.RunId == envelope.ProcessingRunId).Select(r => r.GenerationId).SingleOrDefaultAsync(ct);
+            var run = await db.ProcessingRuns.AsNoTracking().Where(r => r.RunId == envelope.ProcessingRunId).Select(r => new { r.GenerationId, r.State }).SingleOrDefaultAsync(ct);
+            generation = run?.GenerationId;
+            runState = run?.State;
         }
-        return new Facts(raw, incidents, observations, kindIds.ToList(), generation);
+        return new Facts(raw, incidents, observations, kindIds.ToList(), generation, runState);
     }
 
     public async Task<DeliveryResult> ApplyAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Envelope envelope, object? state, CancellationToken ct)
@@ -90,6 +93,10 @@ public sealed class IncidentWriterHandler(
         {
             metrics.WriterOutcome(Subscription, "noop_no_facts");
             return DeliveryResult.Noop("no incident facts for the incident branch");
+        }
+        if (envelope.Lane == "replay")
+        {
+            return await ApplyShadowAsync(conn, tx, envelope, f, sw, ct);
         }
         var lockMs = await WriterSupport.LockStoreSharedAsync(conn, tx, ct);
         foreach (var kindId in f.KindIds)
@@ -154,6 +161,66 @@ public sealed class IncidentWriterHandler(
         }
         metrics.WriterOutcome(Subscription, "completed");
         return new DeliveryResult("completed", null, outgoing) { AfterCommit = token => NotifyAsync(notify, token) };
+    }
+
+    /// <summary>
+    /// Shadow replay (P14, ADR-0005): the facts of a replay run are written **only** as incidents of the run's own generation —
+    /// no `targets` row (the public map and its triggers never see them), no `legacy_target_id` link, no `TargetCreated` NOTIFY,
+    /// none of the live ownership guards (live's rows for the same raw are another generation's evidence). Idempotency per generation:
+    /// a raw already linked in this generation (a repeated batch, a rewound checkpoint) is a noop;
+    /// a cancelled or rolled-back run is a noop too (its in-flight deliveries drain without effect).
+    /// </summary>
+    private async Task<DeliveryResult> ApplyShadowAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Envelope envelope, Facts f, Stopwatch sw, CancellationToken ct)
+    {
+        if (f.RunGeneration is not { } generation)
+        {
+            throw new PermanentDeliveryException("invalid_run", $"replay delivery of run {envelope.ProcessingRunId} without a generation");
+        }
+        if (f.RunState is "cancelled" or "rolled_back" or "failed")
+        {
+            metrics.WriterOutcome(Subscription, "noop_run_" + f.RunState);
+            return DeliveryResult.Noop($"run_{f.RunState}: the replay run is {f.RunState}; its deliveries drain without effect");
+        }
+        var lockMs = 0L;
+        foreach (var kindId in f.KindIds)
+        {
+            lockMs += await WriterSupport.LockAsync(conn, tx, $"incident:kind:{kindId}", shared: false, ct);
+        }
+        metrics.WriterStage(Subscription, "lock_wait", lockMs);
+        await using (var linked = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM incident_observations io JOIN processing.observations o ON o.observation_id = io.observation_id WHERE io.generation_id = @g AND o.raw_message_id = @raw)", conn, tx))
+        {
+            linked.Parameters.AddWithValue("g", generation);
+            linked.Parameters.AddWithValue("raw", f.Raw.RawMessageId);
+            if ((bool)(await linked.ExecuteScalarAsync(ct))!)
+            {
+                metrics.WriterOutcome(Subscription, "noop_already_written");
+                return DeliveryResult.Noop("already_written: this raw message is already linked in the run's generation");
+            }
+        }
+        await using var db = await ConsumerDbContext.AttachAsync(conn, tx, ct);
+        await IncidentStateWriter.EnsureGenerationAsync(conn, tx, generation, ct);
+        var outgoing = new List<Envelope>();
+        var changed = 0;
+        foreach (var (row, observationId, kind, effectiveAt) in f.Incidents.OrderBy(i => i.EffectiveAt))
+        {
+            var change = await writer.RecordObservationAsync(db, new IncidentStateWriter.ObservationInput(row, observationId, kind, effectiveAt), generation, envelope.ProcessingRunId, envelope, ct);
+            if (change is null)
+            {
+                continue;
+            }
+            outgoing.Add(change.Event); // `incident.changed` in the replay lane: archived, never projected (topology v9)
+            changed++;
+            metrics.WriterOutcome(Subscription, "shadow_incident_" + change.Change);
+        }
+        metrics.WriterStage(Subscription, "apply", sw.ElapsedMilliseconds - lockMs);
+        if (changed == 0)
+        {
+            metrics.WriterOutcome(Subscription, "noop_already_written");
+            return DeliveryResult.Noop("already_written: the incident facts of this event are linked in the generation");
+        }
+        metrics.WriterOutcome(Subscription, "completed");
+        return new DeliveryResult("completed", null, outgoing);
     }
 
     private async Task NotifyAsync(IEnumerable<PulujEvent> events, CancellationToken ct)

@@ -84,7 +84,7 @@ services:
       Worker__AppendHostName: "true"
       # P09 cutover (ADR-0009): scripts/deploy.ps1 -Broker -DomainWriters sets MESSAGING_WORKER_ROLES with
       # track-worker,alert-worker,watchdog,incident-worker and PROCESSOR_REPLICAS=0 — never both owners over one database.
-      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection}
+      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay}
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"

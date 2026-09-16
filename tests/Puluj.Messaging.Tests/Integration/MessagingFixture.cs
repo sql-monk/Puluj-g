@@ -73,6 +73,9 @@ public sealed class MessagingFixture : IAsyncLifetime
     public DlqConsumer Dlq => Services.GetRequiredService<DlqConsumer>();
     public ReconciliationService Reconciliation => Services.GetRequiredService<ReconciliationService>();
     public SubscriptionAdmin Admin => Services.GetRequiredService<SubscriptionAdmin>();
+    /// <summary>P14: run/generation orchestration and the replay job runner (driven by the tests: `PublishOnceAsync`, or started as a hosted service).</summary>
+    public Puluj.Infrastructure.Processing.RunService Runs => Services.GetRequiredService<Puluj.Infrastructure.Processing.RunService>();
+    public ReplayPublisher Replay => Services.GetRequiredService<ReplayPublisher>();
     public BrokerConnection Broker => Services.GetRequiredService<BrokerConnection>();
     public int SourceId { get; private set; }
     public string SourceCode { get; } = "tg_kpszsu";
@@ -139,6 +142,9 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["Ops:Slo:RequiredConsumerMissingSeconds"] = "0", // P13 O03: alarms fire on ages of seconds, not minutes
             ["Ops:Slo:InflightStuckSeconds"] = "0",
             ["Ops:Slo:SnapshotCacheSeconds"] = "0",
+            ["Replay:BatchSize"] = "2", // P14 R02: several batches out of a handful of raw messages
+            ["Replay:PollInterval"] = "00:00:00.200",
+            ["Replay:WatermarkLag"] = "00:00:00",
             ["Messaging:Reconciliation:DeliveryOverdue"] = Options.Reconciliation.DeliveryOverdue.ToString(),
             ["Messaging:Reconciliation:OutboxOverdue"] = Options.Reconciliation.OutboxOverdue.ToString(),
             ["Messaging:Reconciliation:OutboxGrace"] = Options.Reconciliation.OutboxGrace.ToString(),
@@ -152,7 +158,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<IHostEnvironment>(new TestEnvironment(repoRoot));
         services.AddPulujInfrastructure(config, "p03-test");
-        services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole, DependencyInjection.RawWriterRole }, "p03-test");
+        services.AddPulujMessaging(new HashSet<string> { DependencyInjection.RelayRole, DependencyInjection.ArchiveRole, DependencyInjection.RawWriterRole, DependencyInjection.ReplayRole }, "p03-test");
         services.AddSingleton<ILlmCompletion>(Llm); // before AddPulujParsing: the real Anthropic completion is TryAdd'ed
         services.AddPulujProcessing(config, "p03-test"); // legacy processor for the parity test (hosted loop is never started here)
         services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser, StageRoles.LlmWorker, StageRoles.Finalizer }, "p03-test");
@@ -292,6 +298,8 @@ public sealed class MessagingFixture : IAsyncLifetime
     }
 
     public Task<long> CountAsync(string table, string where = "true") => ScalarAsync<long>($"SELECT count(*) FROM {table} WHERE {where}");
+
+    public Task<long> CountAsync(string table, string where, params (string Name, object Value)[] parameters) => ScalarAsync<long>($"SELECT count(*) FROM {table} WHERE {where}", parameters);
 
     /// <summary>Ready + unacked messages of a queue (passive declare answers the ready count; consumers as well).</summary>
     public async Task<(uint Messages, uint Consumers)> QueueAsync(string queue)

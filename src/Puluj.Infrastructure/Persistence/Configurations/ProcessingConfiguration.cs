@@ -22,6 +22,8 @@ public class ProcessingRunConfiguration : IEntityTypeConfiguration<ProcessingRun
         b.HasIndex(x => new { x.Lane, x.State });
         // P03: one open run per lane (live/history); replay runs (P14) are many and never `running` on lane live.
         b.HasIndex(x => x.Lane, "ux_processing_runs_open_per_lane").HasDatabaseName("ux_processing_runs_open_per_lane").IsUnique().HasFilter("state = 'running' AND kind IN ('live', 'history')");
+        // P14: one open replay run at a time — the replay lane, its counters and the verify report belong to it.
+        b.HasIndex(x => x.Kind, "ux_processing_runs_open_replay").HasDatabaseName("ux_processing_runs_open_replay").IsUnique().HasFilter("kind = 'replay' AND state IN ('created', 'running', 'paused', 'verified')");
     }
 }
 

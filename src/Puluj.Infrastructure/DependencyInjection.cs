@@ -73,6 +73,9 @@ public static class DependencyInjection
         services.AddSingleton<Messaging.Ops.BrokerManagementClient>();
         services.AddSingleton<Messaging.Ops.OpsSnapshotService>();
         services.AddSingleton<Messaging.Ops.MessageExplorer>();
+        // P14 (ADR-0005): run/generation orchestration — usable from Admin (commands) and the messaging worker (publisher).
+        services.Configure<Processing.ReplayOptions>(configuration.GetSection(Processing.ReplayOptions.Section));
+        services.AddSingleton<Processing.RunService>();
         return services;
     }
 

@@ -71,7 +71,7 @@
 
 ## Відкрите
 
-Checkpoint-таблиця projection і delta за `recorded_at` — P14; перенесення track/alert push — P16; feed incidents у `FeedPanel` — U-задачі
+Checkpoint-таблиця projection і delta за `recorded_at` — P15/P16 (P14 ізолював replay через generation, projection без replay lane); перенесення track/alert push — P16; feed incidents у `FeedPanel` — U-задачі
 (P12 дав список без локації в легенді); canvas keyboard-навігація — після P13 (P12: DOM-легенда/список — Tab/Enter/Esc); benchmark N реплік × 50
 подій/с — після cutover.
 

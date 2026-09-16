@@ -82,6 +82,7 @@ public class ArchivedEventConfiguration : IEntityTypeConfiguration<ArchivedEvent
         b.Property(x => x.Envelope).HasColumnType("jsonb");
         b.HasIndex(x => x.CorrelationId);
         b.HasIndex(x => new { x.RawMessageId, x.ProcessingRunId });
+        b.HasIndex(x => x.ProcessingRunId).HasDatabaseName("ix_messaging_events_run"); // P14 verify: every delivery of a replay run
         b.HasIndex(x => new { x.EventType, x.PublishedAt });
         b.HasIndex(x => x.PublishedAt).HasMethod("brin");
     }

@@ -7,6 +7,8 @@ public static class DependencyInjection
     public const string RelayRole = "relay";
     public const string ArchiveRole = "archive";
     public const string RawWriterRole = "raw-writer";
+    /// <summary>P14: the replay job runner (publishes a replay run's scope into the replay lane).</summary>
+    public const string ReplayRole = "replay";
 
     /// <summary>
     /// Broker runtime for the given roles (WorkerOptions): `relay` — topology declare, outbox relay, reconciliation and
@@ -28,6 +30,11 @@ public static class DependencyInjection
             services.AddHostedService(sp => sp.GetRequiredService<ReconciliationService>());
         }
 
+        if (roles.Contains(ReplayRole))
+        {
+            services.AddSingleton(sp => ActivatorUtilities.CreateInstance<ReplayPublisher>(sp, instanceName ?? Environment.MachineName.ToLowerInvariant()));
+            services.AddHostedService(sp => sp.GetRequiredService<ReplayPublisher>());
+        }
         if (roles.Contains(ArchiveRole))
         {
             services.AddSingleton<ArchiveHandler>();

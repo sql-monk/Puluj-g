@@ -802,7 +802,7 @@ RabbitMQ/Testcontainers harness — P02+; required CI profile і load/chaos harn
 
 ```powershell
 cd web; npx playwright install chromium          # один раз
-cd web; npx playwright test                       # E01–E08 + A01–A04, desktop + mobile, ~5 хв (dev-сервери :5183/:5184 стартують самі)
+cd web; npx playwright test                       # E01–E08 + A01–A05, desktop + mobile, ~5 хв (dev-сервери :5183/:5184 стартують самі)
 cd web; npx playwright test --project=desktop e2e/E07-workload.e2e.ts   # лише workload
 cd web; npx playwright show-report e2e-report
 ```
@@ -815,6 +815,14 @@ pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests --filte
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Admin.Tests --filter "FullyQualifiedName~AlarmRulesTests"          # O05 правила alarms + explorer summary
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Integration.Tests --filter "FullyQualifiedName~MessagingControlsMigrationTests"  # O07 Up/Down
 cd web; npx playwright test --project=desktop e2e/A03-queues.e2e.ts   # A03 черги/контролі, A04 explorer
+```
+
+**P14 (replay runs, generations)** — інтеграційні R01–R06 у Messaging.Tests (реальні PostGIS + RabbitMQ), контракти v9, Playwright A05:
+
+```powershell
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests --filter "FullyQualifiedName~ReplayTests"   # R01/R03/R04 shadow→promote→rollback→catchup, R02 checkpoints, R05 supersede, R06 lock
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Contracts.Tests                                     # topology v9, producer_roles.replay
+cd web; npx playwright test --project=desktop e2e/A05-replay.e2e.ts   # панель Replay
 ```
 Не вигадувати результати неіснуючого suite.
 Frontend build генерує файли у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`; узгодити ownership
@@ -893,7 +901,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P11 | done | Claude Code (p11) | p11_review: план approve after fixes (B1–B3, N1–N15, Q1–Q6); результат approve after fixes (B1 projection без writers, B2 symbol font, B3 history throttle, N1–N13) → виправлено → re-run зелений | [GitHub P11](https://github.com/sql-monk/Puluj-g/issues/11); [handoff, evidence](evidence/message-platform/P11-handoff.md); ADR-0011; `/api/incidents`, projection (v8), NOTIFY backplane + Resync, incident layer/catalog adapter; закомічено |
 | P12 | done | Claude Code (p12) | p12_review: план approve after fixes (B1–B4, N1–N10, Q1–Q5); результат approve after fixes (N1–N13, Q1–Q6, без blocking) → виправлено → re-run зелений | [GitHub P12](https://github.com/sql-monk/Puluj-g/issues/13); [handoff, evidence](evidence/message-platform/P12-handoff.md); Playwright E2E 17 (desktop+mobile, admin), catalog editor + audit, review queue + merge preview, map quality; закомічено |
 | P13 | done | Claude Code (p13) | p13_review: план approve after fixes (B1–B4, N1–N16, Q1–Q5); результат approve after fixes (B1, N1–N10, Q1–Q9) → виправлено → re-run зелений | [GitHub P13](https://github.com/sql-monk/Puluj-g/issues/16); [handoff, evidence](evidence/message-platform/P13-handoff.md); ADR-0012; ops snapshot + alarms, lane pause/drain + audit, message explorer, панелі «Черги»/«Повідомлення», Playwright A03/A04; закомічено |
-| P14 | planned | — | — | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); — |
+| P14 | done | Claude Code (p14) | p14_review: план approve after fixes (B1–B3, N1–N13, Q1–Q6); результат request changes (B1, B2, N1–N9, Q1–Q8) → виправлено → re-run зелений | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); [handoff, evidence](evidence/message-platform/P14-handoff.md); ADR-0005 accepted; replay runs (checkpoint, catchup, verify/promote/rollback), topology v9, shadow incident-worker, панель «Replay», R01–R06 + A05; закомічено |
 | P15 | planned | — | — | [GitHub P15](https://github.com/sql-monk/Puluj-g/issues/17); — |
 | P16 | planned | — | — | [GitHub P16](https://github.com/sql-monk/Puluj-g/issues/15); — |
 

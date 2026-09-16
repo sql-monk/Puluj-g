@@ -1,0 +1,96 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="63bccfbe-4d16-4b3b-8e1e-ef96af839d80" name="aleks@ASUS-MONK 2026-09-16 21:46:45" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T21:46:45.1225491+03:00" queuing="2026-09-16T21:46:45.1225494+03:00" start="2026-09-16T21:45:54.1302643+03:00" finish="2026-09-16T21:46:46.1718877+03:00" />
+  <TestSettings name="default" id="5337eaa7-1d7d-42f2-9c8d-c00a99c5829e">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_21_46_45" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="28861681-d6df-40ae-83fc-977a820ec08b" testId="371986aa-c74a-7c1e-7d65-5bb221748912" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" computerName="ASUS-MONK" duration="00:00:02.8807627" startTime="2026-09-16T21:46:42.1014697+03:00" endTime="2026-09-16T21:46:45.0298852+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="28861681-d6df-40ae-83fc-977a820ec08b">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ&#xD;
+Expected: 6bb9f959-42f5-5e7c-a384-a325e71fa89b&#xD;
+Actual:   00000000-0000-0000-0000-000000000000</Message>
+          <StackTrace>   at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 325&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 339&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 339&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="371986aa-c74a-7c1e-7d65-5bb221748912">
+      <Execution id="28861681-d6df-40ae-83fc-977a820ec08b" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="371986aa-c74a-7c1e-7d65-5bb221748912" executionId="28861681-d6df-40ae-83fc-977a820ec08b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.26]   Discovering: Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:00.32]   Discovered:  Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:00.35]   Starting:    Puluj.Messaging.Tests&#xD;
+[testcontainers.org 00:00:00.14] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.44] Docker container 2c1ef71e1e45 created&#xD;
+[testcontainers.org 00:00:00.51] Start Docker container 2c1ef71e1e45&#xD;
+[testcontainers.org 00:00:00.87] Wait for Docker container 2c1ef71e1e45 to complete readiness checks&#xD;
+[testcontainers.org 00:00:00.91] Docker container 2c1ef71e1e45 ready&#xD;
+[testcontainers.org 00:00:01.10] Docker container d1b757e0f1c8 created&#xD;
+[testcontainers.org 00:00:01.11] Docker container 1cf94d1debe2 created&#xD;
+[testcontainers.org 00:00:01.12] Start Docker container d1b757e0f1c8&#xD;
+[testcontainers.org 00:00:01.14] Start Docker container 1cf94d1debe2&#xD;
+[testcontainers.org 00:00:01.46] Wait for Docker container d1b757e0f1c8 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.51] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d1b757e0f1c8&#xD;
+[testcontainers.org 00:00:01.51] Wait for Docker container 1cf94d1debe2 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.63] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d1b757e0f1c8&#xD;
+[testcontainers.org 00:00:03.74] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d1b757e0f1c8&#xD;
+[testcontainers.org 00:00:04.85] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container d1b757e0f1c8&#xD;
+[testcontainers.org 00:00:04.98] Docker container d1b757e0f1c8 ready&#xD;
+[testcontainers.org 00:00:06.75] Docker container 1cf94d1debe2 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+warn: Puluj.Infrastructure.Processing.RunService[0]&#xD;
+      Replay run 01a0ab8a-eb26-72ee-bbd7-6e7ab28c3a58 promoted by operator:test: active generation 01a0ab8a-eb26-71a1-927c-bfa00eba7e3d (was (null)): switch&#xD;
+[xUnit.net 00:00:50.39]       Assert.Equal() Failure: Values differ&#xD;
+[xUnit.net 00:00:50.39]       Expected: 6bb9f959-42f5-5e7c-a384-a325e71fa89b&#xD;
+[xUnit.net 00:00:50.39]       Actual:   00000000-0000-0000-0000-000000000000&#xD;
+[xUnit.net 00:00:50.39]       Stack Trace:&#xD;
+[xUnit.net 00:00:50.39]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(325,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one()&#xD;
+[xUnit.net 00:00:50.39]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(339,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one()&#xD;
+[xUnit.net 00:00:50.39]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(339,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one()&#xD;
+[xUnit.net 00:00:50.39]         --- End of stack trace from previous location ---&#xD;
+[testcontainers.org 00:00:49.96] Delete Docker container 1cf94d1debe2&#xD;
+[testcontainers.org 00:00:50.48] Delete Docker container d1b757e0f1c8&#xD;
+[xUnit.net 00:00:51.39]   Finished:    Puluj.Messaging.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T21:46:45.0340761+03:00">
+        <Text>[xUnit.net 00:00:50.39]     Puluj.Messaging.Tests.Integration.ReplayTests.R06_Promote_waits_for_a_writer_that_holds_the_active_generation_and_the_next_writer_sees_the_new_one [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

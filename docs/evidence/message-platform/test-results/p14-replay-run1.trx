@@ -1,0 +1,179 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="c9181292-a487-437b-b4fb-db71ecb3a3cf" name="aleks@ASUS-MONK 2026-09-16 21:32:42" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T21:32:42.3198318+03:00" queuing="2026-09-16T21:32:42.3198323+03:00" start="2026-09-16T21:31:47.8173146+03:00" finish="2026-09-16T21:34:21.6304494+03:00" />
+  <TestSettings name="default" id="6d8a9583-35eb-4f58-87f0-4f60e9b6c521">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_21_32_42" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="3558b19d-60ed-4b97-bb21-7cd7cb6eb1b8" testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" computerName="ASUS-MONK" duration="00:00:01.0088484" startTime="2026-09-16T21:34:19.7116522+03:00" endTime="2026-09-16T21:34:20.7384919+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3558b19d-60ed-4b97-bb21-7cd7cb6eb1b8">
+      <Output>
+        <ErrorInfo>
+          <Message>System.Text.Json.JsonException : The JSON value could not be converted to Puluj.Infrastructure.Processing.RunService+Checkpoint. Path: $.lastPublishedAt | LineNumber: 0 | BytePositionInLine: 109.&#xD;
+---- System.FormatException : The JSON value is not in a supported DateTimeOffset format.</Message>
+          <StackTrace>   at System.Text.Json.ThrowHelper.ReThrowWithPath(ReadStack&amp; state, Utf8JsonReader&amp; reader, Exception ex)&#xD;
+   at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader&amp; reader, T&amp; value, JsonSerializerOptions options, ReadStack&amp; state)&#xD;
+   at System.Text.Json.JsonSerializer.ReadFromSpan[TValue](ReadOnlySpan`1 json, JsonTypeInfo`1 jsonTypeInfo)&#xD;
+   at System.Text.Json.JsonSerializer.Deserialize[TValue](String json, JsonSerializerOptions options)&#xD;
+   at Puluj.Infrastructure.Processing.RunService.Read(NpgsqlDataReader reader) in C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs:line 362&#xD;
+   at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs:line 274&#xD;
+   at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs:line 274&#xD;
+   at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs:line 274&#xD;
+   at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs:line 66&#xD;
+   at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs:line 121&#xD;
+   at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct) in C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs:line 121&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 210&#xD;
+--- End of stack trace from previous location ---&#xD;
+----- Inner Stack Trace -----&#xD;
+   at System.Text.Json.Serialization.Converters.DateTimeOffsetConverter.Read(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options)&#xD;
+   at System.Text.Json.Serialization.Converters.NullableConverter`1.Read(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options)&#xD;
+   at System.Text.Json.Serialization.JsonConverter`1.TryRead(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, T&amp; value, Boolean&amp; isPopulatedValue)&#xD;
+   at System.Text.Json.Serialization.JsonConverter`1.TryReadAsObject(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, Object&amp; value)&#xD;
+   at System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1.ReadAndCacheConstructorArgument(ReadStack&amp; state, Utf8JsonReader&amp; reader, JsonParameterInfo jsonParameterInfo)&#xD;
+   at System.Text.Json.Serialization.Converters.ObjectWithParameterizedConstructorConverter`1.OnTryRead(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, T&amp; value)&#xD;
+   at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader&amp; reader, T&amp; value, JsonSerializerOptions options, ReadStack&amp; state)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="9972f50d-d5f1-4683-a74c-040e52a85520" testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" computerName="ASUS-MONK" duration="00:01:37.4466639" startTime="2026-09-16T21:32:42.2946406+03:00" endTime="2026-09-16T21:34:19.7088587+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9972f50d-d5f1-4683-a74c-040e52a85520">
+      <Output>
+        <ErrorInfo>
+          <Message>replay incidents: parser/live=completed:2, normalizer/live=completed:2, finalizer/live=completed:2, track-worker/live=noop:2, finalizer/replay=completed:2, archive/live=completed:10, incident-worker/live=completed:2, alert-worker/live=noop:2, parser/replay=completed:2, normalizer/replay=completed:2, raw-writer/live=completed:2, archive/replay=completed:6, projection/live=completed:2, incident-worker/replay=noop:2</Message>
+          <StackTrace>   at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 110&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 171&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="ddeb7720-86b0-4960-a1fd-82aaebc31a7c" testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" testName="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" computerName="ASUS-MONK" duration="00:00:02.3058969" startTime="2026-09-16T21:32:39.9349583+03:00" endTime="2026-09-16T21:32:42.2572782+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ddeb7720-86b0-4960-a1fd-82aaebc31a7c">
+      <Output>
+        <ErrorInfo>
+          <Message>System.InvalidCastException : Invalid cast from 'System.DateTime' to 'System.DateTimeOffset'.</Message>
+          <StackTrace>   at System.Convert.DefaultToType(IConvertible value, Type targetType, IFormatProvider provider)&#xD;
+   at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters) in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs:line 297&#xD;
+   at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters) in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs:line 297&#xD;
+   at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters) in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs:line 297&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 246&#xD;
+   at Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run() in C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs:line 253&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb">
+      <Execution id="9972f50d-d5f1-4683-a74c-040e52a85520" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="9e9d5be4-ac0a-566d-32e6-aa665e62abdf">
+      <Execution id="3558b19d-60ed-4b97-bb21-7cd7cb6eb1b8" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream" />
+    </UnitTest>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="c5676cc1-841b-46bb-84c1-b93d09e025e4">
+      <Execution id="ddeb7720-86b0-4960-a1fd-82aaebc31a7c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.ReplayTests" name="R05_A_newer_pipeline_version_supersedes_the_open_live_run" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="9e9d5be4-ac0a-566d-32e6-aa665e62abdf" executionId="3558b19d-60ed-4b97-bb21-7cd7cb6eb1b8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3e35e8e3-5aa3-1c97-eb26-4176efa2adbb" executionId="9972f50d-d5f1-4683-a74c-040e52a85520" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c5676cc1-841b-46bb-84c1-b93d09e025e4" executionId="ddeb7720-86b0-4960-a1fd-82aaebc31a7c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="0" failed="3" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:01.33]   Discovering: Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:01.39]   Discovered:  Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:01.43]   Starting:    Puluj.Messaging.Tests&#xD;
+[testcontainers.org 00:00:00.20] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.45] Docker container bfe3b3ce3870 created&#xD;
+[testcontainers.org 00:00:00.63] Start Docker container bfe3b3ce3870&#xD;
+[testcontainers.org 00:00:01.08] Wait for Docker container bfe3b3ce3870 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.19] Docker container bfe3b3ce3870 ready&#xD;
+[testcontainers.org 00:00:01.34] Docker container fadaa1381487 created&#xD;
+[testcontainers.org 00:00:01.36] Docker container 2fb0eaf62713 created&#xD;
+[testcontainers.org 00:00:01.38] Start Docker container fadaa1381487&#xD;
+[testcontainers.org 00:00:01.39] Start Docker container 2fb0eaf62713&#xD;
+[testcontainers.org 00:00:01.77] Wait for Docker container fadaa1381487 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.82] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container fadaa1381487&#xD;
+[testcontainers.org 00:00:01.82] Wait for Docker container 2fb0eaf62713 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.95] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container fadaa1381487&#xD;
+[testcontainers.org 00:00:04.09] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container fadaa1381487&#xD;
+[testcontainers.org 00:00:04.21] Docker container fadaa1381487 ready&#xD;
+[testcontainers.org 00:00:07.02] Docker container 2fb0eaf62713 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (10ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+[xUnit.net 00:00:53.97]       System.InvalidCastException : Invalid cast from 'System.DateTime' to 'System.DateTimeOffset'.&#xD;
+[xUnit.net 00:00:53.97]       Stack Trace:&#xD;
+[xUnit.net 00:00:53.98]            at System.Convert.DefaultToType(IConvertible value, Type targetType, IFormatProvider provider)&#xD;
+[xUnit.net 00:00:53.98]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs(297,0): at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters)&#xD;
+[xUnit.net 00:00:53.98]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs(297,0): at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters)&#xD;
+[xUnit.net 00:00:53.98]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\MessagingFixture.cs(297,0): at Puluj.Messaging.Tests.Integration.MessagingFixture.ScalarAsync[T](String sql, ValueTuple`2[] parameters)&#xD;
+[xUnit.net 00:00:53.98]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(246,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run()&#xD;
+[xUnit.net 00:00:53.98]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(253,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run()&#xD;
+[xUnit.net 00:00:53.98]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:02:31.42]       replay incidents: parser/live=completed:2, normalizer/live=completed:2, finalizer/live=completed:2, track-worker/live=noop:2, finalizer/replay=completed:2, archive/live=completed:10, incident-worker/live=completed:2, alert-worker/live=noop:2, parser/replay=completed:2, normalizer/replay=completed:2, raw-writer/live=completed:2, archive/replay=completed:6, projection/live=completed:2, incident-worker/replay=noop:2&#xD;
+[xUnit.net 00:02:31.42]       Stack Trace:&#xD;
+[xUnit.net 00:02:31.42]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(110,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup()&#xD;
+[xUnit.net 00:02:31.42]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(171,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup()&#xD;
+[xUnit.net 00:02:31.42]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:02:32.45]       System.Text.Json.JsonException : The JSON value could not be converted to Puluj.Infrastructure.Processing.RunService+Checkpoint. Path: $.lastPublishedAt | LineNumber: 0 | BytePositionInLine: 109.&#xD;
+[xUnit.net 00:02:32.45]       ---- System.FormatException : The JSON value is not in a supported DateTimeOffset format.&#xD;
+[xUnit.net 00:02:32.45]       Stack Trace:&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.ThrowHelper.ReThrowWithPath(ReadStack&amp; state, Utf8JsonReader&amp; reader, Exception ex)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader&amp; reader, T&amp; value, JsonSerializerOptions options, ReadStack&amp; state)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.JsonSerializer.ReadFromSpan[TValue](ReadOnlySpan`1 json, JsonTypeInfo`1 jsonTypeInfo)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.JsonSerializer.Deserialize[TValue](String json, JsonSerializerOptions options)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs(362,0): at Puluj.Infrastructure.Processing.RunService.Read(NpgsqlDataReader reader)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs(274,0): at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs(274,0): at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Infrastructure\Processing\RunService.cs(274,0): at Puluj.Infrastructure.Processing.RunService.LeaseRunningReplayAsync(NpgsqlConnection conn, NpgsqlTransaction tx, CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs(66,0): at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs(121,0): at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\src\Puluj.Messaging\ReplayPublisher.cs(121,0): at Puluj.Messaging.ReplayPublisher.PublishOnceAsync(CancellationToken ct)&#xD;
+[xUnit.net 00:02:32.45]         C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\Integration\ReplayTests.cs(210,0): at Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream()&#xD;
+[xUnit.net 00:02:32.45]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:02:32.45]         ----- Inner Stack Trace -----&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.Converters.DateTimeOffsetConverter.Read(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.Converters.NullableConverter`1.Read(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.JsonConverter`1.TryRead(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, T&amp; value, Boolean&amp; isPopulatedValue)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.JsonConverter`1.TryReadAsObject(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, Object&amp; value)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.Converters.LargeObjectWithParameterizedConstructorConverter`1.ReadAndCacheConstructorArgument(ReadStack&amp; state, Utf8JsonReader&amp; reader, JsonParameterInfo jsonParameterInfo)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.Converters.ObjectWithParameterizedConstructorConverter`1.OnTryRead(Utf8JsonReader&amp; reader, Type typeToConvert, JsonSerializerOptions options, ReadStack&amp; state, T&amp; value)&#xD;
+[xUnit.net 00:02:32.45]            at System.Text.Json.Serialization.JsonConverter`1.ReadCore(Utf8JsonReader&amp; reader, T&amp; value, JsonSerializerOptions options, ReadStack&amp; state)&#xD;
+[testcontainers.org 00:02:30.88] Delete Docker container 2fb0eaf62713&#xD;
+[testcontainers.org 00:02:31.23] Delete Docker container fadaa1381487&#xD;
+[xUnit.net 00:02:33.21]   Finished:    Puluj.Messaging.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T21:32:42.2622940+03:00">
+        <Text>[xUnit.net 00:00:53.97]     Puluj.Messaging.Tests.Integration.ReplayTests.R05_A_newer_pipeline_version_supersedes_the_open_live_run [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T21:34:19.7100846+03:00">
+        <Text>[xUnit.net 00:02:31.42]     Puluj.Messaging.Tests.Integration.ReplayTests.R01_R03_R04_Shadow_replay_in_an_isolated_generation_then_atomic_promote_rollback_and_delta_catchup [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T21:34:20.7392513+03:00">
+        <Text>[xUnit.net 00:02:32.45]     Puluj.Messaging.Tests.Integration.ReplayTests.R02_Checkpoints_are_written_with_their_batch_pause_cancel_are_honoured_and_a_repeated_batch_is_a_noop_downstream [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -69,7 +69,7 @@ track-worker'а; агрегату «подія» не було, карта по�
   requeue (Q1) — лічильники `40P01` знімати після cutover.
 - Crossover асиметричний (Q3): звіт про вибух ніколи не приєднується до incident'а, заснованого `impact.confirmed`; `impact.confirmed` з двома
   кандидатами (вибух і confirmed-kind) може дати `ambiguous`.
-- `is_active` generation обчислюється на insert (Q4): два різні generation id одночасно — обидва active; P14 orchestration.
+- ~~`is_active` generation обчислюється на insert (Q4)~~ — P14: live writers пишуть в active generation під advisory lock; replay — у власну неактивну; promote/rollback (ADR-0005 «Orchestration»); `ux_processing_generations_active` — одна active.
 - Невідомий kind у worker'і → refresh індексу, далі `PermanentDeliveryException unknown_kind` (N9); в Admin індекс вантажиться перед командою (B2),
   подія ніколи не несе числовий код.
 

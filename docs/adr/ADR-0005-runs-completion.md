@@ -1,6 +1,6 @@
 # ADR-0005 — Runs, generations, lanes і completion semantics
 
-Статус: **proposed** (P01); частково реалізовано P03 — receipts `processing.deliveries` з terminal `completed/noop/quarantined/waived`
+Статус: **accepted** (P14 — orchestration: state machine, replay runs з checkpoint, delta catchup, verify/promote/rollback, shadow-гілка incident-worker; див. «Orchestration (P14)» нижче). Історія: proposed (P01); частково реалізовано P03 — receipts `processing.deliveries` з terminal `completed/noop/quarantined/waived`
 (`SubscriptionConsumer`, `DlqConsumer`, `SubscriptionAdmin.WaiveAsync`) і мінімальні `processing.runs` (один відкритий run на lane
 `live`/`history`, `ProcessingRuns`); P05 — стадії `normalize`/`parse` у `processing.stage_results` (unique `(raw, run, stage, stage_version)`,
 повтор → `noop`) і outcomes parser'а `facts | no_facts | unsupported | needs_llm | failed` у `parse.completed`; P06 — **finalizer** (`FinalizerHandler`):
@@ -101,6 +101,56 @@ stale revision) — receipt обов'язковий; `quarantined` — retries �
 `RawMessage.ProcessingStatus` лишається compatibility-проєкцією: `Processed` ⇔ `analyzed ∧ domain_completed`;
 `Failed` ⇔ `needs_attention` через `failed|quarantined`; `Skipped` ⇔ `unsupported`. Точне відображення — P05.
 
+## Orchestration (P14)
+
+- **Replay run як job.** `RunService.CreateReplayAsync(scope {source_ids?, from, to})` → `processing.runs {kind replay, lane replay, state created,
+  generation_id = нова неактивна, replays_run_id = live run, versions {pipeline_version, topology_version}, scope, checkpoint}` + `control_audit run:create`.
+  **Один відкритий replay run** (`ux_processing_runs_open_replay`: created|running|paused|verified) — replay lane, її лічильники і звіт verify належать йому.
+- **State machine (compare-and-set, 409 при гонці, кожен перехід — audit `run:*`):** `created → running` (start), `running ↔ paused`,
+  `failed → running` (resume після виправлення), `created|running|paused|verified|failed → cancelled` (verified, який не хочуть активувати, звільняє
+  єдиний replay-слот), `running|paused → verified` (verify), `verified → promoted`
+  (promote), `promoted → rolled_back` (rollback); `failed` ставить publisher після `Replay:MaxBatchFailures` поспіль (CAS на running). `verified` →
+  catchup → знову `running` (нова дельта потребує нової перевірки). Термінальні: cancelled, rolled_back; history `completed` — P16.
+- **Checkpoint (контракт, jsonb `runs.checkpoint`, camelCase):** `{published, total, lastRawMessageId, lastPublishedAt, ingestCeiling, done, error, failures}`.
+  Keyset — за `raw_message_id` (порядок ingestion, той, що бачив live; PK-індекс), у межах `published_at ∈ [from, to]` і `raw_message_id ≤ ingestCeiling`
+  (max id при create). `scope`: `{source_ids, from, to, catchup_from?, verification?, promoted_from?}`.
+- **Publisher** (`ReplayPublisher`, роль `replay`): `FOR UPDATE SKIP LOCKED` на running run (одна репліка на run), батч `Replay:BatchSize` → `raw.stored
+  {lane replay, is_new:false, processing_run_id = run, producer replay@instance}` через outbox **в одній tx з checkpoint** (crash повторює ≤ 1 неопублікований
+  батч; повтор → stage `noop` per (raw, run)); backpressure `Replay:MaxInFlight` по pending deliveries lane replay; `PrefetchByLane {replay: 2}` — live має
+  зарезервовану місткість каналу; pause/cancel читаються між батчами; помилка батчу → `checkpoint.error/failures` без зміни стану, `failed` після N поспіль.
+  Publisher потребує `relay` (outbox → брокер).
+- **Delta catchup** = ingestion-дельта: `CatchUpAsync(watermark = now − Replay:WatermarkLag)` підіймає `scope.to` до watermark і `ingestCeiling` до поточного
+  max id; той самий keyset-прохід дочитує все, що збережено після попереднього ceiling у (розширеному) вікні — включно з пізнім raw колектора зі старим
+  `published_at`. Дозволено з running/paused/verified — **лише до promote** (після нього generation активна, а replay lane не має projection, тож
+  записане туди не дійшло б до карти без Resync — review B2/Q6): останній catchup — безпосередньо перед promote; raw, оброблені live між ними, лишаються
+  в попередній generation (за потреби — новий replay цього вікна).
+- **Shadow без production effects.** Replay lane досягає normalizer/parser/llm-worker/finalizer/archive/incident-worker (v9); parser поза live не викликає
+  LLM (`llm_skipped_lane`); track/alert-worker і projection без replay lane → без `targets`, треків, тривог, NOTIFY. `IncidentWriterHandler.ApplyShadowAsync`
+  (lane replay): без Store/legacy/already-written guards, без `targets`/`legacy_target_id`/NOTIFY; лише incidents/links/revisions у generation run'а під
+  `incident:kind` locks; ідемпотентність — `(raw_message_id, generation_id)` guard; run `cancelled|rolled_back|failed` → `noop run_*` (in-flight доставки
+  скасованого run'а зливаються без ефекту).
+- **Active generation.** Live/history writers пишуть в **active** generation (`EnsureGenerationAsync`: `run.generation_id ?? active ?? LiveGeneration`) під
+  shared advisory lock `generation:active`; promote/rollback беруть його exclusive → запис ніколи не потрапляє в generation, деактивовану в ту саму мить
+  (row lock тут не годиться: після конфлікту повторна оцінка «немає рядка»). Read-side (`IncidentQueries.Active`, admin list/review) — лише active.
+- **Verify** (гейти → 409): scope опубліковано (`done`), 0 pending deliveries lane replay + 0 unconfirmed outbox lane replay і 0 quarantined **з моменту
+  створення run'а** (залишки попередніх runs не блокують), `unanalyzed = distinct raw(events run) − extractions(run) = 0`; звіт у `scope.verification`: stages per outcome, extractions/observations, `incidents_in_generation`,
+  `active_incidents_in_window`, `active_incidents_outside_scope` (зникнуть після promote), `active_incidents_missing_in_generation` (raw без incident у
+  generation — типово LLM-only факти: replay не викликає модель).
+- **Promote** (з verified): одна tx — деактивувати active, активувати generation run'а (`promoted_at`), run → promoted, `scope.promoted_from`; refused при
+  `active_incidents_outside_scope > 0`, крім `force` (audited) — **відхилення від §11.5** «explicit replacement scope»: promote перемикає всю generation,
+  partial scope = свідоме рішення оператора з reason. **Rollback** (з promoted): active ← `promoted_from` (або LiveGeneration), `rolled_back_at`, run →
+  rolled_back; audit фіксує `incidentsWrittenSincePromote` — incidents, які live записав у promoted generation за вікно `[promoted_at, rolled_back_at]`,
+  невидимі після відкату до повторного replay цього вікна. Нічого не видаляється. Fencing §11.6: старий процесор/legacy reset під час replay — заборонено
+  (ADR-0009 cutover); publisher скасованого run'а не публікує (стан читається per батч під lock).
+- **Supersede live run.** `ProcessingRuns.GetOpenRunAsync`: відкритий run іншої `pipeline_version`, створений **до старту цього процесу**, → `superseded`
+  (`finished_at`), новий `running` з `supersedes_run_id`; run, відкритий пізніше (новіший деплой), приймається — mixed-version window без «хитання»; старий
+  процес до рестарту тримає кешований id. Порівнюються `created_at` БД і час старту процесу — при розбіжності годинників хостів рішення може
+  хитнутись; рестарт старішої збірки після новішого run'а знову supersede'ить його (прийнято: mixed-version window коротка, результати обох runs лишаються).
+- **Межі P14:** tracks/alerts без `generation_id` — replay їх не будує і не ізолює (P16: generation-колонки + запити мапи); partial merge/replacement scope —
+  після даних; history run `completed` — P16; legacy `ReprocessService.ResetAsync`/`ProcessingLoop` — cutover P16; projection checkpoint-таблиця і delta
+  за `recorded_at` (ADR-0011) — P15/P16; `processing_status` Pending/backlog семантика (ADR-0009) — P16; backfill forecast / silent-source alarm
+  (ADR-0012) — P15.
+
 ## Альтернативи
 
 - Один глобальний ACK/лічильник «усі отримали» — неможливий у брокері та змішує транспорт із бізнес-завершенням.
@@ -110,13 +160,14 @@ stale revision) — receipt обов'язковий; `quarantined` — retries �
 ## Наслідки
 
 - Кожен consumer має повертати receipt навіть при `noop`; це +1 рядок на delivery (retention — ADR-0007).
-- Замість reset — новий run/generation; legacy `ReprocessService.ResetAsync` з table fence лишається до P14.
+- Замість reset — новий run/generation; legacy `ReprocessService.ResetAsync` з table fence лишається до cutover (P16).
 - Analytics рахує root messages один раз на `(raw_message_id)`, а результати — на `(raw_message_id, run_id)`.
 
 ## Відкрите
 
 | Питання | Задача |
 |---|---|
-| Checkpoint format, pause/cancel, delta catchup до watermark, promote/rollback, partial replay scope | P14 |
+| ~~Checkpoint format, pause/cancel, delta catchup до watermark, promote/rollback~~ — done (P14, «Orchestration»); partial replay scope (explicit merge) | після даних |
+| Tracks/alerts у generation (replay lane track/alert-worker), history run `completed`, legacy reset cutover, projection checkpoint | P16 |
 | Точний mapping `ProcessingStatus` ⇔ workflow stages — P05 не змінює `ProcessingStatus` (його далі пише legacy `ProcessingLoop`; стадії P05 працюють поруч у shadow-режимі і пишуть лише `stage_results`/outbox); stage `analyzed` з'явиться з finalizer'ом | P06 (analyzed) / P14–P16 (cutover) |
-| Правила conservative merge при promote generation для incidents/tracks з контекстом поза інтервалом | P14 + P09/P10 |
+| Правила conservative merge при promote generation для incidents/tracks з контекстом поза інтервалом | після даних (P14: `active_incidents_outside_scope` gate + force) |

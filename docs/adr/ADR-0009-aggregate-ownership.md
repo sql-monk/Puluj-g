@@ -12,7 +12,7 @@
 
 1. **Власники.** `track-worker` — fact writer усіх не-alert observations (`targets`, compat projection, рівно один рядок на `observation_id`) і владник
    агрегату track. `alert-worker` — fact writer alert-observations і владник інтервалів `air_alerts`. Обидва — subscriptions `observations.recorded`
-   (lanes `live`, `history`; replay — P14) і власних expiry-команд. `incident-worker` (P10, ADR-0010) — fact writer incident-observations і owner агрегату incident (lock `incident:kind:{id}`); track-worker пропускає
+   (lanes `live`, `history`; replay lane для track/alert — P16: без `generation_id` у треків/тривог shadow неможливий, P14 ізолював лише incidents) і власних expiry-команд. `incident-worker` (P10, ADR-0010) — fact writer incident-observations і owner агрегату incident (lock `incident:kind:{id}`); track-worker пропускає
    incident-факти, коли подія називає гілку `incident-worker` у `expected_branches` (старі v6-події дописує сам); `info` — track-worker.
 2. **Partition і lock hierarchy** (у кожній delivery-tx, детермінований порядок): `pg_advisory_xact_lock_shared(Store)` (взаємовиключення з legacy
    processor/watchdog/reset, паралельність writers між собою) → `track` shared (або exclusive, якщо відбій без категорії) → `track:cat:{category}` exclusive

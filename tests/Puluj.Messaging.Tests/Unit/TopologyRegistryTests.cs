@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(8, Registry.TopologyVersion);
+        Assert.Equal(9, Registry.TopologyVersion); // v9 (P14): incident-worker serves the replay lane
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -40,7 +40,9 @@ public sealed class TopologyRegistryTests
         Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // active since v5 (P06)
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "live").Select(s => s.Id)); // domain workers are conditional (by_manifest)
         Assert.Equal(["archive", "track-worker", "alert-worker", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "live", null, null, ["track-worker", "alert-worker", "incident-worker", "nope"]).Select(s => s.Id)); // v7 (P10): every named branch is active
-        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker"]).Select(s => s.Id)); // writers do not serve replay (P14)
+        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker"]).Select(s => s.Id)); // track/alert writers do not serve replay (P14: no live effects)
+        Assert.Equal(["archive", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker", "alert-worker", "incident-worker"]).Select(s => s.Id)); // v9 (P14): incidents are rebuilt in the replay generation
+        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("incident.changed", "replay").Select(s => s.Id)); // no projection in the replay lane: the shadow generation never reaches the map
         Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // v8 (P11): projection active; archive stays required
         Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("incident.changed", "live").Select(s => s.Id));
         Assert.Equal(["track-worker"], Registry.ExpectedSubscriptions("track.expiry.requested", "live").Select(s => s.Id));

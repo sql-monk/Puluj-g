@@ -74,7 +74,7 @@ Admin-процес не посилається на `Puluj.Messaging` і не т
 |---|---|---|
 | DB pool wait / latency | Npgsql OTel-метрики, не з БД | P16 (OTel dashboard) |
 | readiness per worker | потрібен окремий signal у heartbeat | P16 |
-| backfill volume/speed/forecast, replay-контролі | P13 показує лише джерело/checkpoint/помилки (read-only) | P14 |
+| backfill volume/speed/forecast | P13 показує лише джерело/checkpoint/помилки (read-only); replay-контролі — P14 (панель «Replay») | P15 |
 | silent source / faulty collector alarm | `/ops/collectors` вже показує помилки; правило «тихе джерело» потребує baseline per source | P14/P15 |
 | LLM budget 80 % | `llm_paused` покриває rate limit/пауза breaker'а; бюджет — з `llm_requests` cost | P16 |
 | quorum membership / node count | management `/api/queues` members — після появи кластера | P16 |
