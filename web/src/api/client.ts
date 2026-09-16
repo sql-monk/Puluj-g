@@ -73,7 +73,7 @@ export const api = {
   publicMessages: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/messages?${publicQuery({ cursor, dataset })}`),
   publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
   /** U05 source-message catalogue: one row per persisted source revision, with string bigint IDs. */
-  publicMessagesIndex: (params: Record<string, string | number | boolean | undefined> = {}) => get<PublicMessagePageDto>(`/api/public/messages?${publicQuery(params)}`),
+  publicMessagesIndex: (params: Record<string, string | number | boolean | undefined> = {}, signal?: AbortSignal) => get<PublicMessagePageDto>(`/api/public/messages?${publicQuery(params)}`, signal),
   publicMessage: (id: string, dataset = 'live') => get<PublicMessageDetailsDto>(`/api/public/messages/${encodeURIComponent(id)}?${publicQuery({ dataset })}`),
   publicMessageResults: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageResultDto>>(`/api/public/messages/${encodeURIComponent(id)}/results?${publicQuery({ cursor, dataset })}`),
   publicMessageRevisions: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRevisionDto>>(`/api/public/messages/${encodeURIComponent(id)}/revisions?${publicQuery({ cursor, dataset })}`),

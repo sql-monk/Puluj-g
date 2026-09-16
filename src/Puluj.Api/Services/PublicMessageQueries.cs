@@ -213,8 +213,16 @@ public sealed class PublicMessageQueries(IDbContextFactory<PulujDbContext> facto
     }
 
     private PublicMessageSummaryDto Summary(RawMessage raw, Counts? counts, OutcomeInfo? outcome) => new(raw.RawMessageId.ToString(), raw.SourceId, refs.Sources.GetValueOrDefault(raw.SourceId)?.Code,
-        raw.PublishedAt, raw.ReceivedAt, raw.SourceMessageKey, raw.SourceRevision, $"{raw.SourceId}:{raw.SourceMessageKey}", outcome?.Value ?? LegacyOutcome(raw.ProcessingStatus),
+        raw.PublishedAt, raw.ReceivedAt, raw.SourceMessageKey, raw.SourceRevision, $"{raw.SourceId}:{raw.SourceMessageKey}", Excerpt(raw.RawText), outcome?.Value ?? LegacyOutcome(raw.ProcessingStatus),
         outcome?.FromStage == true ? "stage_result" : "legacy", SafeUrl(raw.Url), counts?.All ?? 0, counts?.Matched ?? 0, counts?.Located ?? 0, counts?.Unlocated ?? 0, raw.RawText is not null);
+
+    private static string? Excerpt(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        const int limit = 280;
+        var compact = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return compact.Length <= limit ? compact : compact[..limit] + "…";
+    }
 
     private async Task<PublicCollectionPageDto<PublicMessageResultDto>> ResultsAsync(PulujDbContext db, RawMessage raw, string? cursor, int limit, CancellationToken ct)
     {

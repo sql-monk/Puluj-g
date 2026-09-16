@@ -422,6 +422,7 @@ export interface PublicMessageSummaryDto {
   sourceMessageKey: string
   sourceRevision: string
   revisionGroup: string
+  excerpt?: string
   outcome: string
   outcomeSource: 'stage_result' | 'legacy'
   url?: string
