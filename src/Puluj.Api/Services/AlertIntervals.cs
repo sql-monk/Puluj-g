@@ -8,14 +8,14 @@ public sealed record AlertInterval(int PlaceId, DateTimeOffset StartedAt, DateTi
 
 /// <summary>Everything the alerts tab derives from the intervals of a period (see <see cref="AlertIntervals.Summarize"/>).</summary>
 public sealed record AlertSummary(
-    int Count,
+    long Count,
     double Hours,
-    int OpenAtEnd,
-    int[] DeclaredPerBucket,
+    long OpenAtEnd,
+    long[] DeclaredPerBucket,
     double[] HoursPerBucket,
     IReadOnlyList<StatsAlertRegionDto> ByRegion,
     IReadOnlyList<StatsSliceDto> Durations,
-    int[] DeclaredByHour,
+    long[] DeclaredByHour,
     IReadOnlyList<StatsAlertDayDto> Days);
 
 /// <summary>
@@ -80,15 +80,16 @@ public static class AlertIntervals
     public static AlertSummary Summarize(IEnumerable<AlertInterval> intervals, DateTimeOffset from, DateTimeOffset to, IReadOnlyList<DateTimeOffset> buckets, Func<int, ReferenceCache.PlaceInfo?> place)
     {
         var days = StatsBuckets.Starts(from, to, StatsBucket.Day);
-        var byRegion = new Dictionary<int, (string Name, int Count, double Hours)>();
-        var durations = new int[DurationBins.Length];
-        var declaredPerBucket = new int[buckets.Count];
+        var byRegion = new Dictionary<int, (string Name, long Count, double Hours)>();
+        var clippedByRegion = new Dictionary<int, List<(DateTimeOffset Start, DateTimeOffset End)>>();
+        var durations = new long[DurationBins.Length];
+        var declaredPerBucket = new long[buckets.Count];
         var hoursPerBucket = new double[buckets.Count];
-        var declaredByHour = new int[24];
-        var declaredPerDay = new int[days.Count];
+        var declaredByHour = new long[24];
+        var declaredPerDay = new long[days.Count];
         var hoursPerDay = new double[days.Count];
-        var count = 0;
-        var open = 0;
+        long count = 0;
+        long open = 0;
         var hours = 0.0;
         foreach (var a in intervals)
         {
@@ -97,15 +98,15 @@ public static class AlertIntervals
             {
                 continue;
             }
-            var h = (end - start).TotalHours;
             count++;
-            hours += h;
             if (a.EndedAt is null || a.EndedAt > to)
             {
                 open++;
             }
             var cur = byRegion.GetValueOrDefault(p!.Id);
-            byRegion[p.Id] = (p.Name, cur.Count + 1, cur.Hours + h);
+            byRegion[p.Id] = (p.Name, cur.Count + 1, cur.Hours);
+            if (!clippedByRegion.TryGetValue(p.Id, out var clipped)) clippedByRegion[p.Id] = clipped = [];
+            clipped.Add((start, end));
             if (a.EndedAt is { } ended)
             {
                 durations[DurationBin((ended - a.StartedAt).TotalMinutes)]++;
@@ -119,8 +120,20 @@ public static class AlertIntervals
                 declaredByHour[StatsBuckets.HourOfDay(a.StartedAt)]++;
                 declaredPerDay[StatsBuckets.IndexOf(days, a.StartedAt)]++;
             }
-            SplitHours(start, end, buckets, to, hoursPerBucket);
-            SplitHours(start, end, days, to, hoursPerDay);
+        }
+        // A source can revise or repeat a state interval.  Declarations remain individual facts, but coverage is the
+        // union per whole region: overlapping/nested intervals never inflate oblast-hours.
+        foreach (var (regionId, clippedIntervals) in clippedByRegion)
+        {
+            foreach (var (start, end) in Union(clippedIntervals))
+            {
+                var h = (end - start).TotalHours;
+                hours += h;
+                var row = byRegion[regionId];
+                byRegion[regionId] = (row.Name, row.Count, row.Hours + h);
+                SplitHours(start, end, buckets, to, hoursPerBucket);
+                SplitHours(start, end, days, to, hoursPerDay);
+            }
         }
         var regions = byRegion.OrderByDescending(kv => kv.Value.Hours).ThenBy(kv => kv.Value.Name)
             .Select(kv => new StatsAlertRegionDto(kv.Key, kv.Value.Name, kv.Value.Count, Round(kv.Value.Hours)))
@@ -131,4 +144,24 @@ public static class AlertIntervals
     }
 
     private static double Round(double hours) => Math.Round(hours, 2);
+
+    private static IEnumerable<(DateTimeOffset Start, DateTimeOffset End)> Union(IEnumerable<(DateTimeOffset Start, DateTimeOffset End)> intervals)
+    {
+        var ordered = intervals.OrderBy(x => x.Start).ThenBy(x => x.End).ToList();
+        if (ordered.Count == 0) yield break;
+        var current = ordered[0];
+        foreach (var next in ordered.Skip(1))
+        {
+            if (next.Start <= current.End)
+            {
+                if (next.End > current.End) current = (current.Start, next.End);
+            }
+            else
+            {
+                yield return current;
+                current = next;
+            }
+        }
+        yield return current;
+    }
 }

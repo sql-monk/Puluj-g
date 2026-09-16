@@ -38,6 +38,11 @@ function mapQuery(filter?: DataQuery): string {
     confidence: filter.confidence,
     location: filter.location,
     hasResults: filter.hasResults,
+    outcome: filter.outcome,
+    sort: filter.sort,
+    cursor: filter.cursor,
+    pageSize: filter.pageSize,
+    dataset: filter.dataset,
   })
 }
 
@@ -85,10 +90,10 @@ export const api = {
   replay: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<ReplayDto>(withQuery(`/api/replay?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, mapQuery(filter)), signal),
   /** The statistics page, one payload per tab for one period (server-cached, the same for everyone). */
   stats: {
-    targets: (from: Date, to: Date) => get<StatsTargetsDto>(`/api/stats/targets?${periodQuery(from, to)}`),
-    alerts: (from: Date, to: Date) => get<StatsAlertsDto>(`/api/stats/alerts?${periodQuery(from, to)}`),
-    sources: (from: Date, to: Date) => get<StatsSourcesDto>(`/api/stats/sources?${periodQuery(from, to)}`),
-    recognition: (from: Date, to: Date) => get<StatsRecognitionDto>(`/api/stats/recognition?${periodQuery(from, to)}`),
+    targets: (from: Date, to: Date, filter?: DataQuery) => get<StatsTargetsDto>(withQuery(`/api/stats/targets?${periodQuery(from, to)}`, mapQuery(filter))),
+    alerts: (from: Date, to: Date, filter?: DataQuery) => get<StatsAlertsDto>(withQuery(`/api/stats/alerts?${periodQuery(from, to)}`, mapQuery(filter))),
+    sources: (from: Date, to: Date, filter?: DataQuery) => get<StatsSourcesDto>(withQuery(`/api/stats/sources?${periodQuery(from, to)}`, mapQuery(filter))),
+    recognition: (from: Date, to: Date, filter?: DataQuery) => get<StatsRecognitionDto>(withQuery(`/api/stats/recognition?${periodQuery(from, to)}`, mapQuery(filter))),
   },
   timeline: (from: Date, to: Date, bucketMinutes: number, filter?: DataQuery, signal?: AbortSignal) =>
     get<TimelineBucketDto[]>(

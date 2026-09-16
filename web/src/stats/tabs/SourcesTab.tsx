@@ -8,10 +8,12 @@ import { MUTED, SERIES_SLOTS, seriesColor } from '../palette'
 import { bucketLabel, bucketTitle, compact, pct, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
 import SourcesTable from '../SourcesTable'
+import type { DataQuery } from '../../public/query'
+import FilterMeta from '../FilterMeta'
 
 /** Who reported: the table of sources and their messages over time. */
-export default function SourcesTab({ period }: { period: Period }) {
-  const state = useSection(api.stats.sources, period)
+export default function SourcesTab({ period, filter }: { period: Period; filter: DataQuery }) {
+  const state = useSection(api.stats.sources, period, filter)
   return <SectionShell {...state}>{(data) => <Sources data={data} />}</SectionShell>
 }
 
@@ -32,6 +34,7 @@ function Sources({ data }: { data: StatsSourcesDto }) {
   const empty = data.messages === 0
   return (
     <>
+      <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="Повідомлень" value={compact(data.messages)} note={`з ${data.sources.length} джерел`} />
         <StatTile label="Оброблено" value={pct(data.processed, data.messages)} note={`${compact(data.processed)} повідомлень`} />

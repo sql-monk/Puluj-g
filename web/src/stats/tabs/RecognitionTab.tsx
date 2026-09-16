@@ -7,10 +7,12 @@ import HBars from '../charts/HBars'
 import { ACCENT } from '../palette'
 import { bucketLabel, bucketTitle, compact, num, pct, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
+import type { DataQuery } from '../../public/query'
+import FilterMeta from '../FilterMeta'
 
 /** How the pipeline read the period: what kinds of events, how the facts were identified, how sure and how precise, and where nothing was found. */
-export default function RecognitionTab({ period }: { period: Period }) {
-  const state = useSection(api.stats.recognition, period)
+export default function RecognitionTab({ period, filter }: { period: Period; filter: DataQuery }) {
+  const state = useSection(api.stats.recognition, period, filter)
   return <SectionShell {...state}>{(data) => <Recognition data={data} />}</SectionShell>
 }
 
@@ -25,6 +27,7 @@ function Recognition({ data }: { data: StatsRecognitionDto }) {
   const totalWithout = data.processed - data.withTargets
   return (
     <>
+      <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="Фактів про цілі" value={compact(data.targets)} note="без повторів між джерелами" />
         <StatTile label="Оброблено повідомлень" value={compact(data.processed)} note="за часом публікації" />

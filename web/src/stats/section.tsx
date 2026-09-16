@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import type { DataQuery } from '../public/query'
 import type { Period } from './period'
 
 /**
  * One tab's payload for the period. While a new period loads the previous payload stays on screen (the tab dims it);
  * a response that arrives after a newer request was sent is dropped. `load` must be a stable reference (api.stats.x).
  */
-export function useSection<T>(load: (from: Date, to: Date) => Promise<T>, period: Period) {
+export function useSection<T>(load: (from: Date, to: Date, filter?: DataQuery) => Promise<T>, period: Period, filter?: DataQuery) {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -15,7 +16,7 @@ export function useSection<T>(load: (from: Date, to: Date) => Promise<T>, period
   useEffect(() => {
     const id = ++seq.current
     setLoading(true)
-    load(new Date(fromMs), new Date(toMs))
+    load(new Date(fromMs), new Date(toMs), filter)
       .then((d) => {
         if (id !== seq.current) return
         setData(d)
@@ -27,7 +28,7 @@ export function useSection<T>(load: (from: Date, to: Date) => Promise<T>, period
       .finally(() => {
         if (id === seq.current) setLoading(false)
       })
-  }, [load, fromMs, toMs])
+  }, [load, fromMs, toMs, filter])
   return { data, loading, error }
 }
 

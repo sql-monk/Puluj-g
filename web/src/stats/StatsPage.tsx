@@ -9,13 +9,14 @@ import RecognitionTab from './tabs/RecognitionTab'
 import SourcesTab from './tabs/SourcesTab'
 import TargetsTab from './tabs/TargetsTab'
 import { useStatsRoute } from './useStatsRoute'
+import type { DataQuery } from '../public/query'
 
 /**
  * The statistics page: four tabs, each answering one question with its own payload, one period for all of them,
  * and a live line from the store. Sits over the map (which stays mounted underneath) and scrolls on its own; the
  * chart colours of the current theme are CSS variables on this root.
  */
-export default function StatsPage({ filterUnavailable = false }: { filterUnavailable?: boolean }) {
+export default function StatsPage({ filter }: { filter: DataQuery }) {
   const { route, setTab, setPeriod } = useStatsRoute()
   const dark = themeIsDark(useStore((s) => s.theme))
   return (
@@ -29,7 +30,7 @@ export default function StatsPage({ filterUnavailable = false }: { filterUnavail
           </div>
           <LiveLine />
         </div>
-        {filterUnavailable ? <div role="alert" className="rounded-xl bg-amber-100 p-4 text-amber-950 dark:bg-amber-950 dark:text-amber-100">Обрана метрика ще не підтримує активні URL filters. Дані не завантажено, щоб не показати unfiltered chart під активними chips.</div> : <TabPanel tab={route.tab} period={route.period} />}
+        <TabPanel tab={route.tab} period={route.period} filter={filter} />
       </div>
     </div>
   )
@@ -47,13 +48,13 @@ function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   )
 }
 
-function TabPanel({ tab, period }: { tab: Tab; period: Period }) {
+function TabPanel({ tab, period, filter }: { tab: Tab; period: Period; filter: DataQuery }) {
   return (
     <div id="stats-panel" role="tabpanel" aria-labelledby={`stats-tab-${tab}`} className="flex flex-col gap-3">
-      {tab === 'targets' && <TargetsTab period={period} />}
-      {tab === 'alerts' && <AlertsTab period={period} />}
-      {tab === 'sources' && <SourcesTab period={period} />}
-      {tab === 'recognition' && <RecognitionTab period={period} />}
+      {tab === 'targets' && <TargetsTab period={period} filter={filter} />}
+      {tab === 'alerts' && <AlertsTab period={period} filter={filter} />}
+      {tab === 'sources' && <SourcesTab period={period} filter={filter} />}
+      {tab === 'recognition' && <RecognitionTab period={period} filter={filter} />}
     </div>
   )
 }

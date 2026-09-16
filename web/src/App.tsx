@@ -56,7 +56,6 @@ export default function App() {
   const mapFocus = useMapFocus(mapSelection, route.query.get('dataset') ?? undefined, replayWindow?.at.toISOString())
   const panelOpen = panelOpenBySection[route.section] ?? legacyPanelOpen
   const dataQuery = useMemo(() => parseDataQuery(route.query).value, [route.query])
-  const analyticsFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.sourceIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
   const activeMap = mapRoute
 
   useEffect(() => {
@@ -308,7 +307,7 @@ export default function App() {
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
       {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} focus={mapFocus.focus} />)}
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
-      {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
+      {stats && <StatsPage filter={dataQuery} />}
       {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} />}
       {route.section === 'messages' && <MessageCatalogue route={route} query={dataQuery} />}
       {mapRoute && (kyivPreset ? (

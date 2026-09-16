@@ -11,14 +11,14 @@ public static class StatsEndpoints
     /// </summary>
     public static IEndpointRouteBuilder MapStatsEndpoints(this IEndpointRouteBuilder api)
     {
-        api.MapGet("/stats/targets", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, HttpContext http, CancellationToken ct) =>
-            SectionAsync(from, to, http, ct2 => stats.TargetsAsync(from, to, ct2), ct));
-        api.MapGet("/stats/alerts", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, HttpContext http, CancellationToken ct) =>
-            SectionAsync(from, to, http, ct2 => stats.AlertsAsync(from, to, ct2), ct));
-        api.MapGet("/stats/sources", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, HttpContext http, CancellationToken ct) =>
-            SectionAsync(from, to, http, ct2 => stats.SourcesAsync(from, to, ct2), ct));
-        api.MapGet("/stats/recognition", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, HttpContext http, CancellationToken ct) =>
-            SectionAsync(from, to, http, ct2 => stats.RecognitionAsync(from, to, ct2), ct));
+        api.MapGet("/stats/targets", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, ReferenceCache refs, HttpContext http, CancellationToken ct) =>
+            SectionAsync(from, to, http, async ct2 => { await refs.Ready.WaitAsync(ct2); return await stats.TargetsAsync(from, to, StatsFilter.From(http.Request.Query, refs), ct2); }, ct));
+        api.MapGet("/stats/alerts", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, ReferenceCache refs, HttpContext http, CancellationToken ct) =>
+            SectionAsync(from, to, http, async ct2 => { await refs.Ready.WaitAsync(ct2); return await stats.AlertsAsync(from, to, StatsFilter.From(http.Request.Query, refs), ct2); }, ct));
+        api.MapGet("/stats/sources", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, ReferenceCache refs, HttpContext http, CancellationToken ct) =>
+            SectionAsync(from, to, http, async ct2 => { await refs.Ready.WaitAsync(ct2); return await stats.SourcesAsync(from, to, StatsFilter.From(http.Request.Query, refs), ct2); }, ct));
+        api.MapGet("/stats/recognition", (DateTimeOffset? from, DateTimeOffset? to, StatsService stats, ReferenceCache refs, HttpContext http, CancellationToken ct) =>
+            SectionAsync(from, to, http, async ct2 => { await refs.Ready.WaitAsync(ct2); return await stats.RecognitionAsync(from, to, StatsFilter.From(http.Request.Query, refs), ct2); }, ct));
         return api;
     }
 

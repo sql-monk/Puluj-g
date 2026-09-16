@@ -8,10 +8,12 @@ import Histogram from '../charts/Histogram'
 import { ACCENT, ACCENT_2 } from '../palette'
 import { HOURS, bucketLabel, bucketTitle, compact, dayTitle, hoursText, num, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
+import type { DataQuery } from '../../public/query'
+import FilterMeta from '../FilterMeta'
 
 /** Region-level air-raid alerts: hours under alert over time, per region, durations, hour of day, the heaviest days. */
-export default function AlertsTab({ period }: { period: Period }) {
-  const state = useSection(api.stats.alerts, period)
+export default function AlertsTab({ period, filter }: { period: Period; filter: DataQuery }) {
+  const state = useSection(api.stats.alerts, period, filter)
   return <SectionShell {...state}>{(data) => <Alerts data={data} />}</SectionShell>
 }
 
@@ -24,6 +26,7 @@ function Alerts({ data }: { data: StatsAlertsDto }) {
   const empty = data.alerts === 0
   return (
     <>
+      <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="Тривог по областях" value={compact(data.alerts)} note="область або Київ; громади не рахуються" />
         <StatTile label="Годин під тривогою" value={hoursText(data.alertHours)} note="сума по областях" />

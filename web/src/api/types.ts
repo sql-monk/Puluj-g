@@ -450,6 +450,16 @@ export interface StatsPeriodDto {
   bucketStarts: string[]
 }
 
+export interface StatsUnavailableFilterDto { key: string; reason: string }
+/** Explains the exact population of a statistics response and never hides an unsupported URL filter. */
+export interface StatsFilterMetaDto {
+  applied: string[]
+  unavailable: StatsUnavailableFilterDto[]
+  timeBasis: string
+  population: string
+  exclusionReason?: string
+}
+
 export interface StatsCategoryDto {
   code: string
   name: string
@@ -488,6 +498,7 @@ export interface StatsSliceDto {
 /** "What flew": facts and tracks per bucket and category, classes, regions, routes, hour × weekday. */
 export interface StatsTargetsDto {
   period: StatsPeriodDto
+  filters: StatsFilterMetaDto
   targets: number
   tracks: number
   objectsDeclared: number
@@ -521,6 +532,7 @@ export interface StatsAlertDayDto {
 /** Region-level air-raid alerts of the period. */
 export interface StatsAlertsDto {
   period: StatsPeriodDto
+  filters: StatsFilterMetaDto
   alerts: number
   alertHours: number
   openAtEnd: number
@@ -548,6 +560,7 @@ export interface StatsSourceDto {
 
 export interface StatsSourcesDto {
   period: StatsPeriodDto
+  filters: StatsFilterMetaDto
   messages: number
   processed: number
   withTargets: number
@@ -558,6 +571,7 @@ export interface StatsSourcesDto {
 /** How the pipeline read the period: distributions of the facts, processed messages with / without a fact per bucket. */
 export interface StatsRecognitionDto {
   period: StatsPeriodDto
+  filters: StatsFilterMetaDto
   targets: number
   processed: number
   withTargets: number
