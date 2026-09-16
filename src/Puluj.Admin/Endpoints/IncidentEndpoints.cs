@@ -59,20 +59,20 @@ public static class IncidentEndpoints
             });
         });
 
-        g.MapPost("/{id:long}/resolve", (long id, CommandRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Ok(await writer.ResolveAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
-        g.MapPost("/{id:long}/retract", (long id, CommandRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Ok(await writer.RetractAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
-        g.MapPost("/{id:long}/confirm", (long id, CommandRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Ok(await writer.ConfirmAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
-        g.MapPost("/{id:long}/suppress", (long id, CommandRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Ok(await writer.SuppressAsync(id, true, Required(req.Actor), Required(req.Reason), ct))));
-        g.MapPost("/{id:long}/unsuppress", (long id, CommandRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Ok(await writer.SuppressAsync(id, false, Required(req.Actor), Required(req.Reason), ct))));
-        g.MapPost("/merge", (MergeRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Results.Ok((await writer.MergeAsync(req.SourceId, req.TargetId, Required(req.Actor), Required(req.Reason), ct)).Select(Summary))));
-        g.MapPost("/{id:long}/split", (long id, SplitRequest req, IncidentStateWriter writer, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
-            Guard(messaging, async () => Results.Ok((await writer.SplitAsync(id, req.ObservationIds ?? [], Required(req.Actor), Required(req.Reason), ct)).Select(Summary))));
+        g.MapPost("/{id:long}/resolve", (long id, CommandRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Ok(await writer.ResolveAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
+        g.MapPost("/{id:long}/retract", (long id, CommandRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Ok(await writer.RetractAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
+        g.MapPost("/{id:long}/confirm", (long id, CommandRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Ok(await writer.ConfirmAsync(id, Required(req.Actor), Required(req.Reason), req.EffectiveAt, ct))));
+        g.MapPost("/{id:long}/suppress", (long id, CommandRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Ok(await writer.SuppressAsync(id, true, Required(req.Actor), Required(req.Reason), ct))));
+        g.MapPost("/{id:long}/unsuppress", (long id, CommandRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Ok(await writer.SuppressAsync(id, false, Required(req.Actor), Required(req.Reason), ct))));
+        g.MapPost("/merge", (MergeRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Results.Ok((await writer.MergeAsync(req.SourceId, req.TargetId, Required(req.Actor), Required(req.Reason), ct)).Select(Summary))));
+        g.MapPost("/{id:long}/split", (long id, SplitRequest req, IncidentStateWriter writer, AdminIndexes indexes, IOptions<MessagingOptions> messaging, CancellationToken ct) =>
+            Guard(messaging, indexes, ct, async () => Results.Ok((await writer.SplitAsync(id, req.ObservationIds ?? [], Required(req.Actor), Required(req.Reason), ct)).Select(Summary))));
         return app;
     }
 
@@ -82,8 +82,11 @@ public static class IncidentEndpoints
 
     private static object Summary(IncidentChange c) => new { c.Incident.IncidentId, c.Change, c.Incident.State, c.Incident.Suppressed, c.Incident.Revision, EventId = c.Event.EventId, ObservationIds = c.ObservationIds };
 
-    /// <summary>404 unknown incident, 409 wrong state / kinds / outbox off, 400 missing actor or reason.</summary>
-    public static async Task<IResult> Guard(IOptions<MessagingOptions> messaging, Func<Task<IResult>> action)
+    /// <summary>
+    /// 404 unknown incident, 409 wrong state / kinds / outbox off, 400 missing actor or reason. The admin process has no background
+    /// index refresh: the catalog is loaded before a command, so the event carries the kind code, never a numeric id (review B2).
+    /// </summary>
+    public static async Task<IResult> Guard(IOptions<MessagingOptions> messaging, AdminIndexes? indexes, CancellationToken ct, Func<Task<IResult>> action)
     {
         if (!messaging.Value.Outbox.Enabled)
         {
@@ -91,6 +94,10 @@ public static class IncidentEndpoints
         }
         try
         {
+            if (indexes is not null)
+            {
+                await indexes.EnsureFreshAsync(ct);
+            }
             return await action();
         }
         catch (IncidentNotFoundException ex)

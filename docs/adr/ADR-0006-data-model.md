@@ -127,7 +127,13 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
   null у compat window; з P09 writers заповнюють `legacy_target_id` у тій самій tx, що й рядок `targets` (`observation_id`).
 - P09 (`AddAggregateRevisions`): `targets.observation_id uuid NULL` (partial unique, CONCURRENTLY; NULL = рядок legacy loop), `target_tracks`/`air_alerts`:
   `revision int`, `last_event_id uuid`, `last_correlation_id uuid` (causation chain для watchdog-команд). Writers `targets` для не-alert фактів — track-worker,
-  для alert — alert-worker; incident/info — лише рядок `targets` до P10.
+  для alert — alert-worker; для incident — incident-worker (P10); info — track-worker.
+- P10 (`AddIncidents`, ADR-0010): `incidents` (state check, `suppressed`, `event_at`/`first_reported_at`/`last_reported_at`, location + `accuracy_km`,
+  `source_count`, `independent_source_count` NULL, `canonical_observation_id`, `revision`, `closure_reason`, `merged_into_incident_id`, `last_event_id`,
+  `last_correlation_id`, `generation_id`, `run_id`; індекси `(event_kind_id, event_at)`, `(state, last_reported_at)`, `(generation_id)`), `incident_observations`
+  (PK `(incident_id, observation_id)`, unique `(observation_id)`, `relation`, `score`, `decision_reason` jsonb, `policy_version`, `legacy_target_id` без FK,
+  `source_id`, `effective_at`, `linked_at`), `incident_revisions` (unique `(incident_id, revision)`, `change`, `effective_at`, `recorded_at`,
+  `triggering_event_id`, `actor`, `reason`, `snapshot` jsonb). `ReprocessService.ResetAsync` ці таблиці не чіпає (P14).
 - `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; (`AddLlmPayloads`) +`request_payload jsonb`,
   `response_payload jsonb` — дослівні тіла запиту/відповіді (або тіло помилки) в обох шляхах; `outcome` ∈ `answered → applied | late`, коди помилок
   провайдера; рядок пишеться autocommit до result-tx. `processing.attempts`: partial unique `(job_key, fencing_token) WHERE fencing_token > 0`

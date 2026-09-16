@@ -42,8 +42,8 @@ public sealed record IncidentDecision(long? IncidentId, string Relation, double 
 /// the fact's kind (or of a kind the fact's kind confirms) inside the symmetric time window and spatially compatible
 /// (polygon/radius gap ≤ slack, via <see cref="SpatialAnchor.GapTo"/>). Score = 0.6·time + 0.4·space; attach at ≥
 /// <see cref="Threshold"/>; two candidates closer than <see cref="AmbiguityMargin"/> → a new incident marked ambiguous
-/// (review), never a guess. Facts without a usable location attach only by the very same place id. Closed incidents take
-/// a fact only when it is older than their closure (late evidence), without reopening.
+/// (review), never a guess. Facts without a usable location attach only by the very same place id. Resolved incidents take
+/// a fact only when it is older than their closure (late evidence), without reopening; retracted ones never.
 /// </summary>
 public static class IncidentPolicy
 {
@@ -72,9 +72,13 @@ public static class IncidentPolicy
             {
                 continue;
             }
-            if (c.State is Incident.Resolved or Incident.Retracted && (c.ClosureEffectiveAt is null || fact.EffectiveAt > c.ClosureEffectiveAt))
+            if (c.State == Incident.Retracted)
             {
-                continue; // a report after the closure is a new event, never a reopen
+                continue; // withdrawn (hoax, merged away): never accumulates evidence (review B3/Q2)
+            }
+            if (c.State == Incident.Resolved && (c.ClosureEffectiveAt is null || fact.EffectiveAt > c.ClosureEffectiveAt))
+            {
+                continue; // a report after the closure is a new event, never a reopen; late evidence attaches without reopening
             }
             considered++;
             var time = 1 - dt / policy.WindowMinutes;
@@ -139,14 +143,18 @@ public static class IncidentPolicy
         return new IncidentDecision(best.Candidate.IncidentId, relation, best.Score, reason);
     }
 
-    /// <summary>`confirms` only for a confirming kind from another source; the same source again is an `echo` (never raises the state); otherwise `supports`.</summary>
+    /// <summary>
+    /// `confirms` only for a confirming kind from a source the incident has not heard from yet (the canonical one included — an
+    /// incident founded by an ambiguous or split link has no canonical source, review B4); the same source again is an `echo`
+    /// (never raises the state); otherwise `supports`.
+    /// </summary>
     public static string Relation(IncidentFact fact, IncidentCandidate incident, KindPolicy policy)
     {
-        if (policy.Confirms.Contains(incident.KindCode, StringComparer.Ordinal) && fact.KindCode != incident.KindCode && fact.SourceId != incident.CanonicalSourceId)
+        if (incident.SourceIds.Contains(fact.SourceId) || fact.SourceId == incident.CanonicalSourceId)
         {
-            return IncidentObservation.Confirms;
+            return IncidentObservation.Echo;
         }
-        return incident.SourceIds.Contains(fact.SourceId) ? IncidentObservation.Echo : IncidentObservation.Supports;
+        return policy.Confirms.Contains(incident.KindCode, StringComparer.Ordinal) && fact.KindCode != incident.KindCode ? IncidentObservation.Confirms : IncidentObservation.Supports;
     }
 
     /// <summary>State after a link: only a `confirms` relation moves reported → confirmed; nothing else changes the state automatically.</summary>

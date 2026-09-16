@@ -109,6 +109,17 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P10): incident-worker
+
+- `incident.changed` (`IncidentWriterHandler` → `IncidentStateWriter`): `aggregate_id = incident:{id}`, `aggregate_revision` = `incidents.revision`,
+  `partition_key = incident:kind:{event_kind_code}`; `change`: `created` | `updated` (link, confirm, unsuppress) | `resolved` | `retracted` | `suppressed` |
+  `merged` (source; `merged_into_incident_id`, state `retracted`) | `split` (новий incident); `observation_ids` — прив'язані/перенесені цією зміною;
+  `suppressed` (additive v7, top-level властивість payload); `location {kind, place_id, accuracy_km, geometry?}` — найточніший evidence;
+  `policy_version = incident-1/p{catalog}` (як у links); fixture `fixtures/valid/incident.changed.json` — за реальною подією I01;
+  `generation_id` — `run.generation_id` або live `UUIDv5(generation:live)`; `occurred_at` = effective, `recorded_at` = clock. Admin-команди — той самий
+  writer, envelope як у watchdog-команд (`causation_id = last_event_id`). Уже прив'язана observation → без події (N6).
+- Topology v7: `incident-worker` active (lanes `live`, `history`); `archive` required для `incident.changed`; `by_manifest`: `incident → incident-worker`.
+
 ## Runtime (P09): track/alert writers і watchdog
 
 - `track.changed` (`TrackWriterHandler`): `aggregate_id = track:{id}`, `aggregate_revision` = `target_tracks.revision` (лише writers інкрементують),

@@ -12,7 +12,8 @@
 
 1. **Власники.** `track-worker` — fact writer усіх не-alert observations (`targets`, compat projection, рівно один рядок на `observation_id`) і владник
    агрегату track. `alert-worker` — fact writer alert-observations і владник інтервалів `air_alerts`. Обидва — subscriptions `observations.recorded`
-   (lanes `live`, `history`; replay — P14) і власних expiry-команд. `incident-worker` — P10 (до нього incident/info факти лише лежать у `targets`).
+   (lanes `live`, `history`; replay — P14) і власних expiry-команд. `incident-worker` (P10, ADR-0010) — fact writer incident-observations і owner агрегату incident (lock `incident:kind:{id}`); track-worker пропускає
+   incident-факти, коли подія називає гілку `incident-worker` у `expected_branches` (старі v6-події дописує сам); `info` — track-worker.
 2. **Partition і lock hierarchy** (у кожній delivery-tx, детермінований порядок): `pg_advisory_xact_lock_shared(Store)` (взаємовиключення з legacy
    processor/watchdog/reset, паралельність writers між собою) → `track` shared (або exclusive, якщо відбій без категорії) → `track:cat:{category}` exclusive
    (sorted). Alerts: `alert:region:{regionPlaceId}` exclusive (sorted; `alert:unknown` без місця). Категорія — консервативна межа треків (§7); реальна межа
@@ -49,10 +50,11 @@
 
 1. Розгорнути збірку (міграція `AddAggregateRevisions`; індекс `ux_targets_observation_id` будується CONCURRENTLY).
 2. Зупинити роль `processing` (legacy loop + `TrackWatchdog`); `ReprocessService.ResetAsync` під час роботи writers заборонено.
-3. Увімкнути ролі `track-worker,alert-worker,watchdog` у сервісі `messaging` (профіль `broker`); backlog `observations.recorded` доробиться.
+3. Увімкнути ролі `track-worker,alert-worker,watchdog,incident-worker` (P10) у сервісі `messaging` (профіль `broker`); backlog `observations.recorded` доробиться.
 4. Після cutover `raw_messages.processing_status` для нових raw лишається Pending (admin/backlog семантика — P14/P16); NOTIFY для API живе
    через `AfterCommit` writers до P11.
-Rollback: зупинити три ролі, повернути `processing`; рядки з `observation_id` legacy не чіпає (guard), треки/інтервали спільні.
+Rollback: зупинити чотири ролі, повернути `processing`; рядки з `observation_id` legacy не чіпає (guard), треки/інтервали спільні; incidents лишаються
+(legacy їх не знає — карта показує `targets`).
 
 ## Межі
 

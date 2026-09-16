@@ -17,7 +17,7 @@
     "failed":       { "terminal": true, "publishes_observations": false, "expected_branches": ["message-analytics", "archive"], "domain_branches": "none", "workflow_status": "needs_attention" }
   },
   "domain_branches_by_observation_category": {
-    "$comment": "Яка required підписка очікується для observations.recorded залежно від категорії кожного observation (§1 п.6, §8.1). info не має доменного власника.",
+    "$comment": "Яка required підписка очікується для observations.recorded залежно від категорії кожного observation (§1 п.6, §8.1). info не має доменного власника (рядок targets пише track-worker як fact writer, P09). incident — incident-worker з P10 (ADR-0010).",
     "target":   "track-worker",
     "alert":    "alert-worker",
     "incident": "incident-worker",

@@ -59,6 +59,14 @@ public sealed class IncidentWriterHandler(
                 continue;
             }
             var kind = fact["event_kind_code"]?.GetValue<string>() ?? throw new PermanentDeliveryException("invalid_payload", "incident fact without event_kind_code");
+            if (indexes.EventKinds.ByCode(kind) is null)
+            {
+                await indexes.RefreshAsync(ct); // a kind published after the last 10-minute refresh (review N9)
+                if (indexes.EventKinds.ByCode(kind) is null)
+                {
+                    throw new PermanentDeliveryException("unknown_kind", $"event kind {kind} is not in the catalog");
+                }
+            }
             foreach (var id in writer.CandidateKindIds(kind))
             {
                 kindIds.Add(id);

@@ -7,7 +7,8 @@
 state machine на (raw, run) з terminal outcomes `completed | no_facts | unsupported | needs_review | failed`, канонічний extraction у
 `processing.extractions` (unique (raw, run), immutable) + `processing.observations`, `message.analysis.completed` для кожного outcome,
 `observations.recorded` лише для `completed`; **llm-worker** (`LlmWorkerHandler`) з lease/fencing (ADR-0004 W8). Workflow stage `analyzed` тепер
-задовольняється; `domain_completed` у compat window не настає для planned гілок (track/alert/incident — P09/P10). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
+задовольняється; `domain_completed` настає з P09/P10: гілки `track-worker`/`alert-worker`/`incident-worker` active (`info` — track-worker як fact writer). Generation до P14 —
+`run.generation_id` або стала live generation `UUIDv5(generation:live)` (`processing.generations` on demand, ADR-0010 п.8). Machine-readable: [`completion-manifest.json`](../../contracts/messaging/completion-manifest.json).
 Вимоги: plan §4, §5.2, §11, §15.1 «Completion semantics», §15.2. Orchestration/generations/state machine — P14.
 
 ## Контекст

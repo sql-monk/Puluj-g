@@ -100,9 +100,11 @@ public sealed class IncidentStateWriter(
         var rows = await db.Incidents.Include(i => i.Observations)
             .Where(i => i.GenerationId == generationId && candidateKindIds.Contains(i.EventKindId) && i.EventAt >= input.EffectiveAt - window && i.EventAt <= input.EffectiveAt + window)
             .ToListAsync(ct);
-        var candidates = rows.Select(i => new IncidentCandidate(i.IncidentId, kinds.ByCode(KindCode(i.EventKindId))?.Code ?? "", i.State, i.Suppressed, i.EventAt,
-                i.State is Incident.Resolved or Incident.Retracted ? i.UpdatedAt : null, AnchorOf(i, gazetteer), i.LocationPlaceId, RegionOf(i.LocationPlaceId),
-                i.Observations.Select(o => o.SourceId).ToHashSet(), i.Observations.FirstOrDefault(o => o.Relation == IncidentObservation.Canonical)?.SourceId))
+        rows.RemoveAll(i => i.MergedIntoIncidentId is not null); // a merged source is dead: its evidence lives in the target (review B3)
+        var closures = await ClosuresAsync(db, rows, ct);
+        var candidates = rows.Select(i => new IncidentCandidate(i.IncidentId, KindCode(i.EventKindId), i.State, i.Suppressed, i.EventAt,
+                closures.TryGetValue(i.IncidentId, out var closedAt) ? closedAt : null, AnchorOf(i, gazetteer), i.LocationPlaceId, RegionOf(i.LocationPlaceId),
+                i.Observations.Select(o => o.SourceId).ToHashSet(), i.Observations.FirstOrDefault(o => o.ObservationId == i.CanonicalObservationId)?.SourceId))
             .ToList();
         var decision = IncidentPolicy.Decide(fact, candidates, policy);
 
@@ -168,12 +170,11 @@ public sealed class IncidentStateWriter(
             Relation = decision.Relation,
             Score = decision.Score,
             DecisionReason = JsonDocument.Parse(decision.Reason.ToJsonString()),
-            PolicyVersion = $"{IncidentPolicy.Version}/p{kinds.PolicyVersion}",
+            PolicyVersion = PolicyVersion,
             EffectiveAt = input.EffectiveAt,
             LinkedAt = now,
         };
-        db.IncidentObservations.Add(link);
-        incident.Observations.Add(link);
+        db.IncidentObservations.Add(link); // fixup puts it into incident.Observations
         await db.SaveChangesAsync(ct);
         return await ReviseAsync(db, incident, change, [input.ObservationId], cause, Instance, decision.Relation == IncidentObservation.Ambiguous ? "ambiguous candidates: separate incident for review" : null, input.EffectiveAt, now, ct);
     }
@@ -228,18 +229,24 @@ public sealed class IncidentStateWriter(
             {
                 throw new IncidentConflictException("a retracted incident cannot take part in a merge");
             }
+            if (source.GenerationId != target.GenerationId)
+            {
+                throw new IncidentConflictException("incidents of different generations are never merged (ADR-0010 п.8)");
+            }
             var now = clock.GetUtcNow();
-            var moved = source.Observations.Select(o => o.ObservationId).ToList();
-            foreach (var link in source.Observations.ToList())
+            var links = source.Observations.ToList(); // fixup empties the navigation on Remove
+            var moved = links.Select(o => o.ObservationId).ToList();
+            foreach (var link in links)
             {
                 db.IncidentObservations.Remove(link);
             }
             await db.SaveChangesAsync(ct); // the unique (observation_id) frees before the re-insert
-            foreach (var link in source.Observations)
+            foreach (var link in links)
             {
                 var reasonJson = link.DecisionReason is null ? new JsonObject() : JsonNode.Parse(link.DecisionReason.RootElement.GetRawText())!.AsObject();
                 reasonJson["merged_from"] = sourceId;
                 reasonJson["merged_by"] = actor;
+                reasonJson["original_relation"] = link.Relation;
                 db.IncidentObservations.Add(new IncidentObservation
                 {
                     IncidentId = targetId,
@@ -266,6 +273,7 @@ public sealed class IncidentStateWriter(
             target.FirstReportedAt = target.Observations.Min(o => o.EffectiveAt);
             target.LastReportedAt = target.Observations.Max(o => o.EffectiveAt);
             target.EventAt = target.FirstReportedAt;
+            AbsorbEvidence(target, source); // the most precise location and the highest confidence win, as on the worker path
             target.UpdatedAt = now;
             await db.SaveChangesAsync(ct);
             return [(source, "merged", moved, "merged into " + targetId), (target, "updated", moved, "merged from " + sourceId)];
@@ -294,7 +302,11 @@ public sealed class IncidentStateWriter(
             }
             var now = clock.GetUtcNow();
             var first = links.OrderBy(l => l.EffectiveAt).First();
-            var target = await db.Targets.AsNoTracking().FirstOrDefaultAsync(t => t.TargetId == first.LegacyTargetId, ct);
+            var rowIds = links.Select(l => l.LegacyTargetId).Where(t => t is not null).Select(t => t!.Value).ToList();
+            var rowsOfLinks = await db.Targets.AsNoTracking().Where(t => rowIds.Contains(t.TargetId)).ToListAsync(ct);
+            // The most precise located evidence among the moved rows (the worker's rule), the canonical row as the fallback.
+            var target = rowsOfLinks.Where(t => t.Location is not null).OrderBy(t => t.LocationAccuracyKm ?? double.MaxValue).FirstOrDefault()
+                ?? rowsOfLinks.FirstOrDefault(t => t.TargetId == first.LegacyTargetId);
             var split = new Incident
             {
                 GenerationId = source.GenerationId,
@@ -308,7 +320,7 @@ public sealed class IncidentStateWriter(
                 LocationPlaceId = target?.LocationPlaceId,
                 Geometry = target?.Location,
                 AccuracyKm = target?.LocationAccuracyKm,
-                Confidence = target?.Confidence ?? ConfidenceLevel.Unknown,
+                Confidence = rowsOfLinks.Count == 0 ? ConfidenceLevel.Unknown : rowsOfLinks.Max(t => t.Confidence),
                 SourceCount = links.Select(l => l.SourceId).Distinct().Count(),
                 CanonicalObservationId = first.ObservationId,
                 CreatedAt = now,
@@ -340,8 +352,7 @@ public sealed class IncidentStateWriter(
                     EffectiveAt = link.EffectiveAt,
                     LinkedAt = now,
                 };
-                db.IncidentObservations.Add(moved);
-                split.Observations.Add(moved);
+                db.IncidentObservations.Add(moved); // fixup puts it into split.Observations
             }
             source.SourceCount = source.Observations.Select(o => o.SourceId).Distinct().Count();
             source.FirstReportedAt = source.Observations.Min(o => o.EffectiveAt);
@@ -350,6 +361,10 @@ public sealed class IncidentStateWriter(
             if (!source.Observations.Any(o => o.ObservationId == source.CanonicalObservationId))
             {
                 source.CanonicalObservationId = source.Observations.OrderBy(o => o.EffectiveAt).First().ObservationId;
+            }
+            if (source.State == Incident.Confirmed && !source.Observations.Any(o => o.Relation == IncidentObservation.Confirms))
+            {
+                source.State = Incident.Reported; // the confirmation left with the split observations (review N8)
             }
             source.UpdatedAt = now;
             await db.SaveChangesAsync(ct);
@@ -367,9 +382,13 @@ public sealed class IncidentStateWriter(
             {
                 throw new IncidentConflictException($"incident {id} is {incident.State}; {change} needs one of {string.Join("/", from)}");
             }
+            if (effectiveAt is { } at && (at < incident.EventAt || at > clock.GetUtcNow().AddMinutes(5)))
+            {
+                throw new IncidentConflictException($"effective_at must lie between the incident's event_at ({incident.EventAt:O}) and now"); // review Q6
+            }
             incident.State = state;
             incident.ClosureReason = closure;
-            incident.UpdatedAt = effectiveAt ?? clock.GetUtcNow();
+            incident.UpdatedAt = clock.GetUtcNow();
             await db.SaveChangesAsync(ct);
             return [(incident, change, (IReadOnlyList<Guid>)[], (string?)null)];
         }, actor, reason, effectiveAt, ct);
@@ -405,7 +424,7 @@ public sealed class IncidentStateWriter(
         foreach (var (incident, change, observations, note) in results)
         {
             var cause = CommandCause(incident, runId, now);
-            var revised = await ReviseAsync(db, incident, change, observations, cause, actor, note is null ? reason : $"{reason} ({note})", effectiveAt ?? incident.UpdatedAt, now, ct);
+            var revised = await ReviseAsync(db, incident, change, observations, cause, actor, note is null ? reason : $"{reason} ({note})", effectiveAt ?? now, now, ct);
             await outbox.EnqueueAsync(conn, tx, revised.Event, ct);
             changes.Add(revised);
         }
@@ -450,7 +469,7 @@ public sealed class IncidentStateWriter(
             ["state"] = incident.State,
             ["generation_id"] = incident.GenerationId.ToString(),
             ["suppressed"] = incident.Suppressed,
-            ["policy_version"] = IncidentPolicy.Version,
+            ["policy_version"] = PolicyVersion,
             ["location"] = Location(incident),
         };
         if (reason is not null)
@@ -528,9 +547,49 @@ public sealed class IncidentStateWriter(
         Lane = "live",
     };
 
-    private string KindCode(int kindId) => indexes.EventKinds.CodeOf(kindId) ?? kindId.ToString();
+    /// <summary>The catalog code of a kind id; an id the index does not know is a configuration/refresh problem, never a numeric code in an event (review B2).</summary>
+    private string KindCode(int kindId) => indexes.EventKinds.CodeOf(kindId) ?? throw new IncidentConflictException($"event kind {kindId} is not in the catalog index (refresh the indexes)");
+
+    /// <summary>`incident-1/p{catalog policyVersion}`: the code policy and the catalog parameters it read (links and events alike).</summary>
+    public string PolicyVersion => $"{IncidentPolicy.Version}/p{indexes.EventKinds.PolicyVersion}";
 
     private int? RegionOf(int? placeId) => placeId is int id && indexes.Gazetteer.Get(id) is { } p ? indexes.Gazetteer.RegionOf(p)?.PlaceId : null;
+
+    /// <summary>Effective time of the closure of every closed candidate: the last resolved/retracted/merged revision (N5: late facts compare against it, not against the clock).</summary>
+    private static async Task<Dictionary<long, DateTimeOffset>> ClosuresAsync(PulujDbContext db, List<Incident> rows, CancellationToken ct)
+    {
+        var closed = rows.Where(i => i.State is Incident.Resolved or Incident.Retracted).Select(i => i.IncidentId).ToList();
+        if (closed.Count == 0)
+        {
+            return [];
+        }
+        var revisions = await db.IncidentRevisions.AsNoTracking()
+            .Where(r => closed.Contains(r.IncidentId) && (r.Change == "resolved" || r.Change == "retracted" || r.Change == "merged"))
+            .Select(r => new { r.IncidentId, r.EffectiveAt })
+            .ToListAsync(ct);
+        var result = revisions.GroupBy(r => r.IncidentId).ToDictionary(g => g.Key, g => g.Max(r => r.EffectiveAt));
+        foreach (var id in closed.Where(id => !result.ContainsKey(id)))
+        {
+            result[id] = rows.Single(i => i.IncidentId == id).UpdatedAt; // closed without a revision row: the clock is all there is
+        }
+        return result;
+    }
+
+    /// <summary>Location: the most precise evidence wins, never widened; confidence: the maximum (§8.5, the same rule as for a new link).</summary>
+    private static void AbsorbEvidence(Incident target, Incident source)
+    {
+        if (source.Geometry is not null && (target.Geometry is null || (source.AccuracyKm ?? double.MaxValue) < (target.AccuracyKm ?? double.MaxValue)))
+        {
+            target.Geometry = source.Geometry;
+            target.AccuracyKm = source.AccuracyKm;
+            target.LocationKind = source.LocationKind;
+            target.LocationPlaceId = source.LocationPlaceId;
+        }
+        if (source.Confidence > target.Confidence)
+        {
+            target.Confidence = source.Confidence;
+        }
+    }
 
     private static SpatialAnchor? AnchorOf(Incident i, GazetteerIndex gazetteer) =>
         i.Geometry is null ? null : new SpatialAnchor(i.Geometry.Centroid.Coordinate, i.AccuracyKm ?? 0, i.LocationPlaceId, gazetteer.Get(i.LocationPlaceId ?? -1)?.Boundary);

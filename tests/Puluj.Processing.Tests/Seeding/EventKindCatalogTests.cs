@@ -58,7 +58,10 @@ public sealed class EventKindCatalogTests
     {
         var file = SeedFile();
         EventKindSeeder.Validate(file);
-        Assert.Equal(1, file.PolicyVersion);
+        Assert.Equal(2, file.PolicyVersion); // P10: dedupPolicy for incident kinds (ADR-0010)
+        var incidents = file.Kinds.Where(k => k.Category == "incident").ToList();
+        Assert.All(incidents, k => Assert.NotNull(k.DedupPolicy));
+        Assert.All(file.Kinds.Where(k => k.Category != "incident"), k => Assert.Null(k.DedupPolicy));
         Assert.Equal(ExpectedCodes.Order(StringComparer.Ordinal), file.Kinds.Select(k => k.Code).Order(StringComparer.Ordinal));
         Assert.DoesNotContain(file.Kinds, k => k.Code == "casualties.reported");
         // Every legacy member is represented in the seed metadata exactly once, and only on its mapped code.

@@ -166,7 +166,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
         var observed = targets.Single(t => t.RawMessageId == text.RawMessageId);
         Assert.Equal(EventType.TargetObserved, observed.EventType);
         Assert.Equal("target.observed", observed.EventKind!.Code);
-        Assert.Equal(1, observed.ParserMetadata!.RootElement.GetProperty("eventKindPolicyVersion").GetInt32());
+        Assert.Equal(2, observed.ParserMetadata!.RootElement.GetProperty("eventKindPolicyVersion").GetInt32()); // P10: dedupPolicy for incident kinds
         var started = targets.Single(t => t.RawMessageId == structured.RawMessageId);
         Assert.Equal(EventType.AirRaidAlert, started.EventType);
         Assert.Equal("alert.air_raid.started", started.EventKind!.Code);

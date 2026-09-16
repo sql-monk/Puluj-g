@@ -15,7 +15,7 @@ namespace Puluj.Messaging.Tests.Integration;
 /// P10: the incident owner on real PostGIS + RabbitMQ — provenance, the concurrent create/dedup race, conservative
 /// merge, echo vs supports vs confirms, out-of-order closure, replay idempotency, as-of revisions and the admin commands
 /// through the same state writer. Incident kinds the v1 rules do not produce (fire, confirmed hit) arrive as synthetic
-/// `observations.recorded` events written through the outbox, exactly as the finalizer would publish them.
+/// `observations.recorded` events written through the outbox (the raw row inserted directly), exactly as the finalizer would publish them.
 /// </summary>
 [Collection(MessagingCollection.Name)]
 public sealed class IncidentWriterTests(MessagingFixture f)
@@ -58,8 +58,8 @@ public sealed class IncidentWriterTests(MessagingFixture f)
             foreach (var (id, text, at, sourceCode) in messages)
             {
                 var source = await f.SourceAsync(sourceCode ?? f.SourceCode);
+                var expected = await f.CountAsync("processing.extractions") + 1; // before the publish: the pipeline may already be done by the next count
                 await f.Ingress.PublishAsync(f.Message(id, text, at, sourceId: source.SourceId), source, "test", null, live: true, None);
-                var expected = await f.CountAsync("processing.extractions") + 1;
                 await SettleAsync(expected);
             }
         }
@@ -71,23 +71,47 @@ public sealed class IncidentWriterTests(MessagingFixture f)
 
     private async Task SettleAsync(long extractions)
     {
-        Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.extractions") == extractions, TimeSpan.FromSeconds(60)), "extraction");
+        Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.extractions") == extractions, TimeSpan.FromSeconds(60)), await DiagnosticsAsync($"extraction {extractions}"));
         Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "subscription_id IN ('track-worker', 'alert-worker', 'incident-worker') AND outcome IS NULL") == 0, TimeSpan.FromSeconds(60)), "writers settled");
         Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("messaging.outbox", "confirmed_at IS NULL") == 0, TimeSpan.FromSeconds(40)), "outbox confirmed");
         Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "subscription_id = 'archive' AND outcome IS NULL") == 0, TimeSpan.FromSeconds(40)), "archived");
     }
 
+    /// <summary>What the platform was doing when a wait ran out: deliveries by subscription/outcome, failed attempts, quarantine, unconfirmed outbox.</summary>
+    private async Task<string> DiagnosticsAsync(string what)
+    {
+        var deliveries = await f.ScalarAsync<string>("SELECT COALESCE(string_agg(subscription_id || '=' || COALESCE(outcome, 'pending') || ':' || n, ', ' ORDER BY subscription_id), '') FROM (SELECT subscription_id, outcome, count(*) n FROM processing.deliveries WHERE expected_at > now() - interval '3 minutes' GROUP BY 1, 2) d");
+        var attempts = await f.ScalarAsync<string>("SELECT COALESCE(string_agg(subscription_id || ':' || state || ':' || left(COALESCE(error, ''), 200), ' | '), '') FROM processing.attempts WHERE state <> 'completed' AND started_at > now() - interval '3 minutes'");
+        var quarantine = await f.CountAsync("processing.quarantine");
+        var outbox = await f.CountAsync("messaging.outbox", "confirmed_at IS NULL");
+        var extractions = await f.CountAsync("processing.extractions");
+        return $"{what}: extractions {extractions}; deliveries [{deliveries}]; attempts [{attempts}]; quarantine {quarantine}; unconfirmed outbox {outbox}";
+    }
+
+    /// <summary>A city (or a region) by its nominative name — the admin index only carries raions/hromadas/oblasts.</summary>
+    private Puluj.Processing.Indexes.PlaceEntry FindPlace(string name)
+    {
+        var key = name.ToLowerInvariant();
+        var hits = f.Indexes.Gazetteer.Candidates(key)
+            .Where(v => v.Place.Name == name && v.Place.Level is Puluj.Domain.Enums.PlaceLevel.City or Puluj.Domain.Enums.PlaceLevel.Region)
+            .Select(v => v.Place).Distinct().OrderBy(p => p.Level).ToList();
+        return hits.FirstOrDefault(p => p.Level == Puluj.Domain.Enums.PlaceLevel.City) ?? hits.FirstOrDefault()
+            ?? throw new InvalidOperationException($"place {name} not in the gazetteer");
+    }
+
     /// <summary>
-    /// A synthetic `observations.recorded` for a kind the rules cannot produce: the raw row goes in through the ingestor,
-    /// the event through the outbox (expected deliveries by manifest), the relay publishes it like any finalizer event.
+    /// A synthetic `observations.recorded` for a kind the rules cannot produce: the raw row is inserted directly (the ingestor
+    /// would bridge a `raw.stored` and the pipeline would parse the text a second time), the event goes through the outbox
+    /// (expected deliveries by manifest), the relay publishes it like any finalizer event.
     /// </summary>
     private async Task PublishObservationAsync(string id, string text, DateTimeOffset at, string sourceCode, string kind, string placeName, string? category = "incident")
     {
         var source = await f.SourceAsync(sourceCode);
-        var ingested = await f.Ingestor.IngestAsync(f.Message(id, text, at, sourceId: source.SourceId), sourceCode, None, enqueue: false);
-        var rawId = ingested.RawMessageId!.Value;
-        var place = f.Indexes.Gazetteer.FindAdmin(Puluj.Domain.Enums.PlaceLevel.City, placeName) ?? f.Indexes.Gazetteer.FindAdmin(Puluj.Domain.Enums.PlaceLevel.Region, placeName)
-            ?? throw new InvalidOperationException($"place {placeName} not in the gazetteer");
+        // The raw row goes in directly: the ingestor would also bridge a `raw.stored` (history lane) and the pipeline would parse the text again.
+        var rawId = await f.ScalarAsync<long>(
+            "INSERT INTO raw_messages (source_id, source_message_id, source_message_key, source_revision, published_at, received_at, raw_text, url, hash, processing_status, attempts) VALUES (@s, @m, @m, '0', @at, now(), @t, @u, md5(@t), 0, 0) RETURNING raw_message_id",
+            ("s", source.SourceId), ("m", id), ("at", at.ToUniversalTime()), ("t", text), ("u", $"https://t.me/{sourceCode}/{id}"));
+        var place = FindPlace(placeName);
         var kindRow = f.Indexes.EventKinds.ByCode(kind)!;
         var observationId = Guid.CreateVersion7();
         var fact = new JsonObject
@@ -286,7 +310,7 @@ public sealed class IncidentWriterTests(MessagingFixture f)
         }
         Assert.Equal(1, await f.CountAsync("incidents"));
         Assert.Equal(1, await f.CountAsync("incidents", "state = 'reported' AND source_count = 2 AND revision = 2"));
-        Assert.Equal(["canonical", "supports"], (await EventsAsync("incident.changed")).Select(e => e["payload"]!["change"]!.GetValue<string>()).Select((c, i) => i == 0 ? "canonical" : "supports")); // created, updated
+        Assert.Equal(["created", "updated"], (await EventsAsync("incident.changed")).Select(e => e["payload"]!["change"]!.GetValue<string>()));
         Assert.Equal(1, await f.CountAsync("incident_observations", "relation = 'supports'"));
         f.Evidence.Record("P10-I02", new { replicas = 2, barrier = "both met", incidents = 1, links = "canonical + supports", source_count = 2, state = "reported (no auto-confirm)" });
     }
@@ -300,24 +324,23 @@ public sealed class IncidentWriterTests(MessagingFixture f)
             ("i03-a", "Вибухи у Харкові.", t0, f.SourceCode, "impact.explosion.reported", "Харків"),
             ("i03-b", "Вибухи у Сумах.", t0.AddMinutes(2), f.SourceCode, "impact.explosion.reported", "Суми"), // another oblast: separate
             ("i03-c", "Вибухи у Харкові.", t0.AddMinutes(200), MessagingFixture.SourceCode2, "impact.explosion.reported", "Харків"), // past the 120-minute window: separate
-            ("i03-d", "Вибухи на Харківщині.", t0.AddMinutes(210), MessagingFixture.SourceCode2, "impact.explosion.reported", "Харківська область")); // oblast report inside the window of the city incident: containment → merge
+            ("i03-d", "Вибухи на Харківщині.", t0.AddMinutes(210), "tg_monitoringwar", "impact.explosion.reported", "Харківська область")); // oblast report (third source) inside the window of the city incident: containment → merge
         Assert.Equal(3, await f.CountAsync("incidents"));
         Assert.Equal(1, await f.CountAsync("incident_observations", "relation = 'supports' AND (decision_reason->>'considered')::int >= 1"));
         Assert.Equal(1, await f.CountAsync("incidents", "source_count = 2")); // the oblast report joined the later Kharkiv incident
         Assert.Equal(1, await f.CountAsync("incidents", "location_place_id = (SELECT place_id FROM places WHERE name = 'Харків') AND source_count = 2 AND accuracy_km < 30")); // the precise location stayed
 
-        // Ambiguity: two Kharkiv incidents open 30 minutes apart, a third report in between with equal scores → a separate incident flagged ambiguous.
+        // Ambiguity: two Kharkiv incidents 121 minutes apart (outside each other's window), a third-source report at +60 scores 0.7 vs 0.695
+        // (margin 0.1) → a separate incident flagged ambiguous with both candidates in the reason, not a guess.
         await f.ResetAsync();
         await RunSyntheticAsync(
             ("i03-e", "Вибухи у Харкові.", t0, f.SourceCode, "impact.explosion.reported", "Харків"),
-            ("i03-f", "Вибухи у Харкові.", t0.AddMinutes(60), MessagingFixture.SourceCode2, "impact.explosion.reported", "Харків"));
-        Assert.Equal(1, await f.CountAsync("incidents")); // within the window they merge: one incident so far
-        // Force two candidates: close the first by admin, open a fresh one, then a report equidistant in time from both.
-        await f.Incidents.ResolveAsync(1, "test", "make room", t0.AddMinutes(61), None);
-        await RunSyntheticAsync(("i03-g", "Вибухи у Харкові.", t0.AddMinutes(180), "tg_monitoringwar", "impact.explosion.reported", "Харків"));
+            ("i03-f", "Вибухи у Харкові.", t0.AddMinutes(121), MessagingFixture.SourceCode2, "impact.explosion.reported", "Харків"));
         Assert.Equal(2, await f.CountAsync("incidents"));
-        await RunSyntheticAsync(("i03-h", "Вибухи у Харкові.", t0.AddMinutes(120), "tg_strategicaviation", "impact.explosion.reported", "Харків")); // 60 min from the resolved one's closure window and from the new one
-        Assert.True(await f.CountAsync("incident_observations", "relation = 'ambiguous'") >= 1 || await f.CountAsync("incident_observations", "relation = 'supports'") >= 1, "the late report either joined unambiguously or was flagged");
+        await RunSyntheticAsync(("i03-g", "Вибухи у Харкові.", t0.AddMinutes(60), "tg_monitoringwar", "impact.explosion.reported", "Харків"));
+        Assert.Equal(3, await f.CountAsync("incidents"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "incident_id = 3 AND relation = 'ambiguous' AND decision_reason->'ambiguous' = '[1, 2]'::jsonb"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "incident_id = 3 AND (decision_reason->>'considered')::int = 2"));
         f.Evidence.Record("P10-I03", new { other_oblast = "separate", outside_window = "separate", containment_oblast_report = "merged, precise location kept", ambiguity = "separate + review when scores tie" });
     }
 
@@ -365,6 +388,7 @@ public sealed class IncidentWriterTests(MessagingFixture f)
         await RunOrderedAsync(("i05-d", "Відбій повітряної тривоги в Полтавській області.", t0.AddMinutes(95), null), ("i05-e", "Загроза для Полтавщини минула.", t0.AddMinutes(96), null));
         Assert.Equal(2, await f.CountAsync("incidents"));
         Assert.Equal(1, await f.CountAsync("incidents", "incident_id = 2 AND state = 'reported' AND revision = 1"));
+        Assert.Equal(1, await f.CountAsync("incidents", "incident_id = 1 AND state = 'resolved' AND revision = 3")); // created, resolved, late supports — nothing since
         f.Evidence.Record("P10-I05", new { resolve = "revision 2, effective-dated", late_fact = "attached to resolved without reopen", later_fact = "new incident", cancellations = "no effect" });
     }
 
@@ -468,6 +492,15 @@ public sealed class IncidentWriterTests(MessagingFixture f)
         Assert.Equal(evidenceBefore, await f.ScalarAsync<string>("SELECT md5(string_agg(t.target_id || ':' || t.observation_id::text || ':' || t.segment_text, ',' ORDER BY t.target_id)) FROM targets t"));
         Assert.Equal(observationsBefore, await f.ScalarAsync<string>("SELECT md5(string_agg(observation_id::text || ':' || payload::text, ',' ORDER BY observation_id)) FROM processing.observations"));
         Assert.Equal(await f.CountAsync("incident_revisions", "actor = 'ops' AND reason IS NOT NULL"), await f.CountAsync("incident_revisions", "actor = 'ops'"));
+
+        // A new Mykolaiv report after the merge: the merged source (1) and the retracted split (3) are no candidates; Kherson (2) is the only one
+        // considered and too far (another oblast, ~40 km beyond the radii) → a new incident, not a link to a dead one.
+        await RunSyntheticAsync(("i08-d", "Знову пошкодження у Миколаєві.", t0.AddMinutes(10), "tg_monitoringwar", "damage.reported", "Миколаїв"));
+        Assert.Equal(4, await f.CountAsync("incidents"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "incident_id = 4 AND relation = 'canonical' AND (decision_reason->>'considered')::int = 1 AND decision_reason->'candidates' = '[]'::jsonb"));
+        Assert.Equal(0, await f.CountAsync("incident_observations", "incident_id = 1"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "incident_id = 3"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "incident_id = 3 AND decision_reason->>'merged_from' = '1' AND decision_reason->>'original_relation' = 'canonical' AND decision_reason->>'split_from' = '2'")); // the link carries its whole history
         var events = await EventsAsync("incident.changed");
         Assert.All(events, Valid);
         Assert.Contains(events, e => e["payload"]!["change"]!.GetValue<string>() == "merged" && e["payload"]!["merged_into_incident_id"]!.GetValue<long>() == 2);
@@ -475,5 +508,28 @@ public sealed class IncidentWriterTests(MessagingFixture f)
         Assert.Contains(events, e => e["payload"]!["change"]!.GetValue<string>() == "suppressed" && e["payload"]!["suppressed"]!.GetValue<bool>());
         Assert.Contains(events, e => e["payload"]!["change"]!.GetValue<string>() == "retracted");
         f.Evidence.Record("P10-I08", new { merge = "links moved with reason, source retracted{merged}", split = "new incident split_from", retract_suppress = "revisions with actor/reason", evidence_untouched = true, events = events.Count });
+    }
+
+    /// <summary>Plan review B2: one raw with a target fact and an incident fact → both writers write their rows, both guards see the whole observation set.</summary>
+    [Fact]
+    public async Task I09_A_mixed_raw_is_written_by_both_owners_with_one_incident_and_one_track()
+    {
+        await f.ResetAsync();
+        await RunOrderedAsync(("i09", "Шахеди на Харківщині. Вибухи у Харкові.", Recent(5), null));
+        var observed = Assert.Single(await EventsAsync("observations.recorded"));
+        var facts = observed["payload"]!["observations"]!.AsArray();
+        Assert.Equal(["incident", "target"], facts.Select(o => o!["category"]!.GetValue<string>()).Order());
+        Assert.Equal(["incident-worker", "track-worker"], observed["payload"]!["expected_branches"]!.AsArray().Select(b => b!.GetValue<string>()).Order());
+        Assert.Equal(2, await f.CountAsync("targets", "observation_id IS NOT NULL"));
+        Assert.Equal(2, await f.CountAsync("processing.observations", "legacy_target_id IS NOT NULL"));
+        Assert.Equal(1, await f.CountAsync("incidents"));
+        Assert.Equal(1, await f.CountAsync("incident_observations", "relation = 'canonical' AND legacy_target_id IS NOT NULL"));
+        Assert.Equal(1, await f.CountAsync("target_tracks"));
+        Assert.Equal(1, await f.CountAsync("track_targets"));
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "subscription_id = 'track-worker' AND outcome = 'completed'"));
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "subscription_id = 'incident-worker' AND outcome = 'completed'"));
+        Assert.Equal(1, await f.CountAsync("messaging.outbox", "event_type = 'track.changed'"));
+        Assert.Equal(1, await f.CountAsync("messaging.outbox", "event_type = 'incident.changed'"));
+        f.Evidence.Record("P10-I09", new { facts = 2, targets = 2, incidents = 1, tracks = 1, writers = "both completed" });
     }
 }
