@@ -18,4 +18,8 @@ public class AirAlert
     public long? EndRawMessageId { get; set; }
     /// <summary>Identifier of the alert in the source, for idempotent updates.</summary>
     public required string SourceAlertId { get; set; }
+    /// <summary>P09 aggregate revision (envelope.aggregate_revision of the last alert.changed); incremented only by the alert-worker.</summary>
+    public int Revision { get; set; }
+    public Guid? LastEventId { get; set; }
+    public Guid? LastCorrelationId { get; set; }
 }

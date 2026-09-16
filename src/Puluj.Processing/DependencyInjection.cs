@@ -112,6 +112,50 @@ public static class DependencyInjection
         }
         return services;
     }
+
+    /// <summary>
+    /// P09 domain writers (`track-worker`, `alert-worker`) and the command-emitting `watchdog`: the platform-path owners of
+    /// tracks and alert intervals. Never registered together with the legacy loop in one process; the cutover procedure
+    /// (ADR-0009) stops the `processing` role first. Reuses the legacy sinks as singletons.
+    /// </summary>
+    public static IServiceCollection AddPulujDomainWriters(this IServiceCollection services, IConfiguration configuration, IReadOnlySet<string> roles, string? instanceName = null)
+    {
+        services.AddPulujParsing(configuration);
+        services.Configure<CorrelationOptions>(configuration.GetSection(CorrelationOptions.Section));
+        services.TryAddSingleton<CorrelationSink>();
+        services.TryAddSingleton<Structured.TextAlertSink>();
+        if (roles.Contains(StageRoles.TrackWorker))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<Writers.TrackWriterHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(Writers.TrackWriterHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<Writers.TrackWriterHandler>(instanceName);
+        }
+        if (roles.Contains(StageRoles.AlertWorker))
+        {
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<Writers.AlertWriterHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(Writers.AlertWriterHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<Writers.AlertWriterHandler>(instanceName);
+        }
+        if (roles.Contains(StageRoles.Watchdog))
+        {
+            services.AddSingleton(sp =>
+            {
+                var watchdog = ActivatorUtilities.CreateInstance<Writers.DomainWatchdog>(sp);
+                watchdog.Instance = Puluj.Messaging.DependencyInjection.ConsumerWorker(Writers.DomainWatchdog.Producer, instanceName);
+                return watchdog;
+            });
+            services.AddHostedService(sp => sp.GetRequiredService<Writers.DomainWatchdog>());
+        }
+        return services;
+    }
 }
 
 /// <summary>Worker role names of the stage subscriptions (WorkerOptions.Roles).</summary>
@@ -121,4 +165,8 @@ public static class StageRoles
     public const string Parser = "parser";
     public const string LlmWorker = "llm-worker";
     public const string Finalizer = "finalizer";
+    public const string TrackWorker = "track-worker";
+    public const string AlertWorker = "alert-worker";
+    public const string Watchdog = "watchdog";
+    public static readonly string[] DomainWriters = [TrackWorker, AlertWorker, Watchdog];
 }

@@ -26,6 +26,8 @@ public class TargetConfiguration : IEntityTypeConfiguration<Target>
         // Plan §8.2 candidate for map/feed queries by kind; with fresh statistics the planner also uses it for the backfill's
         // `event_kind_id IS NULL` pass (Index Only Scan; EXPLAIN evidence in P07-backfill-report.json).
         b.HasIndex(x => new { x.EventKindId, x.ObservedAt }).IsDescending(false, true);
+        // P09: one targets row per observation (idempotent writers); legacy rows keep NULL. Built CONCURRENTLY in the migration.
+        b.HasIndex(x => x.ObservationId).HasDatabaseName("ux_targets_observation_id").IsUnique().HasFilter("observation_id IS NOT NULL");
 
         b.HasOne(x => x.RawMessage).WithMany(x => x.Targets).HasForeignKey(x => x.RawMessageId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Source).WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);

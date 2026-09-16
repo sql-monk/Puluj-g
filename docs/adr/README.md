@@ -18,5 +18,7 @@ ADR фіксують рішення програми [`plan-message-platform.md`
 | [0005](ADR-0005-runs-completion.md) | Runs/generations/lanes, completion manifest, terminal outcomes, workflow status | proposed (реалізовано: receipts P03, stage_results P05, finalizer/extraction P06; формальний accept — owner ADR) | P01, P03, P05, P06 | Orchestration/generations — P14 |
 | [0006](ADR-0006-data-model.md) | Логічна модель `messaging.*`, `processing.*`, `analytics.message_*` | accepted (messaging/processing — P03; extractions/observations — P06) | P01, P03, P05, P06 | Analytics DDL — P15; партиціювання — P16 |
 | [0007](ADR-0007-slo-retention-proposal.md) | SLO орієнтири з P00 baseline, quota, retention, deletion eligibility | proposed | P01 | Абсолютні SLO — P16; outbox/inbox cleanup — P03, решта retention — P16/Ops |
+| [0008](ADR-0008-event-catalog.md) | Каталог event kinds, legacy mapping/backfill, правила розпізнавання (версії, resolver, shadow) | accepted (P07; rules — P08) | P07, P08 | Incidents — P10; catalog у API/UI — P11/P12; analytics — P15 |
+| [0009](ADR-0009-aggregate-ownership.md) | Володіння агрегатами: track/alert writers, lock hierarchy (Store shared → track → category / alert region), revisions, watchdog-команди, cutover, SQL trigger ownership | accepted (P09) | P09 | Incident owner — P10; projection/NOTIFY — P11; stats/links поза fact path — P11/P15; replay lane агрегатів — P14 |
 
 Шаблон: Контекст → Рішення → Альтернативи → Наслідки → Відкрите (task ID) → Перевірка.

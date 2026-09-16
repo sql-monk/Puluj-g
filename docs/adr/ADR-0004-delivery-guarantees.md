@@ -148,7 +148,7 @@ sequenceDiagram
 
 - Абсолютну безвтратність при одночасній втраті всіх durable копій (БД + outbox + брокер).
 - Порядок між різними підписками або між lanes; порядок усередині агрегату — через `aggregate_revision` і
-  стратегію конкуренції P09, не через брокер.
+  lock hierarchy ADR-0009 (P09), не через брокер; напрямок дубліката/склад треку залежить від порядку обробки (§7: відтворюваність = впорядкований input).
 - Ідемпотентність платного LLM-виклику на боці провайдера — тільки `request_id` + audit + budget.
 
 ## Відкрите
@@ -195,3 +195,13 @@ Bridge-специфіка (до P04): `causation_id = event_id` для `raw.stor
 | Lease + fencing (§6 п.6, W8) | job-рядки `processing.attempts` (`llm-worker:job`, `job_key = llm:{request_id}`), takeover = token+1 після `lease_until` (старий рядок → `interrupted`); чужий живий lease → очікування (bounded), не throw; перевірка токена в result-tx під тим самим advisory lock; пізній результат → job `superseded` + audit `late` **поза** tx і `DeliveryDeferredException` (attempt `superseded`, requeue без inbox-запису — inbox події лишається актуальному holder'у); redelivery для job `succeeded` → `noop`; terminal без виклику (deadline/drift/exhausted/budget) теж бере власний job-рядок, тож finalizer ніколи не відкидає terminal подію; finalizer відкидає token < current | F04 (обидві сторони), F04b (реальний takeover після lease), F09 (crash після audit), F10 (terminal без виклику), F03 |
 | Retry у БД, terminal до delivery-limit (§6.3) | retryable помилка провайдера → job attempt `failed` + transient redelivery до `Llm:MaxAttempts`, потім `llm.failed{final:true}`; non-retryable/deadline/drift → final одразу; відкритий breaker → очікування до кінця паузи в межах `deadline_at`, інакше `budget_unavailable`; відповідь, яку mapper не приймає → `invalid_response` final (без другого виклику); `final:false` не публікується; `attempts` ≥ 1 | F05 (2 спроби → final), F07 (1 спроба), F10 |
 | Один канонічний extraction | `processing.extractions` unique `(raw, run)` + `ON CONFLICT DO NOTHING`; повтор/пізній вхід → `noop` | F06 (3 дублі + 2 репліки → 1), F08 (порядок черг) |
+
+## Реалізація (P09): доменні writers
+
+| Рішення ADR | Код | Перевірка |
+|---|---|---|
+| ACK після commit; targets + агрегат + outbox в одній tx (§6) | `TrackWriterHandler`/`AlertWriterHandler.ApplyAsync`: EF sinks над консюмерським tx (`ConsumerDbContext`), `track.changed`/`alert.changed` у тій самій tx, NOTIFY у `AfterCommit` | W01 (created, revision 1, archive routable), W04 |
+| Ідемпотентність за `observation_id` + inbox (W3/W5) | partial unique `ux_targets_observation_id`; повтор події → inbox fast path; інший набір observations того самого raw → `noop already_written` | W01 (duplicate), W07 |
+| Команди з `expected_revision` (§6.2, W8-аналог для агрегатів) | `DomainWatchdog` → `*.expiry.requested{expected_revision, expire_at, watermark}`; owner: `stale_revision`/`not_active`/`still_fresh` → noop | W05 |
+| Backlog-aware watermark | outbox unconfirmed + deliveries без receipt (через `messaging.events`), tolerance 30 хв | W05 (backlog → 0 команд) |
+| Дедлок між writers — не delivery failure | `SubscriptionConsumer`: `40P01`/`40001` → attempt `superseded` + requeue | W08 (0 дедлоків / 120) |

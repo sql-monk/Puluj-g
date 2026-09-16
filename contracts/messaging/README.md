@@ -109,6 +109,23 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P09): track/alert writers і watchdog
+
+- `track.changed` (`TrackWriterHandler`): `aggregate_id = track:{id}`, `aggregate_revision` = `target_tracks.revision` (лише writers інкрементують),
+  `partition_key = track:cat:{category}`, `category` = код таксономії (`UAV`, `MISSILE`, …); `change`: `created` (трек відкрито цією доставкою) |
+  `updated` | `cancelled` (відбій, `target.cancelled`) | `expired` (команда watchdog'а); `closed` — reserved (таймаут іде через команду → `expired`);
+  `observation_ids` — observations цього raw на треку (для `cancelled` — факти-причини доставки); `reason` при закритті; `occurred_at` envelope =
+  `effective_at` агрегату, `recorded_at` — годинник writer'а.
+- `alert.changed` (`AlertWriterHandler`): `aggregate_id = alert:{id}`, `scope {place_id, external_alert_id? (structured), level?}`, `partition_key =
+  alert:region:{regionPlaceId}`; `change` визначається порівнянням pre/post-image інтервалу в tx: `started | ended | updated (рівень, start після end,
+  тихе закриття за MaxAge) | expired`; `cancelled` не використовується.
+- `track.expiry.requested`/`alert.expiry.requested` (`DomainWatchdog`, producer `watchdog@instance`): `event_id` = UUIDv5(тип, aggregate, revision,
+  хвилина watermark) — не UUIDv7; `causation_id` = `last_event_id` агрегату (або UUIDv5 `legacy:{aggregate}` для агрегатів legacy loop);
+  `correlation_id` = `last_correlation_id` або UUIDv5(aggregate); lane `live`, run = open live run. Owner: `stale_revision`/`not_active`/`still_fresh` → `noop`.
+- Expected deliveries `observations.recorded` = `archive` + гілки з `expected_branches` (`by_manifest`), що active/paused; `track.changed`/`alert.changed`
+  — `archive` required (v6).
+- Receipts writers: `noop` reasons `legacy_owned`, `already_written`, `no target facts…`, `no alert facts…`, `stale_revision`, `still_fresh`.
+
 ## Правила сумісності
 
 - `schema_version` `MAJOR.MINOR`: той самий MAJOR — сумісно; інший → `quarantined`, не exception.

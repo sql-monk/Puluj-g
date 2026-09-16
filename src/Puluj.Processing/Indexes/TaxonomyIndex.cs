@@ -48,6 +48,11 @@ public sealed class TaxonomyIndex(
 
     public int? CategoryId(string code) => categoryIdsByCode.TryGetValue(code, out var id) ? id : null;
 
+    private readonly IReadOnlyDictionary<int, string> _categoryCodes = categoryIdsByCode.ToDictionary(kv => kv.Value, kv => kv.Key);
+
+    /// <summary>Stable taxonomy code of a category id (the `category` of track.changed, P09); the id as text when unknown.</summary>
+    public string CategoryCode(int categoryId) => _categoryCodes.TryGetValue(categoryId, out var code) ? code : categoryId.ToString();
+
     public int? ClassId(string code) => classIdsByCode.TryGetValue(code, out var id) ? id : null;
 
     public static TaxonomyIndex Empty { get; } = new([], new Dictionary<(AliasTargetLevel, int), TargetRef>(),

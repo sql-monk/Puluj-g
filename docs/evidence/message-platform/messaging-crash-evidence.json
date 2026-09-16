@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-15T22:33:56.0352437+00:00",
+  "generated_at": "2026-09-16T00:24:00.8488189+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.142349,
+      "outbox_age_seen_s": 1.130925,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0a734-6c6a-7b59-b042-8d1c6f2233b1"
+      "event_id": "01a0a799-2f09-7f4e-b608-de1507d41cb5"
     },
     "P03-C05": {
       "window": "W6b",
@@ -118,7 +118,7 @@
       "overdue_reported": 2,
       "registry_versions": [
         1,
-        5
+        6
       ]
     },
     "P03-C07": {
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-15T22:33:55.3585448\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T00:23:59.8023568\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -220,8 +220,8 @@
         "noop": 2
       },
       "replicas": {
-        "r1": 3,
-        "r2": 0,
+        "r1": 0,
+        "r2": 3,
         "raw_total": 2,
         "is_new_true": 2
       }
@@ -375,6 +375,83 @@
       "shadow": "v2",
       "disagreements": 1,
       "report_by_kind": "impact.explosion.reported \u2192 fire.reported"
+    },
+    "P09-W01": {
+      "targets": 1,
+      "tracks": 1,
+      "revision": 1,
+      "track_changed": "created",
+      "alert_worker": "noop",
+      "duplicate": "inbox fast path"
+    },
+    "P09-W02": {
+      "replicas": 2,
+      "barrier": "BeforeCommit (both met)",
+      "path": "candidate (5 min apart)",
+      "tracks": 1,
+      "targets": 2,
+      "changes": "created, updated",
+      "revisions": "1, 2"
+    },
+    "P09-W03": {
+      "messages": 4,
+      "tracks": 3,
+      "cross_region": "separate",
+      "outside_window": "separate",
+      "target_cancelled": "both Sumy tracks cancelled, Kharkiv untouched (exclusive track scope)"
+    },
+    "P09-W04": {
+      "text_alert": "started \u2192 ended, track cancelled",
+      "structured": "end before start \u2192 one interval (started, updated)",
+      "level_reannounce": "updated, revision 2, scope.level red",
+      "alert_changed": 6
+    },
+    "P09-W05": {
+      "stale_revision": "noop",
+      "duplicate_command": "inbox fast path",
+      "backlog": "watermark held, 0 commands",
+      "sweep": "1 command, memo blocks the repeat",
+      "expired": "revision 2"
+    },
+    "P09-W06": {
+      "messages": 7,
+      "targets": 7,
+      "tracks": 2,
+      "alerts": 1,
+      "differences": 0
+    },
+    "P09-W07": {
+      "legacy_first": "writer noop legacy_owned (concurrent, gate)",
+      "writers_first": "legacy ProcessAsync \u2192 0, status Processed, rows untouched"
+    },
+    "P09-W08": {
+      "one_category": {
+        "label": "uav",
+        "messages": 60,
+        "total_ms": 3827,
+        "writers_tail_ms": 884,
+        "per_observation_ms": 63.8,
+        "tracks": 6,
+        "replica_split": {
+          "primary": 30,
+          "replica": 30
+        },
+        "deadlock_retries": 0
+      },
+      "two_categories": {
+        "label": "uav\u002Bmissile",
+        "messages": 60,
+        "total_ms": 3244,
+        "writers_tail_ms": 439,
+        "per_observation_ms": 54.1,
+        "tracks": 6,
+        "replica_split": {
+          "primary": 30,
+          "replica": 30
+        },
+        "deadlock_retries": 0
+      },
+      "note": "wall time of N observations through 2 track-worker replicas; category = partition (serial ceiling within one), (source, day) stats row shared by both"
     }
   }
 }

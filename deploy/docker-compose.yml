@@ -82,6 +82,7 @@ services:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
+      # P09 cutover (ADR-0009): додати track-worker,alert-worker,watchdog ЛИШЕ після зупинки ролі processing у сервісі processor.
       Worker__Roles: relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq

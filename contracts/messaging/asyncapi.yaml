@@ -3,7 +3,7 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '5.0.0'
+  version: '6.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
@@ -461,7 +461,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/observations_recorded'
-    summary: subscription track-worker (required=true, owner_task=P09, status=planned)
+    summary: subscription track-worker (required=true, owner_task=P09, status=active)
     messages:
       - $ref: '#/channels/observations_recorded/messages/observations_recorded'
     bindings:
@@ -469,12 +469,12 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.track-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history, replay]
+    x-lanes: [live, history]
   receive_track_worker_track_expiry_requested:
     action: receive
     channel:
       $ref: '#/channels/track_expiry_requested'
-    summary: subscription track-worker (required=true, owner_task=P09, status=planned)
+    summary: subscription track-worker (required=true, owner_task=P09, status=active)
     messages:
       - $ref: '#/channels/track_expiry_requested/messages/track_expiry_requested'
     bindings:
@@ -482,12 +482,12 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.track-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history, replay]
+    x-lanes: [live, history]
   receive_alert_worker_observations_recorded:
     action: receive
     channel:
       $ref: '#/channels/observations_recorded'
-    summary: subscription alert-worker (required=true, owner_task=P09, status=planned)
+    summary: subscription alert-worker (required=true, owner_task=P09, status=active)
     messages:
       - $ref: '#/channels/observations_recorded/messages/observations_recorded'
     bindings:
@@ -495,12 +495,12 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.alert-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history, replay]
+    x-lanes: [live, history]
   receive_alert_worker_alert_expiry_requested:
     action: receive
     channel:
       $ref: '#/channels/alert_expiry_requested'
-    summary: subscription alert-worker (required=true, owner_task=P09, status=planned)
+    summary: subscription alert-worker (required=true, owner_task=P09, status=active)
     messages:
       - $ref: '#/channels/alert_expiry_requested/messages/alert_expiry_requested'
     bindings:
@@ -508,7 +508,7 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.alert-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history, replay]
+    x-lanes: [live, history]
   receive_incident_worker_observations_recorded:
     action: receive
     channel:
@@ -672,6 +672,32 @@ operations:
     summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_track_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/track_changed'
+    summary: subscription archive (required=true, owner_task=P03, status=active)
+    messages:
+      - $ref: '#/channels/track_changed/messages/track_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_alert_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/alert_changed'
+    summary: subscription archive (required=true, owner_task=P03, status=active)
+    messages:
+      - $ref: '#/channels/alert_changed/messages/alert_changed'
     bindings:
       amqp:
         ack: true
@@ -851,7 +877,7 @@ components:
       x-kind: event
       x-schema-version: '1.0'
       x-producer: track-worker
-      x-required-subscriptions: [projection, message-analytics]
+      x-required-subscriptions: [archive, projection, message-analytics]
       payload:
         allOf:
           - $ref: 'schemas/envelope.schema.json'
@@ -869,7 +895,7 @@ components:
       x-kind: event
       x-schema-version: '1.0'
       x-producer: alert-worker
-      x-required-subscriptions: [projection, message-analytics]
+      x-required-subscriptions: [archive, projection, message-analytics]
       payload:
         allOf:
           - $ref: 'schemas/envelope.schema.json'

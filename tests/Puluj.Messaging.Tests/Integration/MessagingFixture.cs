@@ -57,6 +57,9 @@ public sealed class MessagingFixture : IAsyncLifetime
     public SubscriptionConsumer Parser => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == ParserHandler.Subscription);
     public SubscriptionConsumer LlmWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == LlmWorkerHandler.Subscription);
     public SubscriptionConsumer Finalizer => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == FinalizerHandler.Subscription);
+    public SubscriptionConsumer TrackWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Writers.TrackWriterHandler.Subscription);
+    public SubscriptionConsumer AlertWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Writers.AlertWriterHandler.Subscription);
+    public Puluj.Processing.Writers.DomainWatchdog Watchdog => Services.GetRequiredService<Puluj.Processing.Writers.DomainWatchdog>();
     public FakeLlmCompletion Llm { get; } = new();
     public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
     public IndexProvider Indexes => Services.GetRequiredService<IndexProvider>();
@@ -106,6 +109,8 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["Llm:TimeoutSeconds"] = "2",
             ["Llm:FailurePause"] = "00:00:02",
             ["Messaging:Consumer:PrefetchBySubscription:llm-worker"] = "1", // a blocked replica has no credit → a duplicate command lands on the other one (F04b)
+            ["Messaging:Consumer:PrefetchBySubscription:track-worker"] = "1", // W02: two replicas must each take one delivery
+            ["Correlation:WatchdogInterval"] = "00:10:00", // sweeps are driven by the tests (SweepAsync), never by the timer
             ["Messaging:Enabled"] = "true",
             ["Messaging:Outbox:Enabled"] = "true",
             ["Messaging:Outbox:PipelineVersion"] = Options.Outbox.PipelineVersion,
@@ -143,6 +148,8 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddSingleton<ILlmCompletion>(Llm); // before AddPulujParsing: the real Anthropic completion is TryAdd'ed
         services.AddPulujProcessing(config, "p03-test"); // legacy processor for the parity test (hosted loop is never started here)
         services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser, StageRoles.LlmWorker, StageRoles.Finalizer }, "p03-test");
+        // P09 domain writers next to the legacy processor: never started together on the same messages (W06/W07 drive each path explicitly).
+        services.AddPulujDomainWriters(config, new HashSet<string> { StageRoles.TrackWorker, StageRoles.AlertWorker, StageRoles.Watchdog }, "p03-test");
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -179,7 +186,7 @@ public sealed class MessagingFixture : IAsyncLifetime
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
                      processing.observations, processing.extractions, llm_requests,
-                     collector_states, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
+                     collector_states, targets, target_tracks, track_targets, target_track_revisions, target_links, source_daily_stats, source_copies, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
             """);
         Registrar.Reset();
         Outbox.Runs.Reset();
@@ -189,6 +196,9 @@ public sealed class MessagingFixture : IAsyncLifetime
         Parser.ResetCounters();
         LlmWorker.ResetCounters();
         Finalizer.ResetCounters();
+        TrackWorker.ResetCounters();
+        AlertWorker.ResetCounters();
+        Watchdog.ResetMemo();
         Llm.Reset();
         Services.GetRequiredService<LlmBreaker>().Reset(); // a 429 in one test must not pause the model for the next
         await Registrar.EnsureRegisteredAsync(CancellationToken.None);
@@ -200,7 +210,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {
@@ -224,10 +234,15 @@ public sealed class MessagingFixture : IAsyncLifetime
         Ingestor.IngestAsync(Message(sourceMessageId, text, publishedAt), SourceCode, CancellationToken.None, enqueue);
 
     /// <summary>The collectors' path (P04): ingress.received + checkpoint in one transaction; the raw-writer stores the row.</summary>
-    public async Task<Source> SourceAsync()
+    public async Task<Source> SourceAsync() => await SourceAsync(SourceCode);
+
+    /// <summary>A second, independent source (P09: duplicates across sources raise confidence).</summary>
+    public const string SourceCode2 = "tg_kyiv_ova";
+
+    public async Task<Source> SourceAsync(string code)
     {
         await using var db = await Factory.CreateDbContextAsync();
-        return await db.Sources.AsNoTracking().SingleAsync(s => s.SourceId == SourceId);
+        return await db.Sources.AsNoTracking().SingleAsync(s => s.Code == code);
     }
 
     public async Task<int> ExecAsync(string sql, params (string Name, object Value)[] parameters)

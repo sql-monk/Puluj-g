@@ -77,7 +77,7 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
 | raw-writer | unique `(source_id, source_message_key, source_revision)` → існуючий id, `is_new:false` |
 | stage consumers | `messaging.inbox (subscription_id, event_id)` + `stage_results` unique |
 | finalizer | `stage_results (raw, run, 'extraction', version)` — рівно один канонічний extraction на run |
-| domain workers | inbox + `aggregate_revision` (optimistic) або lock за стратегією P09 |
+| domain workers | inbox + `targets.observation_id` unique + lock hierarchy ADR-0009 (Store shared → track → category / alert region); `aggregate_revision` = `target_tracks.revision`/`air_alerts.revision` (P09) |
 | archive | `messaging.events` PK `event_id` |
 | analytics | upsert `(raw_message_id, run_id)`; агрегати — recompute з lifecycle rows, не інкремент |
 
@@ -124,7 +124,10 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
   `(raw_message_id, run_id)` — рівно один канонічний immutable extraction на run (`extraction_version` = 1; повторний розрахунок = новий run), `method`,
   `outcome`, `versions`/`facts`/`error` jsonb, `llm_request_ids uuid[]`, `finalized_by`; **`processing.observations`**: `observation_id` uuid PK, FK extraction
   (cascade), `raw_message_id`, `run_id`, `event_kind_code`, `category`, `effective_at`, `payload` jsonb (факт за `$defs/observation`), `legacy_target_id`
-  null у compat window (P09/P14 зв'язують із `targets`, які далі пише legacy loop).
+  null у compat window; з P09 writers заповнюють `legacy_target_id` у тій самій tx, що й рядок `targets` (`observation_id`).
+- P09 (`AddAggregateRevisions`): `targets.observation_id uuid NULL` (partial unique, CONCURRENTLY; NULL = рядок legacy loop), `target_tracks`/`air_alerts`:
+  `revision int`, `last_event_id uuid`, `last_correlation_id uuid` (causation chain для watchdog-команд). Writers `targets` для не-alert фактів — track-worker,
+  для alert — alert-worker; incident/info — лише рядок `targets` до P10.
 - `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; `outcome` ∈ `answered → applied | late`, коди помилок
   провайдера; рядок пишеться autocommit до result-tx. `processing.attempts`: partial unique `(job_key, fencing_token) WHERE fencing_token > 0`
   (lease takeover), job-рядки llm-worker під `subscription_id = 'llm-worker:job'` (не рахуються consumer'ом; `event_id` = `request_id` команди,

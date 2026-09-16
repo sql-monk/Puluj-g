@@ -1,6 +1,6 @@
 {
   "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; версія 4 (P05): normalizer, parser → active, finalizer і llm-worker → paused; версія 5 (P06): finalizer, llm-worker → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
-  "topology_version": 5,
+  "topology_version": 6,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -110,7 +110,8 @@
       "producer": "track-worker",
       "scope": "aggregate",
       "replay_source": false,
-      "required_subscriptions": ["projection", "message-analytics"],
+      "$comment": "P09: archive у required — projection/message-analytics ще planned, без active consumer подія була б unroutable (ADR-0002).",
+      "required_subscriptions": ["archive", "projection", "message-analytics"],
       "optional_subscriptions": []
     },
     "alert.changed": {
@@ -120,7 +121,8 @@
       "producer": "alert-worker",
       "scope": "aggregate",
       "replay_source": false,
-      "required_subscriptions": ["projection", "message-analytics"],
+      "$comment": "P09: archive у required — див. track.changed.",
+      "required_subscriptions": ["archive", "projection", "message-analytics"],
       "optional_subscriptions": []
     },
     "incident.changed": {
@@ -195,14 +197,16 @@
       "idempotency": "inbox + unique(raw_message_id, run_id, stage, stage_version)"
     },
     "track-worker": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P09",
-      "bindings": ["observations.recorded", "track.expiry.requested"], "lanes": ["live", "history", "replay"],
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P09",
+      "$comment": "P09: replay lane поза межами — run-ізоляція агрегатів (P14); live+history пишуть у спільні агрегати.",
+      "bindings": ["observations.recorded", "track.expiry.requested"], "lanes": ["live", "history"],
       "emits": ["track.changed"], "queue_policy": "required",
       "idempotency": "inbox + aggregate_revision"
     },
     "alert-worker": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P09",
-      "bindings": ["observations.recorded", "alert.expiry.requested"], "lanes": ["live", "history", "replay"],
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P09",
+      "$comment": "P09: replay lane поза межами (P14).",
+      "bindings": ["observations.recorded", "alert.expiry.requested"], "lanes": ["live", "history"],
       "emits": ["alert.changed"], "queue_policy": "required",
       "idempotency": "inbox + aggregate_revision"
     },
@@ -228,7 +232,7 @@
     },
     "archive": {
       "role": "consumer", "required": true, "status": "active", "owner_task": "P03",
-      "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed"],
+      "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed", "track.changed", "alert.changed"],
       "lanes": ["live", "history", "replay"],
       "emits": [], "queue_policy": "required",
       "idempotency": "append-only unique(event_id)",

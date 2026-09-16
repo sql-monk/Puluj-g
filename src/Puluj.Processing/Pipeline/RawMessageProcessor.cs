@@ -83,6 +83,10 @@ public sealed class RawMessageProcessor(
                 // The handler already reads and modifies AirAlerts; locking after it is too late.
                 await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
                 lockedMs = sw.ElapsedMilliseconds;
+                if (await WritersOwnAsync(db, raw, source, sw, ct))
+                {
+                    return 0;
+                }
                 targets = await alertsHandler.HandleAsync(db, raw, source, ct);
             }
             else if (!string.IsNullOrWhiteSpace(raw.RawText))
@@ -133,6 +137,10 @@ public sealed class RawMessageProcessor(
                 return 0;
             }
 
+            if (await WritersOwnAsync(db, raw, source, sw, ct))
+            {
+                return 0;
+            }
             // Plan §8.2 compatibility window: every target carries the catalog kind next to the legacy enum. One catalog
             // snapshot per message; an empty catalog (not seeded yet) leaves the column NULL for the backfill, never a guess.
             var kinds = indexes.EventKinds;
@@ -190,6 +198,29 @@ public sealed class RawMessageProcessor(
             await RecordFailureAsync(db, tx, raw, ex);
             return 0;
         }
+    }
+
+    /// <summary>
+    /// P09 cutover guard (ADR-0009), checked under Store (the writers take it shared): the platform writers already materialized
+    /// this raw's observations, so the legacy loop must not write a second owner's rows. The row is marked done, nothing else is written.
+    /// </summary>
+    private async Task<bool> WritersOwnAsync(PulujDbContext db, RawMessage raw, Source source, Stopwatch sw, CancellationToken ct)
+    {
+        if (!await db.Targets.AnyAsync(t => t.RawMessageId == raw.RawMessageId && t.ObservationId != null, ct))
+        {
+            return false;
+        }
+        raw.ProcessingStatus = ProcessingStatus.Processed;
+        raw.ProcessedAt = clock.GetUtcNow();
+        raw.Attempts++;
+        raw.ProcessingMs = (int)Math.Min(sw.ElapsedMilliseconds, int.MaxValue);
+        Stamp(raw);
+        await db.SaveChangesAsync(ct);
+        await db.Database.CurrentTransaction!.CommitAsync(ct);
+        metrics.RawProcessed(identity.Name, "writers_owned");
+        stats.Outcome("processed", raw.RawMessageId);
+        logger.LogWarning("RawMessage {Id} ({Source}): the domain writers own it already (targets.observation_id set) — legacy write skipped", raw.RawMessageId, source.Code);
+        return true;
     }
 
     private bool OwnedByMe(RawMessage raw) =>

@@ -33,7 +33,10 @@ concurrency quotas (ADR-0007), а `projection` не має replay-черги (sh
 - `subscriptions.{id}`: `bindings`, `lanes`, `emits`, `required`, `queue_policy`, `idempotency`,
   `owner_task`, `status` (`planned` → `active` після реалізації; `paused`/`retired` — з audit). З P03 (`topology_version` 2)
   `archive` — `active`, з P04 (`topology_version` 3) — `raw-writer`, з P05 (`topology_version` 4) — `normalizer` і `parser` (тоді `finalizer` і
-  `llm-worker` були `paused`, щоб черги існували до реалізації), з P06 (`topology_version` 5) — `finalizer` і `llm-worker` `active`. Черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
+  `llm-worker` були `paused`, щоб черги існували до реалізації), з P06 (`topology_version` 5) — `finalizer` і `llm-worker` `active`; з P09 (`topology_version` 6) — `track-worker`, `alert-worker` `active` (lanes `live`, `history`;
+  replay — P14), а `archive` — required subscriber `track.changed`/`alert.changed`: без active consumer aggregate-події були б unroutable, поки
+  `projection`/`message-analytics` planned. `conditional_subscriptions.by_manifest` реалізовано (P09): expected deliveries `observations.recorded`
+  включають гілки з `payload.expected_branches`, що active/paused. Черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
   (статус після першого insert належить БД — `messaging.subscriptions`, команди `SubscriptionAdmin`).
 - `producer_roles`: collectors, watchdog, outbox-relay, reconciliation — публікують через outbox, черг не мають.
 - Правила консистентності (тести T03–T09 у `tests/Puluj.Messaging.Contracts.Tests`): кожен event має

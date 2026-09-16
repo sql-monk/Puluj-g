@@ -54,6 +54,14 @@ if (brokerRoles.Count > 0 && messaging.Enabled)
     {
         builder.Services.AddPulujStages(builder.Configuration, brokerRoles, worker.InstanceName); // P05/P06 stage workers (no legacy loop)
     }
+    if (brokerRoles.Overlaps([WorkerOptions.TrackWorker, WorkerOptions.AlertWorker, WorkerOptions.Watchdog]))
+    {
+        if (roles.Contains(WorkerOptions.Processing))
+        {
+            throw new InvalidOperationException("Worker roles: the legacy `processing` role and the P09 domain writers (track-worker/alert-worker/watchdog) must not run in one process — two owners of the same rows (ADR-0009 cutover)");
+        }
+        builder.Services.AddPulujDomainWriters(builder.Configuration, brokerRoles, worker.InstanceName); // P09 track/alert owners + watchdog
+    }
 }
 var collectors = new List<string>();
 if (roles.Contains(WorkerOptions.Telegram))

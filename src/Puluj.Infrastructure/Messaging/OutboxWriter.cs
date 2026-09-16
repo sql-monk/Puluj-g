@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using System.Text.Json.Nodes;
 using Npgsql;
 using NpgsqlTypes;
 using Puluj.Infrastructure.Messaging.Topology;
@@ -56,7 +57,8 @@ public sealed class OutboxWriter(TopologyRegistrar registrar, ProcessingRuns run
         var outboxId = (long)(await insert.ExecuteScalarAsync(ct))!;
 
         var statuses = await TopologyRegistrar.StatusesAsync(conn, tx, registry.TopologyVersion, ct);
-        var expected = registry.ExpectedSubscriptions(envelope.EventType, envelope.Lane, statuses);
+        var branches = envelope.Payload?["expected_branches"] is JsonArray eb ? eb.Select(b => b?.GetValue<string>()).Where(b => b is not null).Select(b => b!).ToList() : null;
+        var expected = registry.ExpectedSubscriptions(envelope.EventType, envelope.Lane, statuses, null, branches);
         foreach (var subscription in expected)
         {
             await using var delivery = new NpgsqlCommand(

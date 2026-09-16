@@ -244,9 +244,10 @@ public sealed class SubscriptionConsumer : BackgroundService
                 await FinishAttemptAsync(conn, attemptId, "failed", ex.Message, ct);
                 await QuarantineAsync(channel, ea, eventId, envelope, body, ex.Reason, ex.Message, attemptId, ct);
             }
-            catch (DeliveryDeferredException ex)
+            catch (Exception ex) when (ex is DeliveryDeferredException || IsSerializationFailure(ex))
             {
-                // Not a failure: the outcome belongs to another delivery of the same command; requeue without counting.
+                // Not a failure: the outcome belongs to another delivery of the same command, or the database asked us to
+                // retry (deadlock / serialization failure between two writers, P09 §7) — requeue without counting.
                 await FinishAttemptAsync(conn, attemptId, "superseded", ex.Message, ct);
                 _logger.LogInformation("Delivery {EventId} to {Subscription} deferred: {Reason}", eventId, SubscriptionId, ex.Message);
                 _metrics.Delivered(SubscriptionId, "deferred");
@@ -332,6 +333,11 @@ public sealed class SubscriptionConsumer : BackgroundService
     }
 
     /// <summary>Closing the channel from inside its own dispatch loop would wait for this callback: close from another task.</summary>
+    /// <summary>PostgreSQL 40001 (serialization_failure) / 40P01 (deadlock_detected): the transaction was rolled back by the server; the delivery is simply tried again.</summary>
+    private static bool IsSerializationFailure(Exception ex) =>
+        (ex as PostgresException ?? ex.InnerException as PostgresException) is { SqlState: "40001" or "40P01" };
+
+    /// <summary>Simulated crash (tests): the channels close without an ACK/NACK, the broker redelivers, the service re-consumes after <see cref="RestartDelay"/>.</summary>
     private void Crash()
     {
         List<IChannel> channels;

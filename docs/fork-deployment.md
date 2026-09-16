@@ -71,3 +71,13 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `Parsing__RulesetPollSeconds` (30 — лаг publish/rollback). Rollback міграції — `Down` (таблиці правил зникають, resolver повертається до builtin;
 `parse.completed`/`stage_results` з `ruleset_id = v{n}` лишаються як історія). Admin-сервіс для preview вантажить індекси парсера на запит (TTL 10 хв; вказівники active/shadow — на кожен запит) і містить `data/corpus/` в образі
 (`Dockerfile.admin`) для `POST /rulesets/{v}/corpus`; без файлу — 404, порожній корпус — 400 (ніколи «accuracy 1.0 на нулі»).
+
+### Доменні writers і watchdog (P09, cutover)
+
+Ролі `track-worker`, `alert-worker`, `watchdog` сервісу `messaging` **вимкнені за замовчуванням**: до cutover домен пише legacy роль `processing`.
+Cutover (ADR-0009): 1) міграція `AddAggregateRevisions` (індекс `ux_targets_observation_id` будується CONCURRENTLY поза транзакцією; перерваний
+build лишає INVALID індекс — міграція спершу робить `DROP INDEX CONCURRENTLY IF EXISTS`, повторний `migrate` добудовує); 2) зупинити роль `processing` (loop + `TrackWatchdog`; reset заборонено
+під час роботи writers); 3) додати `track-worker,alert-worker,watchdog` до `Worker__Roles` сервісу `messaging`. Worker відмовляється стартувати з
+`processing` і писачами в одному процесі; на різних процесах над однією БД обидва напрямки захищені (writers `noop legacy_owned`, legacy `writers_owned`).
+Після cutover `raw_messages.processing_status` нових raw лишається Pending (backlog — outbox/deliveries; admin-семантика — P14/P16); NOTIFY для мапи
+йде з writers після commit. Rollback: прибрати три ролі, повернути `processing`. Метрики `puluj.writer.stage/outcomes`; benchmark — `P09-writers-evidence.md`.

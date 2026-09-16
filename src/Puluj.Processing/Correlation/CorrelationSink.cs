@@ -54,6 +54,23 @@ public sealed class CorrelationSink(
         }
     }
 
+    /// <summary>
+    /// P09 track-worker entry: the target sightings of one raw message (already saved rows), in event-time order, sharing
+    /// one `usedTracks` set — the same correlation the legacy sink runs, under the caller's locks.
+    /// </summary>
+    public async Task HandleTargetFactsAsync(PulujDbContext db, IReadOnlyList<Target> targets, Source source, ICollection<PulujEvent> events, DateTimeOffset now, CancellationToken ct)
+    {
+        var usedTracks = new HashSet<long>();
+        foreach (var o in targets.Where(t => t.EventType == EventType.TargetObserved && t.TargetCategoryId is not null).OrderBy(x => x.ObservedAt))
+        {
+            await HandleTargetAsync(db, o, source, events, now, usedTracks, ct);
+        }
+    }
+
+    /// <summary>P09 track-worker entry for a cancellation fact (an alert end or `target.cancelled`, not necessarily a saved row: a null TargetId is recorded as no provenance).</summary>
+    public Task CloseTracksForCancellationAsync(PulujDbContext db, Target cancellation, string reason, ICollection<PulujEvent> events, DateTimeOffset now, CancellationToken ct) =>
+        CloseTracksInRegionAsync(db, cancellation, reason, events, now, ct);
+
     private async Task HandleTargetAsync(PulujDbContext db, Target o, Source source, ICollection<PulujEvent> events, DateTimeOffset now, HashSet<long> usedTracks, CancellationToken ct)
     {
         var duplicateOf = await FindDuplicateAsync(db, o, ct);
@@ -210,7 +227,7 @@ public sealed class CorrelationSink(
             t.Status = TrackStatus.Cancelled;
             t.ClosedReason = reason;
             t.UpdatedAt = Later(t.UpdatedAt, o.ObservedAt);
-            db.TargetTrackRevisions.Add(TrackUpdater.Revision(t, o.TargetId, t.UpdatedAt));
+            db.TargetTrackRevisions.Add(TrackUpdater.Revision(t, o.TargetId == 0 ? null : o.TargetId, t.UpdatedAt));
             events.Add(new PulujEvent(PulujEventType.TrackClosed, t.TargetTrackId, now));
             logger.LogInformation("Track {Track} closed ({Reason}) by target {Obs}", t.TargetTrackId, reason, o.TargetId);
         }

@@ -29,7 +29,9 @@ public sealed class TopologyRegistry
     private readonly string _dlqPattern;
     private readonly string _routingPattern;
 
-    public sealed record EventDefinition(string Type, string Kind, string Producer, string SchemaVersion, string Scope, bool ReplaySource, IReadOnlyList<string> RequiredSubscriptions, IReadOnlyList<string> OptionalSubscriptions)
+    /// <param name="ManifestSubscriptions">`conditional_subscriptions.by_manifest`: subscriptions expected only when the payload's `expected_branches` names them (P09).</param>
+    public sealed record EventDefinition(string Type, string Kind, string Producer, string SchemaVersion, string Scope, bool ReplaySource, IReadOnlyList<string> RequiredSubscriptions, IReadOnlyList<string> OptionalSubscriptions,
+        IReadOnlyList<string> ManifestSubscriptions)
     {
         public int SchemaMajor => ParseMajor(SchemaVersion) ?? throw new InvalidOperationException($"topology.json: event {Type} has invalid schema_version '{SchemaVersion}'");
     }
@@ -85,7 +87,8 @@ public sealed class TopologyRegistry
                 node["scope"]!.GetValue<string>(),
                 node["replay_source"]?.GetValue<bool>() ?? false,
                 Strings(node["required_subscriptions"]),
-                Strings(node["optional_subscriptions"]));
+                Strings(node["optional_subscriptions"]),
+                Strings(node["conditional_subscriptions"]?["by_manifest"]));
         }
         Events = events;
 
@@ -137,12 +140,16 @@ public sealed class TopologyRegistry
     /// `paused` — a stopped required consumer stays interested; a `planned` one is not, it gets a backfill later).
     /// <paramref name="statusOverride"/> supplies the database-owned status per subscription id when known.
     /// </summary>
-    public IReadOnlyList<SubscriptionDefinition> ExpectedSubscriptions(string eventType, string lane, IReadOnlyDictionary<string, string>? statusOverride = null, IReadOnlySet<string>? activeStatuses = null)
+    public IReadOnlyList<SubscriptionDefinition> ExpectedSubscriptions(string eventType, string lane, IReadOnlyDictionary<string, string>? statusOverride = null, IReadOnlySet<string>? activeStatuses = null, IEnumerable<string>? expectedBranches = null)
     {
         activeStatuses ??= DefaultExpectedStatuses;
         var definition = Event(eventType);
         var result = new List<SubscriptionDefinition>();
-        foreach (var id in definition.RequiredSubscriptions)
+        // The completion manifest's conditional branches (`expected_branches` of observations.recorded, P09): expected like a required subscription when named.
+        var ids = expectedBranches is null
+            ? definition.RequiredSubscriptions
+            : definition.RequiredSubscriptions.Concat(expectedBranches.Where(b => definition.ManifestSubscriptions.Contains(b, StringComparer.Ordinal))).Distinct(StringComparer.Ordinal).ToList();
+        foreach (var id in ids)
         {
             var subscription = Subscription(id);
             var status = statusOverride is not null && statusOverride.TryGetValue(id, out var s) ? s : subscription.Status;
