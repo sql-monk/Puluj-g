@@ -26,10 +26,6 @@ namespace Puluj.Admin;
 public static partial class OpsEndpoints
 {
     private static readonly TimeSpan WorkerStale = TimeSpan.FromSeconds(90);
-    private static readonly TimeSpan WorkerForgotten = TimeSpan.FromMinutes(15); // a killed dev process leaves its key behind
-
-    /// <summary>The Worker writes its status document in camelCase (the web JSON options); enums as strings.</summary>
-    private static readonly JsonSerializerOptions StatusJson = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) } };
 
     public static IEndpointRouteBuilder MapOpsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -268,46 +264,12 @@ public static partial class OpsEndpoints
     /// Heartbeats of the Worker instances (`Runtime:Worker:{name}:Heartbeat`), oldest first. An instance removes its key on a clean
     /// shutdown; one that died leaves a stale value, which is shown as down for a while and then forgotten.
     /// </summary>
-    public static List<(string Name, DateTimeOffset At)> WorkerHeartbeats(IReadOnlyDictionary<string, AppSetting> all, DateTimeOffset now)
-    {
-        var result = new List<(string, DateTimeOffset)>();
-        foreach (var (key, setting) in all)
-        {
-            const string prefix = "Runtime:Worker:", suffix = ":Heartbeat";
-            // The pre-roles key `Runtime:Worker:Heartbeat` (no instance name) is skipped, not parsed.
-            if (key.Length <= prefix.Length + suffix.Length
-                || !key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || !key.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            var name = key[prefix.Length..^suffix.Length];
-            if (DateTimeOffset.TryParse(setting.Value, out var at) && now - at < WorkerForgotten)
-            {
-                result.Add((name, at));
-            }
-        }
-        return result.OrderBy(w => w.Item2).ToList();
-    }
+    public static List<(string Name, DateTimeOffset At)> WorkerHeartbeats(IReadOnlyDictionary<string, AppSetting> all, DateTimeOffset now) =>
+        Puluj.Infrastructure.Messaging.Ops.WorkerStatusDocuments.Heartbeats(all, now); // shared with the P13 ops snapshot
 
     /// <summary>The instance's own status document (`Runtime:Worker:{name}:Status`, §2.1); null when absent or unreadable.</summary>
-    public static WorkerStatusDto? WorkerStatus(IReadOnlyDictionary<string, AppSetting> all, string name)
-    {
-        var key = $"Runtime:Worker:{name}:Status";
-        var value = all.TryGetValue(key, out var exact) ? exact.Value
-            : all.FirstOrDefault(kv => kv.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value?.Value;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-        try
-        {
-            return JsonSerializer.Deserialize<WorkerStatusDto>(value, StatusJson);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
+    public static WorkerStatusDto? WorkerStatus(IReadOnlyDictionary<string, AppSetting> all, string name) =>
+        Puluj.Infrastructure.Messaging.Ops.WorkerStatusDocuments.Status(all, name);
 
     private sealed record ClaimRow(string ClaimedBy, long ProcessedDay, long InProgress);
 

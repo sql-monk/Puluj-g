@@ -19,7 +19,11 @@ public sealed record WorkerStatusDto(
     ProcessingStatusDto? Processing,
     LlmStatusDto? Llm,
     string? Paused,
-    ProcessingPauseDto? Pause = null);
+    ProcessingPauseDto? Pause = null,
+    /// <summary>P13: lane runtimes of every subscription consumer this process hosts (empty for processes without broker roles).</summary>
+    IReadOnlyList<ConsumerLaneDto>? Consumers = null,
+    /// <summary>P13: the process's broker connection; null for processes without broker roles.</summary>
+    BrokerStatusDto? Broker = null);
 
 /// <summary>Why all processors are temporarily held. SourceStatus is the live collector status that owns the hold.</summary>
 public sealed record ProcessingPauseDto(string Reason, string? SourceStatus);

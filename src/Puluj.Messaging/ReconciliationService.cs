@@ -3,9 +3,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using System.Text.Json;
+using Puluj.Contracts;
 using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Messaging.Topology;
 using Puluj.Infrastructure.Persistence;
+using Puluj.Infrastructure.Settings;
 
 namespace Puluj.Messaging;
 
@@ -23,8 +26,18 @@ public sealed class ReconciliationService(
     IDbContextFactory<PulujDbContext> factory,
     IOptions<MessagingOptions> options,
     MessagingMetrics metrics,
-    ILogger<ReconciliationService> logger) : BackgroundService
+    SettingsStore settings,
+    ILogger<ReconciliationService> logger,
+    string? worker = null) : BackgroundService
 {
+    /// <summary>`app_settings` key of the last report (P13): the admin panel reads it, the messaging process writes it after every pass.</summary>
+    public const string ReportKey = "Reconciliation:Report";
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    private readonly string _worker = worker ?? Environment.MachineName.ToLowerInvariant();
+
+    /// <summary>Last report of this process (null before the first pass).</summary>
+    public Report? LastReport { get; private set; }
+
     public sealed record OverdueDelivery(Guid EventId, string SubscriptionId, int TopologyVersion, DateTimeOffset ExpectedAt);
 
     public sealed record Report(
@@ -180,6 +193,17 @@ public sealed class ReconciliationService(
         }
         logger.LogDebug("Reconciliation: outbox unconfirmed {Unconfirmed} (oldest {Oldest}), overdue {Overdue}, quarantine {Quarantine}, cleanup outbox {OutboxDeleted}/inbox {InboxDeleted}",
             unconfirmed, oldest, overdueCount, quarantineOpen, outboxDeleted, inboxDeleted);
-        return new Report(unconfirmed, oldest, overdueCount, overdue, unknown, quarantineOpen, declareFailed, outboxDeleted, inboxDeleted);
+        var report = new Report(unconfirmed, oldest, overdueCount, overdue, unknown, quarantineOpen, declareFailed, outboxDeleted, inboxDeleted);
+        LastReport = report;
+        try
+        {
+            var dto = new ReconciliationReportDto(DateTimeOffset.UtcNow, _worker, unconfirmed, oldest.TotalSeconds, overdueCount, unknown, quarantineOpen, declareFailed, outboxDeleted, inboxDeleted);
+            await settings.SetStatusAsync(ReportKey, JsonSerializer.Serialize(dto, Json), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Reconciliation report write failed");
+        }
+        return report;
     }
 }

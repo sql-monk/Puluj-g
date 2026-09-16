@@ -68,6 +68,11 @@ public static class DependencyInjection
             return writer;
         });
         services.AddSingleton<SubscriptionAdmin>();
+        // P13 (ADR-0012): ops snapshot, alarms and the message explorer — database-only, usable from any process.
+        services.Configure<Messaging.Ops.OpsOptions>(configuration.GetSection(Messaging.Ops.OpsOptions.Section));
+        services.AddSingleton<Messaging.Ops.BrokerManagementClient>();
+        services.AddSingleton<Messaging.Ops.OpsSnapshotService>();
+        services.AddSingleton<Messaging.Ops.MessageExplorer>();
         return services;
     }
 

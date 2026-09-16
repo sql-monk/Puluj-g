@@ -1080,6 +1080,65 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("events", "messaging");
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.ControlAudit", b =>
+                {
+                    b.Property<long>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("audit_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AuditId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<JsonDocument>("Details")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
+                    b.Property<string>("Lane")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.HasKey("AuditId")
+                        .HasName("pk_control_audit");
+
+                    b.HasIndex("At")
+                        .IsDescending()
+                        .HasDatabaseName("ix_control_audit_at");
+
+                    b.HasIndex("SubscriptionId", "Lane", "At")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("ix_control_audit_subscription_id_lane_at");
+
+                    b.ToTable("control_audit", "messaging");
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.Messaging.EventLink", b =>
                 {
                     b.Property<Guid>("OutputEventId")
@@ -1231,6 +1290,47 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasFilter("confirmed_at IS NULL");
 
                     b.ToTable("outbox", "messaging");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.Messaging.SubscriptionLane", b =>
+                {
+                    b.Property<string>("SubscriptionId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("Lane")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<string>("Actor")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("SubscriptionId", "Lane")
+                        .HasName("pk_subscription_lanes");
+
+                    b.ToTable("subscription_lanes", "messaging", t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_lanes_state", "state IN ('active', 'paused', 'draining')");
+                        });
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.Messaging.SubscriptionRegistration", b =>
@@ -1452,6 +1552,15 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("expected_at");
 
+                    b.Property<string>("Lane")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<DateTimeOffset?>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
                     b.Property<string>("Outcome")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)")
@@ -1468,6 +1577,20 @@ namespace Puluj.Infrastructure.Persistence.Migrations
 
                     b.HasKey("EventId", "SubscriptionId")
                         .HasName("pk_deliveries");
+
+                    b.HasIndex("CompletedAt")
+                        .HasDatabaseName("ix_processing_deliveries_completed_brin");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("CompletedAt"), "brin");
+
+                    b.HasIndex("ExpectedAt")
+                        .HasDatabaseName("ix_processing_deliveries_expected_brin");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ExpectedAt"), "brin");
+
+                    b.HasIndex("SubscriptionId", "Lane")
+                        .HasDatabaseName("ix_processing_deliveries_pending_lane")
+                        .HasFilter("outcome IS NULL");
 
                     b.HasIndex("SubscriptionId", "Outcome")
                         .HasDatabaseName("ix_deliveries_subscription_id_outcome");
@@ -1687,6 +1810,9 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.HasKey("AttemptId")
                         .HasName("pk_attempts");
 
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_processing_attempts_event");
+
                     b.HasIndex("StageResultId")
                         .HasDatabaseName("ix_attempts_stage_result_id");
 
@@ -1694,6 +1820,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_attempts_started_at");
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("StartedAt"), "brin");
+
+                    b.HasIndex("SubscriptionId")
+                        .HasDatabaseName("ix_processing_attempts_running")
+                        .HasFilter("state = 'running'");
 
                     b.HasIndex("JobKey", "FencingToken")
                         .HasDatabaseName("ix_attempts_job_key_fencing_token");

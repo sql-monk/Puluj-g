@@ -63,13 +63,15 @@ public sealed class OutboxWriter(TopologyRegistrar registrar, ProcessingRuns run
         {
             await using var delivery = new NpgsqlCommand(
                 """
-                INSERT INTO processing.deliveries (event_id, subscription_id, topology_version, expected_at)
-                VALUES (@event_id, @subscription_id, @v, now())
+                INSERT INTO processing.deliveries (event_id, subscription_id, topology_version, expected_at, lane, occurred_at)
+                VALUES (@event_id, @subscription_id, @v, now(), @lane, @occurred_at)
                 ON CONFLICT DO NOTHING
                 """, conn, tx);
             delivery.Parameters.AddWithValue("event_id", envelope.EventId);
             delivery.Parameters.AddWithValue("subscription_id", subscription.Id);
             delivery.Parameters.AddWithValue("v", registry.TopologyVersion);
+            delivery.Parameters.AddWithValue("lane", envelope.Lane);
+            delivery.Parameters.AddWithValue("occurred_at", envelope.OccurredAt);
             await delivery.ExecuteNonQueryAsync(ct);
         }
         return new OutboxWrite(outboxId, envelope.EventId, expected.Select(s => s.Id).ToList());

@@ -119,8 +119,15 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
     }
 
     /// <summary>`docker compose up --scale processor=N`; 0…MaxReplicas, otherwise 400.</summary>
-    public async Task<ActionOutcome> ScaleAsync(int replicas, string? remoteIp, CancellationToken ct)
+    public Task<ActionOutcome> ScaleAsync(int replicas, string? remoteIp, CancellationToken ct) => ScaleAsync(Options.ScalableService, replicas, remoteIp, ct);
+
+    /// <summary>`docker compose up --scale &lt;service&gt;=N` for one of <see cref="DockerOptions.ScalableServices"/> (P13: processor | messaging); 0…MaxReplicas, otherwise 400.</summary>
+    public async Task<ActionOutcome> ScaleAsync(string service, int replicas, string? remoteIp, CancellationToken ct)
     {
+        if (!Options.ScalableServices.Contains(service, StringComparer.Ordinal) && !string.Equals(service, Options.ScalableService, StringComparison.Ordinal))
+        {
+            return new ActionOutcome(400, new ContainerActionResultDto(false, $"сервіс '{service}' не масштабується з панелі", ""));
+        }
         if (replicas < 0 || replicas > Options.MaxReplicas)
         {
             return new ActionOutcome(400, new ContainerActionResultDto(false, $"кількість реплік має бути від 0 до {Options.MaxReplicas}", ""));
@@ -132,9 +139,9 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
         var dir = Options.ComposeDir;
         var files = DockerCommands.ComposeFiles(Options.ComposeFiles, f => File.Exists(Path.Combine(dir, f)));
         var envFile = File.Exists(Path.Combine(dir, ".env")) ? ".env" : null;
-        var target = $"{Options.ScalableService}={replicas}";
+        var target = $"{service}={replicas}";
         log.LogInformation("Docker: {Action} {Target} by {RemoteIp}", "scale", target, remoteIp);
-        var res = await RunAsync(DockerCommands.Scale(Options.Project, dir, files, envFile, Options.ScalableService, replicas), ct);
+        var res = await RunAsync(DockerCommands.Scale(Options.Project, dir, files, envFile, service, replicas), ct);
         _list = null;
         return Outcome(res, $"scale {target}");
     }

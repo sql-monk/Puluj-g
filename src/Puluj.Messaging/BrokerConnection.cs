@@ -15,6 +15,10 @@ public sealed class BrokerConnection(IOptions<MessagingOptions> options, ILogger
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
 
+    /// <summary>True while the process holds an open connection (worker status `Broker`, P13); false before the first use and after a loss until the next call re-opens it.</summary>
+    public bool IsConnected => _connection is { IsOpen: true };
+    public string Endpoint => $"{options.Value.Broker.Host}:{options.Value.Broker.Port}{options.Value.Broker.VirtualHost}";
+
     public async Task<IConnection> GetAsync(CancellationToken ct)
     {
         var current = _connection;

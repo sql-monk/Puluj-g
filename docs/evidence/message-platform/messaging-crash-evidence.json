@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-16T16:29:02.3675857+00:00",
+  "generated_at": "2026-09-16T18:18:06.1875362+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.138133,
+      "outbox_age_seen_s": 1.208616,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0ab0c-ab3e-7aa8-b83f-3e83115258f8"
+      "event_id": "01a0ab70-8149-7dba-9295-20ca3612bcad"
     },
     "P03-C05": {
       "window": "W6b",
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T16:29:01.1060022\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T18:18:04.7265796\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -220,8 +220,8 @@
         "noop": 2
       },
       "replicas": {
-        "r1": 0,
-        "r2": 3,
+        "r1": 3,
+        "r2": 0,
         "raw_total": 2,
         "is_new_true": 2
       }
@@ -336,8 +336,8 @@
       "finalizer_noops": 3,
       "extractions": 1,
       "replicas": {
-        "r1": 2,
-        "r2": 2
+        "r1": 3,
+        "r2": 1
       }
     },
     "P06-F07": {
@@ -431,9 +431,9 @@
       "one_category": {
         "label": "uav",
         "messages": 60,
-        "total_ms": 4824,
-        "writers_tail_ms": 859,
-        "per_observation_ms": 80.4,
+        "total_ms": 7022,
+        "writers_tail_ms": 979,
+        "per_observation_ms": 117,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -444,9 +444,9 @@
       "two_categories": {
         "label": "uav\u002Bmissile",
         "messages": 60,
-        "total_ms": 4127,
-        "writers_tail_ms": 443,
-        "per_observation_ms": 68.8,
+        "total_ms": 6717,
+        "writers_tail_ms": 217,
+        "per_observation_ms": 112,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -526,6 +526,57 @@
       "history_lane": "pushed",
       "reconnect": "resync marker",
       "burst": 1000
+    },
+    "P13-O01": {
+      "scope": "raw-writer/history then raw-writer/live",
+      "paused_consumers": 0,
+      "live_consumers_during_history_pause": 1,
+      "backlog": 3,
+      "drained_after_resume": 5,
+      "audit": "pause:history:operator:test,pause:live:operator:test,resume:history:operator:test,resume:live:operator:test"
+    },
+    "P13-O02": {
+      "scope": "raw-writer/history",
+      "backlog": 4,
+      "stored": 4,
+      "final_state": "paused",
+      "actor": "system",
+      "audit": "drained"
+    },
+    "P13-O03": {
+      "CompletedHour": 3,
+      "normalizerPending": 3,
+      "alarms": [
+        "inflight_stuck@parser/live",
+        "oldest_age_slo@parser/live",
+        "required_consumer_missing@normalizer/live",
+        "required_consumer_missing@parser/live",
+        "stale_heartbeat_with_jobs@worker:ghost",
+        "backlog_growing@normalizer/live",
+        "dlq@normalizer/live",
+        "roots_need_attention@roots"
+      ],
+      "paused_alarm": {
+        "Code": "lane_paused",
+        "Severity": "info",
+        "Scope": "normalizer/live",
+        "Message": "live lane \u043F\u0456\u0434\u043F\u0438\u0441\u043A\u0438 normalizer: paused (operator:test: waiting for the parser fix); pending 3"
+      }
+    },
+    "P13-O04": {
+      "rawId": 1,
+      "events": [
+        "raw.stored"
+      ],
+      "Summary": {
+        "Completion": "completed",
+        "Waiting": [],
+        "Completed": [
+          "archive/live",
+          "normalizer/live"
+        ],
+        "Failed": []
+      }
     }
   }
 }

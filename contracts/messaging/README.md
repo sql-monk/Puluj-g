@@ -109,6 +109,17 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P13): ops controls, worker status, reconciliation report
+
+- `WorkerStatusDto` (additive): `consumers[] {subscription, lane, queue, state active|paused|draining, consuming, inFlight, prefetch, consumerTag,
+  delivered, duplicates, requeued}` — lane-runtime кожного консюмера процесу; `broker {connected, endpoint}` — зʼєднання процесу з брокером
+  (null у процесів без broker-ролей). `Runtime:Reconciliation:Report` (`ReconciliationReportDto`) — останній прохід reconciliation, пише `messaging`.
+- `messaging.subscription_lanes` — операторський стан lane'а; консюмер читає його до першого `basic.consume` і кожні `Messaging:Consumer:ControlPoll`
+  (5 с): `paused` → `basic.cancel` тегу `{subscription}@{instance}:{lane}` (in-flight доробляються), `draining` → до порожньої черги, потім `paused`
+  (actor `system`, audit `drained`). Expected set не змінюється. `messaging.control_audit` — кожна команда (pause/resume/drain/retry/waive/status/scale).
+- `processing.deliveries` (additive): `lane`, `occurred_at` — заповнює `OutboxWriter` (NULL для старих рядків).
+- Snapshot/alarms/explorer DTO — `Puluj.Contracts/MessagingOpsDtos.cs` ([ADR-0012](../../docs/adr/ADR-0012-ops-controls.md)).
+
 ## Runtime (P11): projection і read-side
 
 - `projection` (`ProjectionHandler`, topology v8, lanes live/history): `incident.changed` → після commit NOTIFY `puluj_events` `{type: IncidentChanged, id,

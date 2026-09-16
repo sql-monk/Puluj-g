@@ -28,10 +28,10 @@ public static class DockerContainers
         .ToList();
     }
 
-    /// <summary>processor | collector-telegram | collector-alerts | analytics | worker | migrate | other — from the instance name.</summary>
+    /// <summary>processor | messaging | collector-telegram | collector-alerts | analytics | worker | migrate | other — from the instance name.</summary>
     public static string KindOf(string instanceName)
     {
-        foreach (var kind in new[] { "collector-telegram", "collector-alerts", "processor", "analytics", "migrate", "worker" })
+        foreach (var kind in new[] { "collector-telegram", "collector-alerts", "processor", "messaging", "analytics", "migrate", "worker" })
         {
             if (instanceName.Equals(kind, StringComparison.OrdinalIgnoreCase) || instanceName.StartsWith(kind + "-", StringComparison.OrdinalIgnoreCase))
             {
@@ -61,7 +61,7 @@ public static class DockerContainers
                 }
             }
         }
-        if (kind is "processor" or "other" or "worker")
+        if (kind is "processor" or "messaging" or "other" or "worker")
         {
             return null; // several replicas share the service name: without the id suffix there is nothing to pin
         }

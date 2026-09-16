@@ -1,0 +1,67 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="32c92610-a531-49cb-ab68-49c684858eac" name="aleks@ASUS-MONK 2026-09-16 20:39:17" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T20:39:17.1329530+03:00" queuing="2026-09-16T20:39:17.1329538+03:00" start="2026-09-16T20:38:20.3383771+03:00" finish="2026-09-16T20:39:17.1442944+03:00" />
+  <TestSettings name="default" id="ce6204f4-ad15-48c9-8321-043990627a5c">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_20_39_17" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="afa38e7c-cebe-40a1-b253-091d8e449f8e" testId="772f038a-e325-ef2e-1705-b239902fe585" testName="Puluj.Integration.Tests.MessagingControlsMigrationTests.Migration_down_removes_controls_and_up_restores_them" computerName="ASUS-MONK" duration="00:00:00.6602773" startTime="2026-09-16T20:39:15.6791747+03:00" endTime="2026-09-16T20:39:16.3414729+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="afa38e7c-cebe-40a1-b253-091d8e449f8e" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Integration.Tests.MessagingControlsMigrationTests.Migration_down_removes_controls_and_up_restores_them" storage="c:\repos\puluj-g\tests\puluj.integration.tests\bin\debug\net10.0\puluj.integration.tests.dll" id="772f038a-e325-ef2e-1705-b239902fe585">
+      <Execution id="afa38e7c-cebe-40a1-b253-091d8e449f8e" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Integration.Tests\bin\Debug\net10.0\Puluj.Integration.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Integration.Tests.MessagingControlsMigrationTests" name="Migration_down_removes_controls_and_up_restores_them" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="772f038a-e325-ef2e-1705-b239902fe585" executionId="afa38e7c-cebe-40a1-b253-091d8e449f8e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:01.12]   Discovering: Puluj.Integration.Tests&#xD;
+[xUnit.net 00:00:01.19]   Discovered:  Puluj.Integration.Tests&#xD;
+[xUnit.net 00:00:01.24]   Starting:    Puluj.Integration.Tests&#xD;
+[testcontainers.org 00:00:00.19] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.49] Docker container fdded02ddb18 created&#xD;
+[testcontainers.org 00:00:00.59] Start Docker container fdded02ddb18&#xD;
+[testcontainers.org 00:00:00.81] Wait for Docker container fdded02ddb18 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.87] Docker container fdded02ddb18 ready&#xD;
+[testcontainers.org 00:00:02.03] Docker container 4e4d84141e18 created&#xD;
+[testcontainers.org 00:00:02.05] Start Docker container 4e4d84141e18&#xD;
+[testcontainers.org 00:00:02.30] Wait for Docker container 4e4d84141e18 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.34] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 4e4d84141e18&#xD;
+[testcontainers.org 00:00:03.52] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 4e4d84141e18&#xD;
+[testcontainers.org 00:00:04.60] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 4e4d84141e18&#xD;
+[testcontainers.org 00:00:05.67] Execute "pg_isready --host localhost --dbname puluj_test --username postgres" at Docker container 4e4d84141e18&#xD;
+[testcontainers.org 00:00:05.74] Docker container 4e4d84141e18 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (13ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      INSERT INTO messaging.subscription_lanes (subscription_id, lane, state, changed_at) VALUES ('parser', 'live', 'stopped', now())&#xD;
+[testcontainers.org 00:00:53.90] Delete Docker container 4e4d84141e18&#xD;
+[xUnit.net 00:00:55.94]   Finished:    Puluj.Integration.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

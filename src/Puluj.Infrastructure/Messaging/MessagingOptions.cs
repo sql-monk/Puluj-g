@@ -64,6 +64,11 @@ public sealed class MessagingOptions
         public TimeSpan Heartbeat { get; set; } = TimeSpan.FromSeconds(20);
         /// <summary>Name shown in the broker's connection list; defaults to the worker instance name.</summary>
         public string? ClientName { get; set; }
+        /// <summary>P13: RabbitMQ management API base URL (e.g. `http://rabbitmq:15672`) for the ops panel; unset = database view only.</summary>
+        public string? ManagementUrl { get; set; }
+        /// <summary>Management credentials; default to <see cref="User"/>/<see cref="Password"/> (the user needs the `management` tag).</summary>
+        public string? ManagementUser { get; set; }
+        public string? ManagementPassword { get; set; }
     }
 
     public sealed class RelayOptions
@@ -94,6 +99,8 @@ public sealed class MessagingOptions
         public TimeSpan MaxBackoff { get; set; } = TimeSpan.FromSeconds(30);
         /// <summary>A `running` attempt older than this belongs to a crashed process and is marked `interrupted` when the delivery comes back; younger ones may be a live replica.</summary>
         public TimeSpan StaleAttempt { get; set; } = TimeSpan.FromMinutes(5);
+        /// <summary>How often a consumer reads the operator state of its lanes (`messaging.subscription_lanes`, P13): pause/resume/drain react within this plus the in-flight deliveries.</summary>
+        public TimeSpan ControlPoll { get; set; } = TimeSpan.FromSeconds(5);
     }
 
     public sealed class ReconciliationOptions

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Puluj.Contracts;
 using Puluj.Infrastructure.Ingestion;
 using Puluj.Infrastructure.Settings;
+using Puluj.Messaging;
 using Puluj.Processing;
 using Puluj.Processing.Llm;
 using Puluj.Processing.Pipeline;
@@ -32,6 +33,8 @@ public sealed class WorkerStatusReporter(
 
     private readonly ProcessingStats? _stats = services.GetService<ProcessingStats>();
     private readonly LlmBreaker? _breaker = services.GetService<LlmBreaker>();
+    private readonly BrokerConnection? _broker = services.GetService<BrokerConnection>();
+    private readonly IReadOnlyList<SubscriptionConsumer> _consumers = services.GetServices<SubscriptionConsumer>().ToList();
     private readonly string _version = BuildVersion(typeof(WorkerStatusReporter).Assembly);
     private readonly DateTimeOffset _builtAt = BuiltAt(typeof(WorkerStatusReporter).Assembly);
     private readonly DateTimeOffset _startedAt = StartedAt();
@@ -103,7 +106,9 @@ public sealed class WorkerStatusReporter(
                 _breaker.Calls,
                 _breaker.Failures),
             paused,
-            pause);
+            pause,
+            _consumers.SelectMany(c => c.Lanes().Select(l => new ConsumerLaneDto(c.SubscriptionId, l.Lane, l.Queue, l.State, l.Consuming, l.InFlight, l.Prefetch, l.ConsumerTag, c.Delivered, c.Duplicates, c.Requeued))).ToList(),
+            _broker is null || _consumers.Count == 0 ? null : new BrokerStatusDto(_broker.IsConnected, _broker.Endpoint));
     }
 
     /// <summary>Processor time used since the previous call over the wall time that passed, per core, in percent.</summary>

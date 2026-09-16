@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using NpgsqlTypes;
+using Puluj.Domain.Entities.Messaging;
 using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Messaging.Topology;
 using Puluj.Infrastructure.Persistence;
@@ -32,8 +33,10 @@ public sealed class SubscriptionConsumer : BackgroundService
     private readonly MessagingMetrics _metrics;
     private readonly ILogger _logger;
     private readonly string _worker;
-    private readonly List<IChannel> _channels = [];
+    /// <summary>One runtime per lane of the subscription (P13 controls): the channel, the consumer tag, the last state read from `messaging.subscription_lanes` and the in-flight count. Guarded by its own lock.</summary>
+    private readonly Dictionary<string, LaneRuntime> _lanes = new(StringComparer.Ordinal);
     private TaskCompletionSource _crashed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool _controlTableMissingLogged;
 
     public SubscriptionConsumer(
         IDeliveryHandler handler,
@@ -68,6 +71,33 @@ public sealed class SubscriptionConsumer : BackgroundService
     public Task Crashed => _crashed.Task;
     public TimeSpan RestartDelay { get; set; } = TimeSpan.FromSeconds(1);
 
+    /// <summary>What one lane of this replica is doing right now (worker status `Consumers[]`, P13).</summary>
+    public sealed record LaneStatus(string Lane, string Queue, string State, bool Consuming, int InFlight, ushort Prefetch, string ConsumerTag);
+
+    /// <summary>Snapshot of every lane runtime of this replica (only lanes this process serves).</summary>
+    public IReadOnlyList<LaneStatus> Lanes()
+    {
+        lock (_lanes)
+        {
+            return _lanes.Values.Select(l => new LaneStatus(l.Lane, l.Queue, l.State, l.Consuming, l.InFlight, l.Prefetch, l.Tag)).ToList();
+        }
+    }
+
+    private sealed class LaneRuntime(string lane, string queue, ushort prefetch, string tag)
+    {
+        public string Lane { get; } = lane;
+        public string Queue { get; } = queue;
+        public ushort Prefetch { get; } = prefetch;
+        public string Tag { get; } = tag;
+        public IChannel? Channel { get; set; }
+        public bool Consuming { get; set; }
+        /// <summary>Deliveries received and not yet acked/nacked on this replica (own view only: other replicas count their own).</summary>
+        public int InFlight;
+        public string State { get; set; } = SubscriptionLane.Active;
+        /// <summary>Consecutive polls of a draining lane that saw an empty queue and no in-flight delivery.</summary>
+        public int DrainedPolls { get; set; }
+    }
+
     private long _delivered;
     private long _duplicates;
     private long _requeued;
@@ -95,7 +125,16 @@ public sealed class SubscriptionConsumer : BackgroundService
             {
                 await _registrar.EnsureRegisteredAsync(ct);
                 await ConsumeAsync(ct);
-                await Task.WhenAny(Crashed, Task.Delay(Timeout.Infinite, ct));
+                // Control poll (P13, ADR-0012) in the same loop as the crash wait: no second timer races Crash()/shutdown.
+                while (!ct.IsCancellationRequested)
+                {
+                    var completed = await Task.WhenAny(Crashed, Task.Delay(_options.Consumer.ControlPoll, ct));
+                    if (ct.IsCancellationRequested || completed == Crashed)
+                    {
+                        break;
+                    }
+                    await PollControlAsync(ct);
+                }
                 if (ct.IsCancellationRequested)
                 {
                     break;
@@ -116,26 +155,239 @@ public sealed class SubscriptionConsumer : BackgroundService
         await CloseChannelsAsync();
     }
 
+    /// <summary>
+    /// Opens the lanes this process serves. The lane states are read before the first `basic.consume`, so a paused lane
+    /// never takes `prefetch` deliveries after a restart; a lane whose channel is still open (a poll failure re-entered
+    /// the start path) is left alone.
+    /// </summary>
     private async Task ConsumeAsync(CancellationToken ct)
     {
         var subscription = Registry.Subscription(SubscriptionId);
         var lanes = _options.Consumer.Lanes.Length == 0 ? subscription.Lanes : subscription.Lanes.Where(l => _options.Consumer.Lanes.Contains(l, StringComparer.Ordinal)).ToList();
+        var prefetch = _options.Consumer.PrefetchBySubscription.TryGetValue(SubscriptionId, out var own) ? own : _options.Consumer.Prefetch;
+        var states = await LaneStatesAsync(ct);
         var connection = await _broker.GetAsync(ct);
+        var consuming = new List<string>();
+        var paused = new List<string>();
         foreach (var lane in lanes)
         {
-            var queue = Registry.QueueName(SubscriptionId, lane);
-            var channel = await connection.CreateChannelAsync(cancellationToken: ct);
-            var prefetch = _options.Consumer.PrefetchBySubscription.TryGetValue(SubscriptionId, out var own) ? own : _options.Consumer.Prefetch;
-            await channel.BasicQosAsync(0, prefetch, false, ct);
-            var consumer = new AsyncEventingBasicConsumer(channel);
-            consumer.ReceivedAsync += (_, ea) => OnReceivedAsync(channel, ea, ct);
-            await channel.BasicConsumeAsync(queue, autoAck: false, consumerTag: $"{_worker}:{lane}", consumer, cancellationToken: ct);
-            lock (_channels)
+            LaneRuntime runtime;
+            lock (_lanes)
             {
-                _channels.Add(channel);
+                if (!_lanes.TryGetValue(lane, out runtime!))
+                {
+                    runtime = new LaneRuntime(lane, Registry.QueueName(SubscriptionId, lane), prefetch, $"{_worker}:{lane}");
+                    _lanes[lane] = runtime;
+                }
+                runtime.State = states.GetValueOrDefault(lane, SubscriptionLane.Active);
+            }
+            if (runtime.State == SubscriptionLane.Paused)
+            {
+                paused.Add(lane);
+                continue;
+            }
+            await StartLaneAsync(runtime, connection, ct);
+            consuming.Add(lane);
+        }
+        _logger.LogInformation("Consumer {Subscription} ({Worker}) consuming lanes {Lanes}, prefetch {Prefetch}{Paused}", SubscriptionId, _worker, string.Join(",", consuming), prefetch,
+            paused.Count == 0 ? "" : $"; paused by operator: {string.Join(",", paused)}");
+    }
+
+    private async Task StartLaneAsync(LaneRuntime runtime, IConnection connection, CancellationToken ct)
+    {
+        IChannel? channel;
+        lock (_lanes)
+        {
+            if (runtime.Consuming && runtime.Channel is { IsOpen: true })
+            {
+                return;
+            }
+            runtime.Consuming = false; // a consuming lane whose channel closed underneath (server-side channel error) is re-opened here
+            channel = runtime.Channel;
+        }
+        if (channel is not { IsOpen: true })
+        {
+            channel = await connection.CreateChannelAsync(cancellationToken: ct);
+            await channel.BasicQosAsync(0, runtime.Prefetch, false, ct);
+        }
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += (_, ea) => OnReceivedAsync(runtime, channel, ea, ct);
+        await channel.BasicConsumeAsync(runtime.Queue, autoAck: false, consumerTag: runtime.Tag, consumer, cancellationToken: ct);
+        lock (_lanes)
+        {
+            // Crash()/shutdown may have taken the channels meanwhile: then this consume is on a closing channel and the restart re-reads the state.
+            runtime.Channel = channel;
+            runtime.Consuming = channel.IsOpen;
+        }
+    }
+
+    /// <summary>`basic.cancel` of the lane's consumer tag: no new deliveries; the channel stays open so in-flight deliveries are still acked after their commit.</summary>
+    private async Task StopLaneAsync(LaneRuntime runtime, CancellationToken ct)
+    {
+        IChannel? channel;
+        lock (_lanes)
+        {
+            if (!runtime.Consuming)
+            {
+                return;
+            }
+            runtime.Consuming = false;
+            channel = runtime.Channel;
+        }
+        if (channel is { IsOpen: true })
+        {
+            await channel.BasicCancelAsync(runtime.Tag, noWait: false, ct);
+        }
+    }
+
+    /// <summary>Lane states of this subscription from `messaging.subscription_lanes`; a missing row (or a database older than the P13 migration) means `active`.</summary>
+    private async Task<Dictionary<string, string>> LaneStatesAsync(CancellationToken ct)
+    {
+        var states = new Dictionary<string, string>(StringComparer.Ordinal);
+        try
+        {
+            await using var db = await _factory.CreateDbContextAsync(ct);
+            var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+            await conn.OpenAsync(ct);
+            await using var cmd = new NpgsqlCommand("SELECT lane, state FROM messaging.subscription_lanes WHERE subscription_id = @s", conn);
+            cmd.Parameters.AddWithValue("s", SubscriptionId);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                states[reader.GetString(0)] = reader.GetString(1);
             }
         }
-        _logger.LogInformation("Consumer {Subscription} ({Worker}) consuming lanes {Lanes}, prefetch {Prefetch}", SubscriptionId, _worker, string.Join(",", lanes), _options.Consumer.PrefetchBySubscription.TryGetValue(SubscriptionId, out var p) ? p : _options.Consumer.Prefetch);
+        catch (PostgresException ex) when (ex.SqlState == "42P01")
+        {
+            if (!_controlTableMissingLogged)
+            {
+                _controlTableMissingLogged = true;
+                _logger.LogWarning("messaging.subscription_lanes does not exist (database older than migration AddMessagingControls): every lane is treated as active");
+            }
+        }
+        return states;
+    }
+
+    /// <summary>
+    /// One control tick (ADR-0012): `paused` cancels the lane's consumer, `active` consumes again, `draining` keeps consuming
+    /// until the queue is empty and nothing is in flight on two consecutive ticks, then this replica sets the lane `paused`
+    /// itself (actor `system`, audit `drained`). A failed tick is logged and retried on the next one; it never stops the consumer.
+    /// </summary>
+    private async Task PollControlAsync(CancellationToken ct)
+    {
+        try
+        {
+            var states = await LaneStatesAsync(ct);
+            List<LaneRuntime> lanes;
+            lock (_lanes)
+            {
+                lanes = [.. _lanes.Values];
+            }
+            foreach (var runtime in lanes)
+            {
+                var state = states.GetValueOrDefault(runtime.Lane, SubscriptionLane.Active);
+                bool changed;
+                lock (_lanes)
+                {
+                    changed = runtime.State != state;
+                    runtime.State = state;
+                    if (changed)
+                    {
+                        runtime.DrainedPolls = 0;
+                    }
+                }
+                if (changed)
+                {
+                    _logger.LogInformation("Consumer {Subscription} lane {Lane}: operator state {State}", SubscriptionId, runtime.Lane, state);
+                }
+                switch (state)
+                {
+                    case SubscriptionLane.Paused:
+                        await StopLaneAsync(runtime, ct);
+                        break;
+                    case SubscriptionLane.Active:
+                        await StartLaneAsync(runtime, await _broker.GetAsync(ct), ct);
+                        break;
+                    case SubscriptionLane.Draining:
+                        await StartLaneAsync(runtime, await _broker.GetAsync(ct), ct);
+                        await DrainTickAsync(runtime, ct);
+                        break;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Consumer {Subscription}: control poll failed; retrying on the next tick", SubscriptionId);
+        }
+    }
+
+    private async Task DrainTickAsync(LaneRuntime runtime, CancellationToken ct)
+    {
+        uint ready;
+        var connection = await _broker.GetAsync(ct);
+        await using (var probe = await connection.CreateChannelAsync(cancellationToken: ct)) // a passive declare that fails closes its channel: never the consuming one
+        {
+            ready = (await probe.QueueDeclarePassiveAsync(runtime.Queue, ct)).MessageCount;
+        }
+        int polls;
+        lock (_lanes)
+        {
+            runtime.DrainedPolls = ready == 0 && Volatile.Read(ref runtime.InFlight) == 0 ? runtime.DrainedPolls + 1 : 0;
+            polls = runtime.DrainedPolls;
+        }
+        if (polls < 2)
+        {
+            return;
+        }
+        await using var db = await _factory.CreateDbContextAsync(ct);
+        var conn = (NpgsqlConnection)db.Database.GetDbConnection();
+        await conn.OpenAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+        int updated;
+        await using (var cmd = new NpgsqlCommand(
+            "UPDATE messaging.subscription_lanes SET state = 'paused', actor = 'system', reason = 'drained', changed_at = now() WHERE subscription_id = @s AND lane = @l AND state = 'draining'", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("s", SubscriptionId);
+            cmd.Parameters.AddWithValue("l", runtime.Lane);
+            updated = await cmd.ExecuteNonQueryAsync(ct);
+        }
+        if (updated == 1) // an operator may have resumed the lane between the read and here: then the audit row is theirs, not ours
+        {
+            await using var audit = new NpgsqlCommand(
+                "INSERT INTO messaging.control_audit (action, subscription_id, lane, actor, reason, at, details) VALUES ('drained', @s, @l, 'system', 'queue empty, nothing in flight', now(), @d)", conn, tx);
+            audit.Parameters.AddWithValue("s", SubscriptionId);
+            audit.Parameters.AddWithValue("l", runtime.Lane);
+            audit.Parameters.Add(new NpgsqlParameter("d", NpgsqlDbType.Jsonb) { Value = JsonSerializer.Serialize(new { worker = _worker, queue = runtime.Queue }) });
+            await audit.ExecuteNonQueryAsync(ct);
+        }
+        await tx.CommitAsync(ct);
+        if (updated == 1)
+        {
+            lock (_lanes)
+            {
+                runtime.State = SubscriptionLane.Paused;
+                runtime.DrainedPolls = 0;
+            }
+            _logger.LogInformation("Consumer {Subscription} lane {Lane} drained: paused by system", SubscriptionId, runtime.Lane);
+            await StopLaneAsync(runtime, ct);
+        }
+    }
+
+    private async Task OnReceivedAsync(LaneRuntime runtime, IChannel channel, BasicDeliverEventArgs ea, CancellationToken ct)
+    {
+        Interlocked.Increment(ref runtime.InFlight);
+        try
+        {
+            await OnReceivedAsync(channel, ea, ct);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref runtime.InFlight);
+        }
     }
 
     private async Task OnReceivedAsync(IChannel channel, BasicDeliverEventArgs ea, CancellationToken ct)
@@ -211,7 +463,7 @@ public sealed class SubscriptionConsumer : BackgroundService
                     }
                     var result = await _handler.ApplyAsync(conn, tx, envelope, state, ct);
                     await CompleteInboxAsync(conn, tx, eventId, result.Outcome, ct);
-                    await WriteReceiptAsync(conn, tx, eventId, envelope.TopologyVersion, result.Outcome, result.Reason, null, attemptId, ct);
+                    await WriteReceiptAsync(conn, tx, eventId, envelope.TopologyVersion, result.Outcome, result.Reason, null, attemptId, ct, envelope);
                     foreach (var outgoing in result.OutEvents ?? [])
                     {
                         await _outbox.EnqueueAsync(conn, tx, outgoing, ct);
@@ -315,7 +567,7 @@ public sealed class SubscriptionConsumer : BackgroundService
             await conn.OpenAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
             await UpsertInboxAsync(conn, tx, eventId, "quarantined", ct);
-            await WriteReceiptAsync(conn, tx, eventId, envelope?.TopologyVersion ?? Registry.TopologyVersion, "quarantined", reason, null, attemptId, ct);
+            await WriteReceiptAsync(conn, tx, eventId, envelope?.TopologyVersion ?? Registry.TopologyVersion, "quarantined", reason, null, attemptId, ct, envelope);
             await InsertQuarantineAsync(conn, tx, eventId, envelope?.Lane ?? LaneFromHeaders(ea), reason, error, envelope is null ? RawBodyAsJson(body) : envelope.ToArchiveJson(), HeadersAsJson(ea), attemptId, ct);
             await tx.CommitAsync(ct);
         }
@@ -340,12 +592,7 @@ public sealed class SubscriptionConsumer : BackgroundService
     /// <summary>Simulated crash (tests): the channels close without an ACK/NACK, the broker redelivers, the service re-consumes after <see cref="RestartDelay"/>.</summary>
     private void Crash()
     {
-        List<IChannel> channels;
-        lock (_channels)
-        {
-            channels = [.. _channels];
-            _channels.Clear();
-        }
+        var channels = TakeChannels();
         _ = Task.Run(async () =>
         {
             try
@@ -370,14 +617,29 @@ public sealed class SubscriptionConsumer : BackgroundService
         });
     }
 
+    /// <summary>Detaches every lane's channel (crash or shutdown); the lane runtimes stay, so a restart reads the operator state again before consuming.</summary>
+    private List<IChannel> TakeChannels()
+    {
+        var channels = new List<IChannel>();
+        lock (_lanes)
+        {
+            foreach (var runtime in _lanes.Values)
+            {
+                if (runtime.Channel is { } channel)
+                {
+                    channels.Add(channel);
+                }
+                runtime.Channel = null;
+                runtime.Consuming = false;
+                runtime.DrainedPolls = 0;
+            }
+        }
+        return channels;
+    }
+
     private async Task CloseChannelsAsync()
     {
-        List<IChannel> channels;
-        lock (_channels)
-        {
-            channels = [.. _channels];
-            _channels.Clear();
-        }
+        var channels = TakeChannels();
         foreach (var channel in channels)
         {
             try
@@ -437,14 +699,15 @@ public sealed class SubscriptionConsumer : BackgroundService
     }
 
     /// <summary>Terminal receipt; an expected row is completed, a missing one (optional/unregistered subscription) is created. `completed`/`noop` are never downgraded; `quarantined` (retry) and `waived` (backlog processed after all) may become `completed`.</summary>
-    internal static async Task WriteReceiptAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string subscriptionId, Guid eventId, int topologyVersion, string outcome, string? reason, string? actor, long? attemptId, CancellationToken ct)
+    internal static async Task WriteReceiptAsync(NpgsqlConnection conn, NpgsqlTransaction tx, string subscriptionId, Guid eventId, int topologyVersion, string outcome, string? reason, string? actor, long? attemptId, CancellationToken ct, string? lane = null, DateTimeOffset? occurredAt = null)
     {
         await using var cmd = new NpgsqlCommand(
             """
-            INSERT INTO processing.deliveries (event_id, subscription_id, topology_version, expected_at, outcome, completed_at, reason, actor, attempt_id)
-            VALUES (@e, @s, @v, now(), @o, now(), @r, @a, @attempt)
+            INSERT INTO processing.deliveries (event_id, subscription_id, topology_version, expected_at, outcome, completed_at, reason, actor, attempt_id, lane, occurred_at)
+            VALUES (@e, @s, @v, now(), @o, now(), @r, @a, @attempt, @lane, @occurred)
             ON CONFLICT (event_id, subscription_id) DO UPDATE
-                SET outcome = EXCLUDED.outcome, completed_at = EXCLUDED.completed_at, reason = EXCLUDED.reason, actor = EXCLUDED.actor, attempt_id = EXCLUDED.attempt_id
+                SET outcome = EXCLUDED.outcome, completed_at = EXCLUDED.completed_at, reason = EXCLUDED.reason, actor = EXCLUDED.actor, attempt_id = EXCLUDED.attempt_id,
+                    lane = COALESCE(processing.deliveries.lane, EXCLUDED.lane), occurred_at = COALESCE(processing.deliveries.occurred_at, EXCLUDED.occurred_at)
                 WHERE processing.deliveries.outcome IS NULL OR processing.deliveries.outcome IN ('quarantined', 'waived')
             """, conn, tx);
         cmd.Parameters.AddWithValue("e", eventId);
@@ -454,11 +717,13 @@ public sealed class SubscriptionConsumer : BackgroundService
         cmd.Parameters.AddWithValue("r", (object?)reason ?? DBNull.Value);
         cmd.Parameters.AddWithValue("a", (object?)actor ?? DBNull.Value);
         cmd.Parameters.AddWithValue("attempt", (object?)attemptId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("lane", (object?)lane ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("occurred", (object?)occurredAt ?? DBNull.Value);
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    private Task WriteReceiptAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid eventId, int topologyVersion, string outcome, string? reason, string? actor, long? attemptId, CancellationToken ct) =>
-        WriteReceiptAsync(conn, tx, SubscriptionId, eventId, topologyVersion, outcome, reason, actor, attemptId, ct);
+    private Task WriteReceiptAsync(NpgsqlConnection conn, NpgsqlTransaction tx, Guid eventId, int topologyVersion, string outcome, string? reason, string? actor, long? attemptId, CancellationToken ct, Envelope? envelope = null) =>
+        WriteReceiptAsync(conn, tx, SubscriptionId, eventId, topologyVersion, outcome, reason, actor, attemptId, ct, envelope?.Lane, envelope?.OccurredAt);
 
     private async Task<int> CountAttemptsAsync(NpgsqlConnection conn, Guid eventId, CancellationToken ct)
     {

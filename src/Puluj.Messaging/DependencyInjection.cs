@@ -24,7 +24,7 @@ public static class DependencyInjection
         {
             services.AddSingleton<OutboxRelay>();
             services.AddHostedService(sp => sp.GetRequiredService<OutboxRelay>());
-            services.AddSingleton<ReconciliationService>();
+            services.AddSingleton(sp => ActivatorUtilities.CreateInstance<ReconciliationService>(sp, instanceName ?? Environment.MachineName.ToLowerInvariant()));
             services.AddHostedService(sp => sp.GetRequiredService<ReconciliationService>());
         }
 

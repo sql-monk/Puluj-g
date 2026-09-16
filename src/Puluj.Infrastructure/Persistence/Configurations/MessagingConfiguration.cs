@@ -39,6 +39,38 @@ public class InboxEntryConfiguration : IEntityTypeConfiguration<InboxEntry>
     }
 }
 
+public class SubscriptionLaneConfiguration : IEntityTypeConfiguration<SubscriptionLane>
+{
+    public void Configure(EntityTypeBuilder<SubscriptionLane> b)
+    {
+        b.ToTable("subscription_lanes", "messaging");
+        b.HasKey(x => new { x.SubscriptionId, x.Lane });
+        b.Property(x => x.SubscriptionId).HasMaxLength(64);
+        b.Property(x => x.Lane).HasMaxLength(16);
+        b.Property(x => x.State).HasMaxLength(16);
+        b.Property(x => x.Reason).HasMaxLength(1000);
+        b.Property(x => x.Actor).HasMaxLength(128);
+        b.ToTable(t => t.HasCheckConstraint("ck_subscription_lanes_state", "state IN ('active', 'paused', 'draining')"));
+    }
+}
+
+public class ControlAuditConfiguration : IEntityTypeConfiguration<ControlAudit>
+{
+    public void Configure(EntityTypeBuilder<ControlAudit> b)
+    {
+        b.ToTable("control_audit", "messaging");
+        b.HasKey(x => x.AuditId);
+        b.Property(x => x.Action).HasMaxLength(32);
+        b.Property(x => x.SubscriptionId).HasMaxLength(64);
+        b.Property(x => x.Lane).HasMaxLength(16);
+        b.Property(x => x.Actor).HasMaxLength(128);
+        b.Property(x => x.Reason).HasMaxLength(1000);
+        b.Property(x => x.Details).HasColumnType("jsonb");
+        b.HasIndex(x => x.At).IsDescending();
+        b.HasIndex(x => new { x.SubscriptionId, x.Lane, x.At }).IsDescending(false, false, true);
+    }
+}
+
 public class ArchivedEventConfiguration : IEntityTypeConfiguration<ArchivedEvent>
 {
     public void Configure(EntityTypeBuilder<ArchivedEvent> b)

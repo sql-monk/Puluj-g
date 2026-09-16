@@ -44,6 +44,8 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
     public DbSet<InboxEntry> Inbox => Set<InboxEntry>();
     public DbSet<ArchivedEvent> ArchivedEvents => Set<ArchivedEvent>();
+    public DbSet<SubscriptionLane> SubscriptionLanes => Set<SubscriptionLane>();
+    public DbSet<ControlAudit> ControlAudits => Set<ControlAudit>();
     public DbSet<EventLink> EventLinks => Set<EventLink>();
     public DbSet<SubscriptionRegistration> Subscriptions => Set<SubscriptionRegistration>();
     public DbSet<TopologyVersionRecord> TopologyVersions => Set<TopologyVersionRecord>();

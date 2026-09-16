@@ -79,6 +79,19 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `AddIncidentReadIndexes` (індекс keyset для `/api/incidents`) — additive. Налаштування API: `Map:IncidentHours` (24), `Map:IncidentSnapshotLimit` (1000),
 `Map:IncidentMaxWindowDays` (7). Rolling deploy: старий API ігнорує NOTIFY невідомого типу.
 
+### Ops-контролі, панелі «Черги»/«Повідомлення» (P13)
+
+Міграція `AddMessagingControls` — additive (`messaging.subscription_lanes`, `messaging.control_audit`, `processing.deliveries.lane/occurred_at`, індекси);
+`Down` дропає їх без втрати квитанцій. Старий worker з новою БД працює; новий worker зі старою БД — консюмери логують один warning і вважають усі lanes
+active. Налаштування Admin (усі опційні): `Messaging:Broker:ManagementUrl` (+`ManagementUser/Password`; користувачу потрібен tag `management`) — тоді
+панель показує `ready/unacked` per queue і alarms вузлів; без нього — лише БД. `Ops:Slo:*` — пороги alarms: `OldestAgeSeconds:live|history|replay` (300/3600/3600),
+`OutboxUnconfirmedSeconds` (60), `OutboxCriticalSeconds` (300), `StaleHeartbeatSeconds` (90), `InflightStuckSeconds` (300), `RequiredConsumerMissingSeconds` (60),
+`SnapshotCacheSeconds` (5). Worker: `Messaging:Consumer:ControlPoll` (5 с) — час реакції на pause/resume/drain. Scale з панелі —
+`Docker:ScalableServices` (`processor`, `messaging`; `messaging` під профілем `broker` — compose вмикає його для явно названого сервісу).
+Пауза lane'а не змінює expected set: backlog накопичується і видимий, не губиться ([ADR-0012](adr/ADR-0012-ops-controls.md)). Індекси міграції
+будуються звичайним `CREATE INDEX` (ShareLock на `processing.deliveries`/`attempts` на час побудови — секунди при поточних обсягах). Rolling deploy:
+оновлювати `admin` тим самим образом, що й `messaging` (панель реєструє вбудовану топологію і 500-ить при розбіжності версій).
+
 ### Доменні writers і watchdog (P09/P10, cutover)
 
 Ролі `track-worker`, `alert-worker`, `watchdog`, `incident-worker` сервісу `messaging` **вимкнені за замовчуванням**: до cutover домен пише legacy роль `processing`.

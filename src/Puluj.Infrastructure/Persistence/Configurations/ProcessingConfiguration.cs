@@ -72,6 +72,9 @@ public class ProcessingAttemptConfiguration : IEntityTypeConfiguration<Processin
         b.HasIndex(x => new { x.JobKey, x.FencingToken }, "ux_processing_attempts_job_token").HasDatabaseName("ux_processing_attempts_job_token").IsUnique().HasFilter("fencing_token > 0");
         b.HasIndex(x => x.StageResultId);
         b.HasIndex(x => x.StartedAt).HasMethod("brin");
+        // P13 ops snapshot / explorer: running attempts (in-flight, stuck) and all attempts of an event (lifecycle card).
+        b.HasIndex(x => x.SubscriptionId).HasDatabaseName("ix_processing_attempts_running").HasFilter("state = 'running'");
+        b.HasIndex(x => x.EventId).HasDatabaseName("ix_processing_attempts_event");
     }
 }
 
@@ -88,6 +91,11 @@ public class DeliveryConfiguration : IEntityTypeConfiguration<Delivery>
         // Reconciliation: expected rows without a terminal receipt, oldest first.
         b.HasIndex(x => x.ExpectedAt, "ix_processing_deliveries_pending").HasDatabaseName("ix_processing_deliveries_pending").HasFilter("outcome IS NULL");
         b.HasIndex(x => new { x.SubscriptionId, x.Outcome });
+        b.Property(x => x.Lane).HasMaxLength(16);
+        // P13 ops snapshot: pending per subscription × lane, and the last hour of completions (BRIN: completed_at grows with time).
+        b.HasIndex(x => new { x.SubscriptionId, x.Lane }).HasDatabaseName("ix_processing_deliveries_pending_lane").HasFilter("outcome IS NULL");
+        b.HasIndex(x => x.CompletedAt).HasDatabaseName("ix_processing_deliveries_completed_brin").HasMethod("brin");
+        b.HasIndex(x => x.ExpectedAt).HasDatabaseName("ix_processing_deliveries_expected_brin").HasMethod("brin");
     }
 }
 

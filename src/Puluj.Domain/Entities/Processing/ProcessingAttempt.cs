@@ -45,6 +45,10 @@ public class Delivery
     public string? Reason { get; set; }
     public string? Actor { get; set; }
     public long? AttemptId { get; set; }
+    /// <summary>Lane of the event (P13 per-lane ops metrics); null for rows written before the column existed.</summary>
+    public string? Lane { get; set; }
+    /// <summary>`occurred_at` of the event (event-time lag); null for older rows.</summary>
+    public DateTimeOffset? OccurredAt { get; set; }
 }
 
 /// <summary>

@@ -86,7 +86,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         Ingress = { Enabled = true, DrainTimeout = TimeSpan.FromSeconds(3) },
         RawWriter = { InsertTimeout = TimeSpan.FromSeconds(20) },
         Relay = { BatchSize = 200, ConfirmTimeout = TimeSpan.FromSeconds(2), Lease = TimeSpan.FromSeconds(3), PollInterval = TimeSpan.FromMilliseconds(200), MinBackoff = TimeSpan.FromMilliseconds(200), MaxBackoff = TimeSpan.FromSeconds(2), UnroutableRetry = TimeSpan.FromMilliseconds(500) },
-        Consumer = { Prefetch = 10, MinBackoff = TimeSpan.FromMilliseconds(100), MaxBackoff = TimeSpan.FromMilliseconds(500) },
+        Consumer = { Prefetch = 10, MinBackoff = TimeSpan.FromMilliseconds(100), MaxBackoff = TimeSpan.FromMilliseconds(500), ControlPoll = TimeSpan.FromMilliseconds(200) },
         Reconciliation = { DeliveryOverdue = TimeSpan.Zero, OutboxOverdue = TimeSpan.FromSeconds(1), OutboxGrace = TimeSpan.FromSeconds(1), InboxRetention = TimeSpan.FromSeconds(1), CleanupBatch = 1000 },
     };
 
@@ -135,6 +135,10 @@ public sealed class MessagingFixture : IAsyncLifetime
             ["Messaging:Consumer:Prefetch"] = Options.Consumer.Prefetch.ToString(),
             ["Messaging:Consumer:MinBackoff"] = Options.Consumer.MinBackoff.ToString(),
             ["Messaging:Consumer:MaxBackoff"] = Options.Consumer.MaxBackoff.ToString(),
+            ["Messaging:Consumer:ControlPoll"] = Options.Consumer.ControlPoll.ToString(), // P13: pause/resume/drain react within a tick
+            ["Ops:Slo:RequiredConsumerMissingSeconds"] = "0", // P13 O03: alarms fire on ages of seconds, not minutes
+            ["Ops:Slo:InflightStuckSeconds"] = "0",
+            ["Ops:Slo:SnapshotCacheSeconds"] = "0",
             ["Messaging:Reconciliation:DeliveryOverdue"] = Options.Reconciliation.DeliveryOverdue.ToString(),
             ["Messaging:Reconciliation:OutboxOverdue"] = Options.Reconciliation.OutboxOverdue.ToString(),
             ["Messaging:Reconciliation:OutboxGrace"] = Options.Reconciliation.OutboxGrace.ToString(),
@@ -188,7 +192,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     public async Task ResetAsync()
     {
         await ExecAsync("""
-            TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
+            TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions, messaging.subscription_lanes, messaging.control_audit,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
                      processing.observations, processing.extractions, llm_requests, incident_revisions, incident_observations, incidents,
                      collector_states, targets, target_tracks, track_targets, target_track_revisions, target_links, source_daily_stats, source_copies, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE

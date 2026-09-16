@@ -10,6 +10,8 @@ import { WorkersPanel } from './WorkersPanel'
 import { PipelinePanel } from './PipelinePanel'
 import { CatalogPanel } from './CatalogPanel'
 import { IncidentsPanel } from './IncidentsPanel'
+import { QueuesPanel } from './QueuesPanel'
+import { MessagesPanel } from './MessagesPanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
 // The admin build is used both locally (:5268 → map :5267) and through Docker
@@ -17,11 +19,13 @@ import { IncidentsPanel } from './IncidentsPanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
   { id: 'workers', label: 'Воркери', group: 'Моніторинг' },
+  { id: 'queues', label: 'Черги', group: 'Моніторинг' },
+  { id: 'messages', label: 'Повідомлення', group: 'Моніторинг' },
   { id: 'collectors', label: 'Колектори', group: 'Моніторинг' },
   { id: 'pipeline', label: 'Конвеєр', group: 'Моніторинг' },
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
@@ -40,7 +44,7 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
 ]
 
 function sectionFromHash(): SectionId {
-  const id = window.location.hash.replace(/^#\/?/, '')
+  const id = window.location.hash.replace(/^#\/?/, '').replace(/\?.*$/, '') // `#/messages?raw=123` opens the explorer on a card
   return NAV.some((n) => n.id === id) ? (id as SectionId) : 'overview'
 }
 
@@ -160,6 +164,8 @@ export default function AdminApp() {
               <div className="mx-auto max-w-5xl space-y-4">
                 {section === 'overview' && <OverviewPanel />}
                 {section === 'workers' && <WorkersPanel />}
+                {section === 'queues' && <QueuesPanel />}
+                {section === 'messages' && <MessagesPanel />}
                 {section === 'collectors' && <CollectorsPanel />}
                 {section === 'pipeline' && <PipelinePanel />}
                 {section === 'db' && <DbPanel />}

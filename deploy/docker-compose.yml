@@ -196,6 +196,10 @@ services:
       Admin__ApiUrl: http://api:8080
       Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
       Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}  # /dev/ingest takes the collectors' path (P04)
+      # P13: optional second source for the queues panel (ready/unacked per queue, node alarms); the AMQP user needs the `management` tag.
+      Messaging__Broker__ManagementUrl: ${RABBITMQ_MANAGEMENT_URL:-}
+      Messaging__Broker__User: ${RABBITMQ_USER:-puluj}
+      Messaging__Broker__Password: ${RABBITMQ_PASSWORD:-puluj}
       Logs__Directory: /app/logs
       Docker__Enabled: "true"
       Docker__ComposeDir: /deploy

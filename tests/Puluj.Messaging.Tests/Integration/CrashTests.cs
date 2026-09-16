@@ -211,6 +211,7 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND actor = 'operator:test'"));
         Assert.Equal(1, await f.CountAsync("processing.quarantine", "resolved_at IS NOT NULL AND resolution = 'retried' AND retry_outbox_id = " + outboxId));
         Assert.Equal(0, await f.CountAsync("messaging.inbox"));
+        Assert.Equal(1, await f.CountAsync("messaging.control_audit", "action = 'retry' AND subscription_id = 'archive' AND lane = 'live' AND actor = 'operator:test' AND (details->>'quarantineId')::bigint = " + quarantineId)); // P13: one audit source
 
         var pass = await f.Relay.RelayOnceAsync(None);
         Assert.Equal((1, 1), (pass.Leased, pass.Confirmed));
@@ -282,6 +283,7 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.DoesNotContain(after.OverdueDeliveries, d => d.SubscriptionId == "archive"); // the normalizer's rows (v4) are still expected
         var waiver = await f.ScalarAsync<string>("SELECT waiver::text FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion);
         Assert.Contains("operator:test", waiver);
+        Assert.Equal(1, await f.CountAsync("messaging.control_audit", "action = 'waive' AND subscription_id = 'archive' AND actor = 'operator:test' AND (details->>'waived')::int = 3")); // P13
         Assert.Equal("paused", await f.ScalarAsync<string>("SELECT status FROM messaging.subscriptions WHERE subscription_id = 'archive' AND topology_version = " + f.Registry.TopologyVersion));
 
         await f.Admin.SetStatusAsync("archive", "active", "maintenance over", "operator:test", None);
