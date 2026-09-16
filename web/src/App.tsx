@@ -12,6 +12,7 @@ import TopBar from './components/TopBar'
 import TrackDetailsDrawer from './components/TrackDetailsDrawer'
 import KyivMapView from './map/KyivMapView'
 import MapView from './map/MapView'
+import EntityCatalogue from './entities/EntityCatalogue'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
 import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
 import { parseDataQuery } from './public/query'
@@ -295,7 +296,7 @@ export default function App() {
       {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} />)}
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
-      {route.section === 'entities' && <SectionPlaceholder title="Цілі і події" text="Каталог з пов’язаними даними буде додано в U08." />}
+      {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} />}
       {route.section === 'messages' && <SectionPlaceholder title="Повідомлення" text="Каталог початкових повідомлень буде додано в U09." />}
       {mapRoute && (kyivPreset ? (
         <KyivPanel route={route} open={panelOpen} onClose={closePanel} />
