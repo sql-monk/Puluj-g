@@ -209,6 +209,33 @@ public sealed class IncidentStateWriter(
         return changes[0];
     }
 
+    /// <summary>
+    /// What a merge would do (P12 review N3): the one place the rules live — the admin preview and <see cref="MergeAsync"/> both call it.
+    /// Pure: no locks, no writes; <c>Refusal</c> carries the 409 reason when the pair cannot be merged.
+    /// </summary>
+    public sealed record MergePlan(string? Refusal, IReadOnlyList<Guid> MovedObservationIds, int SourceCountAfter, DateTimeOffset FirstReportedAtAfter, DateTimeOffset LastReportedAtAfter,
+        string StateAfter, string? LocationFrom, double? AccuracyKmAfter, ConfidenceLevel ConfidenceAfter, int TargetRevision)
+    {
+        public bool Allowed => Refusal is null;
+    }
+
+    public static MergePlan PlanMerge(Incident source, Incident target)
+    {
+        string? refusal = source.IncidentId == target.IncidentId ? "an incident cannot be merged into itself"
+            : source.EventKindId != target.EventKindId ? "incidents of different kinds are never merged (crossover, ADR-0010)"
+            : source.State == Incident.Retracted || target.State == Incident.Retracted ? "a retracted incident cannot take part in a merge"
+            : source.GenerationId != target.GenerationId ? "incidents of different generations are never merged (ADR-0010 п.8)"
+            : null;
+        var moved = source.Observations.Select(o => o.ObservationId).ToList();
+        var all = target.Observations.Concat(source.Observations).ToList();
+        var first = all.Count == 0 ? target.FirstReportedAt : all.Min(o => o.EffectiveAt);
+        var last = all.Count == 0 ? target.LastReportedAt : all.Max(o => o.EffectiveAt);
+        var sourceMorePrecise = source.Geometry is not null && (target.Geometry is null || (source.AccuracyKm ?? double.MaxValue) < (target.AccuracyKm ?? double.MaxValue));
+        return new MergePlan(refusal, moved, all.Select(o => o.SourceId).Distinct().Count(), first, last, target.State, // the target's state never changes on merge
+            sourceMorePrecise ? "source" : "target", sourceMorePrecise ? source.AccuracyKm : target.AccuracyKm,
+            source.Confidence > target.Confidence ? source.Confidence : target.Confidence, target.Revision);
+    }
+
     /// <summary>Moves every evidence link of <paramref name="sourceId"/> to <paramref name="targetId"/> (same kind); the source is retracted with reason `merged`.</summary>
     public async Task<IReadOnlyList<IncidentChange>> MergeAsync(long sourceId, long targetId, string actor, string reason, CancellationToken ct)
     {
@@ -221,17 +248,10 @@ public sealed class IncidentStateWriter(
         {
             var source = incidents.Single(i => i.IncidentId == sourceId);
             var target = incidents.Single(i => i.IncidentId == targetId);
-            if (source.EventKindId != target.EventKindId)
+            var plan = PlanMerge(source, target);
+            if (!plan.Allowed)
             {
-                throw new IncidentConflictException("incidents of different kinds are never merged (crossover, ADR-0010)");
-            }
-            if (source.State == Incident.Retracted || target.State == Incident.Retracted)
-            {
-                throw new IncidentConflictException("a retracted incident cannot take part in a merge");
-            }
-            if (source.GenerationId != target.GenerationId)
-            {
-                throw new IncidentConflictException("incidents of different generations are never merged (ADR-0010 п.8)");
+                throw new IncidentConflictException(plan.Refusal!);
             }
             var now = clock.GetUtcNow();
             var links = source.Observations.ToList(); // fixup empties the navigation on Remove

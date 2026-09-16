@@ -1,0 +1,200 @@
+{
+  "task": "P12",
+  "baseCommit": "4917327",
+  "generatedAt": "2026-09-16T16:56:08.149778+00:00",
+  "configuration": "Debug/net10.0",
+  "sdk": "10.0.401",
+  "broker": {
+    "image": "rabbitmq:4.3-management",
+    "server": "4.3.5",
+    "client": "RabbitMQ.Client 7.2.2",
+    "testcontainers": "Testcontainers.RabbitMq 4.15.0"
+  },
+  "database": {
+    "image": "postgis/postgis:17-3.5",
+    "migration": "AddEventKindAudit (event_kind_audit, event_kinds.presentation_overridden_at)"
+  },
+  "productionSourcesChanged": true,
+  "files": [
+    {
+      "path": "docs/README.md",
+      "status": "M",
+      "sha256": "41ae796a8b3d473be83b80f09ccc0e49650aff089f1c14f870d65490164fdcda"
+    },
+    {
+      "path": "docs/adr/ADR-0008-event-catalog.md",
+      "status": "M",
+      "sha256": "e62ea23110345304a7dca4936cb3e5a044834f786a7b2d62d2a4bd7de6859422"
+    },
+    {
+      "path": "docs/adr/ADR-0010-incidents.md",
+      "status": "M",
+      "sha256": "ce95b689212a533e6ad8b54538705890ba4a23535c23a73f189b015b5a3f1c9e"
+    },
+    {
+      "path": "docs/adr/ADR-0011-read-side-realtime.md",
+      "status": "M",
+      "sha256": "f0a2bd9489239f608f612d87c978d3f8aedb016355c81a49188213b7a6b268e8"
+    },
+    {
+      "path": "docs/evidence/message-platform/P12-handoff.md",
+      "status": "??",
+      "sha256": "34886a8db951557bde2bce3ee8a9261b7db8be50001d355f3aba968fcad047e9"
+    },
+    {
+      "path": "docs/evidence/message-platform/P12-plan.md",
+      "status": "??",
+      "sha256": "86da73cc4cd2f60cb436c99fb3c307a63de53170597218db3968ed6fac3bc08b"
+    },
+    {
+      "path": "docs/evidence/message-platform/P12-ui-evidence.md",
+      "status": "??",
+      "sha256": "65c777fb5798d61732c2e08b4812a3476f1d8bf71a14b3221592bb0cc7068317"
+    },
+    {
+      "path": "docs/evidence/message-platform/messaging-crash-evidence.json",
+      "status": "M",
+      "sha256": "5276a54531b4a0b173d99739edafe056f6b2117b2b36378eaa4299990bf36a9d"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Admin.Tests-run2.trx",
+      "status": "??",
+      "sha256": "f786a1f20abf264f989ab3a67550a72a6ce25a6efb9932a89d33e3c58e224a64"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Admin.Tests.trx",
+      "status": "??",
+      "sha256": "9fbf9ea0530c3520745f5b9364d6892ad6a69658457a63a19f8dfd0e839d13e2"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Analytics.Tests.trx",
+      "status": "??",
+      "sha256": "d929bcbfc09022a16d85b36fde033246e68ae6d4ab5e4c150f6e8f619c1dd844"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Api.Tests.trx",
+      "status": "??",
+      "sha256": "b2b1444496a726e05e5cec348d469b22c3ba5ed89b42fa17d7dcb2d8fe7b81c3"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Integration.Tests-run2.trx",
+      "status": "??",
+      "sha256": "3283ad50a9aa00ca6fd740b8e76632314453f07aaea0c952f5ebcc6bec089bb3"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Integration.Tests.trx",
+      "status": "??",
+      "sha256": "977423595b80c10b40ff190356a6f3182f379b20456f483ff9fa7812c2616a34"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Messaging.Contracts.Tests.trx",
+      "status": "??",
+      "sha256": "2984c5687488a8432fb6e2b25d1a89149e9deca357a614d4602d8ba46a56cd55"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Messaging.Tests.trx",
+      "status": "??",
+      "sha256": "57c9438066475919ae116e28a84a58e5daca9dc4f6a37781c28614f3300352a5"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Processing.Tests-run2.trx",
+      "status": "??",
+      "sha256": "7fdab0b1bb1a314fb81927151e5f7447a1c8fe49f29e2250204b7d1e484ddebd"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-Puluj.Processing.Tests.trx",
+      "status": "??",
+      "sha256": "da4e7386a8ce2365f0a284aca77a9b760195a3c74d8be06cfa93468f2584cd2c"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-admin-run1.trx",
+      "status": "??",
+      "sha256": "3acc223587ce52bc37f2b432b2a1bf993131ba56bfc6583a48af4d0b17354139"
+    },
+    {
+      "path": "docs/evidence/message-platform/test-results/p12-catalog-run1.trx",
+      "status": "??",
+      "sha256": "b799028358d1b630fbb0f5cfd588703e255f565d9cc3652ee743a53957160b23"
+    },
+    {
+      "path": "docs/plan-message-platform.md",
+      "status": "M",
+      "sha256": "6d5527d7c6636e32173e17528c1eba184b621c2905810d3f4d31b42bad762eb3"
+    },
+    {
+      "path": "src/Puluj.Admin/Endpoints/CatalogEndpoints.cs",
+      "status": "??",
+      "sha256": "49c72659762ee87c57ae5d045ba9a2e3db377bfca224a295a8e8b309c35dca06"
+    },
+    {
+      "path": "src/Puluj.Admin/Endpoints/IncidentEndpoints.cs",
+      "status": "M",
+      "sha256": "59e25fc53604f796a0eb257a61c6a5b8a3392dcb10b4a5904fa1abea50f00084"
+    },
+    {
+      "path": "src/Puluj.Admin/Endpoints/RulesetEndpoints.cs",
+      "status": "M",
+      "sha256": "6b29ea1ecf9cda914edf4f2e697e18802505765c8a600536cce1187d2e32e404"
+    },
+    {
+      "path": "src/Puluj.Admin/Program.cs",
+      "status": "M",
+      "sha256": "ca107d64b9b25756358316e640e401bb095bb8d5f427a8ebe9b09954ca05cdc3"
+    },
+    {
+      "path": "src/Puluj.Domain/Entities/EventKind.cs",
+      "status": "M",
+      "sha256": "890eba7592ed9f948debd43c727a05e77b009b066ee39b8c10ae3ea649b7e433"
+    },
+    {
+      "path": "src/Puluj.Domain/Entities/Rules.cs",
+      "status": "M",
+      "sha256": "3ab9b6f4657ededab630841f291e362010944bd4f8422f941956acfc40bf294d"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Configurations/RulesConfiguration.cs",
+      "status": "M",
+      "sha256": "8cedf6196cde97375759142131dc89c4b8e2dfc5c5f1ccdf7b4a57b0bde57038"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/20260916155950_AddEventKindAudit.Designer.cs",
+      "status": "??",
+      "sha256": "f236d97742d786cb4e5111f6e0199b4ae388cc0caa93403086d49d1c6486a19a"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/20260916155950_AddEventKindAudit.cs",
+      "status": "??",
+      "sha256": "b0dc99ac8668cfab6710db42b1bebaf192eb3523f7eea5498c944f407a3195ec"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/Migrations/PulujDbContextModelSnapshot.cs",
+      "status": "M",
+      "sha256": "354db927bd0da9a915db8da8b15f8872ee3913c69bbabcdec6d8c48dc9208247"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Persistence/PulujDbContext.cs",
+      "status": "M",
+      "sha256": "6ffc5527bdb9b21ca4653208f5c4dfb39ed10d74fe7ad94cb5615986ca9efa63"
+    },
+    {
+      "path": "src/Puluj.Infrastructure/Seeding/EventKindSeeder.cs",
+      "status": "M",
+      "sha256": "c32d75ecb99b304f63f4b490ebb22c0e056ef2848fda2d5f12003da436b7e740"
+    },
+    {
+      "path": "src/Puluj.Processing/Incidents/IncidentStateWriter.cs",
+      "status": "M",
+      "sha256": "d5a36190a914ac95da33d816ab819e12f71c42ad8eb68f2eb5759b80dacf27c9"
+    },
+    {
+      "path": "tests/Puluj.Admin.Tests/CatalogEndpointsTests.cs",
+      "status": "??",
+      "sha256": "c885db947291410117bd92038b8a7e87d6b7a5966dacb8953fae96220ad84eba"
+    },
+    {
+      "path": "tests/Puluj.Integration.Tests/CatalogAdminTests.cs",
+      "status": "??",
+      "sha256": "0ac0c048d64f80d22e880fccbf3fba784706bdc62048f107ada979134d93f1e8"
+    }
+  ]
+}

@@ -191,6 +191,9 @@ public sealed class AdminIndexes(IndexProvider provider, IDbContextFactory<Puluj
 
     public IndexProvider Provider => provider;
 
+    /// <summary>P12: a catalog edit makes the next call reload everything (the API and the workers pick it up on their own poll).</summary>
+    public void Invalidate() => _loadedAt = DateTimeOffset.MinValue;
+
     public async Task EnsureFreshAsync(CancellationToken ct)
     {
         await _gate.WaitAsync(ct);

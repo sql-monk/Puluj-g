@@ -249,6 +249,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("presentation");
 
+                    b.Property<DateTimeOffset?>("PresentationOverriddenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("presentation_overridden_at");
+
                     b.Property<string>("RenderMode")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
@@ -275,6 +279,59 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_event_kinds_code");
 
                     b.ToTable("event_kinds", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindAudit", b =>
+                {
+                    b.Property<long>("AuditId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("audit_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("AuditId"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("actor");
+
+                    b.Property<JsonDocument>("After")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("after");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<JsonDocument>("Before")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("before");
+
+                    b.Property<int>("EventKindId")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_kind_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("AuditId")
+                        .HasName("pk_event_kind_audit");
+
+                    b.HasIndex("EventKindId", "At")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_event_kind_audit_event_kind_id_at");
+
+                    b.ToTable("event_kind_audit", (string)null);
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.EventKindRule", b =>
@@ -3048,6 +3105,16 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_collector_states_sources_source_id");
 
                     b.Navigation("Source");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EventKindAudit", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EventKind", null)
+                        .WithMany()
+                        .HasForeignKey("EventKindId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_kind_audit_event_kinds_event_kind_id");
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.EventKindRule", b =>

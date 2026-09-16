@@ -60,6 +60,22 @@ public class EventKindRulesetAuditConfiguration : IEntityTypeConfiguration<Event
     }
 }
 
+public class EventKindAuditConfiguration : IEntityTypeConfiguration<EventKindAudit>
+{
+    public void Configure(EntityTypeBuilder<EventKindAudit> b)
+    {
+        b.ToTable("event_kind_audit");
+        b.HasKey(x => x.AuditId);
+        b.Property(x => x.Action).HasMaxLength(32);
+        b.Property(x => x.Actor).HasMaxLength(128);
+        b.Property(x => x.Reason).HasMaxLength(1000);
+        b.Property(x => x.Before).HasColumnType("jsonb");
+        b.Property(x => x.After).HasColumnType("jsonb");
+        b.HasIndex(x => new { x.EventKindId, x.At }).IsDescending(false, true);
+        b.HasOne<EventKind>().WithMany().HasForeignKey(x => x.EventKindId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 /// <summary>Disagreements of the shadow set with the live one; no FK to raw_messages (retention of raw rows is independent).</summary>
 public class EventKindRuleShadowConfiguration : IEntityTypeConfiguration<EventKindRuleShadow>
 {

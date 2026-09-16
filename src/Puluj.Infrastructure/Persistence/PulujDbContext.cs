@@ -20,6 +20,7 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<EventKindRuleset> EventKindRulesets => Set<EventKindRuleset>();
     public DbSet<EventKindRule> EventKindRules => Set<EventKindRule>();
     public DbSet<EventKindRulesetAudit> EventKindRulesetAudits => Set<EventKindRulesetAudit>();
+    public DbSet<EventKindAudit> EventKindAudits => Set<EventKindAudit>();
     public DbSet<EventKindRuleShadow> EventKindRuleShadows => Set<EventKindRuleShadow>();
 
     public DbSet<Place> Places => Set<Place>();

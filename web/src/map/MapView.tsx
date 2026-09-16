@@ -214,7 +214,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       // a second while playing); live: the snapshot's tracks with their vectors.
       if (mode === 'history') setTrackData(map, buildReplayLayers(replay.positions(replay.t || clock.getTime(), filters), palette, selectedTrackId))
       else setTrackData(map, buildTrackLayers(visibleTracks(tracks, filters, clock), clock, regionsById, filters, { home, selectedId: selectedTrackId, palette, predecessors, selectedLink }))
-      setData(map, 'events', buildEventLayer(legacyEvents, clock, filters))
+      setData(map, 'events', buildEventLayer(legacyEvents, clock, filters, incidentCatalog.colorOfLegacy))
       // An alerted oblast is drawn by the alert layer instead of the base fill, so the colours never blend;
       // raion / hromada alerts sit on top of the land fill. Hromada and city polygons are fetched on first need.
       for (const a of alertList) if (!regionsById.has(a.placeId) && !placeGeometries[a.placeId]) ensurePlaceGeometry(a.placeId)
@@ -234,7 +234,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
     }
     if (styleLoaded.current) apply()
     else map.once('style.load', apply)
-  }, [mode, tracks, legacyEvents, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
+  }, [mode, tracks, legacyEvents, incidentCatalog, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
 
   // Replay: every frame of the replay clock moves the markers, straight into the source, without a render.
   useEffect(() => {

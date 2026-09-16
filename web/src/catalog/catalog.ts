@@ -60,12 +60,17 @@ export interface Catalog {
   lifetimeMinutesOf: (code: string) => number
   /** Legacy `EventType` names whose facts now live as incidents: the old event markers of these are hidden when the incident layer is on. */
   legacyEventTypesOfIncidents: Set<string>
+  /** Colour of a legacy `EventType` marker from the kind it maps to (the legacy event layer no longer carries its own colour table). */
+  colorOfLegacy: (eventType: string) => string | undefined
 }
 
 export const DEFAULT_INCIDENT_LIFETIME_MINUTES = 6 * 60
 
 const CATEGORY_COLOR: Record<string, string> = { incident: '#dc2626', target: '#2563eb', alert: '#b45309', info: '#64748b' }
-const ICON_SHAPE: Record<string, IncidentShape> = {
+/** Catalog `mapIcon` → glyph shape (the server's icon vocabulary; anything unknown draws a circle). */
+export const ICON_SHAPE: Record<string, IncidentShape> = {
+  'air-defence': 'shield',
+  'alert-off': 'circle',
   explosion: 'burst',
   impact: 'burst',
   fire: 'flame',
@@ -122,6 +127,8 @@ export function buildCatalog(dtos: CatalogKindDto[]): Catalog {
   const legacy = new Set<string>()
   for (const k of kinds.values()) if (k.createsIncident && k.legacyEventType) legacy.add(k.legacyEventType)
   const kindOf = (code: string) => kinds.get(code) ?? unknownKind(code)
+  const byLegacy = new Map<string, CatalogKind>()
+  for (const k of kinds.values()) if (k.legacyEventType) byLegacy.set(k.legacyEventType, k)
   return {
     kinds,
     legend,
@@ -130,6 +137,7 @@ export function buildCatalog(dtos: CatalogKindDto[]): Catalog {
     shapeOf: (code) => kindOf(code).shape,
     lifetimeMinutesOf: (code) => kindOf(code).lifetimeMinutes,
     legacyEventTypesOfIncidents: legacy,
+    colorOfLegacy: (eventType) => byLegacy.get(eventType)?.color,
   }
 }
 

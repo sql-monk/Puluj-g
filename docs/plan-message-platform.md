@@ -796,9 +796,17 @@ dotnet test Puluj.sln
 Безпечний default — Testcontainers. До запуску перевірити target/profile, не друкуючи credentials.
 Тести з відсутньою інфраструктурою не вважати passed evidence (див. §13).
 
-RabbitMQ/Testcontainers harness, required CI profile, Playwright E2E/visual і load/chaos harness треба
-додати в P02/P12/P16: у поточному `web/package.json` є Vitest, але немає готової команди Playwright.
-Не вигадувати результати неіснуючого suite. Після додавання записати точну відтворювану команду тут.
+RabbitMQ/Testcontainers harness — P02+; required CI profile і load/chaos harness — P16. **Playwright E2E/visual (P12)** — UI-контракт мапи й
+адмінки над повністю замоканим API (без .NET/БД), Chromium desktop + mobile (Pixel 7); знімки DOM-елементів (popup/легенда) — win32-only, оновлювати лише
+свідомо (`--update-snapshots`):
+
+```powershell
+cd web; npx playwright install chromium          # один раз
+cd web; npx playwright test                       # E01–E08 + A01/A02, desktop + mobile, ~5 хв (dev-сервери :5183/:5184 стартують самі)
+cd web; npx playwright test --project=desktop e2e/E07-workload.e2e.ts   # лише workload
+cd web; npx playwright show-report e2e-report
+```
+Не вигадувати результати неіснуючого suite.
 Frontend build генерує файли у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`; узгодити ownership
 генерованих assets і не змішувати результати паралельних збірок.
 
@@ -873,7 +881,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P09 | done | Claude Code (p09) | p09_review: план approve after fixes (B1–B7); результат approve after fixes (B1 alert change-detection, B2 NOTIFY TargetCreated, N1–N11) → виправлено → re-run зелений | [GitHub P09](https://github.com/sql-monk/Puluj-g/issues/10); [handoff, evidence](evidence/message-platform/P09-handoff.md); ADR-0009; track/alert writers, lock hierarchy, revisions, watchdog-команди, cutover guards, topology v6; закомічено |
 | P10 | done | Claude Code (p10) | p10_review: план approve after fixes (B1–B3, N1–N10); результат approve after fixes (B1 schema `suppressed`, B2 Admin індекси, B3 merged/retracted кандидати, B4 canonical source, N1–N11) → виправлено → re-run зелений | [GitHub P10](https://github.com/sql-monk/Puluj-g/issues/12); [handoff, evidence](evidence/message-platform/P10-handoff.md); ADR-0010; incident-worker, policy `incident-1`, revisions/snapshot, admin-команди, topology v7; закомічено |
 | P11 | done | Claude Code (p11) | p11_review: план approve after fixes (B1–B3, N1–N15, Q1–Q6); результат approve after fixes (B1 projection без writers, B2 symbol font, B3 history throttle, N1–N13) → виправлено → re-run зелений | [GitHub P11](https://github.com/sql-monk/Puluj-g/issues/11); [handoff, evidence](evidence/message-platform/P11-handoff.md); ADR-0011; `/api/incidents`, projection (v8), NOTIFY backplane + Resync, incident layer/catalog adapter; закомічено |
-| P12 | planned | — | — | [GitHub P12](https://github.com/sql-monk/Puluj-g/issues/13); Ранній map audit можна почати разом із P00 |
+| P12 | done | Claude Code (p12) | p12_review: план approve after fixes (B1–B4, N1–N10, Q1–Q5); результат approve after fixes (N1–N13, Q1–Q6, без blocking) → виправлено → re-run зелений | [GitHub P12](https://github.com/sql-monk/Puluj-g/issues/13); [handoff, evidence](evidence/message-platform/P12-handoff.md); Playwright E2E 17 (desktop+mobile, admin), catalog editor + audit, review queue + merge preview, map quality; закомічено |
 | P13 | planned | — | — | [GitHub P13](https://github.com/sql-monk/Puluj-g/issues/16); — |
 | P14 | planned | — | — | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); — |
 | P15 | planned | — | — | [GitHub P15](https://github.com/sql-monk/Puluj-g/issues/17); — |

@@ -30,6 +30,7 @@ export function connectMapHub(events: MapEvents): HubConnection {
   // P11 (ADR-0011): incident pushes go to the incident store in batches; a stale revision is ignored there. The server's
   // Resync (its NOTIFY listener reconnected — pushes may have been lost) and our own reconnect reload the window.
   const batch = createPushBatcher()
+  if (import.meta.env.DEV) Object.assign(window, { __incidentsPush: batch }) // E2E: a push burst through the real batcher
   connection.on('IncidentUpserted', (i: IncidentDto) => (events.incidentUpserted ?? batch.push)(i))
   connection.on('IncidentRevised', (i: IncidentDto) => (events.incidentRevised ?? batch.push)(i))
   connection.on('Resync', (at: string) => (events.resync ?? (() => useIncidentStore.getState().resync()))(at))

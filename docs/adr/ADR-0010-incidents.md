@@ -73,6 +73,9 @@ track-worker'а; агрегату «подія» не було, карта по�
 - Невідомий kind у worker'і → refresh індексу, далі `PermanentDeliveryException unknown_kind` (N9); в Admin індекс вантажиться перед командою (B2),
   подія ніколи не несе числовий код.
 
+P12: admin merge/split/resolve через UI з preview (`PlanMerge`) і client-side stale-guard за `targetRevision`; серверний `expectedRevision`/`If-Match`
+на командах — P13 (вікно TOCTOU між preview і командою лишається, команда сама тримає locks і перевіряє стан).
+
 ## Відкрите
 
 `independent_source_count` (методика) — Ops/P15; crossover policy — після даних; ~~projection/`NOTIFY IncidentChanged` для карти — P11~~ (done, ADR-0011); replay lane — P14;

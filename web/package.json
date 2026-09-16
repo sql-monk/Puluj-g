@@ -11,7 +11,9 @@
     "preview": "vite preview",
     "dev:admin": "vite --config vite.admin.config.ts",
     "build:user": "tsc -b && vite build",
-    "build:admin": "tsc -b && vite build --config vite.admin.config.ts"
+    "build:admin": "tsc -b && vite build --config vite.admin.config.ts",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report e2e-report"
   },
   "dependencies": {
     "@microsoft/signalr": "^10.0.11",
@@ -29,6 +31,8 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.3.3",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^24.13.4",

@@ -126,7 +126,7 @@ export default function IncidentPopup({ map, incident, anchor, onClose }: Props)
         </dl>
         <div className="mt-2 border-t border-slate-200 pt-1.5 text-[11px] leading-snug text-slate-700 dark:border-slate-700 dark:text-slate-300">
           {current === null ? 'завантаження…' : text || '(текст повідомлення недоступний)'}
-          {canonical?.rawMessage?.url && (
+          {canonical?.rawMessage?.url && /^https?:\/\//i.test(canonical.rawMessage.url) && (
             <a className="ml-1 text-blue-600 underline dark:text-blue-400" href={canonical.rawMessage.url} target="_blank" rel="noreferrer">
               джерело
             </a>

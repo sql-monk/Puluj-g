@@ -80,6 +80,23 @@ public class EventKindRulesetAudit
     public JsonDocument? Details { get; set; }
 }
 
+/// <summary>P12 (§8.7): one admin change of an event kind's presentation — who, why, what was before and after (the catalog editor's audit history).</summary>
+public class EventKindAudit
+{
+    public const string Updated = "updated";
+    public const string Enabled = "enabled";
+    public const string Disabled = "disabled";
+
+    public long AuditId { get; set; }
+    public int EventKindId { get; set; }
+    public required string Action { get; set; }
+    public required string Actor { get; set; }
+    public required string Reason { get; set; }
+    public DateTimeOffset At { get; set; }
+    public JsonDocument? Before { get; set; }
+    public JsonDocument? After { get; set; }
+}
+
 /// <summary>One segment where the shadow rule set disagreed with the live one (kind or rule); only disagreements are stored.</summary>
 public class EventKindRuleShadow
 {

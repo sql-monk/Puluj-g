@@ -71,8 +71,17 @@
 
 ## Відкрите
 
-Checkpoint-таблиця projection і delta за `recorded_at` — P14; перенесення track/alert push — P12/P16; feed окремих incidents (не лише мапа) — P12;
-keyboard-навігація мапи, mobile-layout легенди — P12; benchmark N реплік × 50 подій/с — після cutover.
+Checkpoint-таблиця projection і delta за `recorded_at` — P14; перенесення track/alert push — P16; feed incidents у `FeedPanel` — U-задачі
+(P12 дав список без локації в легенді); canvas keyboard-навігація — після P13 (P12: DOM-легенда/список — Tab/Enter/Esc); benchmark N реплік × 50
+подій/с — після cutover.
+
+## P12 (UI-контракт мапи)
+
+E2E harness (Playwright, `web/e2e`, API повністю замокано — UI-контракт без БД): E01 precision (point/city → глиф, district → коло 64 вершини або
+полігон, region → полігон, без локації → лише список), E02 provenance popup (обидві шкали часу, джерела, revision/policy, raw permalink лише `http(s)`,
+редаговані actor), E03 history (`mode=recorded&asOf`, throttle replay-тиків), E04 main/Kyiv parity, E05 catalog legend/filters (catalog visibility ≠ user
+filter), E06 mobile/a11y (легенда згорнута, не перекриває scale/attribution, Tab/Enter/Esc, axe без serious/critical), E07 10k incidents / 1k push burst =
+1 store update, E08 resync, A01/A02 admin. Кольори legacy event-маркерів — з каталогу (`colorOfLegacy`); `EventPopup` — permalink; легенда — «Без локації».
 
 ## Перевірка
 

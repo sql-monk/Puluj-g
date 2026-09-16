@@ -15,4 +15,15 @@ export const precisionLabel: Record<string, string> = {
   unknown: 'без локації',
 }
 
+/** The glyph shapes of the incident kinds, named: the legend prints the shape next to the colour so meaning never rests on colour alone. */
+export const shapeLabel: Record<string, string> = {
+  burst: 'зірка',
+  flame: 'полум’я',
+  bolt: 'блискавка',
+  square: 'квадрат',
+  shield: 'щит',
+  chevron: 'шеврон',
+  circle: 'коло',
+}
+
 export const confidenceLabel: Record<string, string> = { unknown: 'невідома', low: 'низька', medium: 'середня', high: 'висока', confirmed: 'підтверджена' }

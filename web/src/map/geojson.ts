@@ -84,7 +84,7 @@ export interface EventProps {
   opacity: number
 }
 
-export function buildEventLayer(events: TargetDto[], now: Date, filters: Filters): FeatureCollection<Point, EventProps> {
+export function buildEventLayer(events: TargetDto[], now: Date, filters: Filters, colorOf?: (eventType: string) => string | undefined): FeatureCollection<Point, EventProps> {
   if (!filters.events) return emptyCollection() as FeatureCollection<Point, EventProps>
   const features: Feature<Point, EventProps>[] = []
   for (const event of events) {
@@ -92,7 +92,7 @@ export function buildEventLayer(events: TargetDto[], now: Date, filters: Filters
     if (!point || !sourceEnabled(event.source.id, filters)) continue
     const age = Math.max(0, (now.getTime() - new Date(event.observedAt).getTime()) / 60000)
     if (age > filters.lifetimeMinutes) continue
-    const color = event.eventType === 'ExplosionReport' ? '#dc2626' : event.eventType === 'AirDefenseActivity' ? '#2563eb' : '#16a34a'
+    const color = colorOf?.(event.eventType) ?? (event.eventType === 'ExplosionReport' ? '#dc2626' : event.eventType === 'AirDefenseActivity' ? '#2563eb' : '#16a34a')
     features.push({ type: 'Feature', id: event.id, geometry: point, properties: { id: event.id, eventType: event.eventType, color, opacity: Math.max(0.35, 1 - 0.6 * age / Math.max(1, filters.lifetimeMinutes)) } })
   }
   return { type: 'FeatureCollection', features }

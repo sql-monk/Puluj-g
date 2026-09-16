@@ -177,11 +177,18 @@ export function setIncidentData(map: maplibregl.Map, layers: IncidentLayers) {
   ;(map.getSource(INCIDENT_SOURCES.areas) as maplibregl.GeoJSONSource | undefined)?.setData(layers.areas as FeatureCollection)
 }
 
+/** Half-size of the box around the click that still counts as a hit on a glyph (touch-friendly). */
+const HIT_PX = 10
+
 /** The incident under a click, or null; a cluster zooms in instead and returns null. */
 export function incidentHitAt(map: maplibregl.Map, point: maplibregl.Point): number | null {
   const layers = INCIDENT_HIT_LAYERS.filter((l) => map.getLayer(l))
   if (layers.length === 0) return null
-  const f = map.queryRenderedFeatures(point, { layers })[0]
+  const box: [maplibregl.PointLike, maplibregl.PointLike] = [
+    [point.x - HIT_PX, point.y - HIT_PX],
+    [point.x + HIT_PX, point.y + HIT_PX],
+  ]
+  const f = map.queryRenderedFeatures(box, { layers })[0]
   if (!f) return null
   if (f.properties?.point_count !== undefined) {
     const [lon, lat] = (f.geometry as Point).coordinates
@@ -191,8 +198,8 @@ export function incidentHitAt(map: maplibregl.Map, point: maplibregl.Point): num
   return f.properties?.id === undefined ? null : Number(f.properties.id)
 }
 
-const GLYPH = 40
-const HALO = 8
+const GLYPH = 48
+const HALO = 5
 
 function drawIncidentGlyph(color: string, shape: IncidentShape, p: MapPalette): ImageData {
   const canvas = document.createElement('canvas')
@@ -206,7 +213,7 @@ function drawIncidentGlyph(color: string, shape: IncidentShape, p: MapPalette): 
     case 'burst':
       for (let i = 0; i < 16; i++) {
         const a = (Math.PI * i) / 8
-        const rr = i % 2 === 0 ? r : r * 0.55
+        const rr = i % 2 === 0 ? r : r * 0.66
         const x = c + rr * Math.cos(a)
         const y = c + rr * Math.sin(a)
         if (i === 0) path.moveTo(x, y)

@@ -117,7 +117,7 @@ export function incidentsQuery(q: IncidentQuery): string {
 export const incidentsApi = {
   page: (q: IncidentQuery) => get<IncidentPageDto>(`/api/incidents${incidentsQuery(q)}`),
   /** Every page of the window, up to `maxPages` (the server caps the span at 7 days and the page at 500). */
-  async window(q: IncidentQuery, maxPages = 10): Promise<{ items: IncidentDto[]; to: string; complete: boolean }> {
+  async window(q: IncidentQuery, maxPages = 20): Promise<{ items: IncidentDto[]; to: string; complete: boolean }> {
     const items: IncidentDto[] = []
     let cursor: string | undefined
     let to = ''

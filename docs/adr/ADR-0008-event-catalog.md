@@ -21,6 +21,14 @@ ExplosionReport, AirDefenseActivity`), зашитий у код і в SQL-фун
    даних). `EventKindSeeder` (Order 30): додає відсутні коди; для існуючих оновлює presentation/policy лише коли
    `policyVersion` файлу більший за `policy_version` рядка; `code` не змінює, рядки не видаляє, admin-owned `enabled`
    зберігає. `Validate` перевіряє pattern коду, категорію, унікальність і паритет із legacy map.
+   **P12 (catalog editor, §8.7):** presentation — `name_uk, map_visible, map_color, map_icon, map_lifetime, render_mode, sort_order, enabled,
+   requires_location_for_map` — стає **admin-owned** після першого `PUT /api/admin/event-kinds/{code}` (`presentation_overridden_at`): новіший seed
+   оновлює для такого рядка лише seed-owned поля (`category, default_severity, state_model, creates_incident, dedup_policy, metadata, presentation json,
+   policy_version`). Кожна зміна — `event_kind_audit` (actor, reason, before/after admin-owned полів, у тій самій tx). `enabled=false` для kind із
+   `metadata.legacyEventType` — 409 без `force` (вимикає правила P08 — зміна pipeline, не презентації). Лише `enabled` у PUT **не** робить рядок
+   admin-owned (seed і далі оновлює презентацію, `Enabled` він зберігає сам); порожній PUT → 400. Словник іконок — `EventKindSeeder.IconVocabulary`
+   (сервер валідує і seed, і PUT — drift неможливий). «Скинути до seed» endpoint — P13.
+   Кеші (`ReferenceCache` API, `IndexProvider` worker) — poll 10 хв; UI каже про лаг. `If-Match` для конкурентних PUT — не реалізовано (accepted).
 3. **Legacy mapping** (`Puluj.Domain.EventKindLegacyMap`, одна таблиця для C#, seed `metadata.legacyEventType`,
    SQL backfill): `Unknown→unknown.unclassified`, `TargetObserved→target.observed`, `AirRaidAlert→alert.air_raid.started`,
    `AlertCancelled→alert.air_raid.ended`, `TargetCancelled→target.cancelled`, `ExplosionReport→impact.explosion.reported`,
@@ -109,6 +117,7 @@ event_kind_id IS NULL` — Index Only Scan того самого індексу 
 | Питання | Задача |
 |---|---|
 | Incidents (`creates_incident`, `state_model`) | P10 |
-| Catalog у API/UI: legend/filters з `render_mode`/`map_color`, посилення constraints (NOT NULL) після coverage | P11/P12 |
+| ~~Catalog у API/UI: legend/filters з `render_mode`/`map_color`~~ — done P11 (adapter) / P12 (editor); посилення constraints (NOT NULL) після coverage | P16 |
+| `NOTIFY catalog.changed` → refresh `ReferenceCache`/`IndexProvider` без 10-хв лагу | P13 |
 | Analytics по `event_kind_id`, `unknown.unclassified` як явний outcome | P15 |
 | `casualties.reported` — правила персональних даних | окреме рішення |

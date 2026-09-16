@@ -78,3 +78,18 @@ describe('incident layer geometry (§8.5)', () => {
     expect(specs.map((s) => s.id)).toEqual(['incident-area-fill', 'incident-area-line', 'incident-clusters', 'incident-cluster-count', 'incident-icons'])
   })
 })
+
+describe('legacy event markers take their colour from the catalog', () => {
+  it('buildEventLayer uses colorOf when the catalog knows the legacy kind, the old constants otherwise', async () => {
+    const { buildEventLayer } = await import('./geojson')
+    const events = [
+      { id: 1, eventType: 'ExplosionReport', observedAt: now.toISOString(), source: { id: 1 }, location: { point: { type: 'Point', coordinates: [36, 49] } } },
+      { id: 2, eventType: 'TargetCancelled', observedAt: now.toISOString(), source: { id: 1 }, location: { point: { type: 'Point', coordinates: [35, 49] } } },
+    ] as unknown as TargetDto[]
+    const filters = { events: true, lifetimeMinutes: 120, sources: null } as unknown as import('../store/useStore').Filters
+    const withCatalog = buildEventLayer(events, now, filters, catalog.colorOfLegacy)
+    expect(withCatalog.features.map((f) => f.properties.color)).toEqual(['#fb8c00', '#16a34a'])
+    const without = buildEventLayer(events, now, filters)
+    expect(without.features.map((f) => f.properties.color)).toEqual(['#dc2626', '#16a34a'])
+  })
+})

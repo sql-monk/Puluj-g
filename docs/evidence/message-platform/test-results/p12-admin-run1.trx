@@ -1,0 +1,151 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="922f299e-9d52-4613-8a5c-c26e6eb51ba5" name="aleks@ASUS-MONK 2026-09-16 19:06:44" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T19:06:44.1850904+03:00" queuing="2026-09-16T19:06:44.1850915+03:00" start="2026-09-16T19:06:42.8583462+03:00" finish="2026-09-16T19:06:44.6091652+03:00" />
+  <TestSettings name="default" id="7d856bb8-7cf7-49e6-ad12-7342bbbe5a1d">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_19_06_44" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="8249d589-4e99-467b-a488-dd5aac2d89d7" testId="dfa9dd4c-7570-15e0-bec5-fd520aec1850" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;orange&quot;, icon: null, lifetime: null, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0075900" startTime="2026-09-16T19:06:44.0647276+03:00" endTime="2026-09-16T19:06:44.0647552+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="8249d589-4e99-467b-a488-dd5aac2d89d7" />
+    <UnitTestResult executionId="a0cb85c4-1dba-4f58-bb4f-fbb8081009e1" testId="79967036-7df0-b8f5-436b-703b53248be5" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;soon&quot;, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0000367" startTime="2026-09-16T19:06:44.0648095+03:00" endTime="2026-09-16T19:06:44.0648304+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a0cb85c4-1dba-4f58-bb4f-fbb8081009e1" />
+    <UnitTestResult executionId="f3e5edb0-f37f-4f2a-9c53-7fea213b16e8" testId="824e632b-3003-d3f8-0247-e8d351b1963e" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: &quot;fire&quot;, lifetime: null, mode: null, ok: True)" computerName="ASUS-MONK" duration="00:00:00.0000015" startTime="2026-09-16T19:06:44.1311994+03:00" endTime="2026-09-16T19:06:44.1313149+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f3e5edb0-f37f-4f2a-9c53-7fea213b16e8" />
+    <UnitTestResult executionId="ff74dafa-e51c-4ebe-99c1-b9090221b1ca" testId="eed70d38-78bd-c7b0-fc2b-c2366bcb5acd" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: null, mode: &quot;sprite&quot;, ok: False)" computerName="ASUS-MONK" duration="00:00:00.1169624" startTime="2026-09-16T19:06:43.9221019+03:00" endTime="2026-09-16T19:06:44.0466432+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ff74dafa-e51c-4ebe-99c1-b9090221b1ca" />
+    <UnitTestResult executionId="7bad5766-f929-4da7-af0a-652aa2c709b1" testId="30a7a4f4-2d1e-2227-7b42-9f7d8f8daf89" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Merge_plan_applies_the_command_rules_and_predicts_the_aggregate" computerName="ASUS-MONK" duration="00:00:00.3568673" startTime="2026-09-16T19:06:44.1344523+03:00" endTime="2026-09-16T19:06:44.4931658+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7bad5766-f929-4da7-af0a-652aa2c709b1">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ&#xD;
+           ↓ (pos 0)&#xD;
+Expected: "source"&#xD;
+Actual:   "target"&#xD;
+           ↑ (pos 0)</Message>
+          <StackTrace>   at Puluj.Admin.Tests.CatalogEndpointsTests.Merge_plan_applies_the_command_rules_and_predicts_the_aggregate() in C:\repos\Puluj-g\tests\Puluj.Admin.Tests\CatalogEndpointsTests.cs:line 97&#xD;
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="b2cf9e9b-eab8-47e0-b055-355f19e0b000" testId="2ece072f-6b15-780a-01da-cb5a06b9d1d0" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;8.00:00:00&quot;, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0000045" startTime="2026-09-16T19:06:44.0650205+03:00" endTime="2026-09-16T19:06:44.0650400+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b2cf9e9b-eab8-47e0-b055-355f19e0b000" />
+    <UnitTestResult executionId="aba40f4a-aeb2-4bb0-bd02-43c2c078c93c" testId="3f584e37-8201-649d-9f2f-76c0aa6185eb" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;1.12:00:00&quot;, mode: null, ok: True)" computerName="ASUS-MONK" duration="00:00:00.0000138" startTime="2026-09-16T19:06:44.0649708+03:00" endTime="2026-09-16T19:06:44.0649903+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="aba40f4a-aeb2-4bb0-bd02-43c2c078c93c" />
+    <UnitTestResult executionId="f753abe2-1fdc-4de9-8db9-73ac00818051" testId="f1b42afc-2038-e498-7768-e3b167f30402" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Actor_and_reason_are_required" computerName="ASUS-MONK" duration="00:00:00.0005631" startTime="2026-09-16T19:06:44.1342428+03:00" endTime="2026-09-16T19:06:44.1343131+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f753abe2-1fdc-4de9-8db9-73ac00818051" />
+    <UnitTestResult executionId="70e8c589-90b8-415f-81fa-ea2ed49d003d" testId="dbdfeab5-6131-9b0f-1eb3-0299b16826fb" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;02:00:00&quot;, mode: null, ok: True)" computerName="ASUS-MONK" duration="00:00:00.0000017" startTime="2026-09-16T19:06:44.1320238+03:00" endTime="2026-09-16T19:06:44.1320846+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="70e8c589-90b8-415f-81fa-ea2ed49d003d" />
+    <UnitTestResult executionId="de1c99ea-d2c7-47f7-84b7-34d98fce2a80" testId="fb92173c-ea40-38e4-1007-637709b4db7a" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: &quot;rocket&quot;, lifetime: null, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0000037" startTime="2026-09-16T19:06:44.0650711+03:00" endTime="2026-09-16T19:06:44.0650900+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="de1c99ea-d2c7-47f7-84b7-34d98fce2a80" />
+    <UnitTestResult executionId="432fbdfd-0515-434d-9ebc-1057067fee86" testId="8e6adbde-c697-f659-47de-ce4f63d4adb9" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;#fb8c00&quot;, icon: null, lifetime: null, mode: null, ok: True)" computerName="ASUS-MONK" duration="00:00:00.0002306" startTime="2026-09-16T19:06:44.0649158+03:00" endTime="2026-09-16T19:06:44.0649403+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="432fbdfd-0515-434d-9ebc-1057067fee86" />
+    <UnitTestResult executionId="cb102a4b-ac5b-4836-8448-e0d45bd706f7" testId="0a85425b-73a4-6f57-bb45-43cae307642a" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: null, mode: &quot;area&quot;, ok: True)" computerName="ASUS-MONK" duration="00:00:00.0000065" startTime="2026-09-16T19:06:44.0648648+03:00" endTime="2026-09-16T19:06:44.0648844+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cb102a4b-ac5b-4836-8448-e0d45bd706f7" />
+    <UnitTestResult executionId="ef5b3b04-0ca8-4538-b33c-143a83491478" testId="6ae28846-e0b3-00b5-9d0a-4d3ad171ba63" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;00:00:30&quot;, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0009170" startTime="2026-09-16T19:06:44.0642422+03:00" endTime="2026-09-16T19:06:44.0642939+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ef5b3b04-0ca8-4538-b33c-143a83491478" />
+    <UnitTestResult executionId="d7f5ac03-b56f-4ad6-bb82-bc37a52aee89" testId="9706c49d-0aed-13e0-a1ed-cb3aef3e0dd3" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;#fb8c0&quot;, icon: null, lifetime: null, mode: null, ok: False)" computerName="ASUS-MONK" duration="00:00:00.0000026" startTime="2026-09-16T19:06:44.1318119+03:00" endTime="2026-09-16T19:06:44.1318857+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d7f5ac03-b56f-4ad6-bb82-bc37a52aee89" />
+    <UnitTestResult executionId="e666a643-670a-446e-93e3-5b8c8476909a" testId="b770bd78-d266-47ea-af29-8e4d84561004" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Name_and_sort_order_have_bounds" computerName="ASUS-MONK" duration="00:00:00.0005254" startTime="2026-09-16T19:06:44.5001045+03:00" endTime="2026-09-16T19:06:44.5001880+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e666a643-670a-446e-93e3-5b8c8476909a" />
+    <UnitTestResult executionId="6238e9ae-5bdd-4d11-9874-4aabdfff7c30" testId="25271e2e-d5fa-1341-dadf-be0cf8818c6d" testName="Puluj.Admin.Tests.CatalogEndpointsTests.Legacy_mapping_is_read_from_metadata_and_the_snapshot_carries_the_admin_owned_fields" computerName="ASUS-MONK" duration="00:00:00.0679066" startTime="2026-09-16T19:06:44.1338597+03:00" endTime="2026-09-16T19:06:44.1339607+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6238e9ae-5bdd-4d11-9874-4aabdfff7c30" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Name_and_sort_order_have_bounds" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="b770bd78-d266-47ea-af29-8e4d84561004">
+      <Execution id="e666a643-670a-446e-93e3-5b8c8476909a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Name_and_sort_order_have_bounds" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Merge_plan_applies_the_command_rules_and_predicts_the_aggregate" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="30a7a4f4-2d1e-2227-7b42-9f7d8f8daf89">
+      <Execution id="7bad5766-f929-4da7-af0a-652aa2c709b1" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Merge_plan_applies_the_command_rules_and_predicts_the_aggregate" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;orange&quot;, icon: null, lifetime: null, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="dfa9dd4c-7570-15e0-bec5-fd520aec1850">
+      <Execution id="8249d589-4e99-467b-a488-dd5aac2d89d7" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;00:00:30&quot;, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="6ae28846-e0b3-00b5-9d0a-4d3ad171ba63">
+      <Execution id="ef5b3b04-0ca8-4538-b33c-143a83491478" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: &quot;rocket&quot;, lifetime: null, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="fb92173c-ea40-38e4-1007-637709b4db7a">
+      <Execution id="de1c99ea-d2c7-47f7-84b7-34d98fce2a80" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: null, mode: &quot;sprite&quot;, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="eed70d38-78bd-c7b0-fc2b-c2366bcb5acd">
+      <Execution id="ff74dafa-e51c-4ebe-99c1-b9090221b1ca" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Actor_and_reason_are_required" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="f1b42afc-2038-e498-7768-e3b167f30402">
+      <Execution id="f753abe2-1fdc-4de9-8db9-73ac00818051" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Actor_and_reason_are_required" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;02:00:00&quot;, mode: null, ok: True)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="dbdfeab5-6131-9b0f-1eb3-0299b16826fb">
+      <Execution id="70e8c589-90b8-415f-81fa-ea2ed49d003d" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: &quot;fire&quot;, lifetime: null, mode: null, ok: True)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="824e632b-3003-d3f8-0247-e8d351b1963e">
+      <Execution id="f3e5edb0-f37f-4f2a-9c53-7fea213b16e8" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Legacy_mapping_is_read_from_metadata_and_the_snapshot_carries_the_admin_owned_fields" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="25271e2e-d5fa-1341-dadf-be0cf8818c6d">
+      <Execution id="6238e9ae-5bdd-4d11-9874-4aabdfff7c30" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Legacy_mapping_is_read_from_metadata_and_the_snapshot_carries_the_admin_owned_fields" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;#fb8c0&quot;, icon: null, lifetime: null, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="9706c49d-0aed-13e0-a1ed-cb3aef3e0dd3">
+      <Execution id="d7f5ac03-b56f-4ad6-bb82-bc37a52aee89" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: null, mode: &quot;area&quot;, ok: True)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="0a85425b-73a4-6f57-bb45-43cae307642a">
+      <Execution id="cb102a4b-ac5b-4836-8448-e0d45bd706f7" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;soon&quot;, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="79967036-7df0-b8f5-436b-703b53248be5">
+      <Execution id="a0cb85c4-1dba-4f58-bb4f-fbb8081009e1" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;8.00:00:00&quot;, mode: null, ok: False)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="2ece072f-6b15-780a-01da-cb5a06b9d1d0">
+      <Execution id="b2cf9e9b-eab8-47e0-b055-355f19e0b000" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: &quot;#fb8c00&quot;, icon: null, lifetime: null, mode: null, ok: True)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="8e6adbde-c697-f659-47de-ce4f63d4adb9">
+      <Execution id="432fbdfd-0515-434d-9ebc-1057067fee86" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+    <UnitTest name="Puluj.Admin.Tests.CatalogEndpointsTests.Presentation_fields_are_validated(color: null, icon: null, lifetime: &quot;1.12:00:00&quot;, mode: null, ok: True)" storage="c:\repos\puluj-g\tests\puluj.admin.tests\bin\debug\net10.0\puluj.admin.tests.dll" id="3f584e37-8201-649d-9f2f-76c0aa6185eb">
+      <Execution id="aba40f4a-aeb2-4bb0-bd02-43c2c078c93c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Admin.Tests\bin\Debug\net10.0\Puluj.Admin.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Admin.Tests.CatalogEndpointsTests" name="Presentation_fields_are_validated" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="dfa9dd4c-7570-15e0-bec5-fd520aec1850" executionId="8249d589-4e99-467b-a488-dd5aac2d89d7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="79967036-7df0-b8f5-436b-703b53248be5" executionId="a0cb85c4-1dba-4f58-bb4f-fbb8081009e1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="824e632b-3003-d3f8-0247-e8d351b1963e" executionId="f3e5edb0-f37f-4f2a-9c53-7fea213b16e8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="eed70d38-78bd-c7b0-fc2b-c2366bcb5acd" executionId="ff74dafa-e51c-4ebe-99c1-b9090221b1ca" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="30a7a4f4-2d1e-2227-7b42-9f7d8f8daf89" executionId="7bad5766-f929-4da7-af0a-652aa2c709b1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2ece072f-6b15-780a-01da-cb5a06b9d1d0" executionId="b2cf9e9b-eab8-47e0-b055-355f19e0b000" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3f584e37-8201-649d-9f2f-76c0aa6185eb" executionId="aba40f4a-aeb2-4bb0-bd02-43c2c078c93c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f1b42afc-2038-e498-7768-e3b167f30402" executionId="f753abe2-1fdc-4de9-8db9-73ac00818051" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dbdfeab5-6131-9b0f-1eb3-0299b16826fb" executionId="70e8c589-90b8-415f-81fa-ea2ed49d003d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fb92173c-ea40-38e4-1007-637709b4db7a" executionId="de1c99ea-d2c7-47f7-84b7-34d98fce2a80" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8e6adbde-c697-f659-47de-ce4f63d4adb9" executionId="432fbdfd-0515-434d-9ebc-1057067fee86" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0a85425b-73a4-6f57-bb45-43cae307642a" executionId="cb102a4b-ac5b-4836-8448-e0d45bd706f7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6ae28846-e0b3-00b5-9d0a-4d3ad171ba63" executionId="ef5b3b04-0ca8-4538-b33c-143a83491478" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9706c49d-0aed-13e0-a1ed-cb3aef3e0dd3" executionId="d7f5ac03-b56f-4ad6-bb82-bc37a52aee89" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b770bd78-d266-47ea-af29-8e4d84561004" executionId="e666a643-670a-446e-93e3-5b8c8476909a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="25271e2e-d5fa-1341-dadf-be0cf8818c6d" executionId="6238e9ae-5bdd-4d11-9874-4aabdfff7c30" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="16" executed="16" passed="15" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.17]   Discovering: Puluj.Admin.Tests&#xD;
+[xUnit.net 00:00:00.27]   Discovered:  Puluj.Admin.Tests&#xD;
+[xUnit.net 00:00:00.32]   Starting:    Puluj.Admin.Tests&#xD;
+[xUnit.net 00:00:00.92]       Assert.Equal() Failure: Strings differ&#xD;
+[xUnit.net 00:00:00.92]                  ↓ (pos 0)&#xD;
+[xUnit.net 00:00:00.92]       Expected: "source"&#xD;
+[xUnit.net 00:00:00.92]       Actual:   "target"&#xD;
+[xUnit.net 00:00:00.92]                  ↑ (pos 0)&#xD;
+[xUnit.net 00:00:00.92]       Stack Trace:&#xD;
+[xUnit.net 00:00:00.92]         C:\repos\Puluj-g\tests\Puluj.Admin.Tests\CatalogEndpointsTests.cs(97,0): at Puluj.Admin.Tests.CatalogEndpointsTests.Merge_plan_applies_the_command_rules_and_predicts_the_aggregate()&#xD;
+[xUnit.net 00:00:00.92]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+[xUnit.net 00:00:00.93]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:00.93]   Finished:    Puluj.Admin.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T19:06:44.4966419+03:00">
+        <Text>[xUnit.net 00:00:00.92]     Puluj.Admin.Tests.CatalogEndpointsTests.Merge_plan_applies_the_command_rules_and_predicts_the_aggregate [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

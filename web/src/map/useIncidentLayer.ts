@@ -36,6 +36,7 @@ export function useIncidentLayer({ map, palette, clock, regionsById, placeGeomet
   const ready = useRef(false)
 
   useEffect(() => {
+    if (import.meta.env.DEV) Object.assign(window, { __incidents: useIncidentStore }) // E2E/debug hook (both maps set __map below)
     if (catalogLoaded) return
     catalogLoaded = true
     fetch('/api/event-kinds', { headers: { Accept: 'application/json' } })
@@ -51,6 +52,7 @@ export function useIncidentLayer({ map, palette, clock, regionsById, placeGeomet
   // Layers live in the style: re-added after every style change (theme switch), icons recoloured with the catalog.
   useEffect(() => {
     if (!map) return
+    if (import.meta.env.DEV) Object.assign(window, { __map: map }) // E2E: whichever map is mounted (MapView or KyivMapView)
     const install = () => {
       if (map.getSource('incident-points')) return
       addIncidentSources(map)
@@ -89,11 +91,13 @@ export function useIncidentLayer({ map, palette, clock, regionsById, placeGeomet
   const selected: IncidentDto | undefined = selectedId === null ? undefined : byId[selectedId]
   const open = useCallback(
     (incident: IncidentDto, at?: [number, number]) => {
-      const point = at ?? (incident.location?.point ? [incident.location.point.coordinates[0], incident.location.point.coordinates[1]] : null)
+      // An unlocated incident has no anchor: the popup opens at the map centre (it is never drawn, only listed).
+      const located = incident.location?.point ? ([incident.location.point.coordinates[0], incident.location.point.coordinates[1]] as [number, number]) : null
+      const point = at ?? located ?? (map ? ([map.getCenter().lng, map.getCenter().lat] as [number, number]) : null)
       if (!point) return
       select(incident.id)
       setClickAt(point)
-      if (!at && map) map.easeTo({ center: point })
+      if (!at && located && map) map.easeTo({ center: located })
     },
     [map, select],
   )

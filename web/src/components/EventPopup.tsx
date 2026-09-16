@@ -21,6 +21,11 @@ const eventLabel: Record<string, string> = {
   TargetCancelled: 'Скасування повідомлення про ціль',
 }
 
+/** Only web links are rendered as links (a permalink is source data, never trusted as a scheme). */
+function safeHref(url?: string): boolean {
+  return typeof url === 'string' && /^https?:\/\//i.test(url)
+}
+
 /** A source report is an observation, not a track: it deliberately has no direction, ETA or forecast. */
 export default function EventPopup({ map, event, anchor, onClose }: Props) {
   const now = useStore((s) => s.now)
@@ -72,7 +77,14 @@ export default function EventPopup({ map, event, anchor, onClose }: Props) {
           <dt className="text-slate-500">Локація</dt>
           <dd className="truncate">{event.location?.placeName ?? '—'} {event.location && <span className="text-slate-400">({locationKindLabel[event.location.kind]})</span>}</dd>
           <dt className="text-slate-500">Джерело</dt>
-          <dd className="truncate">{event.source.name}</dd>
+          <dd className="truncate">
+            {event.source.name}
+            {safeHref(event.rawMessage.url) && (
+              <a className="ml-1 text-blue-600 underline dark:text-blue-400" href={event.rawMessage.url} target="_blank" rel="noreferrer">
+                оригінал
+              </a>
+            )}
+          </dd>
         </dl>
         <div className="mt-2 border-t border-slate-200 pt-1.5 text-[11px] leading-snug text-slate-700 dark:border-slate-700 dark:text-slate-300">
           {text || '(текст повідомлення недоступний)'}

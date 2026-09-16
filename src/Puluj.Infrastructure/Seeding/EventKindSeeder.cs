@@ -33,6 +33,12 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
             logger.LogWarning("{File} not found under {Root}; skipping", FileName, files.Root);
             return;
         }
+        await SeedAsync(db, file, ct);
+    }
+
+    /// <summary>Seeds from an in-memory file (tests feed a modified policy version to prove the admin-owned presentation survives a refresh).</summary>
+    public async Task SeedAsync(PulujDbContext db, EventKindsFile file, CancellationToken ct)
+    {
         Validate(file);
 
         var existing = await db.EventKinds.ToDictionaryAsync(k => k.Code, StringComparer.Ordinal, ct);
@@ -50,10 +56,18 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
             }
             else if (file.PolicyVersion > row.PolicyVersion)
             {
-                // Presentation/policy follow the newer seed; the code (identity) and any admin-owned Enabled flag stay.
-                var enabled = row.Enabled;
-                Apply(row, k, file.PolicyVersion);
-                row.Enabled = enabled;
+                if (row.PresentationOverriddenAt is not null)
+                {
+                    // P12 (ADR-0008): an admin owns the presentation of this row — only the seed-owned policy fields follow the newer file.
+                    ApplyPolicy(row, k, file.PolicyVersion);
+                }
+                else
+                {
+                    // Presentation/policy follow the newer seed; the code (identity) and any admin-owned Enabled flag stay.
+                    var enabled = row.Enabled;
+                    Apply(row, k, file.PolicyVersion);
+                    row.Enabled = enabled;
+                }
                 refreshed++;
             }
         }
@@ -61,7 +75,10 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
         logger.LogInformation("Event kinds: {Count} in file (policy v{Version}), {Added} new, {Refreshed} refreshed", file.Kinds.Count, file.PolicyVersion, added, refreshed);
     }
 
-    /// <summary>Seed invariants that tests also check: contract code pattern, known category, unique codes, legacy map parity.</summary>
+    /// <summary>Icons the map can draw (P12 catalog editor validates against the same list, so seed and admin never drift); the client maps them to glyph shapes.</summary>
+    public static readonly string[] IconVocabulary = ["air-defence", "alert", "alert-off", "cancel", "damage", "evacuation", "explosion", "fire", "impact", "interception", "launch", "notice", "outage", "target", "unknown"];
+
+    /// <summary>Seed invariants that tests also check: contract code pattern, known category, unique codes, legacy map parity, icon vocabulary.</summary>
     public static void Validate(EventKindsFile file)
     {
         var codes = new HashSet<string>(StringComparer.Ordinal);
@@ -78,6 +95,10 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
             if (!Enum.GetNames<EventKindCategory>().Any(n => string.Equals(n, k.Category, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new InvalidOperationException($"event-kinds.json: unknown category '{k.Category}' for '{k.Code}'");
+            }
+            if (k.MapIcon is { } icon && !IconVocabulary.Contains(icon, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException($"event-kinds.json: unknown mapIcon '{icon}' for '{k.Code}'");
             }
             EventType? legacy;
             try
@@ -102,21 +123,28 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
         }
     }
 
+    /// <summary>Everything from the file: the admin-owned presentation fields and the seed-owned policy fields.</summary>
     private static void Apply(EventKind row, EventKindSeedEntry k, int policyVersion)
     {
         row.NameUk = k.NameUk;
-        row.Category = Enum.Parse<EventKindCategory>(k.Category, true);
-        row.DefaultSeverity = k.DefaultSeverity;
-        row.StateModel = k.StateModel;
         row.RequiresLocationForMap = k.RequiresLocationForMap ?? false;
         row.RenderMode = k.RenderMode;
         row.MapColor = k.MapColor;
         row.MapIcon = k.MapIcon;
         row.MapLifetime = k.MapLifetime is null ? null : TimeSpan.Parse(k.MapLifetime);
-        row.CreatesIncident = k.CreatesIncident ?? false;
         row.Enabled = k.Enabled ?? true;
         row.MapVisible = k.MapVisible ?? true;
         row.SortOrder = k.SortOrder ?? 0;
+        ApplyPolicy(row, k, policyVersion);
+    }
+
+    /// <summary>The seed-owned fields only (ADR-0008/0010): category, severity, state model, incident policy, metadata, presentation json, policy version.</summary>
+    private static void ApplyPolicy(EventKind row, EventKindSeedEntry k, int policyVersion)
+    {
+        row.Category = Enum.Parse<EventKindCategory>(k.Category, true);
+        row.DefaultSeverity = k.DefaultSeverity;
+        row.StateModel = k.StateModel;
+        row.CreatesIncident = k.CreatesIncident ?? false;
         row.DedupPolicy = ToDoc(k.DedupPolicy);
         row.Presentation = ToDoc(k.Presentation);
         row.Metadata = ToDoc(k.Metadata);

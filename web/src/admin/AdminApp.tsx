@@ -8,6 +8,8 @@ import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
 import { WorkersPanel } from './WorkersPanel'
 import { PipelinePanel } from './PipelinePanel'
+import { CatalogPanel } from './CatalogPanel'
+import { IncidentsPanel } from './IncidentsPanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
 // The admin build is used both locally (:5268 → map :5267) and through Docker
@@ -15,7 +17,7 @@ import { PipelinePanel } from './PipelinePanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
@@ -27,6 +29,8 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'analytics', label: 'Хто кого копіює', group: 'Аналітика' },
   // Same component as `analytics`: it reads the hash itself and opens its "Сервіс" tab on #/analytics-service.
   { id: 'analytics-service', label: 'Стан сервісу', group: 'Аналітика' },
+  { id: 'catalog', label: 'Каталог подій', group: 'Дані' },
+  { id: 'incidents', label: 'Інциденти', group: 'Дані' },
   { id: 'sources', label: 'Джерела', group: 'Налаштування' },
   { id: 'rating', label: 'Рейтинг джерел', group: 'Налаштування' },
   { id: 'alerts', label: 'alerts.in.ua', group: 'Налаштування' },
@@ -161,6 +165,8 @@ export default function AdminApp() {
                 {section === 'db' && <DbPanel />}
                 {section === 'logs' && <LogsPanel />}
                 {(section === 'analytics' || section === 'analytics-service') && <AnalyticsPanel />}
+                {section === 'catalog' && <CatalogPanel />}
+                {section === 'incidents' && <IncidentsPanel />}
                 {section === 'sources' && <SourcesEditor sources={sources} reload={load} notify={setMessage} />}
                 {section === 'rating' && <SourceRatingPanel />}
                 {section === 'alerts' && <AlertsSection {...props} />}

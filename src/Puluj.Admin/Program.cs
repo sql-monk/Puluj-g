@@ -75,6 +75,7 @@ app.MapAdminEndpoints();
 app.MapOpsEndpoints();
 Puluj.Admin.Endpoints.RulesetEndpoints.MapRulesetEndpoints(app);
 Puluj.Admin.Endpoints.IncidentEndpoints.MapIncidentEndpoints(app);
+Puluj.Admin.Endpoints.CatalogEndpoints.MapCatalogEndpoints(app); // P12 catalog editor
 app.MapAnalyticsEndpoints();
 
 // The admin SPA is built as admin.html (second Vite entry of the shared web/ code base).

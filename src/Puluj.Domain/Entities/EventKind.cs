@@ -37,6 +37,12 @@ public class EventKind
     public JsonDocument? Presentation { get; set; }
     /// <summary>Seed metadata, e.g. <c>legacyEventType</c> — the <see cref="EventType"/> member this kind maps to.</summary>
     public JsonDocument? Metadata { get; set; }
+    /// <summary>
+    /// P12 (ADR-0008): set when an admin edited the presentation fields (name, map colour/icon/lifetime/visibility, render mode,
+    /// sort order, enabled, requires-location). A newer seed then refreshes only the seed-owned fields (category, severity, state
+    /// model, creates_incident, dedup_policy, metadata, presentation json, policy_version) and leaves these alone.
+    /// </summary>
+    public DateTimeOffset? PresentationOverriddenAt { get; set; }
     /// <summary>Version of the seed policy the row last took its presentation from; the seeder only overwrites when the file is newer.</summary>
     public int PolicyVersion { get; set; }
 }
