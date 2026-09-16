@@ -100,6 +100,28 @@ aspect ratio on constrained axis. This is not zoom multiplication and geometry
 does not invent event points. Missing/multiple locations need explanation or
 choice. Show-on-map loads closed/history data outside live TTL.
 
+### Map selection and return (U10)
+
+The map owns a typed `select={kind}:{decimal-id}` query value. `kind` is
+`track`, `incident`, `alert`, `observation`, or `message`; `id` is always an
+opaque decimal string. A selected locator is loaded separately from the active
+snapshot and rendered as a selected-evidence overlay, so an old observation is
+not represented as a currently active track.
+
+Examples:
+
+* `#/map/history?from=2026-09-15T00%3A00%3A00.000Z&to=2026-09-16T00%3A00%3A00.000Z&at=2026-09-15T12%3A00%3A00.000Z&select=observation%3A9007199254740993&return=%23%2Fentities%2Fobservation%2F9007199254740993`
+* `#/map/live?select=track%3A9007199254740993&return=%23%2Fentities%2Ftrack%2F9007199254740993`
+
+`return` accepts only a canonical internal public hash. The return action
+restores that route (including its filters/cursor); an absent or invalid return
+only clears selection on the current map route. A selection with no confirmed
+geometry remains a valid detail context and explains why no marker is drawn.
+For a message the URL carries its raw revision ID, never a list of result IDs.
+The UI may render a bounded available-result overlay; when the inline result
+budget is exceeded it requires choosing one result instead of fetching every
+page or silently dropping geometry.
+
 ## Public API v1
 
 | Endpoint | Response |

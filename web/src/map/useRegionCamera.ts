@@ -39,7 +39,7 @@ interface Options {
   placeId: number | null
   ensureGeometry: (placeId: number) => Promise<Geometry | undefined>
   /** Increments for an explicit map/selector/URL selection, including a repeat click on the same region. */
-  request: number
+  request: number | string
   /** Open/close panels and replay are legitimate reasons to re-fit while camera is still automatic. */
   layoutKey: string
 }
@@ -77,7 +77,7 @@ export function useRegionCamera({ map, container, geometry, placeId, ensureGeome
   }, [container])
 
   useEffect(() => {
-    if (request === 0) return
+    if (!request) return
     automatic.current = true
     if (fit() || placeId === null) return
     const selectedRequest = request

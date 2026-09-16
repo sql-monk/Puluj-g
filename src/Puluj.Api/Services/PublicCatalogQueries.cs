@@ -100,7 +100,7 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
             throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
         EnsureDataset(dataset, Dataset(activeGeneration));
         var actualDataset = Dataset(activeGeneration);
-        var entity = await OneAsync(db, kind, id, activeGeneration, ct);
+        var entity = await OneAsync(db, kind, id, activeGeneration, at, ct);
         if (entity is null)
         {
             return null;
@@ -220,15 +220,20 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private static int PageSize(int? limit) => Math.Clamp(limit ?? DefaultPageSize, 1, MaxPageSize);
 
-    private static void ValidateDetail(string kind, string? dataset, string? historyBasis, DateTimeOffset? at)
+    private void ValidateDetail(string kind, string? dataset, string? historyBasis, DateTimeOffset? at)
     {
         if (!EntityKinds.Contains(kind, StringComparer.Ordinal)) throw new QueryException("kind must be track|incident|alert|observation");
-        if (!string.IsNullOrWhiteSpace(historyBasis) || at is not null) throw new QueryException("historical dataset is not ready; reload without historyBasis/at", StatusCodes.Status409Conflict);
+        if (!string.IsNullOrWhiteSpace(historyBasis) || at is not null)
+        {
+            if (!string.Equals(historyBasis, "reconstructed", StringComparison.OrdinalIgnoreCase) || at is null)
+                throw new QueryException("historical detail requires historyBasis=reconstructed and at", StatusCodes.Status400BadRequest);
+            if (at > clock.GetUtcNow()) throw new QueryException("historical at cannot be in the future");
+        }
         if (!string.IsNullOrWhiteSpace(dataset) && !string.Equals(dataset, LiveDataset, StringComparison.OrdinalIgnoreCase)
             && !dataset.StartsWith(LiveDataset + ":", StringComparison.OrdinalIgnoreCase)) throw new QueryException("dataset is no longer active; reload", StatusCodes.Status409Conflict);
     }
 
-    private static void ValidateCollection(string kind, string? dataset) => ValidateDetail(kind, dataset, null, null);
+    private void ValidateCollection(string kind, string? dataset) => ValidateDetail(kind, dataset, null, null);
 
     private static string Dataset(Guid? activeGeneration) => activeGeneration is Guid generation ? $"{LiveDataset}:{generation:N}" : LiveDataset;
     private static void EnsureDataset(Filter filter, Guid? activeGeneration) => EnsureDataset(filter.Dataset, Dataset(activeGeneration));
@@ -465,17 +470,48 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         model is int m && refs.Models.TryGetValue(m, out var md) ? md.CanonicalName : family is int f && refs.Families.TryGetValue(f, out var fa) ? fa.Name :
         @class is int c && refs.Classes.TryGetValue(c, out var cl) ? cl.Name : refs.Categories.GetValueOrDefault(category)?.Name;
 
-    private async Task<PublicEntitySummaryDto?> OneAsync(PulujDbContext db, string kind, long id, Guid? generation, CancellationToken ct) => kind switch
+    private async Task<PublicEntitySummaryDto?> OneAsync(PulujDbContext db, string kind, long id, Guid? generation, DateTimeOffset? at, CancellationToken ct) => kind switch
     {
-        "track" => await db.TargetTracks.AsNoTracking().FirstOrDefaultAsync(x => x.TargetTrackId == id, ct) is { } t ? TrackSummary(t, null) : null,
+        "track" => await TrackAtAsync(db, id, at, ct),
         "incident" when generation is Guid g => await db.Incidents.AsNoTracking().FirstOrDefaultAsync(x => x.IncidentId == id && x.GenerationId == g && !x.Suppressed, ct) is { } i ? IncidentSummary(i, null) : null,
-        "alert" => await db.AirAlerts.AsNoTracking().FirstOrDefaultAsync(x => x.AirAlertId == id, ct) is { } a ? AlertSummary(a) : null,
+        "alert" => await AlertAtAsync(db, id, at, ct),
         "observation" => await db.Targets.AsNoTracking().FirstOrDefaultAsync(x => x.TargetId == id, ct) is { } o ? ObservationSummary(o) : null,
         _ => null,
     };
 
     private async Task<bool> ExistsAsync(PulujDbContext db, string kind, long id, Guid? generation, CancellationToken ct) =>
-        await OneAsync(db, kind, id, generation, ct) is not null;
+        await OneAsync(db, kind, id, generation, null, ct) is not null;
+
+    /// <summary>Uses the append-only revision, rather than the current track row, for an exact reconstructed frame.</summary>
+    private async Task<PublicEntitySummaryDto?> TrackAtAsync(PulujDbContext db, long id, DateTimeOffset? at, CancellationToken ct)
+    {
+        if (at is null)
+            return await db.TargetTracks.AsNoTracking().FirstOrDefaultAsync(x => x.TargetTrackId == id, ct) is { } current ? TrackSummary(current, null) : null;
+        var revision = await db.TargetTrackRevisions.AsNoTracking().Where(x => x.TargetTrackId == id && x.RevisionAt <= at)
+            .OrderByDescending(x => x.RevisionAt).FirstOrDefaultAsync(ct);
+        if (revision is not null)
+            return new PublicEntitySummaryDto("track", id.ToString(), $"Трек #{id}", null, null,
+                Classification(revision.TargetCategoryId, revision.TargetClassId, revision.TargetFamilyId, revision.TargetModelId), revision.LastSeenAt,
+                revision.Status.ToString().ToLowerInvariant(), revision.TrackConfidence.ToString().ToLowerInvariant(), revision.LastLocationKind.ToString().ToLowerInvariant(),
+                revision.LastLocationPlaceId, refs.Place(revision.LastLocationPlaceId)?.Name, refs.RegionOf(revision.LastLocationPlaceId)?.Id, [], revision.TargetCount, revision.TargetCount,
+                revision.LastLocation is not null || revision.LastLocationPlaceId is not null,
+                Locator(revision.LastLocationKind, revision.LastLocationPlaceId, revision.LastLocation, revision.LastLocationAccuracyKm, revision.LastSeenAt));
+        // The detail exists, but a state before its first evidence does not.  Do not fall back to the current row.
+        return await db.TargetTracks.AsNoTracking().AnyAsync(x => x.TargetTrackId == id, ct)
+            ? new PublicEntitySummaryDto("track", id.ToString(), $"Трек #{id}", null, null, null, at.Value, "not_yet_available", null, null, null, null, null, [], 0, 0, false,
+                new PublicMapLocatorDto(null, null, null, null, null, null, at, "before_first_evidence"))
+            : null;
+    }
+
+    private async Task<PublicEntitySummaryDto?> AlertAtAsync(PulujDbContext db, long id, DateTimeOffset? at, CancellationToken ct)
+    {
+        var alert = await db.AirAlerts.AsNoTracking().FirstOrDefaultAsync(x => x.AirAlertId == id, ct);
+        if (alert is null) return null;
+        if (at is not null && at < alert.StartedAt)
+            return AlertSummary(alert) with { At = at.Value, State = "not_yet_available", MapAvailable = false,
+                Map = new PublicMapLocatorDto(null, null, null, null, null, null, at, "before_alert_started") };
+        return AlertSummary(alert);
+    }
 
     private async Task<PublicCollectionPageDto<PublicEvidenceDto>> EvidenceAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, Guid? generation, string scope, CancellationToken ct)
     {
