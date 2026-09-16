@@ -13,6 +13,7 @@ import TrackDetailsDrawer from './components/TrackDetailsDrawer'
 import KyivMapView from './map/KyivMapView'
 import MapView from './map/MapView'
 import EntityCatalogue from './entities/EntityCatalogue'
+import MessagesCatalogue from './messages/MessagesCatalogue'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
 import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
 import { parseDataQuery } from './public/query'
@@ -297,7 +298,7 @@ export default function App() {
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
       {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} />}
-      {route.section === 'messages' && <SectionPlaceholder title="Повідомлення" text="Каталог початкових повідомлень буде додано в U09." />}
+      {route.section === 'messages' && <MessagesCatalogue route={route} query={dataQuery} />}
       {mapRoute && (kyivPreset ? (
         <KyivPanel route={route} open={panelOpen} onClose={closePanel} />
       ) : (
@@ -327,10 +328,6 @@ export default function App() {
       )}
     </div>
   )
-}
-
-function SectionPlaceholder({ title, text }: { title: string; text: string }) {
-  return <main className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-8 pt-28 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-slate-600 dark:text-slate-300">{text}</p></div></main>
 }
 
 function SectionPanel({ route, open, onClose, section }: { route: PublicRoute; open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {

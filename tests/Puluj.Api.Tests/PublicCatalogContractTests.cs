@@ -34,7 +34,7 @@ public class PublicCatalogContractTests
     public void U05_Public_message_contract_keeps_bigint_and_text_allowlist_separate_from_processing_metadata()
     {
         var id = "9007199254740993";
-        var summary = new PublicMessageSummaryDto(id, 7, "source", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "post-1", "e42", "7:post-1",
+        var summary = new PublicMessageSummaryDto(id, 7, "source", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "post-1", "e42", "7:post-1", "safe excerpt",
             "completed", "stage_result", "https://example.test/post", 1, 1, 1, 0, true);
         var map = new PublicMapLocatorDto("point", null, null, null, "point", null, DateTimeOffset.UnixEpoch, null);
         var result = new PublicMessageResultDto(id, null, 0, "allowed segment", "event", null, DateTimeOffset.UnixEpoch, "high", 7, true, map, []);
@@ -43,6 +43,7 @@ public class PublicCatalogContractTests
         ApiDependencyInjection.ConfigureJson(options);
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(detail, options));
         Assert.Equal(JsonValueKind.String, json.RootElement.GetProperty("message").GetProperty("id").ValueKind);
+        Assert.Equal("safe excerpt", json.RootElement.GetProperty("message").GetProperty("excerpt").GetString());
         Assert.False(json.RootElement.TryGetProperty("rawPayload", out _));
         Assert.False(json.RootElement.TryGetProperty("parserMetadata", out _));
         Assert.False(json.RootElement.TryGetProperty("worker", out _));
