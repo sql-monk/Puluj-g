@@ -2,6 +2,10 @@
   <!-- Self-contained: reads the public schema with plain SQL and owns the `analytics` schema; no reference to the
        Domain / Infrastructure projects so the analytics service evolves independently of the pipeline. -->
   <ItemGroup>
+    <ProjectReference Include="..\Puluj.Domain\Puluj.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

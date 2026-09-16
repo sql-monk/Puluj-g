@@ -107,3 +107,4 @@ public class TrackFirst
     public double LagSecondsSum { get; set; }
     public int LagCount { get; set; }
 }
+

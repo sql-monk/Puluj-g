@@ -79,6 +79,17 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `AddIncidentReadIndexes` (індекс keyset для `/api/incidents`) — additive. Налаштування API: `Map:IncidentHours` (24), `Map:IncidentSnapshotLimit` (1000),
 `Map:IncidentMaxWindowDays` (7). Rolling deploy: старий API ігнорує NOTIFY невідомого типу.
 
+### Аналітика повідомлень (P15)
+
+Міграція `AddMessageLifecycle` (`PulujDbContext`, таблиця `analytics.message_lifecycle` + індекси, grants для `puluj_admin`/`puluj_reader`) — additive;
+роль `migrate` створює таблицю до старту consumers. Topology **v10**: `message-analytics` active — роль у дефолтних ролях `messaging` (`MESSAGING_WORKER_ROLES`,
+`deploy.ps1`); expected set `raw.stored`/`message.analysis.completed`/`*.changed` тепер включає її (pending до старту consumer — видно у панелі «Черги»,
+watchdog її не чекає). Порядок: `migrate` → `messaging` (роль `message-analytics`) → Analytics.Worker (backfill з evidence по курсору, reconciliation щохвилини)
+→ панель «Аналітика повідомлень» → перевірити звірку (raw = проєкція) → навігація (copy-аналітика лишається як «Хто кого копіює»). Опції Analytics.Worker:
+`Analytics:LifecycleBackfillBatch` (2000), `LifecycleBackfillBatchesPerPass` (5), `LifecycleReconcileWindow` (48 год), `LifecycleReconcileGrace` (2 хв),
+`LifecycleStaleMinutes` (15), `ReportCacheSeconds` (30). Rollback: `Down` дропає таблицю; підписку можна поставити на паузу lane'ами (P13), expected set
+лишається — після відновлення backlog дочитується. Legacy raw (до стадій P05) отримують `timings_available=false` — не вигадуються.
+
 ### Replay runs і generations (P14)
 
 Міграція `AddReplayRuns` — additive (індекси `ux_processing_runs_open_replay`, `ix_messaging_events_run`); `Down` дропає їх. Topology **v9** (incident-worker

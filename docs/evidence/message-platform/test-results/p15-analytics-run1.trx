@@ -1,0 +1,338 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="05c52172-b0e4-4ab3-acc6-b60ed06ccdaf" name="aleks@ASUS-MONK 2026-09-16 22:58:46" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T22:58:46.0365690+03:00" queuing="2026-09-16T22:58:46.0365695+03:00" start="2026-09-16T22:58:45.2008378+03:00" finish="2026-09-16T22:59:04.5026676+03:00" />
+  <TestSettings name="default" id="2954ee71-f3ff-4c08-84a9-c7b79f17635d">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_22_58_46" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="970df18c-d95b-4372-aede-589a4732ee3b" testId="a6df66cf-c9e5-edbd-8ec6-51bf499f5e0f" testName="Puluj.Analytics.Tests.TextNormalizerTests.Empty_and_null_are_empty" computerName="ASUS-MONK" duration="00:00:00.0089615" startTime="2026-09-16T22:58:45.9584024+03:00" endTime="2026-09-16T22:58:45.9828727+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="970df18c-d95b-4372-aede-589a4732ee3b" />
+    <UnitTestResult executionId="0f33b9ee-e2e8-4c43-9770-a17da4a6a734" testId="5f90fc97-22a3-489a-bb76-16a898a88364" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 60, expected: 1)" computerName="ASUS-MONK" duration="00:00:00.0077990" startTime="2026-09-16T22:58:45.9565431+03:00" endTime="2026-09-16T22:58:45.9829860+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0f33b9ee-e2e8-4c43-9770-a17da4a6a734" />
+    <UnitTestResult executionId="99503405-58a4-485c-af48-c4a31e407a88" testId="2a803423-ec14-b945-d14c-609e03008707" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 21599, expected: 4)" computerName="ASUS-MONK" duration="00:00:00.0000170" startTime="2026-09-16T22:58:46.0069822+03:00" endTime="2026-09-16T22:58:46.0070156+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="99503405-58a4-485c-af48-c4a31e407a88" />
+    <UnitTestResult executionId="73d594f8-4926-4c47-989b-43a8865df361" testId="158e71f8-7d02-87b7-e79c-53af107bff21" testName="Puluj.Analytics.Tests.PairDelaysTests.Summary_of_an_empty_pair_has_no_aggregates" computerName="ASUS-MONK" duration="00:00:00.0030346" startTime="2026-09-16T22:58:46.0169059+03:00" endTime="2026-09-16T22:58:46.0198023+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="73d594f8-4926-4c47-989b-43a8865df361" />
+    <UnitTestResult executionId="0f2c073b-9e92-47ce-a66d-e02e692fc5f7" testId="806351e1-2de9-8fde-57a1-5d2df599b4f2" testName="Puluj.Analytics.Tests.AnalysisRunnerTests.Pairs_differently_worded_posts_when_their_parsed_event_matches" computerName="ASUS-MONK" duration="00:00:00.5547363" startTime="2026-09-16T22:58:58.0752764+03:00" endTime="2026-09-16T22:59:04.2883793+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0f2c073b-9e92-47ce-a66d-e02e692fc5f7" />
+    <UnitTestResult executionId="f5fd658c-400e-4799-b0c9-ba6e53c600ea" testId="8c7ec2ae-2d80-d7ec-e7c2-d7c74bbcf9e3" testName="Puluj.Analytics.Tests.PairDelaysTests.Median_interpolates_like_percentile_cont" computerName="ASUS-MONK" duration="00:00:00.0007868" startTime="2026-09-16T22:58:46.0199282+03:00" endTime="2026-09-16T22:58:46.0207141+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f5fd658c-400e-4799-b0c9-ba6e53c600ea" />
+    <UnitTestResult executionId="f18f3679-7d88-47df-83af-41374082817f" testId="5a0f1251-1c7d-d1ef-ebb4-deff0fa81b45" testName="Puluj.Analytics.Tests.ShinglerTests.Small_edit_keeps_high_similarity_and_different_texts_low" computerName="ASUS-MONK" duration="00:00:00.0077573" startTime="2026-09-16T22:58:45.9584323+03:00" endTime="2026-09-16T22:58:45.9775127+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f18f3679-7d88-47df-83af-41374082817f" />
+    <UnitTestResult executionId="b2d0e19f-b505-460d-bdbe-c60fa4f6ceab" testId="570777c2-f9de-175f-d936-7ea55eadf2eb" testName="Puluj.Analytics.Tests.ShinglerTests.Identical_texts_have_jaccard_one" computerName="ASUS-MONK" duration="00:00:00.0029103" startTime="2026-09-16T22:58:46.0065986+03:00" endTime="2026-09-16T22:58:46.0093638+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b2d0e19f-b505-460d-bdbe-c60fa4f6ceab" />
+    <UnitTestResult executionId="a5043279-4a80-487a-89ff-f145590dc84d" testId="863379aa-50f2-dedd-e93a-535145364b24" testName="Puluj.Analytics.Tests.CopyDetectorTests.Semantic_pair_kind_does_not_depend_on_text_similarity" computerName="ASUS-MONK" duration="00:00:00.0031392" startTime="2026-09-16T22:58:46.0096294+03:00" endTime="2026-09-16T22:58:46.0104732+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a5043279-4a80-487a-89ff-f145590dc84d" />
+    <UnitTestResult executionId="6cafa119-4cca-4e92-9c53-f977f19a3c4a" testId="cdaa3ea7-ffaa-773f-93da-47c8936f7a06" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 3600, expected: 4)" computerName="ASUS-MONK" duration="00:00:00.0000056" startTime="2026-09-16T22:58:45.9921304+03:00" endTime="2026-09-16T22:58:45.9932044+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6cafa119-4cca-4e92-9c53-f977f19a3c4a" />
+    <UnitTestResult executionId="298ff1f6-aa2c-4ff1-b790-065c002492e8" testId="b88fe532-b343-98e4-5039-8bc3221f1b0e" testName="Puluj.Analytics.Tests.LifecycleTests.L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" computerName="ASUS-MONK" duration="00:00:00.6356097" startTime="2026-09-16T22:58:45.9615554+03:00" endTime="2026-09-16T22:58:58.0252840+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="298ff1f6-aa2c-4ff1-b790-065c002492e8" />
+    <UnitTestResult executionId="c2517e86-a145-4efd-abf9-516e6b850f6c" testId="0cb462b8-dd25-2c40-7928-2f29849ff118" testName="Puluj.Analytics.Tests.ShinglerTests.Short_text_gets_one_shingle" computerName="ASUS-MONK" duration="00:00:00.0040911" startTime="2026-09-16T22:58:46.0094597+03:00" endTime="2026-09-16T22:58:46.0096552+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c2517e86-a145-4efd-abf9-516e6b850f6c" />
+    <UnitTestResult executionId="e55609cd-b6d6-4d53-a3db-22bb714f268f" testId="7b7ca3a7-1486-0bc6-10b6-7f9f57f5bea2" testName="Puluj.Analytics.Tests.CopyDetectorTests.Earlier_post_is_the_original_whichever_side_was_indexed_first" computerName="ASUS-MONK" duration="00:00:00.0046658" startTime="2026-09-16T22:58:46.0125346+03:00" endTime="2026-09-16T22:58:46.0125561+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e55609cd-b6d6-4d53-a3db-22bb714f268f" />
+    <UnitTestResult executionId="5a1e0d74-03bf-4549-b118-20b681bf0da5" testId="98e0a095-91cc-f194-ec16-4fbf81e23957" testName="Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" computerName="ASUS-MONK" duration="00:00:00.2169256" startTime="2026-09-16T22:58:58.0285643+03:00" endTime="2026-09-16T22:59:02.9786169+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5a1e0d74-03bf-4549-b118-20b681bf0da5" />
+    <UnitTestResult executionId="d799e46e-18ad-47bf-873b-0512b15fe522" testId="4026ce5f-2887-9b44-2b70-4faac3592153" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 3599, expected: 3)" computerName="ASUS-MONK" duration="00:00:00.0004217" startTime="2026-09-16T22:58:45.9918284+03:00" endTime="2026-09-16T22:58:45.9919136+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d799e46e-18ad-47bf-873b-0512b15fe522" />
+    <UnitTestResult executionId="64534da7-91d2-4a03-8910-8b62151065e6" testId="703fbe5c-4b21-9dbf-c7f2-fba5d389645a" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: -5, expected: 0)" computerName="ASUS-MONK" duration="00:00:00.0000046" startTime="2026-09-16T22:58:46.0073373+03:00" endTime="2026-09-16T22:58:46.0073724+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="64534da7-91d2-4a03-8910-8b62151065e6" />
+    <UnitTestResult executionId="70ef944d-a36b-46cb-8576-97cf6949bed9" testId="f52b78dd-5c78-d881-8b76-860b6c338c22" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 59,899999999999999, expected: 0)" computerName="ASUS-MONK" duration="00:00:00.0000113" startTime="2026-09-16T22:58:46.0070808+03:00" endTime="2026-09-16T22:58:46.0071328+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="70ef944d-a36b-46cb-8576-97cf6949bed9" />
+    <UnitTestResult executionId="9bd198a4-6afe-4c97-9464-c632d59b1c98" testId="3deebd79-a04f-dad7-bdd1-2b99e9b9ab64" testName="Puluj.Analytics.Tests.PairDelaysTests.Summary_counts_primary_edges_only_except_count_all" computerName="ASUS-MONK" duration="00:00:00.0179500" startTime="2026-09-16T22:58:46.0127269+03:00" endTime="2026-09-16T22:58:46.0166876+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9bd198a4-6afe-4c97-9464-c632d59b1c98" />
+    <UnitTestResult executionId="87b031e7-92fa-46af-80c4-3bb256bb9af5" testId="94463b2f-c14b-0d1b-d960-3fbf3ab8e2a6" testName="Puluj.Analytics.Tests.CopyDetectorTests.Different_wording_of_the_same_observation_matches_by_event_features" computerName="ASUS-MONK" duration="00:00:00.0001457" startTime="2026-09-16T22:58:46.0124465+03:00" endTime="2026-09-16T22:58:46.0124689+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="87b031e7-92fa-46af-80c4-3bb256bb9af5" />
+    <UnitTestResult executionId="43ed30cd-94eb-44f1-ae79-76861a09eb12" testId="59e09c50-a10c-40ef-b886-3acc7da4bcca" testName="Puluj.Analytics.Tests.TextNormalizerTests.Keeps_subscribe_sentence_that_is_content" computerName="ASUS-MONK" duration="00:00:00.0001379" startTime="2026-09-16T22:58:46.0091857+03:00" endTime="2026-09-16T22:58:46.0092252+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="43ed30cd-94eb-44f1-ae79-76861a09eb12" />
+    <UnitTestResult executionId="2f0694c5-ec69-468a-b6ed-cecfa312595a" testId="664cbb72-f6fb-b753-8321-d10a45fcd2e6" testName="Puluj.Analytics.Tests.CopyDetectorTests.Post_key_strips_edit_suffix" computerName="ASUS-MONK" duration="00:00:00.0104211" startTime="2026-09-16T22:58:45.9583250+03:00" endTime="2026-09-16T22:58:45.9830200+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2f0694c5-ec69-468a-b6ed-cecfa312595a" />
+    <UnitTestResult executionId="3532ba19-836d-4c78-b839-749233fcfaa1" testId="e06fafa5-fdd8-4a27-ebe2-705e2984c0ea" testName="Puluj.Analytics.Tests.PairDelaysTests.Histogram_has_six_fixed_buckets_with_an_open_last_one" computerName="ASUS-MONK" duration="00:00:00.0193489" startTime="2026-09-16T22:58:46.0090140+03:00" endTime="2026-09-16T22:58:46.0126620+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3532ba19-836d-4c78-b839-749233fcfaa1" />
+    <UnitTestResult executionId="a7bf0394-9833-4092-828b-d95b400fd31d" testId="a7dcf7d4-c507-5ac4-df0e-d7d4929bb294" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 21600, expected: 5)" computerName="ASUS-MONK" duration="00:00:00.0000046" startTime="2026-09-16T22:58:46.0068924+03:00" endTime="2026-09-16T22:58:46.0069250+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a7bf0394-9833-4092-828b-d95b400fd31d" />
+    <UnitTestResult executionId="9376ba3f-a522-4e48-bfb6-dd8b0da81a67" testId="aa374289-f0af-b01c-ad5b-594c83cba098" testName="Puluj.Analytics.Tests.TextNormalizerTests.Same_content_different_decoration_is_equal" computerName="ASUS-MONK" duration="00:00:00.0024522" startTime="2026-09-16T22:58:46.0065690+03:00" endTime="2026-09-16T22:58:46.0090613+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9376ba3f-a522-4e48-bfb6-dd8b0da81a67" />
+    <UnitTestResult executionId="0cd87629-9b42-47b4-a681-d322bbe43b85" testId="3de34557-fe34-013a-c9cd-988aa1892826" testName="Puluj.Analytics.Tests.CopyDetectorTests.Same_instant_orders_by_id" computerName="ASUS-MONK" duration="00:00:00.0019234" startTime="2026-09-16T22:58:46.0121928+03:00" endTime="2026-09-16T22:58:46.0122261+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0cd87629-9b42-47b4-a681-d322bbe43b85" />
+    <UnitTestResult executionId="939a6cf4-bd5e-4a53-8be6-b8b6f4f17cf3" testId="208fbcaa-4432-a6fb-9ce0-99f9a62aac94" testName="Puluj.Analytics.Tests.TextNormalizerTests.Strips_links_mentions_emoji_and_case" computerName="ASUS-MONK" duration="00:00:00.0029061" startTime="2026-09-16T22:58:46.0093260+03:00" endTime="2026-09-16T22:58:46.0094929+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="939a6cf4-bd5e-4a53-8be6-b8b6f4f17cf3" />
+    <UnitTestResult executionId="65591b77-fcd3-4a87-9e11-c0964f172a1c" testId="058496bc-5661-5199-6ca3-8f54e1f06545" testName="Puluj.Analytics.Tests.AnalysisRunnerTests.Does_not_pair_identical_unparsed_posts" computerName="ASUS-MONK" duration="00:00:00.5410414" startTime="2026-09-16T22:58:45.9616018+03:00" endTime="2026-09-16T22:58:58.0750368+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="65591b77-fcd3-4a87-9e11-c0964f172a1c" />
+    <UnitTestResult executionId="4c9e8b37-48ae-42e2-9cfc-dbff1b605e4c" testId="5f1f0042-85bb-cd35-2f91-c486d3816b9c" testName="Puluj.Analytics.Tests.CopyDetectorTests.Forwarded_channel_id_is_parsed_from_channel_form_only" computerName="ASUS-MONK" duration="00:00:00.0031399" startTime="2026-09-16T22:58:46.0123406+03:00" endTime="2026-09-16T22:58:46.0123747+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4c9e8b37-48ae-42e2-9cfc-dbff1b605e4c" />
+    <UnitTestResult executionId="f2d2a038-b9ae-4464-abf3-7f348d44eae4" testId="e849f180-04d8-08ce-f47a-c871b723e6cf" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 300, expected: 2)" computerName="ASUS-MONK" duration="00:00:00.0000058" startTime="2026-09-16T22:58:46.0072168+03:00" endTime="2026-09-16T22:58:46.0072525+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f2d2a038-b9ae-4464-abf3-7f348d44eae4" />
+    <UnitTestResult executionId="5ed82b46-119d-4861-864b-c1ae61ddbb40" testId="390e7798-2dee-d1c2-a621-8752fa68801e" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 0, expected: 0)" computerName="ASUS-MONK" duration="00:00:00.0000044" startTime="2026-09-16T22:58:46.0068226+03:00" endTime="2026-09-16T22:58:46.0068470+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5ed82b46-119d-4861-864b-c1ae61ddbb40" />
+    <UnitTestResult executionId="0ac5cd93-3569-49e3-a184-9e7af26c2d71" testId="fbae8549-3865-d72e-8feb-f2ac0f95c81e" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 299, expected: 1)" computerName="ASUS-MONK" duration="00:00:00.0000126" startTime="2026-09-16T22:58:45.9920307+03:00" endTime="2026-09-16T22:58:45.9920670+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0ac5cd93-3569-49e3-a184-9e7af26c2d71" />
+    <UnitTestResult executionId="81ae023e-d422-4034-90d7-9c66ee70fa78" testId="9d1938ff-37df-ca52-91c7-0a39b43abe3f" testName="Puluj.Analytics.Tests.CopyDetectorTests.Forward_from_the_original_source_is_a_forward" computerName="ASUS-MONK" duration="00:00:00.0006565" startTime="2026-09-16T22:58:46.0126320+03:00" endTime="2026-09-16T22:58:46.0127353+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="81ae023e-d422-4034-90d7-9c66ee70fa78" />
+    <UnitTestResult executionId="cfa6710b-7828-4178-96c1-d345263c87ee" testId="66d3badf-1113-ece3-f96d-c86b2fce1925" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 900, expected: 3)" computerName="ASUS-MONK" duration="00:00:00.0000050" startTime="2026-09-16T22:58:46.0085240+03:00" endTime="2026-09-16T22:58:46.0086029+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cfa6710b-7828-4178-96c1-d345263c87ee" />
+    <UnitTestResult executionId="74deb7bb-28ac-4ac3-81cc-881d70a70e72" testId="fdb7d343-8fe6-f778-802f-ded4a0d5a333" testName="Puluj.Analytics.Tests.CopyDetectorTests.Similar_template_about_another_event_is_not_a_semantic_match" computerName="ASUS-MONK" duration="00:00:00.0056762" startTime="2026-09-16T22:58:46.0065847+03:00" endTime="2026-09-16T22:58:46.0095514+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="74deb7bb-28ac-4ac3-81cc-881d70a70e72" />
+    <UnitTestResult executionId="2d318a35-7b93-4b87-b2a7-245923ad3292" testId="9755f18d-44a3-bdbd-e1b3-ac54f4eb6d01" testName="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 1000000, expected: 5)" computerName="ASUS-MONK" duration="00:00:00.0000050" startTime="2026-09-16T22:58:46.0065323+03:00" endTime="2026-09-16T22:58:46.0066654+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2d318a35-7b93-4b87-b2a7-245923ad3292" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Analytics.Tests.ShinglerTests.Identical_texts_have_jaccard_one" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="570777c2-f9de-175f-d936-7ea55eadf2eb">
+      <Execution id="b2d0e19f-b505-460d-bdbe-c60fa4f6ceab" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.ShinglerTests" name="Identical_texts_have_jaccard_one" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 900, expected: 3)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="66d3badf-1113-ece3-f96d-c86b2fce1925">
+      <Execution id="cfa6710b-7828-4178-96c1-d345263c87ee" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 300, expected: 2)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="e849f180-04d8-08ce-f47a-c871b723e6cf">
+      <Execution id="f2d2a038-b9ae-4464-abf3-7f348d44eae4" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.AnalysisRunnerTests.Pairs_differently_worded_posts_when_their_parsed_event_matches" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="806351e1-2de9-8fde-57a1-5d2df599b4f2">
+      <Execution id="0f2c073b-9e92-47ce-a66d-e02e692fc5f7" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.AnalysisRunnerTests" name="Pairs_differently_worded_posts_when_their_parsed_event_matches" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.LifecycleTests.L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="b88fe532-b343-98e4-5039-8bc3221f1b0e">
+      <Execution id="298ff1f6-aa2c-4ff1-b790-065c002492e8" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.LifecycleTests" name="L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Different_wording_of_the_same_observation_matches_by_event_features" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="94463b2f-c14b-0d1b-d960-3fbf3ab8e2a6">
+      <Execution id="87b031e7-92fa-46af-80c4-3bb256bb9af5" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Different_wording_of_the_same_observation_matches_by_event_features" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Histogram_has_six_fixed_buckets_with_an_open_last_one" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="e06fafa5-fdd8-4a27-ebe2-705e2984c0ea">
+      <Execution id="3532ba19-836d-4c78-b839-749233fcfaa1" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Histogram_has_six_fixed_buckets_with_an_open_last_one" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 60, expected: 1)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="5f90fc97-22a3-489a-bb76-16a898a88364">
+      <Execution id="0f33b9ee-e2e8-4c43-9770-a17da4a6a734" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Summary_counts_primary_edges_only_except_count_all" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="3deebd79-a04f-dad7-bdd1-2b99e9b9ab64">
+      <Execution id="9bd198a4-6afe-4c97-9464-c632d59b1c98" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Summary_counts_primary_edges_only_except_count_all" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 3600, expected: 4)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="cdaa3ea7-ffaa-773f-93da-47c8936f7a06">
+      <Execution id="6cafa119-4cca-4e92-9c53-f977f19a3c4a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 59,899999999999999, expected: 0)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="f52b78dd-5c78-d881-8b76-860b6c338c22">
+      <Execution id="70ef944d-a36b-46cb-8576-97cf6949bed9" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Forward_from_the_original_source_is_a_forward" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="9d1938ff-37df-ca52-91c7-0a39b43abe3f">
+      <Execution id="81ae023e-d422-4034-90d7-9c66ee70fa78" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Forward_from_the_original_source_is_a_forward" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 0, expected: 0)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="390e7798-2dee-d1c2-a621-8752fa68801e">
+      <Execution id="5ed82b46-119d-4861-864b-c1ae61ddbb40" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.ShinglerTests.Small_edit_keeps_high_similarity_and_different_texts_low" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="5a0f1251-1c7d-d1ef-ebb4-deff0fa81b45">
+      <Execution id="f18f3679-7d88-47df-83af-41374082817f" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.ShinglerTests" name="Small_edit_keeps_high_similarity_and_different_texts_low" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.TextNormalizerTests.Keeps_subscribe_sentence_that_is_content" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="59e09c50-a10c-40ef-b886-3acc7da4bcca">
+      <Execution id="43ed30cd-94eb-44f1-ae79-76861a09eb12" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.TextNormalizerTests" name="Keeps_subscribe_sentence_that_is_content" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Forwarded_channel_id_is_parsed_from_channel_form_only" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="5f1f0042-85bb-cd35-2f91-c486d3816b9c">
+      <Execution id="4c9e8b37-48ae-42e2-9cfc-dbff1b605e4c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Forwarded_channel_id_is_parsed_from_channel_form_only" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.TextNormalizerTests.Strips_links_mentions_emoji_and_case" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="208fbcaa-4432-a6fb-9ce0-99f9a62aac94">
+      <Execution id="939a6cf4-bd5e-4a53-8be6-b8b6f4f17cf3" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.TextNormalizerTests" name="Strips_links_mentions_emoji_and_case" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 21600, expected: 5)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="a7dcf7d4-c507-5ac4-df0e-d7d4929bb294">
+      <Execution id="a7bf0394-9833-4092-828b-d95b400fd31d" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: -5, expected: 0)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="703fbe5c-4b21-9dbf-c7f2-fba5d389645a">
+      <Execution id="64534da7-91d2-4a03-8910-8b62151065e6" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Similar_template_about_another_event_is_not_a_semantic_match" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="fdb7d343-8fe6-f778-802f-ded4a0d5a333">
+      <Execution id="74deb7bb-28ac-4ac3-81cc-881d70a70e72" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Similar_template_about_another_event_is_not_a_semantic_match" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.AnalysisRunnerTests.Does_not_pair_identical_unparsed_posts" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="058496bc-5661-5199-6ca3-8f54e1f06545">
+      <Execution id="65591b77-fcd3-4a87-9e11-c0964f172a1c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.AnalysisRunnerTests" name="Does_not_pair_identical_unparsed_posts" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Semantic_pair_kind_does_not_depend_on_text_similarity" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="863379aa-50f2-dedd-e93a-535145364b24">
+      <Execution id="a5043279-4a80-487a-89ff-f145590dc84d" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Semantic_pair_kind_does_not_depend_on_text_similarity" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.TextNormalizerTests.Same_content_different_decoration_is_equal" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="aa374289-f0af-b01c-ad5b-594c83cba098">
+      <Execution id="9376ba3f-a522-4e48-bfb6-dd8b0da81a67" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.TextNormalizerTests" name="Same_content_different_decoration_is_equal" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Earlier_post_is_the_original_whichever_side_was_indexed_first" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="7b7ca3a7-1486-0bc6-10b6-7f9f57f5bea2">
+      <Execution id="e55609cd-b6d6-4d53-a3db-22bb714f268f" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Earlier_post_is_the_original_whichever_side_was_indexed_first" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.TextNormalizerTests.Empty_and_null_are_empty" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="a6df66cf-c9e5-edbd-8ec6-51bf499f5e0f">
+      <Execution id="970df18c-d95b-4372-aede-589a4732ee3b" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.TextNormalizerTests" name="Empty_and_null_are_empty" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="98e0a095-91cc-f194-ec16-4fbf81e23957">
+      <Execution id="5a1e0d74-03bf-4549-b118-20b681bf0da5" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.LifecycleTests" name="L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 3599, expected: 3)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="4026ce5f-2887-9b44-2b70-4faac3592153">
+      <Execution id="d799e46e-18ad-47bf-873b-0512b15fe522" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 299, expected: 1)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="fbae8549-3865-d72e-8feb-f2ac0f95c81e">
+      <Execution id="0ac5cd93-3569-49e3-a184-9e7af26c2d71" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 1000000, expected: 5)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="9755f18d-44a3-bdbd-e1b3-ac54f4eb6d01">
+      <Execution id="2d318a35-7b93-4b87-b2a7-245923ad3292" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Same_instant_orders_by_id" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="3de34557-fe34-013a-c9cd-988aa1892826">
+      <Execution id="0cd87629-9b42-47b4-a681-d322bbe43b85" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Same_instant_orders_by_id" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Median_interpolates_like_percentile_cont" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="8c7ec2ae-2d80-d7ec-e7c2-d7c74bbcf9e3">
+      <Execution id="f5fd658c-400e-4799-b0c9-ba6e53c600ea" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Median_interpolates_like_percentile_cont" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.CopyDetectorTests.Post_key_strips_edit_suffix" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="664cbb72-f6fb-b753-8321-d10a45fcd2e6">
+      <Execution id="2f0694c5-ec69-468a-b6ed-cecfa312595a" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.CopyDetectorTests" name="Post_key_strips_edit_suffix" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Summary_of_an_empty_pair_has_no_aggregates" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="158e71f8-7d02-87b7-e79c-53af107bff21">
+      <Execution id="73d594f8-4926-4c47-989b-43a8865df361" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Summary_of_an_empty_pair_has_no_aggregates" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.ShinglerTests.Short_text_gets_one_shingle" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="0cb462b8-dd25-2c40-7928-2f29849ff118">
+      <Execution id="c2517e86-a145-4efd-abf9-516e6b850f6c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.ShinglerTests" name="Short_text_gets_one_shingle" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.PairDelaysTests.Bucket_edges_are_inclusive_at_the_lower_end(seconds: 21599, expected: 4)" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="2a803423-ec14-b945-d14c-609e03008707">
+      <Execution id="99503405-58a4-485c-af48-c4a31e407a88" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.PairDelaysTests" name="Bucket_edges_are_inclusive_at_the_lower_end" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="a6df66cf-c9e5-edbd-8ec6-51bf499f5e0f" executionId="970df18c-d95b-4372-aede-589a4732ee3b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5f90fc97-22a3-489a-bb76-16a898a88364" executionId="0f33b9ee-e2e8-4c43-9770-a17da4a6a734" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="2a803423-ec14-b945-d14c-609e03008707" executionId="99503405-58a4-485c-af48-c4a31e407a88" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="158e71f8-7d02-87b7-e79c-53af107bff21" executionId="73d594f8-4926-4c47-989b-43a8865df361" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="806351e1-2de9-8fde-57a1-5d2df599b4f2" executionId="0f2c073b-9e92-47ce-a66d-e02e692fc5f7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8c7ec2ae-2d80-d7ec-e7c2-d7c74bbcf9e3" executionId="f5fd658c-400e-4799-b0c9-ba6e53c600ea" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5a0f1251-1c7d-d1ef-ebb4-deff0fa81b45" executionId="f18f3679-7d88-47df-83af-41374082817f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="570777c2-f9de-175f-d936-7ea55eadf2eb" executionId="b2d0e19f-b505-460d-bdbe-c60fa4f6ceab" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="863379aa-50f2-dedd-e93a-535145364b24" executionId="a5043279-4a80-487a-89ff-f145590dc84d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="cdaa3ea7-ffaa-773f-93da-47c8936f7a06" executionId="6cafa119-4cca-4e92-9c53-f977f19a3c4a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b88fe532-b343-98e4-5039-8bc3221f1b0e" executionId="298ff1f6-aa2c-4ff1-b790-065c002492e8" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0cb462b8-dd25-2c40-7928-2f29849ff118" executionId="c2517e86-a145-4efd-abf9-516e6b850f6c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="7b7ca3a7-1486-0bc6-10b6-7f9f57f5bea2" executionId="e55609cd-b6d6-4d53-a3db-22bb714f268f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="98e0a095-91cc-f194-ec16-4fbf81e23957" executionId="5a1e0d74-03bf-4549-b118-20b681bf0da5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="4026ce5f-2887-9b44-2b70-4faac3592153" executionId="d799e46e-18ad-47bf-873b-0512b15fe522" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="703fbe5c-4b21-9dbf-c7f2-fba5d389645a" executionId="64534da7-91d2-4a03-8910-8b62151065e6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f52b78dd-5c78-d881-8b76-860b6c338c22" executionId="70ef944d-a36b-46cb-8576-97cf6949bed9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3deebd79-a04f-dad7-bdd1-2b99e9b9ab64" executionId="9bd198a4-6afe-4c97-9464-c632d59b1c98" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="94463b2f-c14b-0d1b-d960-3fbf3ab8e2a6" executionId="87b031e7-92fa-46af-80c4-3bb256bb9af5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="59e09c50-a10c-40ef-b886-3acc7da4bcca" executionId="43ed30cd-94eb-44f1-ae79-76861a09eb12" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="664cbb72-f6fb-b753-8321-d10a45fcd2e6" executionId="2f0694c5-ec69-468a-b6ed-cecfa312595a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e06fafa5-fdd8-4a27-ebe2-705e2984c0ea" executionId="3532ba19-836d-4c78-b839-749233fcfaa1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a7dcf7d4-c507-5ac4-df0e-d7d4929bb294" executionId="a7bf0394-9833-4092-828b-d95b400fd31d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="aa374289-f0af-b01c-ad5b-594c83cba098" executionId="9376ba3f-a522-4e48-bfb6-dd8b0da81a67" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3de34557-fe34-013a-c9cd-988aa1892826" executionId="0cd87629-9b42-47b4-a681-d322bbe43b85" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="208fbcaa-4432-a6fb-9ce0-99f9a62aac94" executionId="939a6cf4-bd5e-4a53-8be6-b8b6f4f17cf3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="058496bc-5661-5199-6ca3-8f54e1f06545" executionId="65591b77-fcd3-4a87-9e11-c0964f172a1c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5f1f0042-85bb-cd35-2f91-c486d3816b9c" executionId="4c9e8b37-48ae-42e2-9cfc-dbff1b605e4c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="e849f180-04d8-08ce-f47a-c871b723e6cf" executionId="f2d2a038-b9ae-4464-abf3-7f348d44eae4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="390e7798-2dee-d1c2-a621-8752fa68801e" executionId="5ed82b46-119d-4861-864b-c1ae61ddbb40" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fbae8549-3865-d72e-8feb-f2ac0f95c81e" executionId="0ac5cd93-3569-49e3-a184-9e7af26c2d71" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9d1938ff-37df-ca52-91c7-0a39b43abe3f" executionId="81ae023e-d422-4034-90d7-9c66ee70fa78" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="66d3badf-1113-ece3-f96d-c86b2fce1925" executionId="cfa6710b-7828-4178-96c1-d345263c87ee" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fdb7d343-8fe6-f778-802f-ded4a0d5a333" executionId="74deb7bb-28ac-4ac3-81cc-881d70a70e72" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="9755f18d-44a3-bdbd-e1b3-ac54f4eb6d01" executionId="2d318a35-7b93-4b87-b2a7-245923ad3292" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="35" executed="35" passed="35" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.28]   Discovering: Puluj.Analytics.Tests&#xD;
+[xUnit.net 00:00:00.33]   Discovered:  Puluj.Analytics.Tests&#xD;
+[xUnit.net 00:00:00.35]   Starting:    Puluj.Analytics.Tests&#xD;
+[testcontainers.org 00:00:00.11] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.38] Docker container 0b8cb030ef73 created&#xD;
+[testcontainers.org 00:00:00.55] Start Docker container 0b8cb030ef73&#xD;
+[testcontainers.org 00:00:00.80] Wait for Docker container 0b8cb030ef73 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.90] Docker container 0b8cb030ef73 ready&#xD;
+[testcontainers.org 00:00:02.24] Docker container fb94d7d89ed1 created&#xD;
+[testcontainers.org 00:00:02.26] Docker container 39cfe6d88328 created&#xD;
+[testcontainers.org 00:00:02.29] Start Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:02.29] Start Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:02.68] Wait for Docker container fb94d7d89ed1 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.75] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:02.75] Wait for Docker container 39cfe6d88328 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.79] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:03.94] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:03.94] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:05.05] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:05.05] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:06.17] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:06.17] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:06.25] Docker container 39cfe6d88328 ready&#xD;
+[testcontainers.org 00:00:06.25] Docker container fb94d7d89ed1 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (8ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (8ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:11.46] Delete Docker container fb94d7d89ed1&#xD;
+[testcontainers.org 00:00:11.48] Delete Docker container 39cfe6d88328&#xD;
+[testcontainers.org 00:00:12.12] Docker container 35774d7f5655 created&#xD;
+[testcontainers.org 00:00:12.13] Start Docker container 35774d7f5655&#xD;
+[testcontainers.org 00:00:12.17] Docker container ba48dfeff8f7 created&#xD;
+[testcontainers.org 00:00:12.18] Start Docker container ba48dfeff8f7&#xD;
+[testcontainers.org 00:00:12.50] Wait for Docker container 35774d7f5655 to complete readiness checks&#xD;
+[testcontainers.org 00:00:12.51] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 35774d7f5655&#xD;
+[testcontainers.org 00:00:12.52] Wait for Docker container ba48dfeff8f7 to complete readiness checks&#xD;
+[testcontainers.org 00:00:12.53] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container ba48dfeff8f7&#xD;
+[testcontainers.org 00:00:13.62] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 35774d7f5655&#xD;
+[testcontainers.org 00:00:13.63] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container ba48dfeff8f7&#xD;
+[testcontainers.org 00:00:14.71] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 35774d7f5655&#xD;
+[testcontainers.org 00:00:14.72] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container ba48dfeff8f7&#xD;
+[testcontainers.org 00:00:14.78] Docker container 35774d7f5655 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:15.81] Execute "pg_isready --host localhost --dbname puluj_analytics_test --username postgres" at Docker container ba48dfeff8f7&#xD;
+[testcontainers.org 00:00:15.88] Docker container ba48dfeff8f7 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:16.54] Delete Docker container 35774d7f5655&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:17.75] Delete Docker container ba48dfeff8f7&#xD;
+[xUnit.net 00:00:18.71]   Finished:    Puluj.Analytics.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

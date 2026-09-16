@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-16T19:16:02.1038206+00:00",
+  "generated_at": "2026-09-16T20:28:00.7530654+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -28,10 +28,10 @@
       "archived": 2,
       "outbox_deleted": 2,
       "outbox_kept_unarchived": 1,
-      "inbox_deleted": 2
+      "inbox_deleted": 5
     },
     "G03-reconciliation": {
-      "overdue": 2,
+      "overdue": 3,
       "unknown": [
         "ghost-subscription"
       ],
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.133392,
+      "outbox_age_seen_s": 1.142333,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0aba5-8c9f-71b2-af07-080b26362bf4"
+      "event_id": "01a0abe7-6fcb-7368-83fa-457992e9f4bc"
     },
     "P03-C05": {
       "window": "W6b",
@@ -104,7 +104,7 @@
       "outbox_deleted_before_retry": true,
       "events_before_retry": 0,
       "retry_outbox_id": 2,
-      "retry_of_attempt_id": 2,
+      "retry_of_attempt_id": 3,
       "receipt": "completed",
       "quarantine_resolution": "retried",
       "quarantine_rows": 1
@@ -115,10 +115,10 @@
       "v2_event_expected": [
         "archive"
       ],
-      "overdue_reported": 2,
+      "overdue_reported": 3,
       "registry_versions": [
         1,
-        9
+        10
       ]
     },
     "P03-C07": {
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T19:16:01.0846024\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T20:27:59.3005105\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -431,9 +431,9 @@
       "one_category": {
         "label": "uav",
         "messages": 60,
-        "total_ms": 5876,
-        "writers_tail_ms": 1253,
-        "per_observation_ms": 97.9,
+        "total_ms": 4598,
+        "writers_tail_ms": 1084,
+        "per_observation_ms": 76.6,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -444,10 +444,10 @@
       "two_categories": {
         "label": "uav\u002Bmissile",
         "messages": 60,
-        "total_ms": 4777,
-        "writers_tail_ms": 540,
-        "per_observation_ms": 79.6,
-        "tracks": 6,
+        "total_ms": 4711,
+        "writers_tail_ms": 867,
+        "per_observation_ms": 78.5,
+        "tracks": 10,
         "replica_split": {
           "primary": 30,
           "replica": 30
@@ -573,21 +573,22 @@
         "Waiting": [],
         "Completed": [
           "archive/live",
+          "message-analytics/live",
           "normalizer/live"
         ],
         "Failed": []
       }
     },
     "P14-R01-R03-R04": {
-      "runId": "01a0aba2-11b7-76f6-a737-b72d6ccc9287",
+      "runId": "01a0abe3-7ed0-740b-981d-c8b2d66b5dc0",
       "live": "6bb9f959-42f5-5e7c-a384-a325e71fa89b",
-      "generation": "01a0aba2-11b7-7734-9a51-54fb1ab284a8",
+      "generation": "01a0abe3-7ed0-7661-af11-6be56feed8d4",
       "liveRevisions": "1:1,2:1",
-      "report": "{\u0022published\u0022:4,\u0022total\u0022:4,\u0022pending_deliveries\u0022:0,\u0022quarantined\u0022:0,\u0022unconfirmed_outbox\u0022:0,\u0022terminal_deliveries\u0022:24,\u0022stages\u0022:{\u0022finalize:completed\u0022:4,\u0022normalize:completed\u0022:4,\u0022parse:facts\u0022:4},\u0022extractions\u0022:4,\u0022observations\u0022:4,\u0022distinct_raw\u0022:4,\u0022unanalyzed\u0022:0,\u0022incidents_in_generation\u0022:4,\u0022active_incidents_in_window\u0022:4,\u0022active_incidents_outside_scope\u0022:0,\u0022active_incidents_missing_in_generation\u0022:0,\u0022verified_at\u0022:\u00222026-09-16T19:12:06.9325126\u002B00:00\u0022}",
+      "report": "{\u0022published\u0022:4,\u0022total\u0022:4,\u0022pending_deliveries\u0022:0,\u0022quarantined\u0022:0,\u0022unconfirmed_outbox\u0022:0,\u0022terminal_deliveries\u0022:36,\u0022stages\u0022:{\u0022finalize:completed\u0022:4,\u0022normalize:completed\u0022:4,\u0022parse:facts\u0022:4},\u0022extractions\u0022:4,\u0022observations\u0022:4,\u0022distinct_raw\u0022:4,\u0022unanalyzed\u0022:0,\u0022incidents_in_generation\u0022:4,\u0022active_incidents_in_window\u0022:4,\u0022active_incidents_outside_scope\u0022:0,\u0022active_incidents_missing_in_generation\u0022:0,\u0022verified_at\u0022:\u00222026-09-16T20:23:35.512734\u002B00:00\u0022}",
       "audit": "run:create,run:start,run:catchup,run:verify,run:promote,run:rollback"
     },
     "P14-R02": {
-      "runId": "01a0aba2-4907-7574-8fc9-274df36f59ea",
+      "runId": "01a0abe3-bb5b-70eb-9dd6-0af072366139",
       "batches": 9,
       "published": 5,
       "repeated": 2,
@@ -595,13 +596,46 @@
       "normalizer_noops": 2
     },
     "P14-R05": {
-      "superseded": "01a0aba1-f55e-7167-9527-296580d935d5",
-      "next": "01a0aba1-f562-7b98-b521-b2c4d7a32701"
+      "superseded": "01a0abe3-61a4-7701-b1a0-7f36fda223ed",
+      "next": "01a0abe3-61ab-7090-8982-fe4fc74cccbb"
     },
     "P14-R06": {
-      "runId": "01a0aba2-3f32-7c2e-9e31-a2ddc96c0db6",
-      "generation": "01a0aba2-3f32-77d5-ab0f-54189ed8b90f",
+      "runId": "01a0abe3-b111-7b17-aaee-d92ab5b1ea08",
+      "generation": "01a0abe3-b111-773a-9b87-d83d53064cc4",
       "promote_waited_ms": "\u003E=1500"
+    },
+    "P15-L01": {
+      "rows": 2,
+      "live": {
+        "Outcome": "completed",
+        "FactCount": 2,
+        "Expected": [
+          "track-worker",
+          "incident-worker"
+        ],
+        "Done": [
+          "incident-worker",
+          "track-worker"
+        ]
+      },
+      "replay": {
+        "Outcome": "completed",
+        "Expected": [
+          "incident-worker"
+        ],
+        "Done": [
+          "incident-worker"
+        ]
+      },
+      "noText": {
+        "HasText": false,
+        "Outcome": "unsupported"
+      },
+      "analysisFirst": {
+        "StoredAt": "2026-09-16T20:24:24.125071+00:00",
+        "Outcome": "no_facts"
+      },
+      "roots": 4
     }
   }
 }

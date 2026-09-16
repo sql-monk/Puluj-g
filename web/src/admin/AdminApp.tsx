@@ -13,6 +13,7 @@ import { IncidentsPanel } from './IncidentsPanel'
 import { QueuesPanel } from './QueuesPanel'
 import { MessagesPanel } from './MessagesPanel'
 import { ReplayPanel } from './ReplayPanel'
+import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
 // The admin build is used both locally (:5268 → map :5267) and through Docker
@@ -20,7 +21,7 @@ import { ReplayPanel } from './ReplayPanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'replay' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'replay' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
@@ -32,6 +33,7 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'pipeline', label: 'Конвеєр', group: 'Моніторинг' },
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
   { id: 'logs', label: 'Логи', group: 'Моніторинг' },
+  { id: 'lifecycle', label: 'Аналітика повідомлень', group: 'Аналітика' },
   { id: 'analytics', label: 'Хто кого копіює', group: 'Аналітика' },
   // Same component as `analytics`: it reads the hash itself and opens its "Сервіс" tab on #/analytics-service.
   { id: 'analytics-service', label: 'Стан сервісу', group: 'Аналітика' },
@@ -173,6 +175,7 @@ export default function AdminApp() {
                 {section === 'pipeline' && <PipelinePanel />}
                 {section === 'db' && <DbPanel />}
                 {section === 'logs' && <LogsPanel />}
+                {section === 'lifecycle' && <MessageAnalyticsPanel />}
                 {(section === 'analytics' || section === 'analytics-service') && <AnalyticsPanel />}
                 {section === 'catalog' && <CatalogPanel />}
                 {section === 'incidents' && <IncidentsPanel />}

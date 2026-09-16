@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="579eccf8-2612-40e7-9685-6cb45ea28c1f" name="aleks@ASUS-MONK 2026-09-16 23:13:20" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T23:13:20.6403014+03:00" queuing="2026-09-16T23:13:20.6403018+03:00" start="2026-09-16T23:13:03.9763438+03:00" finish="2026-09-16T23:13:32.1342899+03:00" />
+  <TestSettings name="default" id="9196b3da-024d-49f2-9c1c-5f5f5d6b3cc3">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_23_13_20" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="b596af42-19c9-47c8-bcdb-ecbfad065eae" testId="98e0a095-91cc-f194-ec16-4fbf81e23957" testName="Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" computerName="ASUS-MONK" duration="00:00:00.1711859" startTime="2026-09-16T23:13:26.9236896+03:00" endTime="2026-09-16T23:13:31.9809813+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b596af42-19c9-47c8-bcdb-ecbfad065eae">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Values differ&#xD;
+Expected: 4&#xD;
+Actual:   3</Message>
+          <StackTrace>   at Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable() in C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\LifecycleTests.cs:line 406&#xD;
+--- End of stack trace from previous location ---</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="a27cf16b-3cf6-4a87-8273-fd6ff51ee088" testId="b88fe532-b343-98e4-5039-8bc3221f1b0e" testName="Puluj.Analytics.Tests.LifecycleTests.L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" computerName="ASUS-MONK" duration="00:00:01.3249764" startTime="2026-09-16T23:13:05.3336217+03:00" endTime="2026-09-16T23:13:20.5765457+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a27cf16b-3cf6-4a87-8273-fd6ff51ee088" />
+    <UnitTestResult executionId="cf806d5d-5b47-4082-b015-fad5caea83a3" testId="3122be83-9d50-6f6b-f1c4-98cf4599b5f8" testName="Puluj.Analytics.Tests.LifecycleTests.L04_Backfill_and_reconciliation_complete_domain_from_receipts_noop_counts_and_llm_cost_is_computed" computerName="ASUS-MONK" duration="00:00:00.2424143" startTime="2026-09-16T23:13:20.6125539+03:00" endTime="2026-09-16T23:13:26.9155136+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cf806d5d-5b47-4082-b015-fad5caea83a3" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Analytics.Tests.LifecycleTests.L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="b88fe532-b343-98e4-5039-8bc3221f1b0e">
+      <Execution id="a27cf16b-3cf6-4a87-8273-fd6ff51ee088" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.LifecycleTests" name="L02_Backfill_from_evidence_legacy_unavailable_event_rows_kept_idempotent_and_reconciliation_counts" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.LifecycleTests.L04_Backfill_and_reconciliation_complete_domain_from_receipts_noop_counts_and_llm_cost_is_computed" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="3122be83-9d50-6f6b-f1c4-98cf4599b5f8">
+      <Execution id="cf806d5d-5b47-4082-b015-fad5caea83a3" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.LifecycleTests" name="L04_Backfill_and_reconciliation_complete_domain_from_receipts_noop_counts_and_llm_cost_is_computed" />
+    </UnitTest>
+    <UnitTest name="Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" storage="c:\repos\puluj-g\tests\puluj.analytics.tests\bin\debug\net10.0\puluj.analytics.tests.dll" id="98e0a095-91cc-f194-ec16-4fbf81e23957">
+      <Execution id="b596af42-19c9-47c8-bcdb-ecbfad065eae" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\bin\Debug\net10.0\Puluj.Analytics.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Analytics.Tests.LifecycleTests" name="L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="98e0a095-91cc-f194-ec16-4fbf81e23957" executionId="b596af42-19c9-47c8-bcdb-ecbfad065eae" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="b88fe532-b343-98e4-5039-8bc3221f1b0e" executionId="a27cf16b-3cf6-4a87-8273-fd6ff51ee088" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3122be83-9d50-6f6b-f1c4-98cf4599b5f8" executionId="cf806d5d-5b47-4082-b015-fad5caea83a3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="3" executed="3" passed="2" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.63]   Discovering: Puluj.Analytics.Tests&#xD;
+[xUnit.net 00:00:00.72]   Discovered:  Puluj.Analytics.Tests&#xD;
+[xUnit.net 00:00:00.76]   Starting:    Puluj.Analytics.Tests&#xD;
+[testcontainers.org 00:00:00.12] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.37] Docker container 1d1cc32c7582 created&#xD;
+[testcontainers.org 00:00:00.48] Start Docker container 1d1cc32c7582&#xD;
+[testcontainers.org 00:00:00.67] Wait for Docker container 1d1cc32c7582 to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.73] Docker container 1d1cc32c7582 ready&#xD;
+[testcontainers.org 00:00:01.87] Docker container 503d477c10e8 created&#xD;
+[testcontainers.org 00:00:01.93] Start Docker container 503d477c10e8&#xD;
+[testcontainers.org 00:00:02.11] Wait for Docker container 503d477c10e8 to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.13] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 503d477c10e8&#xD;
+[testcontainers.org 00:00:03.26] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 503d477c10e8&#xD;
+[testcontainers.org 00:00:04.38] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container 503d477c10e8&#xD;
+[testcontainers.org 00:00:04.50] Docker container 503d477c10e8 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (30ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:14.71] Delete Docker container 503d477c10e8&#xD;
+[testcontainers.org 00:00:15.25] Docker container e02d868ef5c9 created&#xD;
+[testcontainers.org 00:00:15.26] Start Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:15.51] Wait for Docker container e02d868ef5c9 to complete readiness checks&#xD;
+[testcontainers.org 00:00:15.56] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:16.68] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:17.79] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:18.92] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:19.02] Docker container e02d868ef5c9 ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:21.08] Delete Docker container e02d868ef5c9&#xD;
+[testcontainers.org 00:00:21.59] Docker container f67098c0e6aa created&#xD;
+[testcontainers.org 00:00:21.62] Start Docker container f67098c0e6aa&#xD;
+[testcontainers.org 00:00:22.08] Wait for Docker container f67098c0e6aa to complete readiness checks&#xD;
+[testcontainers.org 00:00:22.11] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container f67098c0e6aa&#xD;
+[testcontainers.org 00:00:23.23] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container f67098c0e6aa&#xD;
+[testcontainers.org 00:00:24.34] Execute "pg_isready --host localhost --dbname puluj_lifecycle_test --username postgres" at Docker container f67098c0e6aa&#xD;
+[testcontainers.org 00:00:24.42] Docker container f67098c0e6aa ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (3ms) [Parameters=[], CommandType='Text', CommandTimeout='300']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:26.12] Delete Docker container f67098c0e6aa&#xD;
+[xUnit.net 00:00:27.45]       Assert.Equal() Failure: Values differ&#xD;
+[xUnit.net 00:00:27.45]       Expected: 4&#xD;
+[xUnit.net 00:00:27.45]       Actual:   3&#xD;
+[xUnit.net 00:00:27.46]       Stack Trace:&#xD;
+[xUnit.net 00:00:27.46]         C:\repos\Puluj-g\tests\Puluj.Analytics.Tests\LifecycleTests.cs(406,0): at Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable()&#xD;
+[xUnit.net 00:00:27.46]         --- End of stack trace from previous location ---&#xD;
+[xUnit.net 00:00:27.46]   Finished:    Puluj.Analytics.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ASUS-MONK" outcome="Error" timestamp="2026-09-16T23:13:31.9871611+03:00">
+        <Text>[xUnit.net 00:00:27.45]     Puluj.Analytics.Tests.LifecycleTests.L03_Report_keeps_denominators_apart_and_marks_unknown_as_unavailable [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

@@ -109,6 +109,198 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("air_alerts", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.Analytics.MessageLifecycle", b =>
+                {
+                    b.Property<long>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.PrimitiveCollection<long[]>("AlertIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]")
+                        .HasColumnName("alert_ids");
+
+                    b.Property<string>("AnalysisOutcome")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("analysis_outcome");
+
+                    b.Property<DateTimeOffset?>("AnalyzedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("analyzed_at");
+
+                    b.PrimitiveCollection<string[]>("BranchesDone")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("branches_done");
+
+                    b.Property<bool>("CompletionAvailable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("completion_available");
+
+                    b.Property<DateTimeOffset?>("DomainCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("domain_completed_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("error");
+
+                    b.PrimitiveCollection<string[]>("ExpectedBranches")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("expected_branches");
+
+                    b.Property<int>("FactCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("fact_count");
+
+                    b.Property<Guid?>("GenerationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("generation_id");
+
+                    b.Property<bool>("HasPayload")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_payload");
+
+                    b.Property<bool>("HasText")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_text");
+
+                    b.PrimitiveCollection<long[]>("IncidentIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]")
+                        .HasColumnName("incident_ids");
+
+                    b.Property<bool>("IsEdit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_edit");
+
+                    b.Property<string>("Lane")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("lane");
+
+                    b.Property<long>("LlmCacheTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("llm_cache_tokens");
+
+                    b.Property<int>("LlmCalls")
+                        .HasColumnType("integer")
+                        .HasColumnName("llm_calls");
+
+                    b.Property<decimal>("LlmCostUsd")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)")
+                        .HasColumnName("llm_cost_usd");
+
+                    b.Property<long>("LlmInputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("llm_input_tokens");
+
+                    b.Property<int>("LlmLatencyMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("llm_latency_ms");
+
+                    b.Property<long>("LlmOutputTokens")
+                        .HasColumnType("bigint")
+                        .HasColumnName("llm_output_tokens");
+
+                    b.Property<string>("Method")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("method");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<int>("SourceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("SourceMessageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("source_message_key");
+
+                    b.Property<string>("SourceOfTruth")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("source_of_truth");
+
+                    b.Property<string>("SourceRevision")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("source_revision");
+
+                    b.Property<DateTimeOffset?>("StoredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stored_at");
+
+                    b.Property<int>("TextLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("text_length");
+
+                    b.Property<string>("Timings")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("timings");
+
+                    b.Property<bool>("TimingsAvailable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("timings_available");
+
+                    b.PrimitiveCollection<long[]>("TrackIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]")
+                        .HasColumnName("track_ids");
+
+                    b.Property<int>("UnlocatedFacts")
+                        .HasColumnType("integer")
+                        .HasColumnName("unlocated_facts");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Versions")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("versions");
+
+                    b.HasKey("RawMessageId", "RunId")
+                        .HasName("pk_message_lifecycle");
+
+                    b.HasIndex("ReceivedAt")
+                        .HasDatabaseName("ix_message_lifecycle_received_brin");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ReceivedAt"), "brin");
+
+                    b.HasIndex("ReceivedAt", "RunId")
+                        .HasDatabaseName("ix_message_lifecycle_pending")
+                        .HasFilter("analyzed_at IS NULL OR domain_completed_at IS NULL");
+
+                    b.HasIndex("SourceId", "SourceMessageKey")
+                        .HasDatabaseName("ix_message_lifecycle_post");
+
+                    b.HasIndex("ReceivedAt", "SourceId", "AnalysisOutcome")
+                        .HasDatabaseName("ix_message_lifecycle_window");
+
+                    b.ToTable("message_lifecycle", "analytics");
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.AppSetting", b =>
                 {
                     b.Property<string>("Key")

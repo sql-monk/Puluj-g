@@ -46,6 +46,8 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<ArchivedEvent> ArchivedEvents => Set<ArchivedEvent>();
     public DbSet<SubscriptionLane> SubscriptionLanes => Set<SubscriptionLane>();
     public DbSet<ControlAudit> ControlAudits => Set<ControlAudit>();
+    /// <summary>P15: the lifecycle projection (`analytics.message_lifecycle`), DDL owned here, written by the `message-analytics` consumer and the analytics backfill.</summary>
+    public DbSet<Puluj.Domain.Entities.Analytics.MessageLifecycle> MessageLifecycle => Set<Puluj.Domain.Entities.Analytics.MessageLifecycle>();
     public DbSet<EventLink> EventLinks => Set<EventLink>();
     public DbSet<SubscriptionRegistration> Subscriptions => Set<SubscriptionRegistration>();
     public DbSet<TopologyVersionRecord> TopologyVersions => Set<TopologyVersionRecord>();

@@ -221,7 +221,7 @@ public sealed class AnalyticsReportService(IDbContextFactory<AnalyticsDbContext>
         await db.Database.ExecuteSqlRawAsync("DELETE FROM analytics.copies", ct);
         await db.Database.ExecuteSqlRawAsync("DELETE FROM analytics.messages", ct);
         await db.Database.ExecuteSqlRawAsync("DELETE FROM analytics.track_firsts", ct);
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM analytics.state", ct);
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM analytics.state WHERE key NOT LIKE 'lifecycle_%'", ct); // P15: the lifecycle projection has its own cursor/report (review N2)
         await tx.CommitAsync(ct);
     }
 

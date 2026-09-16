@@ -27,7 +27,7 @@ public sealed class GateTests(MessagingFixture f)
         await replica.StartAsync(None);
         try
         {
-            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed'") == n, TimeSpan.FromSeconds(60)));
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed' AND subscription_id <> 'message-analytics'") == n, TimeSpan.FromSeconds(60)));
         }
         finally
         {
@@ -35,11 +35,11 @@ public sealed class GateTests(MessagingFixture f)
             await replica.StopAsync(None);
         }
         Assert.Equal(n, await f.CountAsync("messaging.events"));
-        Assert.Equal(n, await f.CountAsync("messaging.inbox"));
+        Assert.Equal(n, await f.CountAsync("messaging.inbox", "subscription_id <> 'message-analytics'"));
         Assert.Equal(n, f.Archive.Delivered + replica.Delivered);
         Assert.True(f.Archive.Delivered > 0 && replica.Delivered > 0, $"work not shared: {f.Archive.Delivered}/{replica.Delivered}");
         Assert.Equal(0, f.Archive.Duplicates + replica.Duplicates);
-        Assert.Equal(n, await f.CountAsync("processing.attempts", "state = 'succeeded'"));
+        Assert.Equal(n, await f.CountAsync("processing.attempts", "state = 'succeeded' AND subscription_id = 'archive'"));
         f.Evidence.Record("G01-competing-consumers", new { published = n, replica_1 = f.Archive.Delivered, replica_2 = replica.Delivered, events = n, duplicates = 0, batch_confirm = pass });
     }
 
@@ -82,8 +82,10 @@ public sealed class GateTests(MessagingFixture f)
         // Inbox retention: completed rows older than the window go, quarantined ones stay.
         await f.ExecAsync("UPDATE messaging.inbox SET completed_at = now() - interval '1 day'");
         await f.ExecAsync("INSERT INTO messaging.inbox (subscription_id, event_id, received_at, completed_at, outcome) VALUES ('archive', @e, now() - interval '2 days', now() - interval '2 days', 'quarantined')", ("e", Guid.CreateVersion7()));
+        var completedRows = await f.CountAsync("messaging.inbox", "outcome <> 'quarantined'"); // archive + the lifecycle projection's rows (v10)
         var second = await f.Reconciliation.RunOnceAsync(None, cleanup: true, redeclare: false);
-        Assert.Equal(2, second.InboxDeleted);
+        Assert.Equal(completedRows, second.InboxDeleted);
+        Assert.True(completedRows >= 2);
         Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'quarantined'"));
         f.Evidence.Record("G02-archive-independent-of-outbox", new { confirmed = 3, archived = 2, outbox_deleted = report.OutboxDeleted, outbox_kept_unarchived = 1, inbox_deleted = second.InboxDeleted });
     }
@@ -97,7 +99,7 @@ public sealed class GateTests(MessagingFixture f)
         await f.ExecAsync("INSERT INTO processing.quarantine (subscription_id, event_id, lane, reason, envelope, quarantined_at) VALUES ('archive', @e, 'live', 'invalid_payload', '{}'::jsonb, now())", ("e", Guid.CreateVersion7()));
         await Task.Delay(1100);
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: true);
-        Assert.Equal(["archive", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order()); // active subscriptions of raw.stored (v4)
+        Assert.Equal(["archive", "message-analytics", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order()); // active subscriptions of raw.stored (v10)
         Assert.Equal(["ghost-subscription"], report.UnknownSubscriptions);
         Assert.Equal(1, report.QuarantineOpen);
         Assert.Equal(1, report.OutboxUnconfirmed);
@@ -161,15 +163,15 @@ public sealed class GateTests(MessagingFixture f)
         await f.Archive.StartAsync(None);
         try
         {
-            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.quarantine") == 3));
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.quarantine", "subscription_id = 'archive'") == 3)); // the lifecycle projection quarantines its own copies too (v10)
         }
         finally
         {
             await f.Archive.StopAsync(None);
         }
-        Assert.Equal(1, await f.CountAsync("processing.quarantine", "reason = 'incompatible_schema'"));
-        Assert.Equal(1, await f.CountAsync("processing.quarantine", "reason = 'unknown_event'"));
-        Assert.Equal(1, await f.CountAsync("processing.quarantine", "reason = 'invalid_payload'"));
+        Assert.Equal(1, await f.CountAsync("processing.quarantine", "subscription_id = 'archive' AND reason = 'incompatible_schema'"));
+        Assert.Equal(1, await f.CountAsync("processing.quarantine", "subscription_id = 'archive' AND reason = 'unknown_event'"));
+        Assert.Equal(1, await f.CountAsync("processing.quarantine", "subscription_id = 'archive' AND reason = 'invalid_payload'"));
         Assert.Equal(0, await f.CountAsync("processing.attempts"));
         Assert.Equal(0, await f.CountAsync("messaging.events"));
         Assert.True(await MessagingFixture.WaitUntilAsync(async () => (await f.QueueAsync("puluj.archive.live.dlq")).Messages == 3));

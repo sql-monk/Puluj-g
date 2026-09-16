@@ -29,4 +29,15 @@ public sealed class AnalyticsOptions
 
     /// <summary>Days of `track_firsts` rebuilt after each run.</summary>
     public int TrackFirstsDays { get; set; } = 30;
+
+    /// <summary>P15: the lifecycle report is served from cache for this long (several viewers share one computation).</summary>
+    public int ReportCacheSeconds { get; set; } = 30;
+    /// <summary>P15: a lifecycle row without an analysis (or without a domain completion) older than this counts as stuck in the funnel.</summary>
+    public int LifecycleStaleMinutes { get; set; } = 15;
+    /// <summary>P15: backfill batch (raw rows per transaction) and batches per loop pass.</summary>
+    public int LifecycleBackfillBatch { get; set; } = 2000;
+    public int LifecycleBackfillBatchesPerPass { get; set; } = 5;
+    /// <summary>P15: reconciliation window and the grace a row gets before it is considered late.</summary>
+    public TimeSpan LifecycleReconcileWindow { get; set; } = TimeSpan.FromHours(48);
+    public TimeSpan LifecycleReconcileGrace { get; set; } = TimeSpan.FromMinutes(2);
 }

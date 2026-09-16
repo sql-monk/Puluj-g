@@ -168,6 +168,23 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>P15 (ADR-0013): the `message-analytics` consumer — the lifecycle projection; a plain projection writer without side effects.</summary>
+    public static IServiceCollection AddPulujMessageAnalytics(this IServiceCollection services, IReadOnlySet<string> roles, string? instanceName = null)
+    {
+        if (!roles.Contains(StageRoles.MessageAnalytics))
+        {
+            return services;
+        }
+        services.AddSingleton(sp =>
+        {
+            var handler = ActivatorUtilities.CreateInstance<Analytics.MessageAnalyticsHandler>(sp);
+            handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(Analytics.MessageAnalyticsHandler.Subscription, instanceName);
+            return handler;
+        });
+        services.AddSubscriptionConsumer<Analytics.MessageAnalyticsHandler>(instanceName);
+        return services;
+    }
+
     /// <summary>
     /// P11 (ADR-0011): the `projection` consumer — the map push adapter's durable half. Its own registration: a projection-only
     /// process needs neither the parser nor the correlation sinks (review B1), and the default `messaging` service runs it without
@@ -202,5 +219,7 @@ public static class StageRoles
     public const string Watchdog = "watchdog";
     public const string IncidentWorker = "incident-worker";
     public const string Projection = "projection";
+    /// <summary>P15: the lifecycle projection consumer (`analytics.message_lifecycle`).</summary>
+    public const string MessageAnalytics = "message-analytics";
     public static readonly string[] DomainWriters = [TrackWorker, AlertWorker, Watchdog, IncidentWorker];
 }

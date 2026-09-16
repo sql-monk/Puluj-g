@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8eeb0934-7799-4d05-a9c4-261eeb23e3b9" name="aleks@ASUS-MONK 2026-09-16 22:32:05" runUser="ASUS-MONK\aleks" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-09-16T22:32:05.7018154+03:00" queuing="2026-09-16T22:32:05.7018158+03:00" start="2026-09-16T22:31:12.3157196+03:00" finish="2026-09-16T22:32:06.4776880+03:00" />
+  <TestSettings name="default" id="8423fd97-7334-4b37-a275-3b83719f718d">
+    <Deployment runDeploymentRoot="aleks_ASUS-MONK_2026-09-16_22_32_05" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="9724678f-43eb-4205-8244-f2c62fbb739c" testId="d858545b-1764-1d4e-92e2-70eb12a16b05" testName="Puluj.Messaging.Tests.Integration.LifecycleTests.L01_Lifecycle_rows_follow_the_events_root_once_no_text_and_failed_visible_replay_in_its_own_row" computerName="ASUS-MONK" duration="00:00:10.3802077" startTime="2026-09-16T22:31:55.1670935+03:00" endTime="2026-09-16T22:32:05.5460908+03:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9724678f-43eb-4205-8244-f2c62fbb739c" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="Puluj.Messaging.Tests.Integration.LifecycleTests.L01_Lifecycle_rows_follow_the_events_root_once_no_text_and_failed_visible_replay_in_its_own_row" storage="c:\repos\puluj-g\tests\puluj.messaging.tests\bin\debug\net10.0\puluj.messaging.tests.dll" id="d858545b-1764-1d4e-92e2-70eb12a16b05">
+      <Execution id="9724678f-43eb-4205-8244-f2c62fbb739c" />
+      <TestMethod codeBase="C:\repos\Puluj-g\tests\Puluj.Messaging.Tests\bin\Debug\net10.0\Puluj.Messaging.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="Puluj.Messaging.Tests.Integration.LifecycleTests" name="L01_Lifecycle_rows_follow_the_events_root_once_no_text_and_failed_visible_replay_in_its_own_row" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="d858545b-1764-1d4e-92e2-70eb12a16b05" executionId="9724678f-43eb-4205-8244-f2c62fbb739c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.12)&#xD;
+[xUnit.net 00:00:00.39]   Discovering: Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:00.47]   Discovered:  Puluj.Messaging.Tests&#xD;
+[xUnit.net 00:00:00.49]   Starting:    Puluj.Messaging.Tests&#xD;
+[testcontainers.org 00:00:00.17] Connected to Docker:&#xD;
+  Host: npipe://./pipe/docker_engine&#xD;
+  Server Version: 29.8.0&#xD;
+  Kernel Version: 6.18.33.2-microsoft-standard-WSL2&#xD;
+  API Version: 1.56&#xD;
+  Operating System: Docker Desktop&#xD;
+  Total Memory: 31.16 GB&#xD;
+  Labels: &#xD;
+    com.docker.desktop.address=npipe://\\.\pipe\docker_cli&#xD;
+[testcontainers.org 00:00:00.44] Docker container 7a1377c4175c created&#xD;
+[testcontainers.org 00:00:00.54] Start Docker container 7a1377c4175c&#xD;
+[testcontainers.org 00:00:00.75] Wait for Docker container 7a1377c4175c to complete readiness checks&#xD;
+[testcontainers.org 00:00:01.81] Docker container 7a1377c4175c ready&#xD;
+[testcontainers.org 00:00:02.00] Docker container 002c294994cc created&#xD;
+[testcontainers.org 00:00:02.03] Docker container 0679607117fb created&#xD;
+[testcontainers.org 00:00:02.11] Start Docker container 002c294994cc&#xD;
+[testcontainers.org 00:00:02.13] Start Docker container 0679607117fb&#xD;
+[testcontainers.org 00:00:02.66] Wait for Docker container 0679607117fb to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.71] Wait for Docker container 002c294994cc to complete readiness checks&#xD;
+[testcontainers.org 00:00:02.74] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 002c294994cc&#xD;
+[testcontainers.org 00:00:03.88] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 002c294994cc&#xD;
+[testcontainers.org 00:00:04.98] Execute "pg_isready --host localhost --dbname puluj_messaging_test --username postgres" at Docker container 002c294994cc&#xD;
+[testcontainers.org 00:00:05.04] Docker container 002c294994cc ready&#xD;
+[testcontainers.org 00:00:06.81] Docker container 0679607117fb ready&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (6ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM "__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+warn: Microsoft.EntityFrameworkCore.Migrations[20410]&#xD;
+      The migration operation 'DROP INDEX CONCURRENTLY IF EXISTS ux_targets_observation_id&#xD;
+      ' from migration 'AddAggregateRevisions' cannot be executed in a transaction. If the app is terminated or an unrecoverable error occurs while this operation is being executed then the migration will be left in a partially applied state and would need to be reverted manually before it can be applied again. Create a separate migration that contains just this operation.&#xD;
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]&#xD;
+      Failed executing DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']&#xD;
+      SELECT migration_id, product_version&#xD;
+      FROM analytics."__EFMigrationsHistory"&#xD;
+      ORDER BY migration_id;&#xD;
+[testcontainers.org 00:00:52.23] Delete Docker container 0679607117fb&#xD;
+[testcontainers.org 00:00:52.58] Delete Docker container 002c294994cc&#xD;
+[xUnit.net 00:00:53.62]   Finished:    Puluj.Messaging.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

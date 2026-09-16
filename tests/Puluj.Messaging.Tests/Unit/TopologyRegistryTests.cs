@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(9, Registry.TopologyVersion); // v9 (P14): incident-worker serves the replay lane
+        Assert.Equal(10, Registry.TopologyVersion); // v10 (P15): message-analytics active
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -33,33 +33,33 @@ public sealed class TopologyRegistryTests
     [Fact]
     public void Expected_set_is_required_active_or_paused_and_serving_the_lane()
     {
-        // topology.json v4: archive, raw-writer, normalizer, parser active; message-analytics still planned → normalizer + archive are expected.
+        // topology.json v10 (P15): message-analytics active — the lifecycle projection is an expected branch of every raw.stored.
         var expected = Registry.ExpectedSubscriptions("raw.stored", "live");
-        Assert.Equal(["normalizer", "archive"], expected.Select(s => s.Id));
+        Assert.Equal(["normalizer", "message-analytics", "archive"], expected.Select(s => s.Id));
         Assert.Equal(["parser"], Registry.ExpectedSubscriptions("message.normalized", "live").Select(s => s.Id));
         Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // active since v5 (P06)
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "live").Select(s => s.Id)); // domain workers are conditional (by_manifest)
         Assert.Equal(["archive", "track-worker", "alert-worker", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "live", null, null, ["track-worker", "alert-worker", "incident-worker", "nope"]).Select(s => s.Id)); // v7 (P10): every named branch is active
+        Assert.Equal(["message-analytics", "archive"], Registry.ExpectedSubscriptions("message.analysis.completed", "live").Select(s => s.Id)); // v10 (P15)
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker"]).Select(s => s.Id)); // track/alert writers do not serve replay (P14: no live effects)
         Assert.Equal(["archive", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker", "alert-worker", "incident-worker"]).Select(s => s.Id)); // v9 (P14): incidents are rebuilt in the replay generation
-        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("incident.changed", "replay").Select(s => s.Id)); // no projection in the replay lane: the shadow generation never reaches the map
-        Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // v8 (P11): projection active; archive stays required
-        Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("incident.changed", "live").Select(s => s.Id));
+        Assert.Equal(["archive", "message-analytics"], Registry.ExpectedSubscriptions("incident.changed", "replay").Select(s => s.Id)); // no projection in the replay lane: the shadow generation never reaches the map; analytics files the replay row
+        Assert.Equal(["archive", "projection", "message-analytics"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // v8 (P11): projection active; archive stays required; v10 analytics
+        Assert.Equal(["archive", "projection", "message-analytics"], Registry.ExpectedSubscriptions("incident.changed", "live").Select(s => s.Id));
         Assert.Equal(["track-worker"], Registry.ExpectedSubscriptions("track.expiry.requested", "live").Select(s => s.Id));
-        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("message.analysis.completed", "live").Select(s => s.Id));
         Assert.Equal(["llm-worker"], Registry.ExpectedSubscriptions("llm.requested", "live").Select(s => s.Id));
         Assert.Equal(["raw-writer", "archive"], Registry.ExpectedSubscriptions("ingress.received", "history").Select(s => s.Id));
 
         // Database-owned status wins over the file: a paused required consumer stays interested, a planned one activated later joins.
-        var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "retired", ["message-analytics"] = "active" };
-        Assert.Equal(["message-analytics", "archive"], Registry.ExpectedSubscriptions("raw.stored", "live", overrides).Select(s => s.Id));
+        var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "retired", ["message-analytics"] = "planned" };
+        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("raw.stored", "live", overrides).Select(s => s.Id));
 
         // Lanes: projection has no replay lane, so it is never expected for a replay-lane track.changed (a shadow generation never reaches the live map).
         Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("track.changed", "replay").Select(s => s.Id));
         Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("incident.changed", "replay").Select(s => s.Id));
 
         // Retired/planned are not expected.
-        Assert.Empty(Registry.ExpectedSubscriptions("raw.stored", "live", new Dictionary<string, string> { ["archive"] = "retired", ["normalizer"] = "retired" }));
+        Assert.Empty(Registry.ExpectedSubscriptions("raw.stored", "live", new Dictionary<string, string> { ["archive"] = "retired", ["normalizer"] = "retired", ["message-analytics"] = "retired" }));
         Assert.Throws<KeyNotFoundException>(() => Registry.ExpectedSubscriptions("no.such.event", "live"));
     }
 

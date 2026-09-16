@@ -81,7 +81,7 @@ public sealed class ProjectionTests(MessagingFixture f)
             ["traceparent"] = RawStoredEnvelope.CurrentTraceparent(),
             ["processing_run_id"] = Guid.CreateVersion7().ToString(),
             ["pipeline_version"] = "test",
-            ["topology_version"] = 9,
+            ["topology_version"] = 10,
             ["lane"] = lane,
             ["aggregate_id"] = $"incident:{incidentId}",
             ["aggregate_revision"] = revision,

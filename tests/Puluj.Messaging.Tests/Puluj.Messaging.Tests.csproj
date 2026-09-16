@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\src\Puluj.Messaging\Puluj.Messaging.csproj" />
     <ProjectReference Include="..\..\src\Puluj.Collectors\Puluj.Collectors.csproj" />
     <ProjectReference Include="..\..\src\Puluj.Processing\Puluj.Processing.csproj" />
+    <ProjectReference Include="..\..\src\Puluj.Analytics\Puluj.Analytics.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using Puluj.Analytics;
 using Puluj.Collectors;
 using Puluj.Domain.Entities;
 using Puluj.Infrastructure;
@@ -63,6 +64,8 @@ public sealed class MessagingFixture : IAsyncLifetime
     public SubscriptionConsumer IncidentWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Incidents.IncidentWriterHandler.Subscription);
     /// <summary>P11: the map push adapter's durable half (incident.changed → NOTIFY IncidentChanged).</summary>
     public SubscriptionConsumer Projection => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Projection.ProjectionHandler.Subscription);
+    /// <summary>P15: the lifecycle projection consumer — started for the whole collection (a projection without side effects; every expected `message-analytics` delivery completes).</summary>
+    public SubscriptionConsumer MessageAnalytics => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Analytics.MessageAnalyticsHandler.Subscription);
     public Puluj.Processing.Incidents.IncidentStateWriter Incidents => Services.GetRequiredService<Puluj.Processing.Incidents.IncidentStateWriter>();
     public FakeLlmCompletion Llm { get; } = new();
     public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
@@ -165,6 +168,8 @@ public sealed class MessagingFixture : IAsyncLifetime
         // P09 domain writers next to the legacy processor: never started together on the same messages (W06/W07 drive each path explicitly).
         services.AddPulujDomainWriters(config, new HashSet<string> { StageRoles.TrackWorker, StageRoles.AlertWorker, StageRoles.Watchdog, StageRoles.IncidentWorker }, "p03-test");
         services.AddPulujProjection(new HashSet<string> { StageRoles.Projection }, "p03-test"); // P11: registered the way the Worker does it (review B1)
+        services.AddPulujMessageAnalytics(new HashSet<string> { StageRoles.MessageAnalytics }, "p03-test"); // P15: lifecycle projection
+        services.AddPulujAnalyticsReporting(config); // P15: the analytics schema (its own migrations) and the report service
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -173,7 +178,11 @@ public sealed class MessagingFixture : IAsyncLifetime
         await using (var db = await Factory.CreateDbContextAsync())
         {
             await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS postgis");
-            await db.Database.MigrateAsync();
+            await db.Database.MigrateAsync(); // includes analytics.message_lifecycle (P15: DDL owned by the pipeline migrations)
+            await using (var analytics = await Services.GetRequiredService<IDbContextFactory<Puluj.Analytics.Persistence.AnalyticsDbContext>>().CreateDbContextAsync())
+            {
+                await analytics.Database.MigrateAsync(); // the copy-analytics tables (state, runs, messages…) the report service and backfill state use
+            }
             foreach (var seeder in Services.GetServices<ISeeder>().OrderBy(s => s.Order))
             {
                 await seeder.SeedAsync(db, CancellationToken.None);
@@ -183,11 +192,12 @@ public sealed class MessagingFixture : IAsyncLifetime
         await Indexes.RefreshAsync(CancellationToken.None);
         var connection = await Broker.GetAsync(CancellationToken.None);
         BrokerVersion = connection.ServerProperties is { } props && props.TryGetValue("version", out var v) && v is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : "?";
-        await ResetAsync();
+        await ResetAsync(); // P15: ResetAsync also (re)starts the lifecycle projection consumer for the whole collection
     }
 
     public async Task DisposeAsync()
     {
+        await MessageAnalytics.StopAsync(CancellationToken.None);
         Evidence.Flush(Path.Combine(FindRepoRoot(), "docs", "evidence", "message-platform", "messaging-crash-evidence.json"), BrokerVersion);
         await Services.DisposeAsync();
         await _rabbit.DisposeAsync();
@@ -197,12 +207,14 @@ public sealed class MessagingFixture : IAsyncLifetime
     /// <summary>Empty tables of both schemas and raw_messages, re-register the topology (v2, archive active), declare it, purge the queues.</summary>
     public async Task ResetAsync()
     {
+        await MessageAnalytics.StopAsync(CancellationToken.None); // P15 (review B4): drained before the TRUNCATE, restarted after the purge — no receipt lands in the next test
         await ExecAsync("""
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions, messaging.subscription_lanes, messaging.control_audit,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
                      processing.observations, processing.extractions, llm_requests, incident_revisions, incident_observations, incidents,
                      collector_states, targets, target_tracks, track_targets, target_track_revisions, target_links, source_daily_stats, source_copies, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
             """);
+        await ExecAsync("TRUNCATE analytics.message_lifecycle"); // P15 projection (analytics schema)
         Registrar.Reset();
         Outbox.Runs.Reset();
         Archive.ResetCounters();
@@ -215,19 +227,21 @@ public sealed class MessagingFixture : IAsyncLifetime
         AlertWorker.ResetCounters();
         IncidentWorker.ResetCounters();
         Projection.ResetCounters();
+        MessageAnalytics.ResetCounters();
         Watchdog.ResetMemo();
         Llm.Reset();
         Services.GetRequiredService<LlmBreaker>().Reset(); // a 429 in one test must not pause the model for the next
         await Registrar.EnsureRegisteredAsync(CancellationToken.None);
         await Declarer.DeclareAsync(CancellationToken.None);
         await PurgeQueuesAsync();
+        await MessageAnalytics.StartAsync(CancellationToken.None);
     }
 
     public async Task PurgeQueuesAsync()
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription, Puluj.Processing.Incidents.IncidentWriterHandler.Subscription, Puluj.Processing.Projection.ProjectionHandler.Subscription })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription, Puluj.Processing.Incidents.IncidentWriterHandler.Subscription, Puluj.Processing.Projection.ProjectionHandler.Subscription, Puluj.Processing.Analytics.MessageAnalyticsHandler.Subscription })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {

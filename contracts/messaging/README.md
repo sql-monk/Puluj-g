@@ -109,6 +109,14 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P15): lifecycle projection (topology v10)
+
+- v10: `message-analytics` → **active** (bindings `raw.stored`, `message.analysis.completed`, `track.changed`, `alert.changed`, `incident.changed`; lanes
+  live/history/replay). Expected set `raw.stored` = normalizer, message-analytics, archive; `message.analysis.completed` = message-analytics, archive;
+  `*.changed` live = archive, projection, message-analytics (replay: archive, message-analytics). Consumer `MessageAnalyticsHandler` (роль
+  `message-analytics`) пише `analytics.message_lifecycle` (DDL — міграція `AddMessageLifecycle` у `PulujDbContext`); події без `raw_message_id` → `noop no_raw`;
+  `DomainWatchdog` watermark ігнорує цю підписку ([ADR-0013](../../docs/adr/ADR-0013-message-analytics.md)).
+
 ## Runtime (P14): replay runs, generations (topology v9)
 
 - v9: `incident-worker.lanes += replay`; `producer_roles.replay` емітить `raw.stored` (lane `replay`, `is_new:false`, `processing_run_id` = replay run,

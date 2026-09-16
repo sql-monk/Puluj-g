@@ -33,7 +33,8 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(1, await f.CountAsync("raw_messages"));
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND subscription_id = 'archive'"));
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND subscription_id = 'normalizer'")); // active since v4 (P05)
-        Assert.Equal(0, await f.CountAsync("processing.deliveries", "subscription_id NOT IN ('archive', 'normalizer')")); // message-analytics is planned, not expected
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "subscription_id = 'message-analytics'")); // active since v10 (P15): the lifecycle projection
+        Assert.Equal(0, await f.CountAsync("processing.deliveries", "subscription_id NOT IN ('archive', 'normalizer', 'message-analytics')"));
         Assert.Equal(0, await f.CountAsync("messaging.events"));
         Assert.Equal(1, await f.CountAsync("processing.runs", "lane = 'live' AND state = 'running'"));
         var envelope = JsonNode.Parse(await f.ScalarAsync<string>("SELECT envelope::text FROM messaging.outbox"))!;
@@ -47,7 +48,7 @@ public sealed class CrashTests(MessagingFixture f)
         var report = await f.Reconciliation.RunOnceAsync(None, cleanup: false, redeclare: false);
         Assert.Equal(1, report.OutboxUnconfirmed);
         Assert.True(report.OutboxOldestAge > TimeSpan.FromSeconds(1));
-        Assert.Equal(["archive", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order());
+        Assert.Equal(["archive", "message-analytics", "normalizer"], report.OverdueDeliveries.Select(d => d.SubscriptionId).Order()); // v10 (P15): the lifecycle projection is expected too
 
         var pass = await f.Relay.RelayOnceAsync(None);
         Assert.Equal((1, 1), (pass.Leased, pass.Confirmed));
@@ -64,8 +65,8 @@ public sealed class CrashTests(MessagingFixture f)
             await f.Archive.StopAsync(None);
         }
         Assert.Equal(eventId, await f.ScalarAsync<Guid>("SELECT event_id FROM messaging.events"));
-        Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'completed'"));
-        Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'succeeded'"));
+        Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'completed' AND subscription_id <> 'message-analytics'"));
+        Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'succeeded' AND subscription_id = 'archive'"));
         f.Evidence.Record("P03-C01", new { window = "W1b/W2", raw = 1, outbox_unconfirmed_before_relay = 1, expected_deliveries = new[] { "archive", "normalizer" }, outbox_age_seen_s = report.OutboxOldestAge.TotalSeconds, relay = pass, events = 1, receipt = "completed" });
     }
 
@@ -126,8 +127,8 @@ public sealed class CrashTests(MessagingFixture f)
             await f.Archive.StopAsync(None);
         }
         Assert.Equal(1, await f.CountAsync("messaging.events"));
-        Assert.Equal(1, await f.CountAsync("messaging.inbox"));
-        Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome = 'completed'"));
+        Assert.Equal(1, await f.CountAsync("messaging.inbox", "subscription_id <> 'message-analytics'"));
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome = 'completed' AND subscription_id <> 'message-analytics'"));
         Assert.Equal(1, f.Archive.Duplicates);
         f.Evidence.Record("P03-C03", new { window = "W3/W12b", publishes = 2, deliveries_seen = f.Archive.Delivered, inbox_rows = 1, events = 1, duplicates_suppressed = f.Archive.Duplicates });
     }
@@ -159,7 +160,7 @@ public sealed class CrashTests(MessagingFixture f)
         }
         Assert.Equal([nameof(OnceHooks.BeforeQuarantineCommit), nameof(OnceHooks.AfterQuarantineCommitBeforeNack)], hooks.Fired);
         Assert.Equal(3, await f.CountAsync("processing.attempts", "state = 'failed'"));
-        Assert.Equal(3, await f.CountAsync("processing.attempts"));
+        Assert.Equal(3, await f.CountAsync("processing.attempts", "subscription_id = 'archive'"));
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome = 'quarantined' AND reason = 'attempts_exhausted'"));
         Assert.Equal(1, await f.CountAsync("processing.quarantine", "resolved_at IS NULL AND reason = 'attempts_exhausted'"));
         Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'quarantined'"));
@@ -210,7 +211,7 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(1, await f.CountAsync("messaging.outbox", "target_queue = 'puluj.archive.live' AND confirmed_at IS NULL"));
         Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome IS NULL AND actor = 'operator:test'"));
         Assert.Equal(1, await f.CountAsync("processing.quarantine", "resolved_at IS NOT NULL AND resolution = 'retried' AND retry_outbox_id = " + outboxId));
-        Assert.Equal(0, await f.CountAsync("messaging.inbox"));
+        Assert.Equal(0, await f.CountAsync("messaging.inbox", "subscription_id <> 'message-analytics'"));
         Assert.Equal(1, await f.CountAsync("messaging.control_audit", "action = 'retry' AND subscription_id = 'archive' AND lane = 'live' AND actor = 'operator:test' AND (details->>'quarantineId')::bigint = " + quarantineId)); // P13: one audit source
 
         var pass = await f.Relay.RelayOnceAsync(None);
@@ -219,7 +220,7 @@ public sealed class CrashTests(MessagingFixture f)
         await f.Dlq.StartAsync(None);
         try
         {
-            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed'") == 1));
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed' AND subscription_id <> 'message-analytics'") == 1));
             Assert.True(await MessagingFixture.WaitUntilAsync(async () => (await f.QueueAsync(LiveDlq)).Messages == 0)); // stale DLQ copy: ACKed, no new quarantine
         }
         finally
@@ -302,6 +303,7 @@ public sealed class CrashTests(MessagingFixture f)
             // bound (v4) the publish would be confirmed and only the archive would silently miss the event.
             await channel.QueueUnbindAsync(LiveQueue, f.Registry.ExchangeName, "puluj.live.raw.stored");
             await channel.QueueUnbindAsync("puluj.normalizer.live", f.Registry.ExchangeName, "puluj.live.raw.stored");
+            await channel.QueueUnbindAsync("puluj.message-analytics.live", f.Registry.ExchangeName, "puluj.live.raw.stored"); // v10 (P15)
         }
         await f.IngestAsync("c08", "Пуск ракет з Криму.");
         var pass = await f.Relay.RelayOnceAsync(None);
@@ -339,7 +341,7 @@ public sealed class CrashTests(MessagingFixture f)
         await consumer.StartAsync(None);
         try
         {
-            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed'") == 1));
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "outcome = 'completed' AND subscription_id <> 'message-analytics'") == 1));
         }
         finally
         {
@@ -348,9 +350,9 @@ public sealed class CrashTests(MessagingFixture f)
         Assert.Equal(1, handler.Failed);
         Assert.Equal(1, consumer.Requeued);
         Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'failed' AND error LIKE '%DB outage%'"));
-        Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'succeeded'"));
+        Assert.Equal(1, await f.CountAsync("processing.attempts", "state = 'succeeded' AND subscription_id = 'archive'"));
         Assert.Equal(1, await f.CountAsync("messaging.events"));
-        Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'completed'"));
+        Assert.Equal(1, await f.CountAsync("messaging.inbox", "outcome = 'completed' AND subscription_id <> 'message-analytics'"));
         Assert.Equal(0, await f.CountAsync("processing.quarantine"));
         f.Evidence.Record("P03-C09", new { window = "W12a", transient_failures = handler.Failed, requeued = consumer.Requeued, attempts = new { failed = 1, succeeded = 1 }, events = 1 });
     }
@@ -376,11 +378,11 @@ public sealed class CrashTests(MessagingFixture f)
         {
             await f.Archive.StopAsync(None);
         }
-        Assert.Equal(1, await f.CountAsync("messaging.inbox"));
+        Assert.Equal(1, await f.CountAsync("messaging.inbox", "subscription_id <> 'message-analytics'"));
         Assert.Equal(1, await f.CountAsync("messaging.events"));
-        Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome = 'completed'"));
+        Assert.Equal(1, await f.CountAsync("processing.deliveries", "outcome = 'completed' AND subscription_id <> 'message-analytics'"));
         Assert.Equal(2, f.Archive.Duplicates);
-        Assert.Equal(1, await f.CountAsync("processing.attempts"));
+        Assert.Equal(1, await f.CountAsync("processing.attempts", "subscription_id = 'archive'"));
         f.Evidence.Record("P03-C10", new { window = "W14a", published = 3, delivered = f.Archive.Delivered, duplicates_suppressed = f.Archive.Duplicates, inbox = 1, events = 1, attempts = 1 });
     }
 }

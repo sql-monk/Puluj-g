@@ -218,8 +218,9 @@ public sealed class DomainWatchdog(
         {
             Consider(await o.ExecuteScalarAsync(ct));
         }
-        // Message-scoped events (ingress.received has no raw id yet, but it is the upstream backlog); aggregate events/commands never hold the watermark.
-        await using (var d = new NpgsqlCommand("SELECT min(e.occurred_at) FROM processing.deliveries d JOIN messaging.events e ON e.event_id = d.event_id WHERE d.outcome IS NULL AND e.event_type IN ('ingress.received', 'raw.stored', 'message.normalized', 'parse.completed', 'llm.requested', 'llm.completed', 'llm.failed', 'observations.recorded', 'message.analysis.completed')", conn))
+        // Message-scoped events (ingress.received has no raw id yet, but it is the upstream backlog); aggregate events/commands never hold the watermark,
+        // nor does the analytics projection (P15): its lag is a reporting lag, not a domain stage — expiry must not wait for it.
+        await using (var d = new NpgsqlCommand("SELECT min(e.occurred_at) FROM processing.deliveries d JOIN messaging.events e ON e.event_id = d.event_id WHERE d.outcome IS NULL AND d.subscription_id <> 'message-analytics' AND e.event_type IN ('ingress.received', 'raw.stored', 'message.normalized', 'parse.completed', 'llm.requested', 'llm.completed', 'llm.failed', 'observations.recorded', 'message.analysis.completed')", conn))
         {
             Consider(await d.ExecuteScalarAsync(ct));
         }

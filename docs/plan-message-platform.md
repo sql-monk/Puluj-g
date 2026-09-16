@@ -802,7 +802,7 @@ RabbitMQ/Testcontainers harness — P02+; required CI profile і load/chaos harn
 
 ```powershell
 cd web; npx playwright install chromium          # один раз
-cd web; npx playwright test                       # E01–E08 + A01–A05, desktop + mobile, ~5 хв (dev-сервери :5183/:5184 стартують самі)
+cd web; npx playwright test                       # E01–E08 + A01–A06, desktop + mobile, ~5 хв (dev-сервери :5183/:5184 стартують самі)
 cd web; npx playwright test --project=desktop e2e/E07-workload.e2e.ts   # лише workload
 cd web; npx playwright show-report e2e-report
 ```
@@ -823,6 +823,15 @@ cd web; npx playwright test --project=desktop e2e/A03-queues.e2e.ts   # A03 че
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests --filter "FullyQualifiedName~ReplayTests"   # R01/R03/R04 shadow→promote→rollback→catchup, R02 checkpoints, R05 supersede, R06 lock
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Contracts.Tests                                     # topology v9, producer_roles.replay
 cd web; npx playwright test --project=desktop e2e/A05-replay.e2e.ts   # панель Replay
+```
+
+**P15 (lifecycle analytics)** — L01 у Messaging.Tests (реальний pipeline → рядки проєкції), L02/L03 у Analytics.Tests (Testcontainers PostGIS: backfill,
+reconciliation, звіт), контракти v10, Playwright A06:
+
+```powershell
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests --filter "FullyQualifiedName~LifecycleTests"   # L01 root once, no-text/failed, late result, replay row
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Analytics.Tests --filter "FullyQualifiedName~LifecycleTests"   # L02 backfill/reconciliation, L03 report
+cd web; npx playwright test --project=desktop e2e/A06-lifecycle.e2e.ts   # сторінка «Аналітика повідомлень»
 ```
 Не вигадувати результати неіснуючого suite.
 Frontend build генерує файли у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`; узгодити ownership
@@ -902,7 +911,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P12 | done | Claude Code (p12) | p12_review: план approve after fixes (B1–B4, N1–N10, Q1–Q5); результат approve after fixes (N1–N13, Q1–Q6, без blocking) → виправлено → re-run зелений | [GitHub P12](https://github.com/sql-monk/Puluj-g/issues/13); [handoff, evidence](evidence/message-platform/P12-handoff.md); Playwright E2E 17 (desktop+mobile, admin), catalog editor + audit, review queue + merge preview, map quality; закомічено |
 | P13 | done | Claude Code (p13) | p13_review: план approve after fixes (B1–B4, N1–N16, Q1–Q5); результат approve after fixes (B1, N1–N10, Q1–Q9) → виправлено → re-run зелений | [GitHub P13](https://github.com/sql-monk/Puluj-g/issues/16); [handoff, evidence](evidence/message-platform/P13-handoff.md); ADR-0012; ops snapshot + alarms, lane pause/drain + audit, message explorer, панелі «Черги»/«Повідомлення», Playwright A03/A04; закомічено |
 | P14 | done | Claude Code (p14) | p14_review: план approve after fixes (B1–B3, N1–N13, Q1–Q6); результат request changes (B1, B2, N1–N9, Q1–Q8) → виправлено → re-run зелений | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); [handoff, evidence](evidence/message-platform/P14-handoff.md); ADR-0005 accepted; replay runs (checkpoint, catchup, verify/promote/rollback), topology v9, shadow incident-worker, панель «Replay», R01–R06 + A05; закомічено |
-| P15 | planned | — | — | [GitHub P15](https://github.com/sql-monk/Puluj-g/issues/17); — |
+| P15 | done | Claude Code (p15) | p15_review: план approve after fixes (B1–B4, N1–N14, Q1–Q6); результат request changes (B1, B2, N1–N7, Q1–Q7) → виправлено → re-run зелений | [GitHub P15](https://github.com/sql-monk/Puluj-g/issues/17); [handoff, evidence](evidence/message-platform/P15-handoff.md); ADR-0013; проєкція `analytics.message_lifecycle`, consumer `message-analytics` (topology v10), backfill/reconciliation, звіт і панель «Аналітика повідомлень», L01–L04 + A06; закомічено |
 | P16 | planned | — | — | [GitHub P16](https://github.com/sql-monk/Puluj-g/issues/15); — |
 
 Програма завершена, коли всі tasks прийняті, усі підтримувані джерела проходять надійний ingress,

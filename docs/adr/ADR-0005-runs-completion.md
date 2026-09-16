@@ -95,7 +95,7 @@ stale revision) — receipt обов'язковий; `quarantined` — retries �
 | `stored` | receipt/подія `raw.stored` |
 | `analyzed` | `message.analysis.completed` (будь-який outcome) |
 | `domain_completed` | усі гілки з `expected_branches` мають terminal receipt `completed|noop|waived` |
-| `analytics_caught_up` | `message-analytics` має receipts для `raw.stored` і `message.analysis.completed` |
+| `analytics_caught_up` | `message-analytics` має receipts для `raw.stored` і `message.analysis.completed` (P15: рядок `analytics.message_lifecycle` з `analyzed_at`; ADR-0013) |
 | `needs_attention` | будь-який `quarantined`, або outcome `needs_review|failed`, або expected без receipt довше SLO |
 
 `RawMessage.ProcessingStatus` лишається compatibility-проєкцією: `Processed` ⇔ `analyzed ∧ domain_completed`;
