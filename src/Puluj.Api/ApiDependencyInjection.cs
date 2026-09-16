@@ -22,7 +22,7 @@ public static class ApiDependencyInjection
             .AllowAnyMethod()
             .AllowCredentials()));
 
-        services.AddSignalR().AddJsonProtocol(o => ConfigureJson(o.PayloadSerializerOptions));
+        services.AddSignalR().AddJsonProtocol(o => ConfigureMapJson(o.PayloadSerializerOptions));
 
         services.AddSingleton<ReferenceCache>();
         services.AddHostedService(sp => sp.GetRequiredService<ReferenceCache>());
@@ -51,4 +51,25 @@ public static class ApiDependencyInjection
         o.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         o.Converters.Add(new GeoJsonConverterFactory(Geo.Factory));
     }
+
+    /// <summary>Map payload identities stay exact in JavaScript; ordinary REST remains numerically compatible.</summary>
+    public static void ConfigureMapJson(JsonSerializerOptions o)
+    {
+        ConfigureJson(o);
+        o.Converters.Insert(0, new MapInt64Converter());
+    }
+
+    public static JsonSerializerOptions MapJsonOptions()
+    {
+        var options = new JsonSerializerOptions();
+        ConfigureMapJson(options);
+        return options;
+    }
+
+    private sealed class MapInt64Converter : JsonConverter<long>
+    {
+        public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.TokenType == JsonTokenType.String ? long.Parse(reader.GetString()!, System.Globalization.CultureInfo.InvariantCulture) : reader.GetInt64();
+        public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
 }

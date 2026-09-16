@@ -26,40 +26,47 @@ public static class EndpointRouteBuilderExtensions
         });
 
         // Live state or the state at a moment in the past (spec §20). Same shape for both.
-        api.MapGet("/snapshot", async (DateTimeOffset? at, bool? activeOnly, SnapshotService snapshots, CancellationToken ct) =>
-            at is null
-                ? await snapshots.LiveAsync(activeOnly ?? true, ct)
-                : await snapshots.AtAsync(at.Value, activeOnly ?? true, ct));
+        api.MapGet("/snapshot", async (HttpContext http, DateTimeOffset? at, bool? activeOnly, SnapshotService snapshots, CancellationToken ct) =>
+        {
+            try { return Results.Json(at is null ? await snapshots.LiveAsync(activeOnly ?? true, ct, MapFilter.From(http.Request.Query)) : await snapshots.AtAsync(at.Value, activeOnly ?? true, ct, MapFilter.From(http.Request.Query)), ApiDependencyInjection.MapJsonOptions()); }
+            catch (MapFutureHistoryException ex) { return Results.BadRequest(new { code = "future_history", detail = ex.Message }); }
+        });
 
         // Replay window (spec §20): every track that was reported inside it, with all its reported positions, so the
         // client can animate the movement between reports instead of asking for a snapshot per tick.
-        api.MapGet("/replay", async (DateTimeOffset from, DateTimeOffset to, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.ReplayAsync(from, to, ct));
+        api.MapGet("/replay", async (HttpContext http, DateTimeOffset from, DateTimeOffset to, SnapshotService snapshots, CancellationToken ct) =>
+        {
+            try { return Results.Json(await snapshots.ReplayAsync(from, to, ct, MapFilter.From(http.Request.Query)), ApiDependencyInjection.MapJsonOptions()); }
+            catch (MapWindowTooLargeException ex) { return Results.BadRequest(new { code = "window_too_large", maximumHours = ex.Maximum.TotalHours, detail = ex.Message }); }
+            catch (MapFutureHistoryException ex) { return Results.BadRequest(new { code = "future_history", detail = ex.Message }); }
+        });
 
         // The probable predecessors of the track's newest target (all of them, two generations back by default).
         api.MapGet("/tracks/{id:long}/predecessors", async (long id, int? depth, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.PredecessorsAsync(id, Math.Clamp(depth ?? 2, 1, 4), ct) is { } p ? Results.Ok(p) : Results.NotFound());
+            await snapshots.PredecessorsAsync(id, Math.Clamp(depth ?? 2, 1, 4), ct) is { } p ? Results.Json(p, ApiDependencyInjection.MapJsonOptions()) : Results.NotFound());
 
-        api.MapGet("/tracks/{id:long}", async Task<Results<Ok<TrackDetailsDto>, NotFound>> (long id, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.TrackDetailsAsync(id, ct) is { } details ? TypedResults.Ok(details) : TypedResults.NotFound());
+        api.MapGet("/tracks/{id:long}", async (long id, SnapshotService snapshots, CancellationToken ct) =>
+            await snapshots.TrackDetailsAsync(id, ct) is { } details ? Results.Json(details, ApiDependencyInjection.MapJsonOptions()) : Results.NotFound());
 
         // One report with its message, source and kinematic links (the link window between two reports).
-        api.MapGet("/targets/{id:long}", async Task<Results<Ok<TargetDto>, NotFound>> (long id, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.TargetAsync(id, ct) is { } o ? TypedResults.Ok(o) : TypedResults.NotFound());
+        api.MapGet("/targets/{id:long}", async (long id, SnapshotService snapshots, CancellationToken ct) =>
+            await snapshots.TargetAsync(id, ct) is { } o ? Results.Json(o, ApiDependencyInjection.MapJsonOptions()) : Results.NotFound());
 
         // Feed: newest targets for the side panel (the feed window by default, never further back). `until` bounds a replay window.
         api.MapGet("/targets", async (DateTimeOffset? since, DateTimeOffset? until, int? limit, SnapshotService snapshots, TimeProvider clock, IOptions<MapOptions> map, CancellationToken ct) =>
-            await snapshots.RecentTargetsAsync(since ?? clock.GetUtcNow() - map.Value.FeedWindow, until, limit ?? 300, ct));
+            Results.Json(await snapshots.RecentTargetsAsync(since ?? clock.GetUtcNow() - map.Value.FeedWindow, until, limit ?? 300, ct), ApiDependencyInjection.MapJsonOptions()));
 
         // Alert history of one place — on it, covering it or inside it (the region window: current alert, last one, count and total time over 24 h).
         api.MapGet("/alerts/history", async (int placeId, double? hours, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.AlertHistoryAsync(placeId, hours ?? 24, ct));
+            Results.Json(await snapshots.AlertHistoryAsync(placeId, hours ?? 24, ct), ApiDependencyInjection.MapJsonOptions()));
 
-        api.MapGet("/timeline", async (DateTimeOffset? from, DateTimeOffset? to, int? bucketMinutes, SnapshotService snapshots, TimeProvider clock, CancellationToken ct) =>
+        api.MapGet("/timeline", async (HttpContext http, DateTimeOffset? from, DateTimeOffset? to, int? bucketMinutes, SnapshotService snapshots, TimeProvider clock, CancellationToken ct) =>
         {
             var end = to ?? clock.GetUtcNow();
             var start = from ?? end.AddHours(-6);
-            return await snapshots.TimelineAsync(start, end, bucketMinutes ?? 15, ct);
+            try { return Results.Ok(await snapshots.TimelineAsync(start, end, bucketMinutes ?? 15, ct, MapFilter.From(http.Request.Query))); }
+            catch (MapWindowTooLargeException ex) { return Results.BadRequest(new { code = "window_too_large", maximumHours = ex.Maximum.TotalHours, detail = ex.Message }); }
+            catch (MapFutureHistoryException ex) { return Results.BadRequest(new { code = "future_history", detail = ex.Message }); }
         });
 
         // P11 (ADR-0011): incidents inside a bounded window, keyset-paged; `mode=recorded&asOf=` is what the system knew then.

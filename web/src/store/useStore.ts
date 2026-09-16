@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Geometry } from 'geojson'
 import type { PublicSection } from '../public/routes'
 import { api } from '../api/client'
-import type { AlertDto, PredecessorsDto, DisplayMode, TargetDto, RegionDto, SourceDto, TrackDto } from '../api/types'
+import type { AlertDto, PredecessorsDto, DisplayMode, MapId, TargetDto, RegionDto, SourceDto, TrackDto } from '../api/types'
 import type { Home } from '../eta/computeEta'
 import { getPalette, type MapPalette } from '../map/palette'
 import { defaultMapConfig, mergeTargets, mergeTracks, nearestLifetime, pruneTracks, type MapConfig } from './liveWindow'
@@ -34,9 +34,9 @@ export type Connection = 'connected' | 'reconnecting' | 'disconnected'
 
 /** A leg of the selected target's family the viewer clicked: the two reports it joins and its probability. */
 export interface SelectedLink {
-  trackId: number
-  fromTargetId: number
-  toTargetId: number
+  trackId: MapId
+  fromTargetId: MapId
+  toTargetId: MapId
   probability: number
   pathProbability: number
   kind: string
@@ -62,9 +62,9 @@ export interface Filters {
 }
 
 interface State {
-  tracks: Record<number, TrackDto>
-  alerts: Record<number, AlertDto>
-  events: Record<number, TargetDto>
+  tracks: Record<string, TrackDto>
+  alerts: Record<string, AlertDto>
+  events: Record<string, TargetDto>
   regions: RegionDto[]
   sources: SourceDto[]
   /** The live windows the server works with (lifetime choices, feed depth); defaults until /api/map/config answers. */
@@ -80,7 +80,7 @@ interface State {
   panelOpen: boolean
   /** U03 migration: each public section remembers its own drawer state; `panelOpen` remains a legacy fallback. */
   panelOpenBySection: Partial<Record<PublicSection, boolean>>
-  selectedTrackId: number | null
+  selectedTrackId: MapId | null
   /** The clicked leg between two reports of the selected target's family (its window is open). */
   selectedLink: SelectedLink | null
   /** Feed of recent targets, newest first (live mode only). */
@@ -112,14 +112,14 @@ interface State {
   setTheme: (t: Theme) => void
   setPanelOpen: (open: boolean) => void
   setPanelOpenFor: (section: PublicSection, open: boolean) => void
-  select: (id: number | null) => void
+  select: (id: MapId | null) => void
   selectLink: (link: SelectedLink | null) => void
   setTargets: (list: TargetDto[]) => void
   addTarget: (o: TargetDto) => void
   /** A batch of new reports for the feed; those outside the feed window are dropped. */
   addTargets: (list: TargetDto[]) => void
   selectRegion: (id: number | null) => void
-  loadPredecessors: (trackId: number | null) => void
+  loadPredecessors: (trackId: MapId | null) => void
   ensurePlaceGeometry: (placeId: number) => void
   setLoading: (v: boolean) => void
   setError: (e: string | null) => void

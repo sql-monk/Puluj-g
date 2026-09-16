@@ -120,16 +120,19 @@ export function isMapRoute(route: PublicRoute): boolean {
 }
 
 /**
- * A history hash describes a half-open UTC interval. Until U03 owns the full
- * filter codec, the shell still needs its stable default and initial frame.
+ * A history hash describes a half-open UTC interval. `at` is optional but, once
+ * present, is the frozen frame and survives unrelated filter changes.
  */
 export function historyWindow(query: URLSearchParams, now = new Date()): HistoryWindow {
   const suppliedFrom = query.get('from')
   const suppliedTo = query.get('to')
+  const suppliedAt = query.get('at')
   const from = suppliedFrom ? new Date(suppliedFrom) : null
   const to = suppliedTo ? new Date(suppliedTo) : null
-  const valid = from && to && !Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from < to
-  const end = valid ? to : new Date(now)
-  const start = valid ? from : new Date(end.getTime() - 24 * 3600_000)
-  return { from: start, to: end, at: new Date(end.getTime() - 1) }
+  const valid = from && to && !Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from < to && from <= now
+  const end = valid ? new Date(Math.min(to.getTime(), now.getTime())) : new Date(now)
+  const start = valid && from < end ? from : new Date(end.getTime() - 24 * 3600_000)
+  const candidateAt = suppliedAt ? new Date(suppliedAt) : null
+  const at = candidateAt && !Number.isNaN(candidateAt.getTime()) && candidateAt >= start && candidateAt < end ? candidateAt : new Date(end.getTime() - 1)
+  return { from: start, to: end, at }
 }

@@ -1,4 +1,4 @@
-import type { ReplayDto, TargetTypeDto } from '../api/types'
+import type { MapId, ReplayDto, TargetTypeDto } from '../api/types'
 import { displayModeEnabled, type Filters } from '../store/useStore'
 
 /** One reported position of a track (ms since epoch, degrees; deg = the reported course, if any). */
@@ -11,7 +11,7 @@ export interface ReplaySample {
 }
 
 export interface ReplayTrack {
-  id: number
+  id: MapId
   type: TargetTypeDto
   /** Oldest first. */
   samples: ReplaySample[]
@@ -19,7 +19,7 @@ export interface ReplayTrack {
 
 /** Where a track is at an instant of the replay, reconstructed between its reports. */
 export interface ReplayPosition {
-  id: number
+  id: MapId
   type: TargetTypeDto
   lon: number
   lat: number

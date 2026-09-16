@@ -4,6 +4,7 @@ import type { TimelineBucketDto } from '../api/types'
 import { replay } from '../replay/engine'
 import { useStore } from '../store/useStore'
 import type { HistoryWindow } from '../public/routes'
+import type { DataQuery } from '../public/query'
 
 const PRESETS_H = [1, 3, 6, 12, 24]
 /** Minutes of history per real second. */
@@ -36,7 +37,7 @@ function toLocalInput(d: Date) {
  * moves the markers between reports — a time-lapse, not a slideshow of snapshots. The store's `at` follows the clock
  * once a second (alerts, feed cutoff). Works on both map pages.
  */
-export default function ReplayBar({ initialWindow, onClose }: { initialWindow: HistoryWindow; onClose: () => void }) {
+export default function ReplayBar({ initialWindow, query, onHistoryChange, onClose }: { initialWindow: HistoryWindow; query: DataQuery; onHistoryChange: (window: HistoryWindow) => void; onClose: () => void }) {
   const at = useStore((s) => s.at)
   const setMode = useStore((s) => s.setMode)
   const loading = useStore((s) => s.loading)
@@ -60,8 +61,9 @@ export default function ReplayBar({ initialWindow, onClose }: { initialWindow: H
       const clamped = new Date(Math.min(to.getTime(), Math.max(from.getTime(), d.getTime())))
       replay.seek(clamped.getTime())
       setMode('history', clamped)
+      onHistoryChange({ from, to, at: clamped })
     },
-    [from, to, setMode],
+    [from, to, setMode, onHistoryChange],
   )
 
   // Entering replay freezes the map at the end of the window; the window's data (tracks with their positions,
@@ -72,28 +74,31 @@ export default function ReplayBar({ initialWindow, onClose }: { initialWindow: H
     setWindowLoaded(false)
     const current = useStore.getState().at
     seek(current && current >= from && current < to ? current : new Date(to.getTime() - 1))
+    const controller = new AbortController()
     let cancelled = false
     api
-      .replay(from, to)
+      .replay(from, to, query, controller.signal)
       .then((d) => {
         if (cancelled) return
         replay.load(d)
         setWindowLoaded(true)
       })
-      .catch(() => {
+      .catch((error: Error) => {
+        if (error.name === 'AbortError') return
         if (!cancelled) useStore.getState().setError('Не вдалося завантажити вікно відтворення')
       })
     const bucketMin = Math.max(1, Math.round(totalMin / 72))
-    api.timeline(from, to, bucketMin).then(setBuckets).catch(() => setBuckets([]))
-    api
-      .targetsBetween(from, to)
-      .then((list) => useStore.getState().setTargets(list))
-      .catch(() => useStore.getState().setTargets([]))
+    api.timeline(from, to, bucketMin, query, controller.signal).then((items) => { if (!cancelled) setBuckets(items) }).catch(() => { if (!cancelled) setBuckets([]) })
+    // The old feed endpoint has a payload cap and no canonical-map filter. An empty
+    // filtered feed is honest; rendering its unfiltered first 5000 rows is not.
+    if (Object.values(query).some((value) => Array.isArray(value) ? value.length > 0 : value !== undefined)) useStore.getState().setTargets([])
+    else api.targetsBetween(from, to).then((list) => { if (!cancelled) useStore.getState().setTargets(list) }).catch(() => useStore.getState().setTargets([]))
     return () => {
       cancelled = true
+      controller.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to])
+  }, [from, to, JSON.stringify(query)])
 
   // Leaving replay stops the clock and drops the window's tracks.
   useEffect(() => () => replay.clear(), [])

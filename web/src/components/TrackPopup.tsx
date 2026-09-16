@@ -1,7 +1,7 @@
 import type * as maplibregl from 'maplibre-gl'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api/client'
-import type { TargetDto, RegionDto, TrackDto } from '../api/types'
+import type { MapId, TargetDto, RegionDto, TrackDto } from '../api/types'
 import { useEta } from '../eta/useEta'
 import { clock, confidenceLabel, directionText, etaConfidence, etaText, fixChain, locationKindLabel, timeAgo } from '../lib/format'
 import { placeWindow, useDraggable } from '../lib/useDraggable'
@@ -162,7 +162,7 @@ export default function TrackPopup({ map, track, anchor, onDetails, onClose }: P
 }
 
 /** The newest few messages behind the track; duplicates fold into a counter, the rest is in the details panel. */
-function Messages({ trackId, version }: { trackId: number; version: number }) {
+function Messages({ trackId, version }: { trackId: MapId; version: number }) {
   const [items, setItems] = useState<TargetDto[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const sourceFilter = useStore((s) => s.filters.sources)
@@ -196,7 +196,7 @@ function Messages({ trackId, version }: { trackId: number; version: number }) {
 
   const list = useMemo(() => {
     if (!items) return []
-    const dupes = new Map<number, number>()
+    const dupes = new Map<MapId, number>()
     for (const o of items) if (o.duplicateOfTargetId) dupes.set(o.duplicateOfTargetId, (dupes.get(o.duplicateOfTargetId) ?? 0) + 1)
     return items
       .filter((o) => !o.duplicateOfTargetId)

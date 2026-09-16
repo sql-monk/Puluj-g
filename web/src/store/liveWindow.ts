@@ -36,9 +36,9 @@ export function isTargetFresh(o: TargetDto, now: Date, feedHours: number): boole
 }
 
 /** The tracks still inside the window; the same object when nothing had to go (no re-render for nothing). */
-export function pruneTracks(tracks: Record<number, TrackDto>, now: Date, cfg: MapConfig): Record<number, TrackDto> {
+export function pruneTracks(tracks: Record<string, TrackDto>, now: Date, cfg: MapConfig): Record<string, TrackDto> {
   let changed = false
-  const kept: Record<number, TrackDto> = {}
+  const kept: Record<string, TrackDto> = {}
   for (const t of Object.values(tracks)) {
     if (isTrackLive(t, now, cfg.maxLifetimeMinutes)) kept[t.id] = t
     else changed = true
@@ -47,7 +47,7 @@ export function pruneTracks(tracks: Record<number, TrackDto>, now: Date, cfg: Ma
 }
 
 /** Incoming tracks laid over the current ones; those outside the window are dropped rather than stored. */
-export function mergeTracks(tracks: Record<number, TrackDto>, incoming: TrackDto[], now: Date, cfg: MapConfig): Record<number, TrackDto> {
+export function mergeTracks(tracks: Record<string, TrackDto>, incoming: TrackDto[], now: Date, cfg: MapConfig): Record<string, TrackDto> {
   const live = incoming.filter((t) => isTrackLive(t, now, cfg.maxLifetimeMinutes))
   if (live.length === 0) return tracks
   const merged = { ...tracks }
@@ -65,6 +65,6 @@ export function mergeTargets(list: TargetDto[], incoming: TargetDto[], now: Date
     fresh.push(o)
   }
   if (fresh.length === 0) return list
-  fresh.sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime() || b.id - a.id)
+  fresh.sort((a, b) => new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime() || String(b.id).localeCompare(String(a.id)))
   return [...fresh, ...list].slice(0, cap)
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
-import type { TargetDto, TrackDetailsDto } from '../api/types'
+import type { MapId, TargetDto, TrackDetailsDto } from '../api/types'
 import { useEta } from '../eta/useEta'
 import { clock, confidenceLabel, dateTime, directionText, etaText, fixChain, locationKindLabel } from '../lib/format'
 import { usePalette, useStore } from '../store/useStore'
@@ -179,7 +179,7 @@ function PredecessorList() {
   const time = (iso: string) => new Date(iso).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })
   const kindLabel: Record<string, string> = { Continuation: 'продовження', Split: 'розділення', Merge: 'злиття', Possible: 'можливо', Duplicate: 'дубль' }
   const gen1 = fork.links.filter((l) => l.ancestral && l.toTargetId === fork.headTargetId).sort((a, b) => b.probability - a.probability)
-  const elsewhere = (from: number) => {
+  const elsewhere = (from: MapId) => {
     const others = fork.links.filter((x) => !x.ancestral && x.fromTargetId === from).sort((a, b) => b.probability - a.probability)
     if (others.length === 0) return null
     return (

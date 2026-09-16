@@ -6,6 +6,8 @@ export type LocationKind = 'Unknown' | 'DirectionOnly' | 'Region' | 'District' |
 export type DirectionKind = 'Unknown' | 'Compass' | 'TowardsPlace'
 export type TrackStatus = 'Active' | 'Closed' | 'Cancelled'
 export type DisplayMode = 'uav' | 'cruise' | 'ballistic' | 'aircraft'
+/** Map API/SignalR bigint fields are opaque decimal strings; numeric values exist only at legacy/test boundaries. */
+export type MapId = string | number
 
 export interface SpeedProfile {
   minKmh?: number
@@ -58,7 +60,7 @@ export interface FixDto {
 }
 
 export interface TrackDto {
-  id: number
+  id: MapId
   status: TrackStatus
   closedReason?: string
   type: TargetTypeDto
@@ -78,13 +80,13 @@ export interface TrackDto {
   /** The last few distinct reported positions, oldest first, the current one last. */
   fixes: FixDto[]
   /** Raw messages behind the newest targets: tracks sharing one are neighbours by message. */
-  messageIds: number[]
+  messageIds: MapId[]
 }
 
 export type AlertLevel = 'Unknown' | 'Yellow' | 'Red'
 
 export interface AlertDto {
-  id: number
+  id: MapId
   placeId: number
   placeName: string
   alertType: string
@@ -131,7 +133,7 @@ export interface ReplaySampleDto {
   approach: boolean
 }
 export interface ReplayTrackDto {
-  id: number
+  id: MapId
   type: TargetTypeDto
   /** Oldest first. */
   samples: ReplaySampleDto[]
@@ -192,7 +194,7 @@ export interface EventKindDto {
 }
 
 export interface RawMessageDto {
-  id: number
+  id: MapId
   sourceMessageId: string
   publishedAt: string
   receivedAt: string
@@ -206,7 +208,7 @@ export interface RawMessageDto {
  * could have flown instead. The node is drawn as the target it is: its class glyph, turned by its course.
  */
 export interface PredecessorDto {
-  targetId: number
+  targetId: MapId
   generation: number
   ancestral: boolean
   at: string
@@ -222,8 +224,8 @@ export interface PredecessorDto {
 }
 /** generation = the generation of `from` above the head; ancestral = a link on the head's own ancestry. */
 export interface PredecessorLinkDto {
-  fromTargetId: number
-  toTargetId: number
+  fromTargetId: MapId
+  toTargetId: MapId
   generation: number
   ancestral: boolean
   kind: 'Continuation' | 'Split' | 'Merge' | 'Possible' | 'Duplicate'
@@ -233,14 +235,14 @@ export interface PredecessorLinkDto {
   pathProbability: number
 }
 export interface PredecessorsDto {
-  trackId: number
-  headTargetId: number
+  trackId: MapId
+  headTargetId: MapId
   targets: PredecessorDto[]
   links: PredecessorLinkDto[]
 }
 
 export interface TargetLinkDto {
-  targetId: number
+  targetId: MapId
   kind: 'Continuation' | 'Split' | 'Merge' | 'Possible' | 'Duplicate'
   /** 0..1: that the two reports are the same object (links into one target sum to at most 1). */
   probability: number
@@ -282,7 +284,7 @@ export interface SourceRatingReportDto {
 }
 
 export interface TargetDto {
-  id: number
+  id: MapId
   observedAt: string
   eventType: string
   type?: TargetTypeDto
@@ -298,12 +300,12 @@ export interface TargetDto {
   identificationMethod: string
   identificationSource?: string
   segmentText?: string
-  duplicateOfTargetId?: number
+  duplicateOfTargetId?: MapId
   associationConfidence?: number
   source: SourceDto
   rawMessage: RawMessageDto
   /** Track the target was attached to (feed highlighting), if any. */
-  trackId?: number
+  trackId?: MapId
   /** Links to related targets (only filled in track details). */
   links?: TargetLinkDto[]
 }

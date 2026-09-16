@@ -3,7 +3,7 @@ import difference from '@turf/difference'
 import distance from '@turf/distance'
 import { point } from '@turf/helpers'
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry, LineString, Point, Polygon, MultiPolygon, Position } from 'geojson'
-import type { AlertDto, AlertLevel, Confidence, PredecessorLinkDto, PredecessorsDto, RegionDto, TargetDto, TrackDto } from '../api/types'
+import type { AlertDto, AlertLevel, Confidence, MapId, PredecessorLinkDto, PredecessorsDto, RegionDto, TargetDto, TrackDto } from '../api/types'
 import { computeEta, distanceToRegionKm, type Home } from '../eta/computeEta'
 import { effectiveLevel } from '../lib/alerts'
 import type { ReplayPosition } from '../replay/engine'
@@ -15,7 +15,7 @@ import { getPalette, type MapPalette } from './palette'
 export type HazardKind = 'near' | 'towards' | ''
 
 export interface TrackProps {
-  id: number
+  id: MapId
   label: string
   mode: string
   /** Marker / last-known-area colour: the class colour, or the class's selection colour when selected. */
@@ -40,7 +40,7 @@ export interface TrackProps {
 
 /** A crumb: where the target was reported earlier, with the time; or the dotted link between crumbs. */
 export interface FixProps {
-  id: number
+  id: MapId
   mode: string
   /** The selected target's selection colour (crumbs and predecessors exist only for the selected target). */
   vector: string
@@ -58,8 +58,8 @@ export interface FixProps {
   /** Generations above the head (family only): 1 = parent's level, 2 = grandparent's, 0 = the head's own. */
   generation?: number
   /** A family leg: the two reports it joins, its own and its path probability, its kind, and whether it is the clicked one. */
-  from?: number
-  to?: number
+  from?: MapId
+  to?: MapId
   linkProbability?: number
   pathProbability?: number
   linkKind?: string
@@ -78,7 +78,7 @@ export interface TrackLayers {
 
 /** A point-in-time public report. Unlike a target track, it has no inferred course, path, or forecast. */
 export interface EventProps {
-  id: number
+  id: MapId
   eventType: string
   color: string
   opacity: number
@@ -112,7 +112,7 @@ const NEAR_KM = 25
 
 export interface TrackLayerOptions {
   home?: Home | null
-  selectedId?: number | null
+  selectedId?: MapId | null
   /** Theme palette; the light one when omitted. */
   palette?: MapPalette
   /** The predecessor fork of the selected track, drawn instead of its crumbs. */
@@ -222,12 +222,12 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
     if (fork && loc?.point) {
       const byId = new Map(fork.targets.map((n) => [n.targetId, n]))
       const headPoint = loc.point
-      const pointOf = (id: number): Position | null => (id === fork.headTargetId ? headPoint.coordinates : (byId.get(id)?.point?.coordinates ?? null))
+      const pointOf = (id: MapId): Position | null => (id === fork.headTargetId ? headPoint.coordinates : (byId.get(id)?.point?.coordinates ?? null))
       const located = (l: PredecessorLinkDto) => pointOf(l.fromTargetId) !== null && pointOf(l.toTargetId) !== null
       const clamp = (v: number) => Math.max(0.05, Math.min(1, v))
       // Ancestry: every parent, and behind each parent its two most probable grandparents (the rest is in the details
       // list; on the map it would only be a tangle of faint legs).
-      const gen2Rank = new Map<number, number>()
+      const gen2Rank = new Map<MapId, number>()
       const shown = fork.links
         .filter((l) => l.ancestral && located(l))
         .sort((x, y) => x.generation - y.generation || y.pathProbability - x.pathProbability)
@@ -242,7 +242,7 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
       // (uncles) and, one step on, an uncle's (cousins). Three per node and nothing further: no relative's own ancestry
       // or later descendants, only what the selected target itself could have been and where else that could have gone.
       const relatives = fork.links.filter((l) => !l.ancestral && located(l) && l.pathProbability >= 0.02).sort((x, y) => y.pathProbability - x.pathProbability)
-      const perNode = new Map<number, number>()
+      const perNode = new Map<MapId, number>()
       const seen = new Set(shown.map((l) => `${l.fromTargetId}>${l.toTargetId}`))
       const drawn = new Set(ancestors)
       const hang = (offAncestors: boolean) => {
@@ -260,7 +260,7 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
       hang(true) // siblings and uncles, off the ancestors
       hang(false) // cousins, off the uncles
       // The best path through each node: its opacity and the percentage in its label.
-      const best = new Map<number, number>()
+      const best = new Map<MapId, number>()
       for (const l of shown) {
         const node = l.ancestral ? l.fromTargetId : l.toTargetId
         best.set(node, Math.max(best.get(node) ?? 0, l.pathProbability))
@@ -272,7 +272,7 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
         const p = clamp(l.probability)
         predecessors.push({
           type: 'Feature',
-          id: t.id * 1000 + i,
+           id: `${t.id}:pred-leg:${i}`,
           geometry: { type: 'LineString', coordinates: [pointOf(l.fromTargetId)!, pointOf(l.toTargetId)!] },
           properties: {
             id: t.id,
@@ -305,7 +305,7 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
         const p = clamp(best.get(id) ?? 0)
         predecessors.push({
           type: 'Feature',
-          id: t.id * 1000 + 500 + k++,
+           id: `${t.id}:pred-node:${k++}`,
           geometry: n.point,
           properties: {
             id: t.id,
@@ -335,11 +335,11 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
         const p = Math.max(0.05, Math.min(1, f.probability))
         fixes.push({
           type: 'Feature',
-          id: t.id * 10 + i,
+           id: `${t.id}:fix:${i}`,
           geometry: f.point,
           properties: { id: t.id, mode: props.mode, vector: selectedColor, label: `${f.approach ? '→ ' : ''}${f.placeName ?? ''} ${time} · ${Math.round(p * 100)}%`.trim(), opacity: 0.3 + 0.7 * p, approach: f.approach, probability: p, hasDirection: false, rotation: 0, size: 0.22 + 0.2 * p },
         })
-        fixes.push({ type: 'Feature', id: t.id * 10 + 5 + i, geometry: { type: 'LineString', coordinates: [chain[i], chain[i + 1]] }, properties: { id: t.id, mode: props.mode, vector: selectedColor, label: '', opacity: 0.2 + 0.8 * p, approach: false, probability: p, hasDirection: false, rotation: 0, size: 0 } })
+        fixes.push({ type: 'Feature', id: `${t.id}:fix-link:${i}`, geometry: { type: 'LineString', coordinates: [chain[i], chain[i + 1]] }, properties: { id: t.id, mode: props.mode, vector: selectedColor, label: '', opacity: 0.2 + 0.8 * p, approach: false, probability: p, hasDirection: false, rotation: 0, size: 0 } })
       })
     }
   }
@@ -356,7 +356,7 @@ export function buildTrackLayers(tracks: TrackDto[], now: Date, regionsById: Map
  * Replay (timelapse) layers: only the markers, at their reconstructed positions, the nose along the movement. No
  * vectors, crumbs, areas, labels or badges — the picture is the movement itself, as in a time-lapse of the night.
  */
-export function buildReplayLayers(positions: ReplayPosition[], palette: MapPalette, selectedId: number | null | undefined): TrackLayers {
+export function buildReplayLayers(positions: ReplayPosition[], palette: MapPalette, selectedId: MapId | null | undefined): TrackLayers {
   const empty = <G extends Geometry, P>(): FeatureCollection<G, P> => ({ type: 'FeatureCollection', features: [] })
   const points: Feature<Point, TrackProps>[] = positions.map((p) => {
     const mode = p.type.displayMode
@@ -401,7 +401,7 @@ function cone(origin: Position, km: number, bearing: number, halfAngle: number, 
 
 export interface AlertProps {
   /** The earliest alert on the place: the feature's identity. */
-  id: number
+  id: MapId
   placeId: number
   placeName: string
   alertType: string

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { TargetDto } from '../api/types'
+import type { MapId, TargetDto } from '../api/types'
 import { alertsFor, ancestorsOf, effectiveLevel, levelTone } from '../lib/alerts'
 import { clock, confidenceLabel } from '../lib/format'
 import Highlight from './Highlight'
@@ -27,7 +27,7 @@ export default function FeedPanel({ open, onToggle }: { open: boolean; onToggle:
   const filters = useStore((s) => s.filters)
   const selectedTrackId = useStore((s) => s.selectedTrackId)
   const palette = usePalette()
-  const [expanded, setExpanded] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState<MapId | null>(null)
 
   const region = regions.find((r) => r.id === selectedRegionId)
   // In replay the feed only shows what had been reported by the cursor instant.

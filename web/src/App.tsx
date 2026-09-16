@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api/client'
 import { connectMapHub } from './api/signalr'
-import type { AlertDto, TargetDto, TrackDto } from './api/types'
+import type { AlertDto, MapId, TargetDto, TrackDto } from './api/types'
 import FeedPanel from './components/FeedPanel'
 import DataFilterControls from './components/DataFilterControls'
 import FilterPanel from './components/FilterPanel'
@@ -48,9 +48,8 @@ export default function App() {
   const replayWindow = useMemo(() => (replay ? historyWindow(route.query) : null), [replay, route.query])
   const panelOpen = panelOpenBySection[route.section] ?? legacyPanelOpen
   const dataQuery = useMemo(() => parseDataQuery(route.query).value, [route.query])
-  const mapFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
   const analyticsFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.sourceIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
-  const activeMap = mapRoute && !mapFilterUnavailable
+  const activeMap = mapRoute
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -83,8 +82,8 @@ export default function App() {
     const kyiv = s.regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ')
     if (kyiv) s.selectRegion(kyiv.id)
   }, [kyivPreset, regionsLoaded])
-  // The existing map transport supports source narrowing locally.
-  // Any other U01 filter is explicitly unavailable below rather than decorating an unfiltered map with a chip.
+  // The selected sources remain a presentation setting too, while the full U03
+  // filter is sent with every snapshot/replay/timeline request below.
   useEffect(() => {
     if (!activeMap) return
     const store = useStore.getState()
@@ -138,6 +137,14 @@ export default function App() {
   const toggleReplay = () => {
     window.location.hash = publicHash({ ...route, mapMode: replay ? 'live' : 'history' })
   }
+  const setHistoryWindow = useCallback((history: { from: Date; to: Date; at: Date }) => {
+    const query = new URLSearchParams(route.query)
+    query.set('from', history.from.toISOString())
+    query.set('to', history.to.toISOString())
+    query.set('at', history.at.toISOString())
+    const next = publicHash({ ...route, mapMode: 'history', query })
+    if (window.location.hash !== next) window.location.hash = next
+  }, [route])
 
   // Region polygons, source filters and live windows are map-only resources.
   useEffect(() => {
@@ -158,44 +165,61 @@ export default function App() {
 
   // Snapshot requests can overlap while the timeline slider moves; only the latest one may land in the store.
   const snapshotSeq = useRef(0)
+  const snapshotAbort = useRef<AbortController | null>(null)
   useEffect(() => {
     // Invalidates a late response after navigating away from the map.
-    if (!activeMap) snapshotSeq.current += 1
+    if (!activeMap) {
+      snapshotSeq.current += 1
+      snapshotAbort.current?.abort()
+    }
   }, [activeMap])
   const loadSnapshot = useCallback(async () => {
     const s = useStore.getState()
     const seq = ++snapshotSeq.current
+    snapshotAbort.current?.abort()
+    const controller = new AbortController()
+    snapshotAbort.current = controller
     s.setLoading(true)
     try {
-      const [snap, feed] = await Promise.all([api.snapshot(s.mode === 'history' && s.at ? s.at : undefined, false), s.mode === 'live' ? api.targets(s.mapConfig.feedHours) : Promise.resolve(null)])
+      const hasMapFilter = Object.values(dataQuery).some((value) => Array.isArray(value) ? value.length > 0 : value !== undefined)
+      const [snap, feed] = await Promise.all([api.snapshot(s.mode === 'history' && s.at ? s.at : undefined, false, dataQuery, controller.signal), s.mode === 'live' && !hasMapFilter ? api.targets(s.mapConfig.feedHours) : Promise.resolve(null)])
       if (seq !== snapshotSeq.current) return
       if (feed) useStore.getState().setTargets(feed)
       // The store applies "active only" itself so toggling the filter needs no round-trip.
       useStore.getState().setSnapshot(snap.tracks, snap.alerts, snap.events)
       s.setError(null)
     } catch (e) {
+      if ((e as Error).name === 'AbortError') return
       if (seq === snapshotSeq.current) s.setError(`Не вдалося завантажити стан: ${(e as Error).message}`)
     } finally {
       if (seq === snapshotSeq.current) s.setLoading(false)
     }
-  }, [])
+  }, [dataQuery])
 
   // Live: snapshot + realtime. History: snapshot at the selected instant, realtime ignored.
   useEffect(() => {
     if (!activeMap) return
     void loadSnapshot()
-  }, [loadSnapshot, activeMap, mode, at])
+  }, [loadSnapshot, activeMap, mode, at, dataQuery])
 
   useEffect(() => {
     if (!activeMap) return
     const store = useStore.getState()
     // Events are buffered and flushed together: a burst (a busy night, a reprocess) then costs one store update per
     // batch, not one per event. The last state of a track or alert within a batch wins.
-    const pending = { tracks: new Map<number, TrackDto>(), alerts: new Map<number, AlertDto>(), events: [] as TargetDto[], targets: [] as TargetDto[] }
+    const pending = { tracks: new Map<MapId, TrackDto>(), alerts: new Map<MapId, AlertDto>(), events: [] as TargetDto[], targets: [] as TargetDto[] }
     let timer: number | null = null
+    const filtered = Object.values(dataQuery).some((value) => Array.isArray(value) ? value.length > 0 : value !== undefined)
     const flush = () => {
       timer = null
       const s = useStore.getState()
+      // Hub deltas are intentionally incomplete for canonical filters. Reload the
+      // server-filtered snapshot rather than accidentally re-introducing a row.
+      if (filtered) {
+        pending.tracks.clear(); pending.alerts.clear(); pending.events = []; pending.targets = []
+        if (s.mode === 'live') void loadSnapshot()
+        return
+      }
       if (pending.tracks.size > 0) s.upsertTracks([...pending.tracks.values()])
       if (pending.alerts.size > 0) s.upsertAlerts([...pending.alerts.values()])
       if (pending.events.length > 0) s.upsertEvents(pending.events)
@@ -240,7 +264,7 @@ export default function App() {
       if (timer !== null) window.clearTimeout(timer)
       void connection.stop()
     }
-  }, [loadSnapshot, activeMap])
+  }, [loadSnapshot, activeMap, dataQuery])
 
   const pickHome = picking
     ? (lon: number, lat: number) => {
@@ -252,7 +276,6 @@ export default function App() {
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
       {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />)}
-      {mapRoute && mapFilterUnavailable && <FilterUnavailable title="Мапа не має публічного endpoint для обраних фільтрів" />}
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
       {route.section === 'entities' && <SectionPlaceholder title="Цілі і події" text="Каталог з пов’язаними даними буде додано в U08." />}
@@ -273,7 +296,7 @@ export default function App() {
           ☰ Фільтри
         </button>
       )}
-      {replay && replayWindow && <ReplayBar key={`${replayWindow.from.toISOString()}-${replayWindow.to.toISOString()}`} initialWindow={replayWindow} onClose={toggleReplay} />}
+      {replay && replayWindow && <ReplayBar key={`${replayWindow.from.toISOString()}-${replayWindow.to.toISOString()}`} initialWindow={replayWindow} query={dataQuery} onHistoryChange={setHistoryWindow} onClose={toggleReplay} />}
       {mapRoute && <FeedPanel open={feedOpen} onToggle={() => setFeedOpen((o) => !o)} />}
       {detailsOpen && mapRoute && <TrackDetailsDrawer onClose={() => setDetailsOpen(false)} />}
       {mapRoute && selectedTrackId && !selectedTrack && !detailsOpen && (
@@ -290,10 +313,6 @@ export default function App() {
 
 function SectionPlaceholder({ title, text }: { title: string; text: string }) {
   return <main className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-8 pt-28 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-slate-600 dark:text-slate-300">{text}</p></div></main>
-}
-
-function FilterUnavailable({ title }: { title: string }) {
-  return <main className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 px-4 pt-12 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="max-w-lg rounded-xl bg-white p-5 text-center shadow-sm dark:bg-slate-900"><h1 className="font-semibold">{title}</h1><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">URL і chips збережені. Приберіть непідтримувані фільтри або дочекайтеся endpoint-ів U04/U05 — unfiltered результат навмисно не показується.</p></div></main>
 }
 
 function SectionPanel({ route, open, onClose, section }: { route: PublicRoute; open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {

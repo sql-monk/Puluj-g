@@ -1,6 +1,7 @@
 import * as maplibregl from 'maplibre-gl'
 import type { GeoJSONSource, MapLayerMouseEvent } from 'maplibre-gl'
 import type { FeatureCollection, Geometry, Position } from 'geojson'
+import type { MapId } from '../api/types'
 import type { TrackLayers } from './geojson'
 import { DISPLAY_MODES, type MapPalette } from './palette'
 
@@ -512,8 +513,8 @@ export function addTrackLayers(map: maplibregl.Map, p: MapPalette, opts: { label
 
 /** What a click on a track landed on: the track, and the family leg when it hit one. */
 export interface TrackHit {
-  trackId: number
-  link?: { fromTargetId: number; toTargetId: number; probability: number; pathProbability: number; kind: string }
+  trackId: MapId
+  link?: { fromTargetId: MapId; toTargetId: MapId; probability: number; pathProbability: number; kind: string }
 }
 
 /**
@@ -541,9 +542,9 @@ export function hitAt(map: maplibregl.Map, point: maplibregl.Point, radius = HIT
     )
   const props = f?.properties
   if (!f || !props || props.id === undefined) return null
-  const trackId = Number(props.id)
+  const trackId = String(props.id)
   if (f.layer.id === 'track-pred-hit' && props.from !== undefined && props.to !== undefined) {
-    return { trackId, link: { fromTargetId: Number(props.from), toTargetId: Number(props.to), probability: Number(props.linkProbability), pathProbability: Number(props.pathProbability), kind: String(props.linkKind ?? '') } }
+    return { trackId, link: { fromTargetId: String(props.from), toTargetId: String(props.to), probability: Number(props.linkProbability), pathProbability: Number(props.pathProbability), kind: String(props.linkKind ?? '') } }
   }
   return { trackId }
 }
@@ -586,9 +587,9 @@ export interface TrackHoverOptions {
  * Target-under-cursor: switches the `track-hover` layer to the hit track and shows the pointer cursor while one is
  * under (or within HIT_RADIUS of) the cursor. Returns the teardown and a `current()` reader for other hover handlers.
  */
-export function trackHover(map: maplibregl.Map, opts: TrackHoverOptions): { stop: () => void; current: () => number | null } {
-  let current: number | null = null
-  const apply = (id: number | null) => {
+export function trackHover(map: maplibregl.Map, opts: TrackHoverOptions): { stop: () => void; current: () => MapId | null } {
+  let current: MapId | null = null
+  const apply = (id: MapId | null) => {
     if (id === current) return
     current = id
     if (map.getLayer('track-hover')) map.setFilter('track-hover', ['==', ['get', 'id'], id ?? -1])

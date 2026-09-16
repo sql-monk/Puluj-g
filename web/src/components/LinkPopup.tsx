@@ -1,7 +1,7 @@
 import type * as maplibregl from 'maplibre-gl'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
-import type { TargetDto } from '../api/types'
+import type { MapId, TargetDto } from '../api/types'
 import { clock, confidenceLabel } from '../lib/format'
 import { placeWindow, useDraggable } from '../lib/useDraggable'
 import { usePalette, type SelectedLink } from '../store/useStore'
@@ -31,7 +31,7 @@ export default function LinkPopup({ map, link, anchor, onClose }: Props) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [pair, setPair] = useState<{ from: TargetDto; to: TargetDto } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [open, setOpen] = useState<number | null>(null)
+  const [open, setOpen] = useState<MapId | null>(null)
   const lon = anchor[0]
   const lat = anchor[1]
   // Dragged by its header; the offset is forgotten when another leg is picked.

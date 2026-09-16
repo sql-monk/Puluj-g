@@ -36,7 +36,7 @@ const DATA_BOUNDS: [[number, number], [number, number]] = [
 interface Props {
   dark: boolean
   theme: Theme
-  onDetails: (trackId: number) => void
+  onDetails: (trackId: import('../api/types').MapId) => void
 }
 
 /** Kyiv page: the city with its ten districts and a ring of surroundings, its own MapLibre instance and layer set. */
@@ -191,10 +191,10 @@ export default function KyivMapView({ dark, theme, onDetails }: Props) {
           ? buildReplayLayers(replay.positions(replay.t || clock.getTime(), filters), palette, selectedTrackId)
           : buildTrackLayers(visibleTracks(tracks, filters, clock), clock, regionsById, filters, { home, selectedId: selectedTrackId, palette, predecessors, selectedLink })
       // Keep only tracks that touch the page: their marker or the end of their forecast lies inside the data box.
-      const near = new Set<number>()
-      for (const f of layers.points.features) if (inBox(f.geometry.coordinates)) near.add(Number(f.id))
-      for (const f of layers.forecasts.features) if (f.geometry.type === 'Point' && inBox(f.geometry.coordinates)) near.add(Number(f.id))
-      const only = <G extends Geometry, P>(fc: FeatureCollection<G, P>): FeatureCollection<G, P> => ({ type: 'FeatureCollection', features: fc.features.filter((f) => near.has(Number((f.properties as { id: number }).id))) })
+      const near = new Set<string>()
+      for (const f of layers.points.features) if (inBox(f.geometry.coordinates)) near.add(String(f.id))
+      for (const f of layers.forecasts.features) if (f.geometry.type === 'Point' && inBox(f.geometry.coordinates)) near.add(String(f.id))
+      const only = <G extends Geometry, P>(fc: FeatureCollection<G, P>): FeatureCollection<G, P> => ({ type: 'FeatureCollection', features: fc.features.filter((f) => near.has(String((f.properties as { id: unknown }).id))) })
       setTrackData(map, { points: only(layers.points), fixes: only(layers.fixes), forecasts: only(layers.forecasts), areas: only(layers.areas), predecessors: only(layers.predecessors) })
 
       for (const a of alertList) if (!regionsById.has(a.placeId) && !placeGeometries[a.placeId]) ensurePlaceGeometry(a.placeId)

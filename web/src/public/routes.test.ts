@@ -30,6 +30,11 @@ describe('public route contract', () => {
     expect(window.at.toISOString()).toBe('2026-09-15T09:59:59.999Z')
   })
 
+  it('keeps an explicit frozen history instant while filters change', () => {
+    const window = historyWindow(new URLSearchParams('from=2026-09-15T09:00:00.000Z&to=2026-09-15T10:00:00.000Z&at=2026-09-15T09:23:00.000Z&sourceIds=3'))
+    expect(window.at.toISOString()).toBe('2026-09-15T09:23:00.000Z')
+  })
+
   it('defaults a history route to a 24-hour window', () => {
     const window = historyWindow(new URLSearchParams(), new Date('2026-09-15T10:00:00.000Z'))
     expect(window.from.toISOString()).toBe('2026-09-14T10:00:00.000Z')

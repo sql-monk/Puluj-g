@@ -28,11 +28,11 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
     /// (whatever their status; the client applies its own lifetime and "active only" on top) and every open alert
     /// (an open alert is a state, not an event: some regions have been under one continuously since 2022).
     /// </summary>
-    public async Task<SnapshotDto> LiveAsync(bool activeOnly, CancellationToken ct)
+    public async Task<SnapshotDto> LiveAsync(bool activeOnly, CancellationToken ct, MapFilter? filter = null)
     {
-        if (Map.SnapshotCache <= TimeSpan.Zero)
+        if (filter?.IsFiltered == true || Map.SnapshotCache <= TimeSpan.Zero)
         {
-            return await BuildLiveAsync(activeOnly, ct);
+            return await BuildLiveAsync(activeOnly, filter, ct);
         }
         var now = clock.GetUtcNow();
         Task<SnapshotDto> task;
@@ -40,7 +40,7 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         {
             if (!_liveCache.TryGetValue(activeOnly, out var entry) || entry.Task.IsFaulted || entry.Task.IsCanceled || now - entry.BuiltAt >= Map.SnapshotCache)
             {
-                entry = (now, BuildLiveAsync(activeOnly, CancellationToken.None));
+                entry = (now, BuildLiveAsync(activeOnly, null, CancellationToken.None));
                 _liveCache[activeOnly] = entry;
             }
             task = entry.Task;
@@ -48,7 +48,7 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         return await task.WaitAsync(ct);
     }
 
-    private async Task<SnapshotDto> BuildLiveAsync(bool activeOnly, CancellationToken ct)
+    private async Task<SnapshotDto> BuildLiveAsync(bool activeOnly, MapFilter? filter, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -63,10 +63,16 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
             .ToListAsync(ct);
         var ids = tracks.Select(t => t.TargetTrackId).ToList();
         var sources = await SourceIdsAsync(db, ids, null, ct);
+        if (filter is not null)
+        {
+            tracks = tracks.Where(t => filter.AllowsTrack(t) && filter.AllowsSource(sources.GetValueOrDefault(t.TargetTrackId, [])) && filter.AllowsPlace(t.LastLocationPlaceId, refs) && filter.AllowsLocation(t.LastLocation is not null) && filter.AllowsText(refs.Categories.GetValueOrDefault(t.TargetCategoryId)?.Name, refs.Place(t.LastLocationPlaceId)?.Name)).ToList();
+            alerts = alerts.Where(a => filter.AllowsAlert(a) && filter.AllowsPlace(a.PlaceId, refs) && filter.AllowsLocation(true) && filter.AllowsText(refs.Place(a.PlaceId)?.Name)).ToList();
+        }
+        ids = tracks.Select(t => t.TargetTrackId).ToList();
         var fixes = await FixesAsync(db, ids, null, ct);
         var messages = await MessageIdsAsync(db, ids, null, ct);
-        var events = await MapEventsAsync(db, since, null, ct);
-        var (incidentRows, truncated) = await incidents.LiveAsync(now, ct);
+        var events = await MapEventsAsync(db, since, null, filter, ct);
+        var (incidentRows, truncated) = filter?.IsFiltered == true ? (Array.Empty<IncidentDto>() as IReadOnlyList<IncidentDto>, false) : await incidents.LiveAsync(now, ct);
         if (truncated)
         {
             logger.LogWarning("Live snapshot carries only the newest {Limit} incidents of the last {Hours} h; the client pages the rest through /api/incidents", Map.IncidentSnapshotLimit, Map.IncidentHours);
@@ -74,8 +80,9 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         return new SnapshotDto(now, false, tracks.Select(t => mapper.Track(t, sources.GetValueOrDefault(t.TargetTrackId, []), fixes.GetValueOrDefault(t.TargetTrackId), messages.GetValueOrDefault(t.TargetTrackId))).ToList(), alerts.Select(mapper.Alert).ToList(), events, incidentRows, truncated);
     }
 
-    public async Task<SnapshotDto> AtAsync(DateTimeOffset at, bool activeOnly, CancellationToken ct)
+    public async Task<SnapshotDto> AtAsync(DateTimeOffset at, bool activeOnly, CancellationToken ct, MapFilter? filter = null)
     {
+        if (at > clock.GetUtcNow()) throw new MapFutureHistoryException();
         await using var db = await factory.CreateDbContextAsync(ct);
         var since = at - HistoryWindow;
         // Latest revision of every track as of `at`.
@@ -88,18 +95,24 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
                 """)
             .AsNoTracking()
             .ToListAsync(ct);
-        var visible = revisions.Where(r => !activeOnly || r.Status == TrackStatus.Active).ToList();
+        var visible = revisions.Where(r => (!activeOnly || r.Status == TrackStatus.Active) && (filter is null || filter.AllowsRevision(r)) && (filter is null || (filter.AllowsPlace(r.LastLocationPlaceId, refs) && filter.AllowsLocation(r.LastLocation is not null) && filter.AllowsText(refs.Categories.GetValueOrDefault(r.TargetCategoryId)?.Name, refs.Place(r.LastLocationPlaceId)?.Name)))).ToList();
         var trackIds = visible.Select(r => r.TargetTrackId).ToList();
         var sources = await SourceIdsAsync(db, trackIds, at, ct);
+        if (filter is not null)
+        {
+            visible = visible.Where(r => filter.AllowsSource(sources.GetValueOrDefault(r.TargetTrackId, []))).ToList();
+            trackIds = visible.Select(r => r.TargetTrackId).ToList();
+        }
         var fixes = await FixesAsync(db, trackIds, at, ct);
         var messages = await MessageIdsAsync(db, trackIds, at, ct);
         var alerts = await db.AirAlerts.AsNoTracking()
             .Where(a => a.StartedAt <= at && (a.EndedAt == null || a.EndedAt > at))
             .OrderBy(a => a.StartedAt)
             .ToListAsync(ct);
-        var events = await MapEventsAsync(db, since, at, ct);
+        if (filter is not null) alerts = alerts.Where(a => filter.AllowsAlert(a) && filter.AllowsPlace(a.PlaceId, refs) && filter.AllowsLocation(true) && filter.AllowsText(refs.Place(a.PlaceId)?.Name)).ToList();
+        var events = await MapEventsAsync(db, since, at, filter, ct);
         // Incidents in history mode are what the system knew at `at` (recorded mode, ADR-0011), never today's reconstruction.
-        var (incidentRows, incidentsTruncated) = await incidents.AtAsync(at, ct);
+        var (incidentRows, incidentsTruncated) = filter?.IsFiltered == true ? (Array.Empty<IncidentDto>() as IReadOnlyList<IncidentDto>, false) : await incidents.AtAsync(at, ct);
         return new SnapshotDto(at, true,
             visible.OrderByDescending(r => r.LastSeenAt).Select(r => mapper.Track(r, sources.GetValueOrDefault(r.TargetTrackId, []), fixes.GetValueOrDefault(r.TargetTrackId), messages.GetValueOrDefault(r.TargetTrackId))).ToList(),
             alerts.Select(mapper.Alert).ToList(),
@@ -107,14 +120,19 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
     }
 
     /// <summary>Map events are individual facts, not tracks: only show a reported location, never an invented point.</summary>
-    private async Task<IReadOnlyList<TargetDto>> MapEventsAsync(PulujDbContext db, DateTimeOffset since, DateTimeOffset? until, CancellationToken ct)
+    private async Task<IReadOnlyList<TargetDto>> MapEventsAsync(PulujDbContext db, DateTimeOffset since, DateTimeOffset? until, MapFilter? filter, CancellationToken ct)
     {
         var rows = await db.Targets.AsNoTracking()
             .Include(o => o.RawMessage)
             .Where(o => MapEventTypes.Contains(o.EventType) && o.Location != null && o.ObservedAt >= since && (until == null || o.ObservedAt <= until))
             .OrderByDescending(o => o.ObservedAt).ThenByDescending(o => o.TargetId)
             .ToListAsync(ct);
-        return rows.Select(o => mapper.Target(o, null)).ToList();
+        return rows.Where(o =>
+        {
+            if (filter is null) return true;
+            var eventKind = o.EventKindId is int id && refs.EventKinds.TryGetValue(id, out var catalog) ? catalog : null;
+            return filter.AllowsTarget(o, eventKind?.Code, eventKind?.Category.ToString()) && filter.AllowsPlace(o.LocationPlaceId, refs) && filter.AllowsLocation(o.Location is not null) && filter.AllowsText(eventKind?.Code, refs.Place(o.LocationPlaceId)?.Name);
+        }).Select(o => mapper.Target(o, null)).ToList();
     }
 
     /// <summary>A replay window may span at most this much.</summary>
@@ -125,28 +143,30 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
     /// each one moving between consecutive reports. Tracks last reported up to HistoryWindow before the window start
     /// are included so that whatever was still on the map at the start is there.
     /// </summary>
-    public async Task<ReplayDto> ReplayAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
+    public async Task<ReplayDto> ReplayAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken ct, MapFilter? filter = null)
     {
         if (to < from)
         {
             (from, to) = (to, from);
         }
-        if (to - from > MaxReplayWindow)
-        {
-            from = to - MaxReplayWindow;
-        }
+        if (to - from > MaxReplayWindow) throw new MapWindowTooLargeException(MaxReplayWindow);
+        if (to > clock.GetUtcNow()) throw new MapFutureHistoryException();
         await using var db = await factory.CreateDbContextAsync(ct);
         var since = from - HistoryWindow;
         var revisions = await db.TargetTrackRevisions.AsNoTracking()
             .Where(r => r.LastSeenAt >= since && r.LastSeenAt <= to && r.RevisionAt <= to)
             .OrderBy(r => r.TargetTrackId).ThenBy(r => r.LastSeenAt).ThenBy(r => r.RevisionAt)
             .ToListAsync(ct);
+        var replaySources = filter?.SourceIds.Count > 0
+            ? await SourceIdsAsync(db, revisions.Select(r => r.TargetTrackId).Distinct().ToList(), to, ct)
+            : [];
         var tracks = new List<ReplayTrackDto>();
         foreach (var group in revisions.GroupBy(r => r.TargetTrackId))
         {
+            if (filter is not null && (!filter.AllowsRevision(group.Last()) || !filter.AllowsSource(replaySources.GetValueOrDefault(group.Key, [])) || !filter.AllowsPlace(group.Last().LastLocationPlaceId, refs) || !filter.AllowsLocation(group.Last().LastLocation is not null) || !filter.AllowsText(refs.Categories.GetValueOrDefault(group.Last().TargetCategoryId)?.Name, refs.Place(group.Last().LastLocationPlaceId)?.Name))) continue;
             var samples = new List<ReplaySampleDto>();
             TargetTrackRevision? last = null;
-            foreach (var r in group)
+            foreach (var r in group.OrderBy(r => r.RevisionAt > r.LastSeenAt ? r.RevisionAt : r.LastSeenAt).ThenBy(r => r.RevisionAt))
             {
                 last = r;
                 var loc = mapper.Location(r.LastLocationKind, r.LastLocationPlaceId, r.LastLocation, r.LastLocationAccuracyKm);
@@ -155,7 +175,10 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
                     continue;
                 }
                 var direction = r.DirectionKind == DirectionKind.Unknown ? null : r.DirectionDeg;
-                var sample = new ReplaySampleDto(r.LastSeenAt, loc.Point, direction, r.LastLocationKind == LocationKind.DirectionOnly);
+                // A correction recorded later must not be shown at its earlier
+                // observed time: the replay is what a viewer could have known.
+                var sampleAt = r.RevisionAt > r.LastSeenAt ? r.RevisionAt : r.LastSeenAt;
+                var sample = new ReplaySampleDto(sampleAt, loc.Point, direction, r.LastLocationKind == LocationKind.DirectionOnly);
                 // A revision that changed nothing about the position (a new source, a count) adds no sample.
                 if (samples.Count > 0 && samples[^1].At == sample.At && samples[^1].Point.EqualsExact(sample.Point))
                 {
@@ -446,21 +469,24 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         return a is null ? null : mapper.Alert(a);
     }
 
-    public async Task<IReadOnlyList<TimelineBucketDto>> TimelineAsync(DateTimeOffset from, DateTimeOffset to, int bucketMinutes, CancellationToken ct)
+    public async Task<IReadOnlyList<TimelineBucketDto>> TimelineAsync(DateTimeOffset from, DateTimeOffset to, int bucketMinutes, CancellationToken ct, MapFilter? filter = null)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         var bucket = TimeSpan.FromMinutes(Math.Clamp(bucketMinutes, 1, 24 * 60));
+        if (to - from > MaxReplayWindow) throw new MapWindowTooLargeException(MaxReplayWindow);
+        if (to > clock.GetUtcNow()) throw new MapFutureHistoryException();
         var targets = await db.Targets.AsNoTracking()
             .Where(o => o.ObservedAt >= from && o.ObservedAt < to && o.DuplicateOfTargetId == null)
-            .Select(o => o.ObservedAt)
+            .Select(o => new { o.ObservedAt, o.SourceId, o.TargetCategoryId, o.TargetClassId, o.TargetFamilyId, o.TargetModelId, o.Confidence, o.EventKindId, o.LocationPlaceId, o.LocationKind })
             .ToListAsync(ct);
         var opened = await db.TargetTracks.AsNoTracking()
             .Where(t => t.FirstSeenAt >= from && t.FirstSeenAt < to)
-            .Select(t => t.FirstSeenAt)
+            .Select(t => new { t.TargetTrackId, t.FirstSeenAt, t.Status, t.TargetCategoryId, t.TargetClassId, t.TargetFamilyId, t.TargetModelId, t.TrackConfidence, t.LastLocationPlaceId, t.LastLocationKind })
             .ToListAsync(ct);
+        var openedSources = filter?.SourceIds.Count > 0 ? await SourceIdsAsync(db, opened.Select(t => t.TargetTrackId).ToList(), to, ct) : [];
         var alerts = await db.AirAlerts.AsNoTracking()
             .Where(a => a.StartedAt < to && (a.EndedAt == null || a.EndedAt >= from))
-            .Select(a => new { a.StartedAt, a.EndedAt })
+            .Select(a => new { a.StartedAt, a.EndedAt, a.SourceId, a.PlaceId })
             .ToListAsync(ct);
 
         var buckets = new List<TimelineBucketDto>();
@@ -468,9 +494,9 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         {
             var end = start + bucket;
             buckets.Add(new TimelineBucketDto(start,
-                targets.Count(x => x >= start && x < end),
-                opened.Count(x => x >= start && x < end),
-                alerts.Count(a => a.StartedAt < end && (a.EndedAt == null || a.EndedAt >= start))));
+                targets.Count(x => x.ObservedAt >= start && x.ObservedAt < end && (filter is null || (filter.AllowsTarget(x.SourceId, x.TargetCategoryId, x.TargetClassId, x.TargetFamilyId, x.TargetModelId, x.Confidence, x.EventKindId is int id && refs.EventKinds.TryGetValue(id, out var kind) ? kind.Code : null, x.EventKindId is int categoryId && refs.EventKinds.TryGetValue(categoryId, out var categoryKind) ? categoryKind.Category.ToString() : null) && filter.AllowsPlace(x.LocationPlaceId, refs) && filter.AllowsLocation(x.LocationKind != LocationKind.Unknown) && filter.AllowsText(x.EventKindId is int kindId && refs.EventKinds.TryGetValue(kindId, out var eventKind) ? eventKind.Code : null, refs.Place(x.LocationPlaceId)?.Name)))),
+                opened.Count(x => x.FirstSeenAt >= start && x.FirstSeenAt < end && (filter is null || (filter.AllowsTrack(x.Status, x.TargetCategoryId, x.TargetClassId, x.TargetFamilyId, x.TargetModelId, x.TrackConfidence) && filter.AllowsSource(openedSources.GetValueOrDefault(x.TargetTrackId, [])) && filter.AllowsPlace(x.LastLocationPlaceId, refs) && filter.AllowsLocation(x.LastLocationKind != LocationKind.Unknown) && filter.AllowsText(refs.Categories.GetValueOrDefault(x.TargetCategoryId)?.Name, refs.Place(x.LastLocationPlaceId)?.Name)))),
+                alerts.Count(a => a.StartedAt < end && (a.EndedAt == null || a.EndedAt >= start) && (filter is null || (filter.Includes("alert") && filter.HasResults is not false && filter.AllowsSource([a.SourceId]) && filter.AllowsPlace(a.PlaceId, refs) && filter.AllowsLocation(true) && filter.AllowsText(refs.Place(a.PlaceId)?.Name))))));
         }
         return buckets;
     }

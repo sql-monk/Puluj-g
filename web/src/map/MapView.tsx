@@ -4,7 +4,7 @@ import type { MapLayerMouseEvent } from 'maplibre-gl'
 // worker entry explicitly here and MapLibre is pointed at it.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { RegionDto } from '../api/types'
+import type { MapId, RegionDto } from '../api/types'
 import type { MapPalette } from './palette'
 import LinkPopup from '../components/LinkPopup'
 import EventPopup from '../components/EventPopup'
@@ -29,7 +29,7 @@ interface Props {
   dark: boolean
   theme: Theme
   onPickHome: ((lon: number, lat: number) => void) | null
-  onDetails: (trackId: number) => void
+  onDetails: (trackId: MapId) => void
 }
 
 /** Country-wide MapLibre map with all Puluj layers. Data flows one way: store -> GeoJSON sources. */
@@ -40,7 +40,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
   // Where the viewer clicked to select the current track: the popup opens there, not at the marker.
   const [clickAt, setClickAt] = useState<[number, number] | null>(null)
   const [eventClickAt, setEventClickAt] = useState<[number, number] | null>(null)
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<MapId | null>(null)
   // Name of the raion / oblast under the cursor, moved by the hover handler directly (no render per mouse move).
   const tip = useRef<HTMLDivElement>(null)
   const styleLoaded = useRef(false)
@@ -146,7 +146,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       if (event?.properties?.id !== undefined) {
         selectRegion(null)
         setRegionClickAt(null)
-        setSelectedEventId(Number(event.properties.id))
+        setSelectedEventId(event.properties.id)
         setEventClickAt([e.lngLat.lng, e.lngLat.lat])
         return
       }
