@@ -1,6 +1,8 @@
 import { useStore, type Filters } from '../store/useStore'
 import HomeLocationPicker from './HomeLocationPicker'
 import Legend from './Legend'
+import DataFilterControls from './DataFilterControls'
+import type { PublicRoute } from '../public/routes'
 
 type BoolFilter = { [K in keyof Filters]: Filters[K] extends boolean ? K : never }[keyof Filters]
 
@@ -15,6 +17,7 @@ const classItems: { key: BoolFilter; label: string }[] = [
 ]
 
 interface Props {
+  route: PublicRoute
   open: boolean
   onClose: () => void
   picking: boolean
@@ -24,7 +27,7 @@ interface Props {
 
 /** Spec §19 left panel: filters, vectors, sources, my location, history, legend. Folds away on every screen size;
  * on phones it is a bottom sheet. */
-export default function FilterPanel({ open, onClose, picking, onPickingChange, onReplay }: Props) {
+export default function FilterPanel({ route, open, onClose, picking, onPickingChange, onReplay }: Props) {
   const filters = useStore((s) => s.filters)
   const setFilter = useStore((s) => s.setFilter)
   const sources = useStore((s) => s.sources)
@@ -73,6 +76,8 @@ export default function FilterPanel({ open, onClose, picking, onPickingChange, o
           ))}
         </div>
       </div>
+
+      <DataFilterControls route={route} />
 
       <div>
         <div className="mb-1 font-medium">Вектори руху</div>

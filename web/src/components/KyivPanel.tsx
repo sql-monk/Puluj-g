@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { alertsFor, effectiveLevel, levelTone } from '../lib/alerts'
 import { useStore, type Filters } from '../store/useStore'
 import Legend from './Legend'
+import DataFilterControls from './DataFilterControls'
+import type { PublicRoute } from '../public/routes'
 
 type BoolFilter = { [K in keyof Filters]: Filters[K] extends boolean ? K : never }[keyof Filters]
 
@@ -17,7 +19,7 @@ const items: { key: BoolFilter; label: string }[] = [
 const RECENT_MS = 60 * 60_000
 
 /** Kyiv page left panel: the ten districts with their alert state and recent message count, plus the class filters. */
-export default function KyivPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function KyivPanel({ route, open, onClose }: { route: PublicRoute; open: boolean; onClose: () => void }) {
   const regions = useStore((s) => s.regions)
   const alerts = useStore((s) => s.alerts)
   const targets = useStore((s) => s.targets)
@@ -93,6 +95,7 @@ export default function KyivPanel({ open, onClose }: { open: boolean; onClose: (
           ))}
         </ul>
       </div>
+      <DataFilterControls route={route} />
       <div>
         <div className="mb-1 font-medium">Фільтри</div>
         <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">

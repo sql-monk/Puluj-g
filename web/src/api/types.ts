@@ -152,6 +152,45 @@ export interface SourceDto {
   url?: string
 }
 
+/** Read-only dictionary tree returned by /api/taxonomy. IDs stay numeric taxonomy IDs, never event kinds. */
+export interface TaxonomyModelDto {
+  id: number
+  code: string
+  name: string
+  manufacturer?: string
+  country?: string
+}
+export interface TaxonomyFamilyDto {
+  id: number
+  code: string
+  name: string
+  models: TaxonomyModelDto[]
+}
+export interface TaxonomyClassDto {
+  id: number
+  code: string
+  name: string
+  families: TaxonomyFamilyDto[]
+}
+export interface TaxonomyCategoryDto {
+  id: number
+  code: string
+  name: string
+  classes: TaxonomyClassDto[]
+}
+export interface TaxonomyDto {
+  categories: TaxonomyCategoryDto[]
+}
+
+/** The enabled API catalogue. A code absent here can still be a historical URL value. */
+export interface EventKindDto {
+  id: number
+  code: string
+  nameUk: string
+  category: string
+  mapVisible: boolean
+}
+
 export interface RawMessageDto {
   id: number
   sourceMessageId: string

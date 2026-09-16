@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson'
-import type { AlertDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TimelineBucketDto, TrackDetailsDto } from './types'
+import type { AlertDto, EventKindDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -32,6 +32,8 @@ export const api = {
     get<TargetDto[]>(`/api/targets?since=${encodeURIComponent(from.toISOString())}&until=${encodeURIComponent(to.toISOString())}&limit=${limit}`),
   regions: () => get<RegionDto[]>('/api/places/regions'),
   sources: () => get<SourceDto[]>('/api/sources'),
+  taxonomy: () => get<TaxonomyDto>('/api/taxonomy'),
+  eventKinds: () => get<EventKindDto[]>('/api/event-kinds'),
   /** Alerts of one place over the last `hours`, ended ones included, newest first. */
   alertsHistory: (placeId: number, hours = 24) => get<AlertDto[]>(`/api/alerts/history?placeId=${placeId}&hours=${hours}`),
   searchPlaces: (q: string) => get<PlaceDto[]>(`/api/places/search?q=${encodeURIComponent(q)}&limit=8`),

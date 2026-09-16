@@ -3,6 +3,7 @@ import { api } from './api/client'
 import { connectMapHub } from './api/signalr'
 import type { AlertDto, TargetDto, TrackDto } from './api/types'
 import FeedPanel from './components/FeedPanel'
+import DataFilterControls from './components/DataFilterControls'
 import FilterPanel from './components/FilterPanel'
 import KyivPanel from './components/KyivPanel'
 import ReplayBar from './components/ReplayBar'
@@ -13,6 +14,7 @@ import KyivMapView from './map/KyivMapView'
 import MapView from './map/MapView'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
 import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
+import { parseDataQuery } from './public/query'
 
 const TICK_MS = 15_000
 /** Hub events are applied to the store in batches this often: one re-render per batch instead of one per event. */
@@ -25,8 +27,9 @@ export default function App() {
   const selectedTrackId = useStore((s) => s.selectedTrackId)
   const selectedTrack = useStore((s) => (s.selectedTrackId ? s.tracks[s.selectedTrackId] : undefined))
   const setHome = useStore((s) => s.setHome)
-  const panelOpen = useStore((s) => s.panelOpen)
-  const setPanelOpen = useStore((s) => s.setPanelOpen)
+  const legacyPanelOpen = useStore((s) => s.panelOpen)
+  const panelOpenBySection = useStore((s) => s.panelOpenBySection)
+  const setPanelOpenFor = useStore((s) => s.setPanelOpenFor)
   // The feed opens folded too: a "Повідомлення (N)" button in the top-right corner unfolds it.
   const [feedOpen, setFeedOpen] = useState(false)
   const [picking, setPicking] = useState(false)
@@ -43,6 +46,11 @@ export default function App() {
   const replay = mapRoute && route.mapMode === 'history'
   const kyivPreset = mapRoute && route.preset === 'kyiv'
   const replayWindow = useMemo(() => (replay ? historyWindow(route.query) : null), [replay, route.query])
+  const panelOpen = panelOpenBySection[route.section] ?? legacyPanelOpen
+  const dataQuery = useMemo(() => parseDataQuery(route.query).value, [route.query])
+  const mapFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
+  const analyticsFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.sourceIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
+  const activeMap = mapRoute && !mapFilterUnavailable
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -51,10 +59,10 @@ export default function App() {
 
   // Fade / ETA are map resources: do not keep a timer while another section is active.
   useEffect(() => {
-    if (!mapRoute) return
+    if (!activeMap) return
     const id = window.setInterval(() => useStore.getState().tick(), TICK_MS)
     return () => window.clearInterval(id)
-  }, [mapRoute])
+  }, [activeMap])
 
   // Hash is the public navigation source of truth. Legacy links replace to a canonical route without a second Back entry.
   useEffect(() => {
@@ -75,6 +83,13 @@ export default function App() {
     const kyiv = s.regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ')
     if (kyiv) s.selectRegion(kyiv.id)
   }, [kyivPreset, regionsLoaded])
+  // The existing map transport supports source narrowing locally.
+  // Any other U01 filter is explicitly unavailable below rather than decorating an unfiltered map with a chip.
+  useEffect(() => {
+    if (!activeMap) return
+    const store = useStore.getState()
+    store.setFilter('sources', dataQuery.sourceIds.length ? dataQuery.sourceIds : null)
+  }, [activeMap, dataQuery.sourceIds])
   // History is a route, rather than a local switch. ReplayBar owns its detailed clock once mounted.
   useEffect(() => {
     if (!mapRoute) return
@@ -83,12 +98,12 @@ export default function App() {
     if (route.mapMode === 'live' && store.mode !== 'live') store.setMode('live')
   }, [mapRoute, replayWindow, route.mapMode])
   useEffect(() => {
-    if (!mapRoute) useStore.getState().setError(null)
-  }, [mapRoute])
+    if (!activeMap) useStore.getState().setError(null)
+  }, [activeMap])
   const closePanel = useCallback(() => {
-    setPanelOpen(false)
+    setPanelOpenFor(route.section, false)
     window.setTimeout(() => panelButton.current?.focus(), 0)
-  }, [setPanelOpen])
+  }, [route.section, setPanelOpenFor])
   useEffect(() => {
     if (!panelOpen) return
     const panel = document.querySelector<HTMLElement>('[data-section-panel="open"]')
@@ -126,7 +141,7 @@ export default function App() {
 
   // Region polygons, source filters and live windows are map-only resources.
   useEffect(() => {
-    if (!mapRoute) return
+    if (!activeMap) return
     api
       .mapConfig()
       .then((c) => useStore.getState().setMapConfig(c))
@@ -139,14 +154,14 @@ export default function App() {
       .sources()
       .then((s) => useStore.getState().setSources(s))
       .catch((e: Error) => useStore.getState().setError(`Джерела: ${e.message}`))
-  }, [mapRoute])
+  }, [activeMap])
 
   // Snapshot requests can overlap while the timeline slider moves; only the latest one may land in the store.
   const snapshotSeq = useRef(0)
   useEffect(() => {
     // Invalidates a late response after navigating away from the map.
-    if (!mapRoute) snapshotSeq.current += 1
-  }, [mapRoute])
+    if (!activeMap) snapshotSeq.current += 1
+  }, [activeMap])
   const loadSnapshot = useCallback(async () => {
     const s = useStore.getState()
     const seq = ++snapshotSeq.current
@@ -167,12 +182,12 @@ export default function App() {
 
   // Live: snapshot + realtime. History: snapshot at the selected instant, realtime ignored.
   useEffect(() => {
-    if (!mapRoute) return
+    if (!activeMap) return
     void loadSnapshot()
-  }, [loadSnapshot, mapRoute, mode, at])
+  }, [loadSnapshot, activeMap, mode, at])
 
   useEffect(() => {
-    if (!mapRoute) return
+    if (!activeMap) return
     const store = useStore.getState()
     // Events are buffered and flushed together: a burst (a busy night, a reprocess) then costs one store update per
     // batch, not one per event. The last state of a track or alert within a batch wins.
@@ -225,7 +240,7 @@ export default function App() {
       if (timer !== null) window.clearTimeout(timer)
       void connection.stop()
     }
-  }, [loadSnapshot, mapRoute])
+  }, [loadSnapshot, activeMap])
 
   const pickHome = picking
     ? (lon: number, lat: number) => {
@@ -236,22 +251,23 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
-      {mapRoute && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />)}
-      <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpen(true)} panelButtonRef={panelButton} />
-      {stats && <StatsPage />}
+      {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />)}
+      {mapRoute && mapFilterUnavailable && <FilterUnavailable title="Мапа не має публічного endpoint для обраних фільтрів" />}
+      <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
+      {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
       {route.section === 'entities' && <SectionPlaceholder title="Цілі і події" text="Каталог з пов’язаними даними буде додано в U08." />}
       {route.section === 'messages' && <SectionPlaceholder title="Повідомлення" text="Каталог початкових повідомлень буде додано в U09." />}
       {mapRoute && (kyivPreset ? (
-        <KyivPanel open={panelOpen} onClose={closePanel} />
+        <KyivPanel route={route} open={panelOpen} onClose={closePanel} />
       ) : (
-        <FilterPanel open={panelOpen} onClose={closePanel} picking={picking} onPickingChange={setPicking} onReplay={() => !replay && toggleReplay()} />
+        <FilterPanel route={route} open={panelOpen} onClose={closePanel} picking={picking} onPickingChange={setPicking} onReplay={() => !replay && toggleReplay()} />
       ))}
-      {!mapRoute && <SectionPanel open={panelOpen} onClose={closePanel} section={route.section as Exclude<PublicRoute['section'], 'map'>} />}
+      {!mapRoute && <SectionPanel route={route} open={panelOpen} onClose={closePanel} section={route.section as Exclude<PublicRoute['section'], 'map'>} />}
       {panelOpen && <button type="button" className="pointer-events-auto absolute inset-0 z-[9] bg-slate-950/35 md:hidden" onClick={closePanel} aria-label="Закрити панель" />}
       {mapRoute && !panelOpen && !detailsOpen && (
         <button
           className="pointer-events-auto absolute left-3 top-14 z-10 hidden rounded-lg bg-white/95 px-3 py-1.5 text-sm shadow md:block dark:bg-slate-900/95 dark:text-slate-100"
-          onClick={() => setPanelOpen(true)}
+          onClick={() => setPanelOpenFor(route.section, true)}
           title="Показати панель фільтрів"
         >
           ☰ Фільтри
@@ -276,7 +292,11 @@ function SectionPlaceholder({ title, text }: { title: string; text: string }) {
   return <main className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-8 pt-28 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-slate-600 dark:text-slate-300">{text}</p></div></main>
 }
 
-function SectionPanel({ open, onClose, section }: { open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {
+function FilterUnavailable({ title }: { title: string }) {
+  return <main className="absolute inset-0 z-10 flex items-center justify-center bg-slate-100 px-4 pt-12 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="max-w-lg rounded-xl bg-white p-5 text-center shadow-sm dark:bg-slate-900"><h1 className="font-semibold">{title}</h1><p className="mt-2 text-sm text-slate-600 dark:text-slate-300">URL і chips збережені. Приберіть непідтримувані фільтри або дочекайтеся endpoint-ів U04/U05 — unfiltered результат навмисно не показується.</p></div></main>
+}
+
+function SectionPanel({ route, open, onClose, section }: { route: PublicRoute; open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {
   const label = section === 'analytics' ? 'Фільтри аналітики' : section === 'entities' ? 'Фільтри каталогу' : 'Фільтри повідомлень'
-  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-20 w-full rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><p className="mt-2 text-sm text-slate-500 dark:text-slate-300">Спільний typed filter codec буде підключено в U03.</p></aside>
+  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-20 max-h-[60vh] w-full overflow-y-auto rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:max-h-[calc(100vh-5rem)] md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="mb-3 flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><DataFilterControls route={route} /></aside>
 }

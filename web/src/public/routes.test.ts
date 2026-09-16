@@ -5,14 +5,14 @@ describe('public route contract', () => {
   it('normalizes legacy links without discarding custom stats instants', () => {
     const parsed = parsePublicHash('#/stats?tab=alerts&from=2026-09-01T00%3A00%3A00.000Z&to=2026-09-02T00%3A00%3A00.000Z')
     expect(parsed.route.section).toBe('analytics')
-    expect(parsed.canonicalHash).toBe('#/analytics?from=2026-09-01T00%3A00%3A00.000Z&to=2026-09-02T00%3A00%3A00.000Z&metric=alerts')
+    expect(parsed.canonicalHash).toBe('#/analytics?metric=alerts&from=2026-09-01T00%3A00%3A00.000Z&to=2026-09-02T00%3A00%3A00.000Z')
     expect(parsed.shouldReplace).toBe(true)
   })
 
   it('turns Kyiv into a map preset', () => {
     const parsed = parsePublicHash('#/kyiv?regionId=8')
     expect(parsed.route).toMatchObject({ section: 'map', mapMode: 'live', preset: 'kyiv' })
-    expect(parsed.canonicalHash).toBe('#/map/live?regionId=8&preset=kyiv')
+    expect(parsed.canonicalHash).toBe('#/map/live?preset=kyiv&regionId=8')
   })
 
   it('keeps canonical details and rejects unknown hashes safely', () => {

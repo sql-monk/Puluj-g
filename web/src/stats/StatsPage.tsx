@@ -3,6 +3,7 @@ import { themeIsDark, useStore } from '../store/useStore'
 import LiveLine from './LiveLine'
 import { chartVars } from './palette'
 import { PRESETS, TABS, presetPeriod, rangeText, toLocalInput, type Period, type Preset, type Tab } from './period'
+import { parseKyivInput } from '../public/kyivTime'
 import AlertsTab from './tabs/AlertsTab'
 import RecognitionTab from './tabs/RecognitionTab'
 import SourcesTab from './tabs/SourcesTab'
@@ -14,7 +15,7 @@ import { useStatsRoute } from './useStatsRoute'
  * and a live line from the store. Sits over the map (which stays mounted underneath) and scrolls on its own; the
  * chart colours of the current theme are CSS variables on this root.
  */
-export default function StatsPage() {
+export default function StatsPage({ filterUnavailable = false }: { filterUnavailable?: boolean }) {
   const { route, setTab, setPeriod } = useStatsRoute()
   const dark = themeIsDark(useStore((s) => s.theme))
   return (
@@ -28,7 +29,7 @@ export default function StatsPage() {
           </div>
           <LiveLine />
         </div>
-        <TabPanel tab={route.tab} period={route.period} />
+        {filterUnavailable ? <div role="alert" className="rounded-xl bg-amber-100 p-4 text-amber-950 dark:bg-amber-950 dark:text-amber-100">Обрана метрика ще не підтримує активні URL filters. Дані не завантажено, щоб не показати unfiltered chart під активними chips.</div> : <TabPanel tab={route.tab} period={route.period} />}
       </div>
     </div>
   )
@@ -61,6 +62,7 @@ function TabPanel({ tab, period }: { tab: Tab; period: Period }) {
 function PeriodBar({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
   const [from, setFrom] = useState(toLocalInput(period.from))
   const [to, setTo] = useState(toLocalInput(period.to))
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => {
     setFrom(toLocalInput(period.from))
     setTo(toLocalInput(period.to))
@@ -70,9 +72,13 @@ function PeriodBar({ period, onChange }: { period: Period; onChange: (p: Period)
     else onChange(presetPeriod(id))
   }
   const apply = () => {
-    const f = new Date(from)
-    const t = new Date(to)
-    if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime()) || t <= f) return
+    const f = parseKyivInput(from)
+    const t = parseKyivInput(to)
+    if (!f || !t || t <= f) {
+      setError('Вкажіть коректний інтервал Europe/Kyiv; неіснуюча DST-година не приймається.')
+      return
+    }
+    setError(null)
     onChange({ preset: 'custom', from: f, to: t })
   }
   return (
@@ -92,6 +98,7 @@ function PeriodBar({ period, onChange }: { period: Period; onChange: (p: Period)
           <button type="button" className="rounded bg-blue-600 px-2 py-0.5 text-white hover:bg-blue-700" onClick={apply}>
             Показати
           </button>
+          {error && <span role="alert" className="text-red-700 dark:text-red-300">{error}</span>}
         </span>
       )}
       <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{rangeText(period)}</span>

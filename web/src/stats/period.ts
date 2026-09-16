@@ -1,4 +1,5 @@
 import type { StatsBucketUnit } from '../api/types'
+import { kyivLabel, toKyivInput } from '../public/kyivTime'
 
 export type Tab = 'targets' | 'alerts' | 'sources' | 'recognition'
 
@@ -53,6 +54,13 @@ function isPreset(s: string | null): s is Exclude<Preset, 'custom'> {
   return s === '24h' || s === '7d' || s === '30d' || s === '90d'
 }
 
+function explicitUtc(raw: string): Date | null {
+  // A URL is a wire protocol, not a browser-local datetime-local field.
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)) return null
+  const value = new Date(raw)
+  return Number.isNaN(value.getTime()) ? null : value
+}
+
 /**
  * The route lives in the hash so a view can be linked: `#/analytics` (targets, 24 h), `#/analytics?tab=alerts&p=7d`,
  * `#/stats?tab=sources&from=…&to=…`. Anything unreadable falls back to the targets tab and 24 h.
@@ -67,17 +75,23 @@ export function parseStatsHash(hash: string, now = new Date()): StatsRoute {
   const from = params.get('from')
   const to = params.get('to')
   if (from && to) {
-    const f = new Date(from)
-    const t = new Date(to)
-    if (!Number.isNaN(f.getTime()) && !Number.isNaN(t.getTime()) && t > f) {
+    const f = explicitUtc(from)
+    const t = explicitUtc(to)
+    if (f && t && t > f) {
       return { tab, period: { preset: 'custom', from: f, to: t } }
     }
   }
   return { tab, period: presetPeriod('24h', now) }
 }
 
-export function statsHash(route: StatsRoute): string {
-  const params = new URLSearchParams()
+export function statsHash(route: StatsRoute, base = new URLSearchParams()): string {
+  const params = new URLSearchParams(base)
+  params.delete('tab')
+  params.delete('p')
+  params.delete('metric')
+  params.delete('preset')
+  params.delete('from')
+  params.delete('to')
   params.set('metric', route.tab)
   const { period } = route
   if (period.preset === 'custom') {
@@ -90,11 +104,8 @@ export function statsHash(route: StatsRoute): string {
   return q ? `#/analytics?${q}` : '#/analytics'
 }
 
-/** Value for an <input type="datetime-local"> in the viewer's local time. */
-export function toLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
+/** Compatibility export; values are Kyiv wall-clock inputs, never browser-local time. */
+export const toLocalInput = toKyivInput
 
 export const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд']
 export const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'))
@@ -102,16 +113,18 @@ export const HOURS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, 
 /** Short axis label of a bucket start: the hour for hour buckets, the day for days, "day.month" for weeks. */
 export function bucketLabel(iso: string, unit: StatsBucketUnit): string {
   const d = new Date(iso)
-  if (unit === 'hour') return d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })
-  return d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' })
+  if (unit === 'hour') return new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', hour: '2-digit', minute: '2-digit' }).format(d)
+  return new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit' }).format(d)
 }
 
 /** Full label for a tooltip: the bucket start and, for hours, the date too. */
 export function bucketTitle(iso: string, unit: StatsBucketUnit): string {
   const d = new Date(iso)
-  if (unit === 'hour') return d.toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-  if (unit === 'week') return `тиждень з ${d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' })}`
-  return `${WEEKDAYS[(d.getDay() + 6) % 7]} ${d.toLocaleDateString('uk-UA', { day: '2-digit', month: '2-digit' })}`
+  if (unit === 'hour') return kyivLabel(d)
+  const date = new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', day: '2-digit', month: '2-digit' }).format(d)
+  if (unit === 'week') return `тиждень з ${date}`
+  const kyivDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv', weekday: 'short' }).format(d)
+  return `${kyivDay} ${date}`
 }
 
 /** "за годину" / "за добу" / "за тиждень" for subtitles. */
@@ -127,8 +140,7 @@ export function dayTitle(day: string): string {
 }
 
 export function rangeText(period: Period): string {
-  const f = (d: Date) => d.toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  return `${f(period.from)} — ${f(period.to)}`
+  return `${kyivLabel(period.from)} — ${kyivLabel(period.to)}`
 }
 
 /** Compact figure: 1 284 / 12,9 тис. / 4,2 млн. */

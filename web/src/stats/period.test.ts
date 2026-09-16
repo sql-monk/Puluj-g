@@ -49,6 +49,7 @@ describe('stats hash', () => {
     expect(parseStatsHash('#/stats?from=abc&to=def', NOW).period.preset).toBe('24h')
     expect(parseStatsHash('#/stats?from=2025-04-01T00:00:00Z&to=2025-03-01T00:00:00Z', NOW).period.preset).toBe('24h')
     expect(parseStatsHash('#/stats?p=5d', NOW).period.preset).toBe('24h')
+    expect(parseStatsHash('#/stats?from=2025-03-01T00:00&to=2025-03-02T00:00', NOW).period.preset).toBe('24h')
   })
 })
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { parseStatsHash, statsHash, type Period, type StatsRoute, type Tab } from './period'
+import { publicHash } from '../public/routes'
 
 /**
  * The tab and the period come from the hash (`#/analytics?tab=alerts&p=7d`) and every change goes back into it, so a
@@ -17,7 +18,8 @@ export function useStatsRoute() {
   }, [])
 
   const go = useCallback((next: StatsRoute) => {
-    const hash = statsHash(next)
+    const encoded = statsHash(next, new URLSearchParams(window.location.hash.split('?', 2)[1] ?? ''))
+    const hash = publicHash({ section: 'analytics', query: new URLSearchParams(encoded.split('?', 2)[1] ?? '') })
     if (window.location.hash === hash) {
       setRoute(next)
     } else {

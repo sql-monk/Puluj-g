@@ -1,3 +1,5 @@
+import { canonicalizeQuery } from './query'
+
 export type PublicSection = 'map' | 'analytics' | 'entities' | 'messages'
 export type MapMode = 'live' | 'history'
 
@@ -60,7 +62,7 @@ function decodedId(value: string): string | null {
   }
 }
 
-/** Serializes only routes accepted by the public shell. Query values are kept verbatim for U03's codec. */
+/** Serializes routes through U03's one canonical query codec. */
 export function publicHash(route: PublicRoute): string {
   const base =
     route.section === 'map'
@@ -72,7 +74,7 @@ export function publicHash(route: PublicRoute): string {
           : `#/${route.section}`
   const query = new URLSearchParams(route.query)
   if (route.preset === 'kyiv') query.set('preset', 'kyiv')
-  const encoded = query.toString()
+  const encoded = canonicalizeQuery(query).toString()
   return encoded ? `${base}?${encoded}` : base
 }
 

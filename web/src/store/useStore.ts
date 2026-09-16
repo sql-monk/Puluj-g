@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Geometry } from 'geojson'
+import type { PublicSection } from '../public/routes'
 import { api } from '../api/client'
 import type { AlertDto, PredecessorsDto, DisplayMode, TargetDto, RegionDto, SourceDto, TrackDto } from '../api/types'
 import type { Home } from '../eta/computeEta'
@@ -77,6 +78,8 @@ interface State {
   theme: Theme
   /** Left panel (filters) shown; folded by default, persisted once the viewer toggles it. */
   panelOpen: boolean
+  /** U03 migration: each public section remembers its own drawer state; `panelOpen` remains a legacy fallback. */
+  panelOpenBySection: Partial<Record<PublicSection, boolean>>
   selectedTrackId: number | null
   /** The clicked leg between two reports of the selected target's family (its window is open). */
   selectedLink: SelectedLink | null
@@ -108,6 +111,7 @@ interface State {
   setHome: (h: Home | null) => void
   setTheme: (t: Theme) => void
   setPanelOpen: (open: boolean) => void
+  setPanelOpenFor: (section: PublicSection, open: boolean) => void
   select: (id: number | null) => void
   selectLink: (link: SelectedLink | null) => void
   setTargets: (list: TargetDto[]) => void
@@ -125,6 +129,7 @@ const HOME_KEY = 'puluj.home'
 const THEME_KEY = 'puluj.theme'
 const FILTERS_KEY = 'puluj.filters'
 const PANEL_KEY = 'puluj.panel'
+const PANELS_KEY = 'puluj.panels.v2'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -180,6 +185,7 @@ export const useStore = create<State>((set, get) => ({
   theme: ((t) => (THEMES.some((x) => x.id === t) ? t : 'dark'))(load<Theme>(THEME_KEY, 'dark')),
   // The map opens uncluttered: the panel stays folded until the viewer opens it (then their choice is remembered).
   panelOpen: load<boolean>(PANEL_KEY, false),
+  panelOpenBySection: load<Partial<Record<PublicSection, boolean>>>(PANELS_KEY, {}),
   selectedTrackId: null,
   selectedLink: null,
   targets: [],
@@ -264,6 +270,12 @@ export const useStore = create<State>((set, get) => ({
     save(PANEL_KEY, panelOpen)
     set({ panelOpen })
   },
+  setPanelOpenFor: (section, open) =>
+    set((state) => {
+      const panelOpenBySection = { ...state.panelOpenBySection, [section]: open }
+      save(PANELS_KEY, panelOpenBySection)
+      return { panelOpenBySection }
+    }),
   select: (selectedTrackId) => set((s) => ({ selectedTrackId, selectedLink: null, predecessors: s.selectedTrackId === selectedTrackId ? s.predecessors : null })),
   selectLink: (selectedLink) => set({ selectedLink }),
   loadPredecessors: (trackId) => {
