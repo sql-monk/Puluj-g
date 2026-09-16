@@ -15,7 +15,7 @@ interface Options {
   clock: Date
   regionsById: ReadonlyMap<number, RegionDto>
   placeGeometries: Record<number, Geometry>
-  ensurePlaceGeometry: (placeId: number) => void
+  ensurePlaceGeometry: (placeId: number) => unknown
 }
 
 let catalogLoaded = false

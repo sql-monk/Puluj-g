@@ -70,7 +70,7 @@ export default function TrackDetailsDrawer({ onClose }: Props) {
   const targets = (data?.targets ?? []).filter((o) => sourceFilter === null || sourceFilter.includes(o.source.id)).slice().reverse()
 
   return (
-    <div className="pointer-events-auto absolute inset-y-0 left-0 top-12 z-30 flex w-full max-w-md flex-col bg-white shadow-2xl md:top-14 md:bottom-3 md:left-3 md:rounded-xl dark:bg-slate-900 dark:text-slate-100">
+    <div data-map-occlusion="true" className="pointer-events-auto absolute inset-y-0 left-0 top-12 z-30 flex w-full max-w-md flex-col bg-white shadow-2xl md:top-14 md:bottom-3 md:left-3 md:rounded-xl dark:bg-slate-900 dark:text-slate-100">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-700">
         <div className="flex min-w-0 items-center gap-2 font-semibold">
           {track && <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: palette.marker[track.type.displayMode] }} />}

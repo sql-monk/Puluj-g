@@ -25,6 +25,7 @@ export default function App() {
   const mode = useStore((s) => s.mode)
   const at = useStore((s) => s.at)
   const selectedTrackId = useStore((s) => s.selectedTrackId)
+  const selectedRegionId = useStore((s) => s.selectedRegionId)
   const selectedTrack = useStore((s) => (s.selectedTrackId ? s.tracks[s.selectedTrackId] : undefined))
   const setHome = useStore((s) => s.setHome)
   const legacyPanelOpen = useStore((s) => s.panelOpen)
@@ -82,6 +83,22 @@ export default function App() {
     const kyiv = s.regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ')
     if (kyiv) s.selectRegion(kyiv.id)
   }, [kyivPreset, regionsLoaded])
+  // A shared URL region filter is also an explicit map selection when the map is visible. This covers first load and
+  // Back/Forward without coupling the camera to data refreshes.
+  useEffect(() => {
+    if (!activeMap || dataQuery.regionId === undefined || dataQuery.regionId === selectedRegionId) return
+    useStore.getState().selectRegion(dataQuery.regionId)
+  }, [activeMap, dataQuery.regionId, selectedRegionId])
+  // The Kyiv presentation is deliberately narrow: following a link or a URL to another region returns to the country
+  // map instead of trying to force an out-of-city polygon into Kyiv's bounded camera.
+  useEffect(() => {
+    if (!kyivPreset || selectedRegionId === null) return
+    const regions = useStore.getState().regions
+    const kyiv = regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ')
+    const selected = regions.find((r) => r.id === selectedRegionId)
+    if (!kyiv || !selected || selected.id === kyiv.id || selected.parentId === kyiv.id) return
+    window.location.hash = publicHash({ ...route, preset: undefined })
+  }, [kyivPreset, route, selectedRegionId])
   // The selected sources remain a presentation setting too, while the full U03
   // filter is sent with every snapshot/replay/timeline request below.
   useEffect(() => {
@@ -275,7 +292,7 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
-      {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />)}
+      {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} />)}
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
       {route.section === 'entities' && <SectionPlaceholder title="Цілі і події" text="Каталог з пов’язаними даними буде додано в U08." />}

@@ -20,6 +20,7 @@ import { getPalette } from './palette'
 import { replay } from '../replay/engine'
 import { buildAlertLayer, buildEventLayer, buildReplayLayers, buildTrackLayers, emptyCollection, visibleTracks } from './geojson'
 import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
+import { useRegionCamera } from './useRegionCamera'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -30,10 +31,11 @@ interface Props {
   theme: Theme
   onPickHome: ((lon: number, lat: number) => void) | null
   onDetails: (trackId: MapId) => void
+  layoutKey: string
 }
 
 /** Country-wide MapLibre map with all Puluj layers. Data flows one way: store -> GeoJSON sources. */
-export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
+export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
@@ -74,10 +76,13 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
   const placeGeometries = useStore((s) => s.placeGeometries)
   const ensurePlaceGeometry = useStore((s) => s.ensurePlaceGeometry)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
+  const regionCameraRequest = useStore((s) => s.regionCameraRequest)
   const selectRegion = useStore((s) => s.selectRegion)
   const clock = effectiveNow({ mode, at, now })
 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
+  const selectedRegion = regionsById.get(selectedRegionId ?? -1)
+  useRegionCamera({ map: mapInstance, container, geometry: selectedRegion?.geometry ?? (selectedRegionId === null ? undefined : placeGeometries[selectedRegionId]), placeId: selectedRegionId, ensureGeometry: ensurePlaceGeometry, request: regionCameraRequest, layoutKey })
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
   // The alert fill (one feature per alerted place, nested polygons cut out) is rebuilt only when alerts change:

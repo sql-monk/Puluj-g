@@ -16,6 +16,7 @@ import { getPalette } from './palette'
 import { replay } from '../replay/engine'
 import { buildAlertLayer, buildReplayLayers, buildTrackLayers, emptyCollection, isPolygonAlert, visibleTracks } from './geojson'
 import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, TEXT_FONT, addIcons, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
+import { useRegionCamera } from './useRegionCamera'
 
 /** The city itself; the view opens on it with a margin of surroundings. */
 const KYIV_BOUNDS: [[number, number], [number, number]] = [
@@ -37,10 +38,11 @@ interface Props {
   dark: boolean
   theme: Theme
   onDetails: (trackId: import('../api/types').MapId) => void
+  layoutKey: string
 }
 
 /** Kyiv page: the city with its ten districts and a ring of surroundings, its own MapLibre instance and layer set. */
-export default function KyivMapView({ dark, theme, onDetails }: Props) {
+export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
@@ -75,10 +77,13 @@ export default function KyivMapView({ dark, theme, onDetails }: Props) {
   const placeGeometries = useStore((s) => s.placeGeometries)
   const ensurePlaceGeometry = useStore((s) => s.ensurePlaceGeometry)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
+  const regionCameraRequest = useStore((s) => s.regionCameraRequest)
   const selectRegion = useStore((s) => s.selectRegion)
   const clock = effectiveNow({ mode, at, now })
 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
+  const selectedRegion = regionsById.get(selectedRegionId ?? -1)
+  useRegionCamera({ map: mapInstance, container, geometry: selectedRegion?.geometry ?? (selectedRegionId === null ? undefined : placeGeometries[selectedRegionId]), placeId: selectedRegionId, ensureGeometry: ensurePlaceGeometry, request: regionCameraRequest, layoutKey })
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
   const kyiv = useMemo(() => regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ'), [regions])

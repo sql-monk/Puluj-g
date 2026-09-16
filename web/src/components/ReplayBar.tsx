@@ -161,7 +161,7 @@ export default function ReplayBar({ initialWindow, query, onHistoryChange, onClo
   const chip = (active: boolean) => `rounded px-2 py-0.5 text-xs ${active ? 'bg-blue-600 text-white' : 'bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600'}`
 
   return (
-    <div className="pointer-events-auto absolute bottom-3 left-1/2 z-20 w-[min(100%-1.5rem,42rem)] -translate-x-1/2 rounded-xl bg-white/95 p-3 text-slate-800 shadow-lg backdrop-blur dark:bg-slate-900/95 dark:text-slate-100">
+    <div data-map-occlusion="true" className="pointer-events-auto absolute bottom-3 left-1/2 z-20 w-[min(100%-1.5rem,42rem)] -translate-x-1/2 rounded-xl bg-white/95 p-3 text-slate-800 shadow-lg backdrop-blur dark:bg-slate-900/95 dark:text-slate-100">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">ВІДТВОРЕННЯ</span>
         <span className="text-xs text-slate-500">вікно:</span>

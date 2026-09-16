@@ -87,6 +87,8 @@ interface State {
   targets: TargetDto[]
   /** Oblast clicked on the map: highlighted border + feed filter. */
   selectedRegionId: number | null
+  /** Monotonic explicit selection token: a repeated click is also a request to centre the region. */
+  regionCameraRequest: number
   /** Probable predecessors (two generations) of the selected track's newest report; null while loading or none. */
   predecessors: PredecessorsDto | null
   /** Polygons fetched one by one for alerts on places the regions payload does not carry (hromadas, cities). */
@@ -120,7 +122,8 @@ interface State {
   addTargets: (list: TargetDto[]) => void
   selectRegion: (id: number | null) => void
   loadPredecessors: (trackId: MapId | null) => void
-  ensurePlaceGeometry: (placeId: number) => void
+  /** Cached/deduplicated geometry request; callers can safely await it for an explicit camera request. */
+  ensurePlaceGeometry: (placeId: number) => Promise<Geometry | undefined>
   setLoading: (v: boolean) => void
   setError: (e: string | null) => void
 }
@@ -152,7 +155,7 @@ function save(key: string, value: unknown) {
   }
 }
 
-const pendingGeometries = new Set<number>()
+const pendingGeometries = new Map<number, Promise<Geometry | undefined>>()
 
 export const defaultFilters: Filters = {
   uav: true,
@@ -190,6 +193,7 @@ export const useStore = create<State>((set, get) => ({
   selectedLink: null,
   targets: [],
   selectedRegionId: null,
+  regionCameraRequest: 0,
   predecessors: null,
   placeGeometries: {},
   loading: false,
@@ -293,13 +297,20 @@ export const useStore = create<State>((set, get) => ({
       })
   },
   ensurePlaceGeometry: (placeId) => {
-    if (get().placeGeometries[placeId] || pendingGeometries.has(placeId)) return
-    pendingGeometries.add(placeId)
-    api
+    const cached = get().placeGeometries[placeId]
+    if (cached) return Promise.resolve(cached)
+    const pending = pendingGeometries.get(placeId)
+    if (pending) return pending
+    const request = api
       .placeGeometry(placeId)
-      .then((g) => set((s) => ({ placeGeometries: { ...s.placeGeometries, [placeId]: g } })))
+      .then((g) => {
+        set((s) => ({ placeGeometries: { ...s.placeGeometries, [placeId]: g } }))
+        return g
+      })
       .catch(() => undefined)
       .finally(() => pendingGeometries.delete(placeId))
+    pendingGeometries.set(placeId, request)
+    return request
   },
   setTargets: (targets) => set({ targets }),
   addTarget: (o) => get().addTargets([o]),
@@ -309,7 +320,7 @@ export const useStore = create<State>((set, get) => ({
       const targets = mergeTargets(s.targets, list, new Date(), s.mapConfig)
       return targets === s.targets ? {} : { targets }
     }),
-  selectRegion: (selectedRegionId) => set({ selectedRegionId }),
+  selectRegion: (selectedRegionId) => set((s) => ({ selectedRegionId, regionCameraRequest: selectedRegionId === null ? s.regionCameraRequest : s.regionCameraRequest + 1 })),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
 }))

@@ -60,7 +60,7 @@ export default function FeedPanel({ open, onToggle }: { open: boolean; onToggle:
   }
 
   return (
-    <aside className="pointer-events-auto absolute bottom-0 right-0 top-12 z-10 flex w-full flex-col bg-white/95 shadow-lg backdrop-blur md:right-3 md:top-14 md:bottom-3 md:w-96 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100">
+    <aside data-map-occlusion="true" className="pointer-events-auto absolute bottom-0 right-0 top-12 z-10 flex w-full flex-col bg-white/95 shadow-lg backdrop-blur md:right-3 md:top-14 md:bottom-3 md:w-96 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100">
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm dark:border-slate-700">
         <span className="font-medium">Повідомлення</span>
         <span className="text-xs text-slate-500">{list.length}</span>
@@ -68,6 +68,9 @@ export default function FeedPanel({ open, onToggle }: { open: boolean; onToggle:
           <span className="ml-1 flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-900 dark:bg-blue-900/50 dark:text-blue-100">
             {region.name}
             {alertText && <span className={alertText === 'тривога' ? 'text-red-600 dark:text-red-300' : 'text-yellow-700 dark:text-yellow-300'}>· {alertText}</span>}
+            <button className="ml-1 text-blue-700 hover:text-blue-900 dark:text-blue-200" onClick={() => selectRegion(region.id)} title="Центрувати область">
+              ⌖
+            </button>
             <button className="ml-1 text-blue-700 hover:text-blue-900 dark:text-blue-200" onClick={() => selectRegion(null)} title="Скинути фільтр">
               ✕
             </button>

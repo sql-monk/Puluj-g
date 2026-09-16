@@ -44,7 +44,7 @@ export interface IncidentLayerOptions {
   /** Polygons fetched on demand (hromadas, towns), by place id. */
   placeGeometries?: Record<number, Geometry>
   /** Asks the store to fetch a polygon it does not have yet (drawn on the next pass; the circle fills in meanwhile). */
-  ensurePlaceGeometry?: (placeId: number) => void
+  ensurePlaceGeometry?: (placeId: number) => unknown
   /** The viewer's own per-kind switches; catalog visibility applies on top (they are different settings). */
   hiddenKinds?: ReadonlySet<string>
   /** The layer switch: off → nothing is drawn (and the legacy event markers come back). */
