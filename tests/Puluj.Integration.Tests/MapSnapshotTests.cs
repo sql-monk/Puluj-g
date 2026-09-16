@@ -155,8 +155,10 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
         var refs = new ReferenceCache(factory, NullLogger<ReferenceCache>.Instance);
         await refs.RefreshAsync(CancellationToken.None);
         var mapper = new DtoMapper(refs);
+        var cached = Options.Create(new MapOptions());
+        var uncached = Options.Create(uncachedOptions);
         return (
-            new SnapshotService(factory, mapper, TimeProvider.System, refs, Options.Create(new MapOptions())),
-            new SnapshotService(factory, mapper, TimeProvider.System, refs, Options.Create(uncachedOptions)));
+            new SnapshotService(factory, mapper, TimeProvider.System, refs, cached, new IncidentQueries(factory, refs, TimeProvider.System, cached), NullLogger<SnapshotService>.Instance),
+            new SnapshotService(factory, mapper, TimeProvider.System, refs, uncached, new IncidentQueries(factory, refs, TimeProvider.System, uncached), NullLogger<SnapshotService>.Instance));
     }
 }

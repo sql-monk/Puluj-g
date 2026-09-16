@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-16T14:12:36.7029775+00:00",
+  "generated_at": "2026-09-16T15:18:25.4949502+00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.130852,
+      "outbox_age_seen_s": 1.132704,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0aa8f-c85b-7a94-bb87-38150699bb76"
+      "event_id": "01a0aacc-0a34-7177-9071-3b71e9c589d7"
     },
     "P03-C05": {
       "window": "W6b",
@@ -118,7 +118,7 @@
       "overdue_reported": 2,
       "registry_versions": [
         1,
-        7
+        8
       ]
     },
     "P03-C07": {
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T14:12:35.739461\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T15:18:24.5462254\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -336,8 +336,8 @@
       "finalizer_noops": 3,
       "extractions": 1,
       "replicas": {
-        "r1": 2,
-        "r2": 2
+        "r1": 3,
+        "r2": 1
       }
     },
     "P06-F07": {
@@ -431,9 +431,9 @@
       "one_category": {
         "label": "uav",
         "messages": 60,
-        "total_ms": 3921,
-        "writers_tail_ms": 1091,
-        "per_observation_ms": 65.4,
+        "total_ms": 3971,
+        "writers_tail_ms": 1079,
+        "per_observation_ms": 66.2,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -444,9 +444,9 @@
       "two_categories": {
         "label": "uav\u002Bmissile",
         "messages": 60,
-        "total_ms": 3266,
-        "writers_tail_ms": 431,
-        "per_observation_ms": 54.4,
+        "total_ms": 3311,
+        "writers_tail_ms": 645,
+        "per_observation_ms": 55.2,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -516,6 +516,16 @@
       "incidents": 1,
       "tracks": 1,
       "writers": "both completed"
+    },
+    "P11-R05": {
+      "replicas": 2,
+      "notify_per_delivery": 1,
+      "redelivery": "inbox duplicate, no NOTIFY",
+      "track_changed": "noop writer_notifies",
+      "inactive_generation": "noop not_live",
+      "history_lane": "pushed",
+      "reconnect": "resync marker",
+      "burst": 1000
     }
   }
 }

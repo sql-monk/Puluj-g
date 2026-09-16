@@ -10,12 +10,15 @@ namespace Puluj.Api.Services;
 /// travel over NOTIFY. Only what the map can still show is pushed (MapOptions): a track last reported inside the
 /// longest marker lifetime, a target inside the feed window, an alert that is open or ended recently. A history load
 /// or a reprocess announces every old message the same way, and those would otherwise cost a few queries each and a
-/// re-render on every client for nothing.
+/// re-render on every client for nothing. P11 (ADR-0011): `IncidentChanged{id, rev}` comes from the projection consumer
+/// (one durable subscription for the role); every API replica listens, so NOTIFY is the backplane — this bridge pushes
+/// `IncidentUpserted` (revision 1) / `IncidentRevised` to the clients of its own replica.
 /// </summary>
 public sealed class NotifyBridge(
     PgNotifyListener listener,
     IHubContext<MapHub, IMapClient> hub,
     SnapshotService snapshots,
+    IncidentQueries incidents,
     ReferenceCache refs,
     IOptions<MapOptions> options,
     TimeProvider clock,
@@ -43,6 +46,8 @@ public sealed class NotifyBridge(
                     PulujEventType.TrackClosed => await PushTrackAsync(evt.Id, now - map.MaxLifetime, closed: true, ct),
                     PulujEventType.TargetCreated => await PushTargetAsync(evt.Id, now - map.FeedWindow, ct),
                     PulujEventType.AlertChanged => await PushAlertAsync(evt.Id, now - map.MaxLifetime, ct),
+                    PulujEventType.IncidentChanged => await PushIncidentAsync(evt.Id, evt.Revision, now - map.IncidentWindow, ct),
+                    PulujEventType.ListenerReconnected => await ResyncAsync(now),
                     _ => true,
                 };
                 if (!pushed)
@@ -99,6 +104,25 @@ public sealed class NotifyBridge(
             return false;
         }
         await hub.Clients.All.TargetCreated(target);
+        return true;
+    }
+
+    /// <summary>NOTIFY is at-most-once: after a LISTEN reconnect every client of this replica reloads its window (the snapshot/checkpoint path, never the missed packets).</summary>
+    private async Task<bool> ResyncAsync(DateTimeOffset now)
+    {
+        logger.LogInformation("LISTEN connection re-established: asking the clients to resync");
+        await hub.Clients.All.Resync(now);
+        return true;
+    }
+
+    /// <summary>The current row (it may already be newer than the announced revision — the client keeps the highest); outside the incident window nothing is pushed.</summary>
+    private async Task<bool> PushIncidentAsync(long id, int? revision, DateTimeOffset notBefore, CancellationToken ct)
+    {
+        if (await incidents.OneAsync(id, notBefore, ct) is not { } incident)
+        {
+            return false;
+        }
+        await IncidentPush.SendAsync(hub.Clients.All, incident, revision);
         return true;
     }
 

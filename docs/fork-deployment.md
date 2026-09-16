@@ -72,6 +72,13 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 `parse.completed`/`stage_results` з `ruleset_id = v{n}` лишаються як історія). Admin-сервіс для preview вантажить індекси парсера на запит (TTL 10 хв; вказівники active/shadow — на кожен запит) і містить `data/corpus/` в образі
 (`Dockerfile.admin`) для `POST /rulesets/{v}/corpus`; без файлу — 404, порожній корпус — 400 (ніколи «accuracy 1.0 на нулі»).
 
+### Projection (P11)
+
+Роль `projection` увімкнена за замовчуванням у сервісі `messaging` (Compose/`deploy.ps1`): вона лише перетворює `incident.changed` на NOTIFY для API-реплік
+(backplane, ADR-0011) і лишає receipts для `track/alert.changed`. Кілька реплік API не потребують Redis: кожна тримає власний LISTEN. Міграція
+`AddIncidentReadIndexes` (індекс keyset для `/api/incidents`) — additive. Налаштування API: `Map:IncidentHours` (24), `Map:IncidentSnapshotLimit` (1000),
+`Map:IncidentMaxWindowDays` (7). Rolling deploy: старий API ігнорує NOTIFY невідомого типу.
+
 ### Доменні writers і watchdog (P09/P10, cutover)
 
 Ролі `track-worker`, `alert-worker`, `watchdog`, `incident-worker` сервісу `messaging` **вимкнені за замовчуванням**: до cutover домен пише legacy роль `processing`.

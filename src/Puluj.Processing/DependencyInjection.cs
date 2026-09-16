@@ -167,6 +167,27 @@ public static class DependencyInjection
         }
         return services;
     }
+
+    /// <summary>
+    /// P11 (ADR-0011): the `projection` consumer — the map push adapter's durable half. Its own registration: a projection-only
+    /// process needs neither the parser nor the correlation sinks (review B1), and the default `messaging` service runs it without
+    /// any domain writer.
+    /// </summary>
+    public static IServiceCollection AddPulujProjection(this IServiceCollection services, IReadOnlySet<string> roles, string? instanceName = null)
+    {
+        if (!roles.Contains(StageRoles.Projection))
+        {
+            return services;
+        }
+        services.AddSingleton(sp =>
+        {
+            var handler = ActivatorUtilities.CreateInstance<Projection.ProjectionHandler>(sp);
+            handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(Projection.ProjectionHandler.Subscription, instanceName);
+            return handler;
+        });
+        services.AddSubscriptionConsumer<Projection.ProjectionHandler>(instanceName);
+        return services;
+    }
 }
 
 /// <summary>Worker role names of the stage subscriptions (WorkerOptions.Roles).</summary>
@@ -180,5 +201,6 @@ public static class StageRoles
     public const string AlertWorker = "alert-worker";
     public const string Watchdog = "watchdog";
     public const string IncidentWorker = "incident-worker";
+    public const string Projection = "projection";
     public static readonly string[] DomainWriters = [TrackWorker, AlertWorker, Watchdog, IncidentWorker];
 }

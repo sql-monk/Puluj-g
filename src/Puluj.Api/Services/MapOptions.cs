@@ -43,4 +43,33 @@ public sealed class MapOptions
     }
 
     public TimeSpan SnapshotCache => TimeSpan.FromSeconds(SnapshotCacheSeconds);
+
+    private double _incidentHours = 24;
+    private int _incidentSnapshotLimit = 1000;
+    private int _incidentMaxWindowDays = 7;
+
+    /// <summary>P11: how far back the map/feed shows incidents (their last report) and the default `/api/incidents` window, hours.</summary>
+    public double IncidentHours
+    {
+        get => _incidentHours;
+        set => _incidentHours = value > 0 ? value : 24;
+    }
+
+    public TimeSpan IncidentWindow => TimeSpan.FromHours(IncidentHours);
+
+    /// <summary>The most incidents one snapshot carries (payload budget); the rest is paged through `/api/incidents`.</summary>
+    public int IncidentSnapshotLimit
+    {
+        get => _incidentSnapshotLimit;
+        set => _incidentSnapshotLimit = value > 0 ? value : 1000;
+    }
+
+    /// <summary>The longest window `/api/incidents` accepts, days (query budget: a wider ask is a 400, never a full-history scan).</summary>
+    public int IncidentMaxWindowDays
+    {
+        get => _incidentMaxWindowDays;
+        set => _incidentMaxWindowDays = value > 0 ? value : 7;
+    }
+
+    public TimeSpan IncidentMaxWindow => TimeSpan.FromDays(IncidentMaxWindowDays);
 }

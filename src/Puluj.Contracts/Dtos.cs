@@ -54,14 +54,17 @@ public sealed record TrackDto(
 public sealed record AlertDto(long Id, int PlaceId, string PlaceName, string AlertType, string Level, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, LocationDto? Location, IReadOnlyList<int> AncestorIds);
 
 /// <param name="Events">Short-lived, non-track facts that have a reported location (explosions, air-defence activity, and threat cancellations).</param>
-public sealed record SnapshotDto(DateTimeOffset At, bool Historical, IReadOnlyList<TrackDto> Tracks, IReadOnlyList<AlertDto> Alerts, IReadOnlyList<TargetDto> Events);
+/// <param name="Incidents">P11 (additive, ADR-0011): incidents last reported inside the incident window; the `events` list stays for the compatibility window.</param>
+/// <param name="IncidentsTruncated">True when the window holds more incidents than the snapshot cap: the client pages the rest through GET /api/incidents.</param>
+public sealed record SnapshotDto(DateTimeOffset At, bool Historical, IReadOnlyList<TrackDto> Tracks, IReadOnlyList<AlertDto> Alerts, IReadOnlyList<TargetDto> Events,
+    IReadOnlyList<IncidentDto>? Incidents = null, bool? IncidentsTruncated = null);
 
 /// <summary>
 /// The live map's time windows (GET /api/map/config), so the client and the server agree on what is still on the map:
 /// the lifetime choices of the panel (the largest one is the window of the live snapshot and of track pushes) and the
 /// window of the feed.
 /// </summary>
-public sealed record MapConfigDto(IReadOnlyList<int> LifetimeOptionsMinutes, int MaxLifetimeMinutes, double FeedHours);
+public sealed record MapConfigDto(IReadOnlyList<int> LifetimeOptionsMinutes, int MaxLifetimeMinutes, double FeedHours, double? IncidentHours = null);
 
 /// <summary>One reported position of a track in a replay window: where it was said to be, when, and on what course.</summary>
 public sealed record ReplaySampleDto(DateTimeOffset At, Point Point, double? DirectionDeg, bool Approach);
@@ -209,3 +212,48 @@ public sealed record StatsRecognitionDto(
     IReadOnlyList<StatsSliceDto> LocationKinds,
     IReadOnlyList<int> ProcessedByBucket,
     IReadOnlyList<int> WithTargetsByBucket);
+
+// ---- P11 incidents (plan §8.5–8.6, ADR-0011): additive read-side contracts ----
+
+/// <summary>
+/// Where an incident is, and how precisely (§8.5, ADR-0011 п.2). <c>Precision</c> comes from the evidence's location kind alone — never from a small
+/// radius, because the point is the centroid of the named place: <c>point</c> — a fact the parser located as a point; <c>city</c> — a city/town marker
+/// (a marker with a precision label, never an address); <c>district</c>/<c>region</c> — an area: the client draws the place polygon or the error circle of
+/// <c>AccuracyKm</c>, never a small pin at the centroid; <c>unknown</c> — no usable place (the incident stays off the map). <c>AccuracyKm</c> is the radius/label.
+/// </summary>
+public sealed record IncidentLocationDto(string Kind, int? PlaceId, string? PlaceName, int? RegionId, string? RegionName, Point? Point, double? AccuracyKm, string Precision);
+
+/// <summary>What the state rests on: the canonical observation, how many observations/sources, the policy that linked them, the last event (causal chain).</summary>
+public sealed record IncidentProvenanceDto(Guid? CanonicalObservationId, int ObservationCount, IReadOnlyList<int> SourceIds, string? PolicyVersion, Guid? LastEventId, Guid GenerationId);
+
+/// <summary>One incident as the map/feed sees it (GET /api/incidents, snapshot.incidents, hub IncidentUpserted/IncidentRevised). Static events: no course, ETA or forecast.</summary>
+public sealed record IncidentDto(
+    long Id,
+    string Kind,
+    string KindName,
+    string Category,
+    string State,
+    bool Suppressed,
+    DateTimeOffset EventAt,
+    DateTimeOffset FirstReportedAt,
+    DateTimeOffset LastReportedAt,
+    IncidentLocationDto? Location,
+    string Confidence,
+    int SourceCount,
+    int Revision,
+    string? ClosureReason,
+    long? MergedIntoIncidentId,
+    IncidentProvenanceDto Provenance);
+
+/// <summary>An observation linked to an incident: the evidence link with its relation and the report it came from (the same raw-message fields as TargetDto).</summary>
+public sealed record IncidentObservationDto(Guid ObservationId, long? TargetId, int SourceId, string? SourceCode, string Relation, double Score, DateTimeOffset EffectiveAt, DateTimeOffset LinkedAt,
+    string? SegmentText, RawMessageDto? RawMessage);
+
+/// <summary>One revision of an incident: what changed, when it took effect (evidence time) and when the system recorded it (clock). <c>Actor</c> is redacted on the public API to <c>system</c> | <c>operator</c>.</summary>
+public sealed record IncidentRevisionDto(int Revision, string Change, DateTimeOffset EffectiveAt, DateTimeOffset RecordedAt, string Actor, string? Reason);
+
+/// <summary>GET /api/incidents/{id}: the incident (as of a revision when asked), its evidence links and its revision history.</summary>
+public sealed record IncidentDetailsDto(IncidentDto Incident, IReadOnlyList<IncidentObservationDto> Observations, IReadOnlyList<IncidentRevisionDto> Revisions);
+
+/// <summary>A page of incidents inside a bounded time window; <c>NextCursor</c> continues the keyset, <c>Truncated</c> says the window holds more than the snapshot cap.</summary>
+public sealed record IncidentPageDto(DateTimeOffset From, DateTimeOffset To, string Mode, IReadOnlyList<IncidentDto> Items, string? NextCursor, bool Truncated);

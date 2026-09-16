@@ -61,6 +61,8 @@ public sealed class MessagingFixture : IAsyncLifetime
     public SubscriptionConsumer AlertWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Writers.AlertWriterHandler.Subscription);
     public Puluj.Processing.Writers.DomainWatchdog Watchdog => Services.GetRequiredService<Puluj.Processing.Writers.DomainWatchdog>();
     public SubscriptionConsumer IncidentWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Incidents.IncidentWriterHandler.Subscription);
+    /// <summary>P11: the map push adapter's durable half (incident.changed → NOTIFY IncidentChanged).</summary>
+    public SubscriptionConsumer Projection => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Projection.ProjectionHandler.Subscription);
     public Puluj.Processing.Incidents.IncidentStateWriter Incidents => Services.GetRequiredService<Puluj.Processing.Incidents.IncidentStateWriter>();
     public FakeLlmCompletion Llm { get; } = new();
     public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
@@ -152,6 +154,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser, StageRoles.LlmWorker, StageRoles.Finalizer }, "p03-test");
         // P09 domain writers next to the legacy processor: never started together on the same messages (W06/W07 drive each path explicitly).
         services.AddPulujDomainWriters(config, new HashSet<string> { StageRoles.TrackWorker, StageRoles.AlertWorker, StageRoles.Watchdog, StageRoles.IncidentWorker }, "p03-test");
+        services.AddPulujProjection(new HashSet<string> { StageRoles.Projection }, "p03-test"); // P11: registered the way the Worker does it (review B1)
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -201,6 +204,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         TrackWorker.ResetCounters();
         AlertWorker.ResetCounters();
         IncidentWorker.ResetCounters();
+        Projection.ResetCounters();
         Watchdog.ResetMemo();
         Llm.Reset();
         Services.GetRequiredService<LlmBreaker>().Reset(); // a 429 in one test must not pause the model for the next
@@ -213,7 +217,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription, Puluj.Processing.Incidents.IncidentWriterHandler.Subscription })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription, Puluj.Processing.Incidents.IncidentWriterHandler.Subscription, Puluj.Processing.Projection.ProjectionHandler.Subscription })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {

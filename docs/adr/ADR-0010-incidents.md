@@ -75,7 +75,7 @@ track-worker'а; агрегату «подія» не було, карта по�
 
 ## Відкрите
 
-`independent_source_count` (методика) — Ops/P15; crossover policy — після даних; projection/`NOTIFY IncidentChanged` для карти — P11; replay lane — P14;
+`independent_source_count` (методика) — Ops/P15; crossover policy — після даних; ~~projection/`NOTIFY IncidentChanged` для карти — P11~~ (done, ADR-0011); replay lane — P14;
 partition finer than kind — після benchmark.
 
 ## Перевірка

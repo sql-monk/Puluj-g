@@ -779,7 +779,10 @@ dotnet test tests/Puluj.Analytics.Tests/Puluj.Analytics.Tests.csproj
 dotnet test tests/Puluj.Messaging.Contracts.Tests/Puluj.Messaging.Contracts.Tests.csproj
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Transport.Spike.Tests/Puluj.Transport.Spike.Tests.csproj  # P02: Testcontainers RabbitMQ, ~3.5 хв
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj  # P03/P04: unit + crash tests (P03-C01…C10, P04-C01…C07, міграція identity) на Testcontainers PostGIS + RabbitMQ, ~2 хв
-pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj --filter "FullyQualifiedName~IncidentWriterTests"  # P10: I01–I08 (incident owner, race, policy, admin), ~1 хв
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj --filter "FullyQualifiedName~IncidentWriterTests"  # P10: I01–I09 (incident owner, race, policy, admin), ~1 хв
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj --filter "FullyQualifiedName~ProjectionTests"  # P11 R05: projection → NOTIFY на 2 репліки, reconnect, burst 1000, ~30 с
+pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Integration.Tests/Puluj.Integration.Tests.csproj --filter "FullyQualifiedName~IncidentReadSideTests"  # P11 R03/R04: 10k incidents keyset/plan/budget, as-of
+cd web; npx vitest run src/catalog src/store/useIncidentStore.test.ts src/map/incidentLayer.test.ts  # P11 client: catalog adapter, revision guard/batch/reload, precision
 dotnet test Puluj.sln
 ```
 
@@ -869,7 +872,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P08 | done | Claude Code (p08) | p08_review: план approve after fixes (B1–B3); результат approve after fixes (B1 stop shadow, B2 corpus в Admin-образі, N1–N13) → виправлено → re-run зелений | [GitHub P08](https://github.com/sql-monk/Puluj-g/issues/9); [handoff, evidence](evidence/message-platform/P08-handoff.md); rulesets v1 (parity), resolver pinned per job, authoring API, shadow, corpus/quality report; закомічено |
 | P09 | done | Claude Code (p09) | p09_review: план approve after fixes (B1–B7); результат approve after fixes (B1 alert change-detection, B2 NOTIFY TargetCreated, N1–N11) → виправлено → re-run зелений | [GitHub P09](https://github.com/sql-monk/Puluj-g/issues/10); [handoff, evidence](evidence/message-platform/P09-handoff.md); ADR-0009; track/alert writers, lock hierarchy, revisions, watchdog-команди, cutover guards, topology v6; закомічено |
 | P10 | done | Claude Code (p10) | p10_review: план approve after fixes (B1–B3, N1–N10); результат approve after fixes (B1 schema `suppressed`, B2 Admin індекси, B3 merged/retracted кандидати, B4 canonical source, N1–N11) → виправлено → re-run зелений | [GitHub P10](https://github.com/sql-monk/Puluj-g/issues/12); [handoff, evidence](evidence/message-platform/P10-handoff.md); ADR-0010; incident-worker, policy `incident-1`, revisions/snapshot, admin-команди, topology v7; закомічено |
-| P11 | planned | — | — | [GitHub P11](https://github.com/sql-monk/Puluj-g/issues/11); — |
+| P11 | done | Claude Code (p11) | p11_review: план approve after fixes (B1–B3, N1–N15, Q1–Q6); результат approve after fixes (B1 projection без writers, B2 symbol font, B3 history throttle, N1–N13) → виправлено → re-run зелений | [GitHub P11](https://github.com/sql-monk/Puluj-g/issues/11); [handoff, evidence](evidence/message-platform/P11-handoff.md); ADR-0011; `/api/incidents`, projection (v8), NOTIFY backplane + Resync, incident layer/catalog adapter; закомічено |
 | P12 | planned | — | — | [GitHub P12](https://github.com/sql-monk/Puluj-g/issues/13); Ранній map audit можна почати разом із P00 |
 | P13 | planned | — | — | [GitHub P13](https://github.com/sql-monk/Puluj-g/issues/16); — |
 | P14 | planned | — | — | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); — |

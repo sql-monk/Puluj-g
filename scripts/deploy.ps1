@@ -62,7 +62,7 @@ function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor C
 
 # Platform path (P03–P09): which roles the `messaging` worker runs and how many legacy processors stay. Compose reads
 # these through ${…} substitution, so they are set here per run — the plain run always restores the legacy layout.
-$defaultMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer"
+$defaultMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection"
 $profileArgs = @()
 if ($Broker) {
     $profileArgs = @("--profile", "broker")

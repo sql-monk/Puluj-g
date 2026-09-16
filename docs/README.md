@@ -358,7 +358,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | Endpoint | Що повертає |
 |---|---|
 | `GET /api/map/config` | вікна живої карти (`Map` у appsettings Api): варіанти часу життя позначки, найбільший з них, глибина стрічки; клієнт бере опції й чистить стор тими самими числами (кеш 5 хв) |
-| `GET /api/snapshot?at=&activeOnly=` | стан карти зараз (треки з `lastSeenAt` не старші за найбільший час життя позначки — типово 120 хв — незалежно від статусу, плюс усі відкриті тривоги; спільний кеш 5 с на всіх клієнтів) або на момент `at` з ревізій (`historical: true`) |
+| `GET /api/snapshot?at=&activeOnly=` | стан карти зараз (треки з `lastSeenAt` не старші за найбільший час життя позначки — типово 120 хв — незалежно від статусу, плюс усі відкриті тривоги; спільний кеш 5 с на всіх клієнтів) або на момент `at` з ревізій (`historical: true`); P11: +`incidents` (останні `Map:IncidentHours`, cap `Map:IncidentSnapshotLimit`, `incidentsTruncated`; для `at` — recorded mode) |
 | `GET /api/tracks/{id}` | трек і всі його факти з джерелом, довірою, текстом оригіналу, посиланням, балом зв'язку |
 | `GET /api/targets/{id}` | одне повідомлення-факт з джерелом, текстом і кінематичними зв'язками (вікно зв'язку) |
 | `GET /api/replay?from&to` | вікно відтворення: кожен трек з усіма повідомленими позиціями (до 36 год) |
@@ -366,7 +366,9 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `GET /api/alerts/history?placeId=&hours=` | тривоги, що стосуються місця, за останні `hours` (до 14 діб), новіші перші: на самому місці, на його предках і на нащадках (`ReferenceCache.Related`); `AlertDto.ancestorIds` — предки місця тривоги від найближчого |
 | `GET /api/targets?since&until&limit` | стрічка спостережень (новіші перші), не глибше вікна стрічки (типово 6 год); `until` — для вікна відтворення (не глибше 36 год) |
 | `GET /api/taxonomy`, `/api/sources` | довідники; в таксономії — швидкості, fade, `displayMode` |
-| `GET /api/event-kinds` | каталог видів подій (лише `enabled`): `code`, `category`, map policy, `legacyEventType`; `TargetDto.eventKindCode` — той самий код на факті |
+| `GET /api/event-kinds` | каталог видів подій (лише `enabled`): `code`, `category`, map policy, `legacyEventType`; `TargetDto.eventKindCode` — той самий код на факті; клієнтський catalog adapter будує з нього легенду/іконки/lifetime incidents (P11) |
+| `GET /api/incidents?from&to&state&kind&category&cursor&limit&mode&asOf` (P11) | incidents у bounded вікні (default 24 год, max 7 діб → 400), keyset-сторінки ≤ 500 (`nextCursor`), без suppressed/retracted за замовчуванням; `mode=effective` (default) — поточний стан, `mode=recorded&asOf=` — «що система знала на момент» зі snapshot ревізій ([ADR-0011](adr/ADR-0011-read-side-realtime.md)) |
+| `GET /api/incidents/{id}?revision=` | incident + evidence links (з raw як у `TargetDto`) + ревізії (`actor` редагований до `system|operator`); `revision=N` — стан ревізії N |
 | `GET /api/stats?from&to` | сторінка «Статистика»: усі графіки одного періоду одним payload (`StatsDto`: KPI, динаміка за категоріями, класи, області, маршрути «звідки → куди», година × день тижня, зрізи, тривоги по областях і тривалості, джерела). Без параметрів — 24 год; кінець обрізається до «зараз», довжина — до 366 днів; крок `hour`/`day`/`week` (≤ 3 дні / ≤ 120 днів / далі), бакети в `Europe/Kyiv`. Кеш 2 хв на період, клієнт округлює кінець до 5 хв. Лише агрегати — нічого про глядача |
 | `GET /api/places/search?q=`, `/api/places/regions`, `/api/places/{id}/geometry` | пошук пункту (лише центроїд), полігони регіонів і районів Києва (кеш 1 год) |
 | `GET /api/health` | БД + свіжість колекторів: `ok` / `stale` (немає успіху > 3× інтервалу → `Degraded`) / `idle` (колектор вимкнено) |
@@ -376,7 +378,7 @@ T = остання ревізія кожного треку з `revision_at ≤ 
 | `POST /api/admin/dev/ingest` | вкинути повідомлення чи payload тривоги як від колектора (тестування) |
 | `/api/admin/incidents` (P10) | `GET` (`state`, `kind`, `hours`, `limit`), `GET /{id}` (incident + links + revisions зі snapshot), `POST /{id}/resolve|retract|confirm|suppress|unsuppress` (`{actor, reason, effectiveAt?}`), `POST /merge` (`{sourceId, targetId, actor, reason}`), `POST /{id}/split` (`{observationIds[], actor, reason}`); усі команди — через `IncidentStateWriter` з `incident.changed` в outbox; 400 без actor/reason, 404, 409 за станом/kind/вимкненим outbox ([ADR-0010](adr/ADR-0010-incidents.md)) |
 | `/api/admin/rulesets` (P08) | версії правил видів подій: `GET`, `GET /{v}`, `POST` (draft; `{parentVersion?, actor, reason}`), `PUT /{v}/rules`, `POST /{v}/validate`, `POST /{v}/preview` (`{texts[], baselineVersion?}`), `POST /{v}/corpus`, `POST /{v}/shadow`, `POST /{v}/shadow/stop`, `GET /{v}/shadow/report?since=`, `POST /{v}/publish`, `POST /rollback` (`{version, actor, reason}`); preview/corpus приймають `sourceCode` для scoped-правил; мутації (включно з validate) без `actor`/`reason` → 400; 404/409/422 за станом |
-| SignalR `/hubs/map` | `TrackUpserted`, `TrackClosed`, `AlertChanged` (аргумент — той самий DTO, що й у snapshot) |
+| SignalR `/hubs/map` | `TrackUpserted`, `TrackClosed`, `AlertChanged`, `TargetCreated` (аргумент — той самий DTO, що й у snapshot); P11: `IncidentUpserted`/`IncidentRevised` (`IncidentDto`; клієнт ігнорує revision ≤ відомої), `Resync(at)` — репліка могла пропустити push, перезавантажити вікно |
 
 `TrackDto`: `target` (коди/назви всіх рівнів, `label` найглибшого, `displayMode`, `fadeMinutes`, `speedProfile`),
 `modelConfidence`, `trackConfidence`, `lastLocation {kind, placeId, placeName, point, accuracyKm}`, `trackGeometry`,

@@ -16,6 +16,8 @@ public class IncidentConfiguration : IEntityTypeConfiguration<Incident>
         b.Property(x => x.Geometry).HasColumnType("geography (geometry, 4326)");
         b.HasIndex(x => new { x.EventKindId, x.EventAt });
         b.HasIndex(x => new { x.State, x.LastReportedAt });
+        // P11 (ADR-0011): the read-side keyset (last_reported_at DESC, incident_id DESC) over the visible rows; the window scan never sorts the table.
+        b.HasIndex(x => new { x.LastReportedAt, x.IncidentId }).HasDatabaseName("ix_incidents_read_keyset").IsDescending(true, true).HasFilter("NOT suppressed");
         b.HasIndex(x => x.GenerationId);
         b.HasIndex(x => x.Geometry).HasMethod("gist");
         b.HasOne(x => x.EventKind).WithMany().HasForeignKey(x => x.EventKindId).OnDelete(DeleteBehavior.Restrict);

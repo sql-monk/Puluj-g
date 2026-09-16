@@ -22,7 +22,7 @@ public static class EndpointRouteBuilderExtensions
         api.MapGet("/map/config", (IOptions<MapOptions> map, HttpContext http) =>
         {
             http.Response.Headers.CacheControl = "public, max-age=300";
-            return new MapConfigDto(map.Value.LifetimeOptionsMinutes, (int)map.Value.MaxLifetime.TotalMinutes, map.Value.FeedHours);
+            return new MapConfigDto(map.Value.LifetimeOptionsMinutes, (int)map.Value.MaxLifetime.TotalMinutes, map.Value.FeedHours, map.Value.IncidentHours);
         });
 
         // Live state or the state at a moment in the past (spec §20). Same shape for both.
@@ -61,6 +61,25 @@ public static class EndpointRouteBuilderExtensions
             var start = from ?? end.AddHours(-6);
             return await snapshots.TimelineAsync(start, end, bucketMinutes ?? 15, ct);
         });
+
+        // P11 (ADR-0011): incidents inside a bounded window, keyset-paged; `mode=recorded&asOf=` is what the system knew then.
+        // Suppressed (moderated) incidents are never listed here — the admin API has its own list.
+        api.MapGet("/incidents", async (DateTimeOffset? from, DateTimeOffset? to, string? state, string? kind, string? category, string? cursor, int? limit, string? mode, DateTimeOffset? asOf,
+            IncidentQueries incidents, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await incidents.ListAsync(new IncidentQueries.Query(from, to, state, kind, category, cursor, limit, mode, asOf, IncludeSuppressed: false), ct));
+            }
+            catch (IncidentQueries.QueryException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        // One incident with its evidence links and revisions; `?revision=N` shows the state as recorded at that revision.
+        api.MapGet("/incidents/{id:long}", async (long id, int? revision, IncidentQueries incidents, CancellationToken ct) =>
+            await incidents.DetailsAsync(id, revision, ct) is { } details ? Results.Ok(details) : Results.NotFound());
 
         api.MapGet("/taxonomy", (ReferenceCache refs) => refs.Taxonomy);
 

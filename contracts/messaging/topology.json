@@ -1,6 +1,6 @@
 {
   "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; версія 4 (P05): normalizer, parser → active, finalizer і llm-worker → paused; версія 5 (P06): finalizer, llm-worker → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
-  "topology_version": 7,
+  "topology_version": 8,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -218,11 +218,11 @@
       "idempotency": "inbox + aggregate_revision + generation"
     },
     "projection": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P11",
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P11",
       "bindings": ["track.changed", "alert.changed", "incident.changed"], "lanes": ["live", "history"],
       "emits": [], "queue_policy": "required",
-      "idempotency": "revision-aware upsert",
-      "$comment": "Replay lane не досягає live projection: shadow generation має окремі проєкції (§11). Realtime bridge — на роль, не на браузер (§8.6)."
+      "idempotency": "receipt-only; NOTIFY IncidentChanged{id, revision} після commit — клієнт відкидає відому revision (ADR-0011)",
+      "$comment": "P11: map push adapter — incident.changed → NOTIFY (backplane на всі API-репліки); track/alert — noop (NOTIFY емітують writers). Replay lane не досягає live projection: shadow generation має окремі проєкції (§11). Realtime bridge — на роль, не на браузер (§8.6)."
     },
     "message-analytics": {
       "role": "consumer", "required": true, "status": "planned", "owner_task": "P15",

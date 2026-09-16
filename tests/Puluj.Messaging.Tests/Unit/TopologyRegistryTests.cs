@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(7, Registry.TopologyVersion);
+        Assert.Equal(8, Registry.TopologyVersion);
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -41,7 +41,8 @@ public sealed class TopologyRegistryTests
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "live").Select(s => s.Id)); // domain workers are conditional (by_manifest)
         Assert.Equal(["archive", "track-worker", "alert-worker", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "live", null, null, ["track-worker", "alert-worker", "incident-worker", "nope"]).Select(s => s.Id)); // v7 (P10): every named branch is active
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker"]).Select(s => s.Id)); // writers do not serve replay (P14)
-        Assert.Equal(["archive"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // routable through the archive until projection exists
+        Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // v8 (P11): projection active; archive stays required
+        Assert.Equal(["archive", "projection"], Registry.ExpectedSubscriptions("incident.changed", "live").Select(s => s.Id));
         Assert.Equal(["track-worker"], Registry.ExpectedSubscriptions("track.expiry.requested", "live").Select(s => s.Id));
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("message.analysis.completed", "live").Select(s => s.Id));
         Assert.Equal(["llm-worker"], Registry.ExpectedSubscriptions("llm.requested", "live").Select(s => s.Id));
@@ -51,10 +52,9 @@ public sealed class TopologyRegistryTests
         var overrides = new Dictionary<string, string> { ["archive"] = "paused", ["normalizer"] = "retired", ["message-analytics"] = "active" };
         Assert.Equal(["message-analytics", "archive"], Registry.ExpectedSubscriptions("raw.stored", "live", overrides).Select(s => s.Id));
 
-        // Lanes: projection has no replay lane, so it is never expected for a replay-lane track.changed.
-        var projectionActive = new Dictionary<string, string> { ["projection"] = "active" };
-        Assert.Contains("projection", Registry.ExpectedSubscriptions("track.changed", "live", projectionActive).Select(s => s.Id));
-        Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("track.changed", "replay", projectionActive).Select(s => s.Id));
+        // Lanes: projection has no replay lane, so it is never expected for a replay-lane track.changed (a shadow generation never reaches the live map).
+        Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("track.changed", "replay").Select(s => s.Id));
+        Assert.DoesNotContain("projection", Registry.ExpectedSubscriptions("incident.changed", "replay").Select(s => s.Id));
 
         // Retired/planned are not expected.
         Assert.Empty(Registry.ExpectedSubscriptions("raw.stored", "live", new Dictionary<string, string> { ["archive"] = "retired", ["normalizer"] = "retired" }));

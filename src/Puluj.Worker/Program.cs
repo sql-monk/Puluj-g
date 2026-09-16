@@ -62,6 +62,7 @@ if (brokerRoles.Count > 0 && messaging.Enabled)
         }
         builder.Services.AddPulujDomainWriters(builder.Configuration, brokerRoles, worker.InstanceName); // P09 track/alert owners + watchdog
     }
+    builder.Services.AddPulujProjection(brokerRoles, worker.InstanceName); // P11 map push adapter (default messaging roles include it)
 }
 var collectors = new List<string>();
 if (roles.Contains(WorkerOptions.Telegram))

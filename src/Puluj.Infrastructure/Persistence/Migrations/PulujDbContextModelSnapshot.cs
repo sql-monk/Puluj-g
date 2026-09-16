@@ -667,6 +667,11 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.HasIndex("EventKindId", "EventAt")
                         .HasDatabaseName("ix_incidents_event_kind_id_event_at");
 
+                    b.HasIndex("LastReportedAt", "IncidentId")
+                        .IsDescending()
+                        .HasDatabaseName("ix_incidents_read_keyset")
+                        .HasFilter("NOT suppressed");
+
                     b.HasIndex("State", "LastReportedAt")
                         .HasDatabaseName("ix_incidents_state_last_reported_at");
 

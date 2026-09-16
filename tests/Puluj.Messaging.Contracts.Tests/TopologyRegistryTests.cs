@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(7, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser; v5 finalizer/llm-worker; v6 track/alert-worker; v7 incident-worker
+        Assert.Equal(8, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser; v5 finalizer/llm-worker; v6 track/alert-worker; v7 incident-worker; v8 projection
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -105,7 +105,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             // (черги для parse.completed/llm.requested існують з P05; active з P06); решта — planned до своїх задач.
             var expectedStatus = subscriptionId switch
             {
-                "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" or "track-worker" or "alert-worker" or "incident-worker" => "active",
+                "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" or "track-worker" or "alert-worker" or "incident-worker" or "projection" => "active",
                 _ => "planned",
             };
             Assert.Equal(expectedStatus, subscription["status"]!.GetValue<string>());

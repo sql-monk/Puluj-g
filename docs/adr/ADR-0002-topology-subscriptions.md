@@ -36,7 +36,8 @@ concurrency quotas (ADR-0007), а `projection` не має replay-черги (sh
   `llm-worker` були `paused`, щоб черги існували до реалізації), з P06 (`topology_version` 5) — `finalizer` і `llm-worker` `active`; з P09 (`topology_version` 6) — `track-worker`, `alert-worker` `active` (lanes `live`, `history`;
   replay — P14), а `archive` — required subscriber `track.changed`/`alert.changed`: без active consumer aggregate-події були б unroutable, поки
   `projection`/`message-analytics` planned; з P10 (`topology_version` 7) — `incident-worker` `active` (lanes `live`, `history`), `archive` required для
-  `incident.changed`, схема `incident.changed` +`suppressed` (additive). `conditional_subscriptions.by_manifest` реалізовано (P09): expected deliveries `observations.recorded`
+  `incident.changed`, схема `incident.changed` +`suppressed` (additive); з P11 (`topology_version` 8) — `projection` `active` (lanes `live`, `history`;
+  receipt-only consumer: `incident.changed` → NOTIFY `IncidentChanged`, track/alert → noop, ADR-0011). `conditional_subscriptions.by_manifest` реалізовано (P09): expected deliveries `observations.recorded`
   включають гілки з `payload.expected_branches`, що active/paused. Черги оголошуються й deliveries очікуються **лише** для `active`/`paused` підписок поточної версії
   (статус після першого insert належить БД — `messaging.subscriptions`, команди `SubscriptionAdmin`).
 - `producer_roles`: collectors, watchdog, outbox-relay, reconciliation — публікують через outbox, черг не мають.
@@ -108,7 +109,9 @@ arguments лишати лише `x-queue-type` і DLX routing, або мігру
 
 На час compatibility window projection/API можуть перетворювати `track.changed` → `TrackUpserted|TrackClosed`,
 `alert.changed` → `AlertChanged`, `observations.recorded` → `TargetCreated`, `raw.stored` → `RawMessageStored`
-(`topology.json.bridge`). NOTIFY не є transport event і не має receipts; дата вимкнення — P11.
+(`topology.json.bridge`). NOTIFY не є transport event і не має receipts. P11 (ADR-0011): NOTIFY лишається як **backplane** на всі API-репліки
+(payload — лише id/revision, at-most-once, recovery — `Resync`/reload); `IncidentChanged` іде з projection-консюмера, track/alert NOTIFY — з writers
+до перенесення їх push у projection (P12/P16) — тоді прямий NOTIFY writers вимикається.
 
 ## Альтернативи
 
@@ -131,5 +134,5 @@ arguments лишати лише `x-queue-type` і DLX routing, або мігру
 | Readiness: required queues — passive declare (`TopologyDeclarer.MissingRequiredQueuesAsync`); drift bindings — **idempotent re-declare** у кожному проході reconciliation (P03-C08), не management API; policies не використовуються — усі параметри в `x-*` arguments, зміна = нова назва черги + transfer | P03 → P13/P16 (management API check) |
 | ~~Runtime registry loader, reconciliation job, receipts~~ — done P03: `TopologyRegistry` (embedded `topology.json`), `TopologyRegistrar` (`messaging.topology_versions`/`subscriptions`), `ReconciliationService`, `processing.deliveries` | P03 |
 | Health endpoint / heartbeat-інтеграція readiness брокера (зараз — логи + метрики) | P13 |
-| Чи потрібна окрема `history` черга для `projection` (зараз так) чи достатньо live з event-time | P11 |
-| Retire NOTIFY bridge | P11 |
+| ~~Чи потрібна окрема `history` черга для `projection`~~ — вирішено P11: lanes `live`, `history` bound; push поза `IncidentHours` відкидає бридж (history reload дає receipts без push-шторму) | P11 |
+| ~~Retire NOTIFY bridge~~ — вирішено P11: NOTIFY = backplane (ADR-0011); прямий NOTIFY writers для track/alert — до перенесення в projection | P11 → P12/P16 |

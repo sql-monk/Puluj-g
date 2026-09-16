@@ -31,10 +31,11 @@ public sealed class WorkerOptions
     public const string AlertWorker = "alert-worker";
     public const string Watchdog = "watchdog";
     public const string IncidentWorker = "incident-worker";
+    public const string Projection = "projection";
 
-    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker];
+    public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker, Projection];
     /// <summary>Roles that talk to the broker: skipped with a warning unless Messaging:Enabled (a plain local run has no RabbitMQ).</summary>
-    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker];
+    public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker, Projection];
 
     /// <summary>Instance name for the heartbeat, logs, telemetry and claims (`worker`, `processor`, `collector-telegram`…); see <see cref="InstanceName"/>.</summary>
     public string Name { get; set; } = "worker";

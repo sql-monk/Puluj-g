@@ -8,6 +8,11 @@ import type { RegionDto } from '../api/types'
 import type { MapPalette } from './palette'
 import LinkPopup from '../components/LinkPopup'
 import EventPopup from '../components/EventPopup'
+import IncidentLegend from '../components/IncidentLegend'
+import IncidentPopup from '../components/IncidentPopup'
+import { useIncidentStore } from '../store/useIncidentStore'
+import { incidentHitAt, withoutIncidentEvents, INCIDENT_HIT_LAYERS } from './incidentLayer'
+import { useIncidentLayer } from './useIncidentLayer'
 import RegionPopup from '../components/RegionPopup'
 import TrackPopup from '../components/TrackPopup'
 import { effectiveNow, useStore, type Theme } from '../store/useStore'
@@ -79,6 +84,20 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
   // the apply effect below runs on every clock tick and track update.
   const alertList = useMemo(() => (filters.alerts ? Object.values(alerts) : []), [alerts, filters.alerts])
   const alertLayer = useMemo(() => buildAlertLayer(alertList, regionsById, placeGeometries), [alertList, regionsById, placeGeometries])
+  // P11: incidents (the catalog-driven layer); the legacy event markers of incident kinds are hidden while it is on (one marker per explosion).
+  const incidents = useIncidentLayer({ map: mapInstance, palette, clock, regionsById, placeGeometries, ensurePlaceGeometry })
+  const incidentCatalog = useIncidentStore((s) => s.catalog)
+  const legacyEvents = useMemo(() => withoutIncidentEvents(Object.values(events), incidentCatalog, filters.events), [events, incidentCatalog, filters.events])
+  // The click handler is registered once; the incident selection goes through a ref so it sees the current hook.
+  const incidentSelect = useRef<(id: number | null, at?: [number, number]) => void>(() => {})
+  incidentSelect.current = (id, at) => {
+    if (id === null) incidents.close()
+    else {
+      incidents.select(id)
+      if (at) incidents.setClickAt(at)
+    }
+  }
+
 
   useEffect(() => {
     if (!container.current || mapRef.current) return
@@ -114,7 +133,15 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       setRegionClickAt(trackId === null ? [e.lngLat.lng, e.lngLat.lat] : null)
       setSelectedEventId(null)
       setEventClickAt(null)
+      incidentSelect.current(null)
       if (trackId !== null) return
+      const incidentId = incidentHitAt(map, e.point)
+      if (incidentId !== null) {
+        selectRegion(null)
+        setRegionClickAt(null)
+        incidentSelect.current(incidentId, [e.lngLat.lng, e.lngLat.lat])
+        return
+      }
       const event = map.queryRenderedFeatures(e.point, { layers: ['event-points'] })[0]
       if (event?.properties?.id !== undefined) {
         selectRegion(null)
@@ -130,7 +157,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       selectRegion(regionId === undefined ? null : Number(regionId))
     })
     const regionLayers = ['raions-fill', 'oblasts-fill', 'alerts-fill']
-    pointerCursor(map, [...regionLayers, 'event-points'])
+    pointerCursor(map, [...regionLayers, 'event-points', ...INCIDENT_HIT_LAYERS])
     // Target under the cursor (within the hit radius): enlarged glyph, pointer cursor. Registered before the region
     // hover, whose resolver reads its state on the same mousemove.
     const hover = trackHover(map, { fallbackLayers: regionLayers, enabled: () => !pickRef.current })
@@ -187,7 +214,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       // a second while playing); live: the snapshot's tracks with their vectors.
       if (mode === 'history') setTrackData(map, buildReplayLayers(replay.positions(replay.t || clock.getTime(), filters), palette, selectedTrackId))
       else setTrackData(map, buildTrackLayers(visibleTracks(tracks, filters, clock), clock, regionsById, filters, { home, selectedId: selectedTrackId, palette, predecessors, selectedLink }))
-      setData(map, 'events', buildEventLayer(Object.values(events), clock, filters))
+      setData(map, 'events', buildEventLayer(legacyEvents, clock, filters))
       // An alerted oblast is drawn by the alert layer instead of the base fill, so the colours never blend;
       // raion / hromada alerts sit on top of the land fill. Hromada and city polygons are fetched on first need.
       for (const a of alertList) if (!regionsById.has(a.placeId) && !placeGeometries[a.placeId]) ensurePlaceGeometry(a.placeId)
@@ -207,7 +234,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
     }
     if (styleLoaded.current) apply()
     else map.once('style.load', apply)
-  }, [mode, tracks, events, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
+  }, [mode, tracks, legacyEvents, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
 
   // Replay: every frame of the replay clock moves the markers, straight into the source, without a render.
   useEffect(() => {
@@ -234,6 +261,8 @@ export default function MapView({ dark, theme, onPickHome, onDetails }: Props) {
       {mapInstance && selectedTrack && !selectedLink && <TrackPopup map={mapInstance} track={selectedTrack} anchor={clickAt} onDetails={() => onDetails(selectedTrack.id)} onClose={() => select(null)} />}
       {mapInstance && selectedLink && linkClickAt && <LinkPopup map={mapInstance} link={selectedLink} anchor={linkClickAt} onClose={() => selectLink(null)} />}
       {mapInstance && selectedEvent && eventClickAt && <EventPopup map={mapInstance} event={selectedEvent} anchor={eventClickAt} onClose={() => setSelectedEventId(null)} />}
+      {mapInstance && incidents.selected && incidents.clickAt && <IncidentPopup map={mapInstance} incident={incidents.selected} anchor={incidents.clickAt} onClose={incidents.close} />}
+      {filters.events && <IncidentLegend onOpen={(i) => incidents.open(i)} />}
       {mapInstance && !selectedTrack && selectedRegionId !== null && regionClickAt && <RegionPopup map={mapInstance} placeId={selectedRegionId} anchor={regionClickAt} onClose={() => selectRegion(null)} />}
     </div>
   )

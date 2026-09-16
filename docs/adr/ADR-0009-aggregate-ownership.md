@@ -51,7 +51,8 @@
 1. Розгорнути збірку (міграція `AddAggregateRevisions`; індекс `ux_targets_observation_id` будується CONCURRENTLY).
 2. Зупинити роль `processing` (legacy loop + `TrackWatchdog`); `ReprocessService.ResetAsync` під час роботи writers заборонено.
 3. Увімкнути ролі `track-worker,alert-worker,watchdog,incident-worker` (P10) у сервісі `messaging` (профіль `broker`); backlog `observations.recorded` доробиться.
-4. Після cutover `raw_messages.processing_status` для нових raw лишається Pending (admin/backlog семантика — P14/P16); NOTIFY для API живе
+4. Після cutover `raw_messages.processing_status` для нових raw лишається Pending (admin/backlog семантика — P14/P16); NOTIFY для API: track/alert —
+   writers через `AfterCommit`; incidents — projection-консюмер (P11, ADR-0011); стрічка мапи (`TargetCreated`) — writers
    через `AfterCommit` writers до P11.
 Rollback: зупинити чотири ролі, повернути `processing`; рядки з `observation_id` legacy не чіпає (guard), треки/інтервали спільні; incidents лишаються
 (legacy їх не знає — карта показує `targets`).

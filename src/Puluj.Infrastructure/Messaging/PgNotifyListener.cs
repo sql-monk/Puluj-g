@@ -12,6 +12,13 @@ public sealed class PgNotifyListener(IConfiguration configuration, ILogger<PgNot
     private readonly string _connectionString = configuration.GetConnectionString(DependencyInjection.ConnectionStringName)
         ?? throw new InvalidOperationException("Connection string is not configured.");
 
+    /// <summary>
+    /// P11 (ADR-0011): NOTIFY is at-most-once — whatever was published while the LISTEN connection was down is gone. The
+    /// pump yields this marker whenever a connection is (re)established after the first one, so the bridge can tell its
+    /// clients to reload their window (`Resync`). Id = the connection generation.
+    /// </summary>
+    public static PulujEvent Reconnected(int generation, DateTimeOffset at) => new(PulujEventType.ListenerReconnected, generation, at);
+
     public async IAsyncEnumerable<PulujEvent> ListenAsync([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         var channel = Channel.CreateUnbounded<PulujEvent>(new UnboundedChannelOptions { SingleReader = true });
@@ -27,6 +34,7 @@ public sealed class PgNotifyListener(IConfiguration configuration, ILogger<PgNot
     private async Task PumpAsync(ChannelWriter<PulujEvent> writer, CancellationToken ct)
     {
         var delay = TimeSpan.FromSeconds(1);
+        var generation = 0;
         while (!ct.IsCancellationRequested)
         {
             try
@@ -45,7 +53,8 @@ public sealed class PgNotifyListener(IConfiguration configuration, ILogger<PgNot
                     }
                     catch (JsonException ex)
                     {
-                        logger.LogWarning(ex, "Bad NOTIFY payload: {Payload}", e.Payload);
+                        // An event type this build does not know (a newer worker during a rolling deploy) is not an error worth a warning per event.
+                        logger.LogDebug(ex, "Unreadable NOTIFY payload skipped: {Payload}", e.Payload);
                     }
                 };
                 await using (var cmd = new NpgsqlCommand($"LISTEN {PgNotifyPublisher.Channel}", conn))
@@ -54,6 +63,10 @@ public sealed class PgNotifyListener(IConfiguration configuration, ILogger<PgNot
                 }
                 logger.LogInformation("Listening on {Channel}", PgNotifyPublisher.Channel);
                 delay = TimeSpan.FromSeconds(1);
+                if (generation++ > 0)
+                {
+                    writer.TryWrite(Reconnected(generation, DateTimeOffset.UtcNow)); // notifications may have been missed: the clients must reload
+                }
                 while (!ct.IsCancellationRequested)
                 {
                     await conn.WaitAsync(ct);

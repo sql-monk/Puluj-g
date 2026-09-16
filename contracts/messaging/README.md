@@ -109,6 +109,16 @@ lanes, emits (кожна — з `producer` = цей id), `queue_policy` (`requir
 - `event_kind_code` факту — з правила, що спрацювало (kind без legacy enum можливий після publish відповідної версії); `attributes.legacy_event_type`
   тоді `Unknown` (або `TargetObserved` для факту з ціллю).
 
+## Runtime (P11): projection і read-side
+
+- `projection` (`ProjectionHandler`, topology v8, lanes live/history): `incident.changed` → після commit NOTIFY `puluj_events` `{type: IncidentChanged, id,
+  at, rev}` — backplane для всіх API-реплік (кожна LISTEN → SignalR `IncidentUpserted` (revision 1) | `IncidentRevised`); `track.changed`/`alert.changed`
+  → `noop writer_notifies` (receipt для completion; NOTIFY емітують writers); replay lane / неактивна generation → `noop not_live`. NOTIFY — at-most-once:
+  `ListenerReconnected` (не транспортна подія) → hub `Resync(at)` → клієнт перезавантажує вікно. Rolling deploy: невідомий `type` у NOTIFY ігнорується.
+- Read-side контракти (`Puluj.Contracts`, camelCase + GeoJSON): `IncidentDto`, `IncidentDetailsDto`, `IncidentPageDto`, `SnapshotDto +incidents,
+  +incidentsTruncated`, `MapConfigDto +incidentHours`; `GET /api/incidents` (вікно ≤ 7 діб, keyset cursor, `mode=effective|recorded&asOf`), `GET /api/incidents/{id}
+  (?revision=)`. Precision — з `LocationKind` (ADR-0011 п.2).
+
 ## Runtime (P10): incident-worker
 
 - `incident.changed` (`IncidentWriterHandler` → `IncidentStateWriter`): `aggregate_id = incident:{id}`, `aggregate_revision` = `incidents.revision`,

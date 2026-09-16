@@ -3,7 +3,7 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '7.0.0'
+  version: '8.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
@@ -526,7 +526,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/track_changed'
-    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    summary: subscription projection (required=true, owner_task=P11, status=active)
     messages:
       - $ref: '#/channels/track_changed/messages/track_changed'
     bindings:
@@ -539,7 +539,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/alert_changed'
-    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    summary: subscription projection (required=true, owner_task=P11, status=active)
     messages:
       - $ref: '#/channels/alert_changed/messages/alert_changed'
     bindings:
@@ -552,7 +552,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/incident_changed'
-    summary: subscription projection (required=true, owner_task=P11, status=planned)
+    summary: subscription projection (required=true, owner_task=P11, status=active)
     messages:
       - $ref: '#/channels/incident_changed/messages/incident_changed'
     bindings:
