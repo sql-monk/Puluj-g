@@ -257,3 +257,39 @@ public sealed record IncidentDetailsDto(IncidentDto Incident, IReadOnlyList<Inci
 
 /// <summary>A page of incidents inside a bounded time window; <c>NextCursor</c> continues the keyset, <c>Truncated</c> says the window holds more than the snapshot cap.</summary>
 public sealed record IncidentPageDto(DateTimeOffset From, DateTimeOffset To, string Mode, IReadOnlyList<IncidentDto> Items, string? NextCursor, bool Truncated);
+
+// ---- U04 public catalogue -------------------------------------------------
+// These are deliberately separate from the map DTOs above.  Map DTOs predate the
+// catalogue and include such things as raw text and rendered geometry; the public
+// catalogue is an allow-list and keeps large evidence collections paged.
+
+/// <summary>A small, stable reference to a public catalogue item.  IDs are strings because the database uses bigint.</summary>
+public sealed record PublicEntityRefDto(string Kind, string Id, string? Title, string Relation, double? Probability = null);
+
+/// <summary>Location usable by a map drill-down.  Geometry is present only when it was actually reported; a place reference is never promoted to an exact point.</summary>
+public sealed record PublicMapLocatorDto(string? LocationKind, int? PlaceId, string? PlaceName, int? RegionId, string? Precision,
+    Geometry? Geometry, DateTimeOffset? At, string? UnavailableReason);
+
+/// <summary>One compact catalogue row.  The response is an allow-list: it contains neither raw message text/payload nor parser metadata.</summary>
+public sealed record PublicEntitySummaryDto(
+    string Kind, string Id, string Title, string? CatalogKind, string? CatalogKindName, string? Classification,
+    DateTimeOffset At, string? State, string? Confidence, string? LocationKind, int? PlaceId, string? PlaceName, int? RegionId,
+    IReadOnlyList<int> SourceIds, int TotalEvidenceCount, int MatchedEvidenceCount, bool MapAvailable, PublicMapLocatorDto Map);
+
+/// <summary>Opaque keyset page.  Lists are best-effort against concurrent live updates; a dataset/cursor mismatch is a reload signal, not snapshot isolation.</summary>
+public sealed record PublicEntityPageDto(DateTimeOffset From, DateTimeOffset To, string Dataset, string Consistency,
+    IReadOnlyList<PublicEntitySummaryDto> Items, string? NextCursor, bool RefreshRecommended, IReadOnlyDictionary<string, bool> Capabilities);
+
+/// <summary>An evidence fact without the raw message body.  <c>ObservationId</c> remains nullable for legacy facts.</summary>
+public sealed record PublicEvidenceDto(string EntityKind, string EntityId, string? ObservationId, string? TargetId, int SourceId,
+    DateTimeOffset At, string? CatalogKind, string? Classification, string? LocationKind, int? PlaceId, string Relation, double? Score);
+
+/// <summary>A deduplicated raw-message reference.  Text and payload intentionally are not part of the public catalogue contract.</summary>
+public sealed record PublicMessageRefDto(string Id, int SourceId, DateTimeOffset PublishedAt, string? Url);
+
+public sealed record PublicCollectionPageDto<T>(IReadOnlyList<T> Items, string? NextCursor, int TotalCount);
+
+/// <summary>Details keep the first bounded evidence/message/relation page for a useful initial render; callers continue with the corresponding paged resource.</summary>
+public sealed record PublicEntityDetailsDto(PublicEntitySummaryDto Entity, PublicCollectionPageDto<PublicEvidenceDto> Evidence,
+    PublicCollectionPageDto<PublicMessageRefDto> Messages, PublicCollectionPageDto<PublicEntityRefDto> Relations,
+    IReadOnlyDictionary<string, string> Links, IReadOnlyDictionary<string, bool> Capabilities);

@@ -81,11 +81,50 @@ public static class EndpointRouteBuilderExtensions
         api.MapGet("/incidents/{id:long}", async (long id, int? revision, IncidentQueries incidents, CancellationToken ct) =>
             await incidents.DetailsAsync(id, revision, ct) is { } details ? Results.Ok(details) : Results.NotFound());
 
-        api.MapGet("/taxonomy", (ReferenceCache refs) => refs.Taxonomy);
+        // U04 public catalogue: distinct from the legacy map endpoints.  PublicCatalogQueries is an allow-list adapter
+        // over the existing read side; it never returns raw text/payload or parser metadata and its large collections page.
+        api.MapGet("/public/entities", async (string? entityKinds, string? q, string? eventKinds, string? eventCategories, string? categoryIds, string? classIds, string? familyIds, string? modelIds,
+            string? sourceIds, int? regionId, string? status, string? confidence, string? location, bool? hasResults, string? sort, DateTimeOffset? from, DateTimeOffset? to,
+            string? cursor, int? pageSize, string? dataset, string? historyBasis, DateTimeOffset? at, PublicCatalogQueries catalogue, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await catalogue.ListAsync(new PublicCatalogQueries.Query(entityKinds, q, eventKinds, eventCategories, categoryIds, classIds, familyIds, modelIds,
+                    sourceIds, regionId, status, confidence, location, hasResults, sort, from, to, cursor, pageSize, dataset, historyBasis, at), ct));
+            }
+            catch (PublicCatalogQueries.QueryException ex)
+            {
+                return Results.Problem(ex.Message, statusCode: ex.StatusCode);
+            }
+        });
+        api.MapGet("/public/entities/{kind}/{id:long}", async (string kind, long id, string? dataset, string? historyBasis, DateTimeOffset? at, PublicCatalogQueries catalogue, CancellationToken ct) =>
+        {
+            try { return await catalogue.DetailsAsync(kind, id, dataset, historyBasis, at, ct) is { } details ? Results.Ok(details) : Results.NotFound(); }
+            catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/entities/{kind}/{id:long}/evidence", async (string kind, long id, string? cursor, int? limit, string? dataset, PublicCatalogQueries catalogue, CancellationToken ct) =>
+        {
+            try { return await catalogue.EvidencePageAsync(kind, id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
+            catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/entities/{kind}/{id:long}/messages", async (string kind, long id, string? cursor, int? limit, string? dataset, PublicCatalogQueries catalogue, CancellationToken ct) =>
+        {
+            try { return await catalogue.MessagePageAsync(kind, id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
+            catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/entities/{kind}/{id:long}/relations", async (string kind, long id, string? cursor, int? limit, string? dataset, PublicCatalogQueries catalogue, CancellationToken ct) =>
+        {
+            try { return await catalogue.RelationPageAsync(kind, id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
+            catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+
+        // Historical disabled models remain available to a detail/catalogue client when explicitly asked; existing UI
+        // continues to receive the enabled-only shape by default.
+        api.MapGet("/taxonomy", (bool? includeDisabled, ReferenceCache refs) => includeDisabled == true ? refs.HistoricalTaxonomy : refs.Taxonomy);
 
         // Plan §8.2 catalog for the read-side; disabled kinds stay out of the UI (their targets keep the code in TargetDto).
-        api.MapGet("/event-kinds", (ReferenceCache refs) =>
-            refs.EventKinds.Values.Where(k => k.Enabled).OrderBy(k => k.SortOrder).ThenBy(k => k.Code, StringComparer.Ordinal).Select(DtoMapper.EventKind));
+        api.MapGet("/event-kinds", (bool? includeDisabled, ReferenceCache refs) =>
+            refs.EventKinds.Values.Where(k => includeDisabled == true || k.Enabled).OrderBy(k => k.SortOrder).ThenBy(k => k.Code, StringComparer.Ordinal).Select(DtoMapper.EventKind));
 
         api.MapGet("/sources", (ReferenceCache refs, DtoMapper mapper) =>
             refs.Sources.Values.OrderByDescending(s => s.Priority).Select(mapper.Source));

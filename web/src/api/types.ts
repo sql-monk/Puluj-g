@@ -342,6 +342,75 @@ export interface TimelineBucketDto {
   alerts: number
 }
 
+// U04 public catalogue. Bigint database identities are intentionally strings here: JavaScript numbers cannot safely
+// represent every server ID, and the catalogue must round-trip direct links without precision loss.
+export type PublicEntityKind = 'track' | 'incident' | 'alert' | 'observation'
+export interface PublicMapLocatorDto {
+  locationKind?: string
+  placeId?: number
+  placeName?: string
+  regionId?: number
+  precision?: string
+  geometry?: Geometry
+  at?: string
+  unavailableReason?: string
+}
+export interface PublicEntitySummaryDto {
+  kind: PublicEntityKind
+  id: string
+  title: string
+  catalogKind?: string
+  catalogKindName?: string
+  classification?: string
+  at: string
+  state?: string
+  confidence?: string
+  locationKind?: string
+  placeId?: number
+  placeName?: string
+  regionId?: number
+  sourceIds: number[]
+  totalEvidenceCount: number
+  matchedEvidenceCount: number
+  mapAvailable: boolean
+  map: PublicMapLocatorDto
+}
+export interface PublicEntityPageDto {
+  from: string
+  to: string
+  dataset: string
+  consistency: 'best_effort_live'
+  items: PublicEntitySummaryDto[]
+  nextCursor?: string
+  refreshRecommended: boolean
+  capabilities: Record<string, boolean>
+}
+export interface PublicEvidenceDto {
+  entityKind: PublicEntityKind
+  entityId: string
+  observationId?: string
+  targetId?: string
+  sourceId: number
+  at: string
+  catalogKind?: string
+  classification?: string
+  locationKind?: string
+  placeId?: number
+  relation: string
+  score?: number
+}
+export interface PublicMessageRefDto { id: string; sourceId: number; publishedAt: string; url?: string }
+export interface PublicEntityRefDto { kind: PublicEntityKind; id: string; title?: string; relation: string; probability?: number }
+export interface PublicCollectionPageDto<T> { items: T[]; nextCursor?: string; totalCount: number }
+export interface PublicEntityDetailsDto {
+  entity: PublicEntitySummaryDto
+  evidence: PublicCollectionPageDto<PublicEvidenceDto>
+  messages: PublicCollectionPageDto<PublicMessageRefDto>
+  relations: PublicCollectionPageDto<PublicEntityRefDto>
+  links: Record<'evidence' | 'messages' | 'relations', string>
+  capabilities: Record<string, boolean>
+}
+
 // Statistics page (GET /api/stats/{targets|alerts|sources|recognition}?from&to): one payload per tab for one period.
 // Per-bucket arrays are aligned with `period.bucketStarts`.
 export type StatsBucketUnit = 'hour' | 'day' | 'week'

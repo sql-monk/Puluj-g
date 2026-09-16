@@ -26,6 +26,8 @@ public sealed class ReferenceCache(IDbContextFactory<PulujDbContext> factory, IL
     /// <summary>Plan §8.2 event catalog by id; the DTO mapper resolves targets.event_kind_id to its code from here.</summary>
     public IReadOnlyDictionary<int, EventKind> EventKinds { get; private set; } = new Dictionary<int, EventKind>();
     public TaxonomyDto Taxonomy { get; private set; } = new([]);
+    /// <summary>Explicit historical lookup for catalog/detail URLs.  The legacy taxonomy endpoint remains enabled-only.</summary>
+    public TaxonomyDto HistoricalTaxonomy { get; private set; } = new([]);
 
     public Task Ready => _ready.Task;
 
@@ -154,12 +156,13 @@ public sealed class ReferenceCache(IDbContextFactory<PulujDbContext> factory, IL
                 .ToListAsync(ct))
             .ToDictionary(p => p.PlaceId, p => new PlaceInfo(p.PlaceId, p.Name, p.Level, p.ParentId, p.CountryCode, p.Centroid.X, p.Centroid.Y, p.RadiusKm, p.Population ?? 0));
         _children = Places.Values.Where(p => p.ParentId is not null).ToLookup(p => p.ParentId!.Value, p => p.Id);
-        Taxonomy = BuildTaxonomy();
+        Taxonomy = BuildTaxonomy(includeDisabled: false);
+        HistoricalTaxonomy = BuildTaxonomy(includeDisabled: true);
         _ready.TrySetResult();
         logger.LogInformation("Reference cache: {Models} models, {Places} places", Models.Count, Places.Count);
     }
 
-    private TaxonomyDto BuildTaxonomy() => new(Categories.Values.OrderBy(c => c.TargetCategoryId).Select(c => new TaxonomyCategoryDto(
+    private TaxonomyDto BuildTaxonomy(bool includeDisabled) => new(Categories.Values.OrderBy(c => c.TargetCategoryId).Select(c => new TaxonomyCategoryDto(
         c.TargetCategoryId, c.Code, c.Name,
         Classes.Values.Where(k => k.TargetCategoryId == c.TargetCategoryId).OrderBy(k => k.TargetClassId).Select(k =>
         {
@@ -167,7 +170,7 @@ public sealed class ReferenceCache(IDbContextFactory<PulujDbContext> factory, IL
             return new TaxonomyClassDto(k.TargetClassId, k.Code, k.Name, display, fade, SpeedProfile(k.TargetClassId, null),
                 Families.Values.Where(f => f.TargetClassId == k.TargetClassId).OrderBy(f => f.TargetFamilyId).Select(f =>
                     new TaxonomyFamilyDto(f.TargetFamilyId, f.Code, f.Name,
-                        Models.Values.Where(m => m.TargetFamilyId == f.TargetFamilyId && m.Enabled).OrderBy(m => m.TargetModelId).Select(m =>
+                        Models.Values.Where(m => m.TargetFamilyId == f.TargetFamilyId && (includeDisabled || m.Enabled)).OrderBy(m => m.TargetModelId).Select(m =>
                             new TaxonomyModelDto(m.TargetModelId, m.Code, m.CanonicalName, m.Manufacturer, m.Country, SpeedProfile(k.TargetClassId, m.TargetModelId))).ToList())).ToList());
         }).ToList())).ToList());
 

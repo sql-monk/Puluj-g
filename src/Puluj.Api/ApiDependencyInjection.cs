@@ -30,6 +30,7 @@ public static class ApiDependencyInjection
         services.Configure<MapOptions>(configuration.GetSection(MapOptions.Section));
         services.AddSingleton<SnapshotService>();
         services.AddSingleton<IncidentQueries>();
+        services.AddSingleton<PublicCatalogQueries>();
         // Statistics page: aggregates cached per period (every entry Size = 1, at most 64 periods in memory).
         services.AddMemoryCache(o => o.SizeLimit = 64);
         services.AddSingleton<StatsService>();

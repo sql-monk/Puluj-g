@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson'
-import type { AlertDto, EventKindDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
+import type { AlertDto, EventKindDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, PublicCollectionPageDto, PublicEntityDetailsDto, PublicEntityKind, PublicEntityPageDto, PublicEntityRefDto, PublicEvidenceDto, PublicMessageRefDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -7,6 +7,12 @@ async function get<T>(path: string): Promise<T> {
     throw new Error(`${path}: HTTP ${res.status}`)
   }
   return (await res.json()) as T
+}
+
+function publicQuery(params: Record<string, string | number | boolean | undefined>): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value !== undefined) query.set(key, String(value))
+  return query.toString()
 }
 
 function periodQuery(from: Date, to: Date): string {
@@ -34,6 +40,12 @@ export const api = {
   sources: () => get<SourceDto[]>('/api/sources'),
   taxonomy: () => get<TaxonomyDto>('/api/taxonomy'),
   eventKinds: () => get<EventKindDto[]>('/api/event-kinds'),
+  /** U04 catalogue: string IDs preserve bigint direct links; cursors are opaque and bound to the current filters/dataset. */
+  publicEntities: (params: Record<string, string | number | boolean | undefined> = {}) => get<PublicEntityPageDto>(`/api/public/entities?${publicQuery(params)}`),
+  publicEntity: (kind: PublicEntityKind, id: string, dataset = 'live') => get<PublicEntityDetailsDto>(`/api/public/entities/${kind}/${encodeURIComponent(id)}?${publicQuery({ dataset })}`),
+  publicEvidence: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEvidenceDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/evidence?${publicQuery({ cursor, dataset })}`),
+  publicMessages: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/messages?${publicQuery({ cursor, dataset })}`),
+  publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
   /** Alerts of one place over the last `hours`, ended ones included, newest first. */
   alertsHistory: (placeId: number, hours = 24) => get<AlertDto[]>(`/api/alerts/history?placeId=${placeId}&hours=${hours}`),
   searchPlaces: (q: string) => get<PlaceDto[]>(`/api/places/search?q=${encodeURIComponent(q)}&limit=8`),
