@@ -180,7 +180,10 @@ public sealed class FinalizerTests(MessagingFixture f)
         Assert.Equal("llm", analysis["payload"]!["method"]!.GetValue<string>());
         Assert.Equal([requestId], analysis["payload"]!["llm_request_ids"]!.AsArray().Select(x => x!.GetValue<string>()));
         Assert.NotNull(analysis["payload"]!["versions"]!["model"]);
-        f.Evidence.Record("P06-F03", new { llm_calls = f.Llm.Calls.Count, extraction = "completed/llm", audit = new { request_id = true, fencing_token = 1, run_id = true, outcome = "applied", provider_request_id = true }, observations = 1 });
+        // Everything sent to the model and everything it answered is on record, verbatim (request/response bodies as JSON).
+        Assert.Equal(1, await f.CountAsync("llm_requests", "request_payload IS NOT NULL AND request_payload->'messages'->0->>'content' = request_text AND request_payload->>'model' IS NOT NULL"));
+        Assert.Equal(1, await f.CountAsync("llm_requests", "response_payload IS NOT NULL AND response_payload->'content'->0->>'text' = response_text"));
+        f.Evidence.Record("P06-F03", new { llm_calls = f.Llm.Calls.Count, extraction = "completed/llm", audit = new { request_id = true, fencing_token = 1, run_id = true, outcome = "applied", provider_request_id = true, request_payload = true, response_payload = true }, observations = 1 });
     }
 
     [Fact]
@@ -410,7 +413,8 @@ public sealed class FinalizerTests(MessagingFixture f)
         Assert.Equal("failed", analysis["payload"]!["outcome"]!.GetValue<string>());
         Assert.Equal("provider_error", analysis["payload"]!["error"]!["code"]!.GetValue<string>());
         Assert.Equal(0, await f.CountAsync("processing.quarantine"));
-        f.Evidence.Record("P06-F05", new { provider_calls = f.Llm.Calls.Count, llm_failed_final = true, attempts = 2, extraction = "failed", quarantine = 0 });
+        Assert.Equal(2, await f.CountAsync("llm_requests", "request_payload IS NOT NULL AND response_payload->'error'->>'type' IN ('provider_timeout', 'provider_error')")); // failed calls keep the request and the error body
+        f.Evidence.Record("P06-F05", new { provider_calls = f.Llm.Calls.Count, llm_failed_final = true, attempts = 2, extraction = "failed", quarantine = 0, payloads = "request + error body audited" });
     }
 
     [Fact]

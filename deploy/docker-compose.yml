@@ -82,8 +82,9 @@ services:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
-      # P09 cutover (ADR-0009): додати track-worker,alert-worker,watchdog ЛИШЕ після зупинки ролі processing у сервісі processor.
-      Worker__Roles: relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer
+      # P09 cutover (ADR-0009): scripts/deploy.ps1 -Broker -DomainWriters sets MESSAGING_WORKER_ROLES with
+      # track-worker,alert-worker,watchdog and PROCESSOR_REPLICAS=0 — never both owners over one database.
+      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer}
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"
@@ -146,7 +147,7 @@ services:
   processor:
     <<: *worker
     deploy:
-      replicas: 2
+      replicas: ${PROCESSOR_REPLICAS:-2}  # 0 after the P09 cutover (scripts/deploy.ps1 -DomainWriters)
     environment:
       <<: *worker-env
       Worker__Name: processor

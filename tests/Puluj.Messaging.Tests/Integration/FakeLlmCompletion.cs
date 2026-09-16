@@ -18,12 +18,17 @@ public sealed class FakeLlmCompletion : ILlmCompletion
     public SemaphoreSlim? Gate { get; set; }
 
     public FakeLlmCompletion Answer(string json, string? providerRequestId = null) =>
-        Enqueue(_ => Task.FromResult(new LlmCompletionResult(json, false, 812, 0, 0, 96, providerRequestId ?? $"msg_{Guid.NewGuid():N}")));
+        Enqueue(r => Task.FromResult(new LlmCompletionResult(json, false, 812, 0, 0, 96, providerRequestId ?? $"msg_{Guid.NewGuid():N}", RequestPayload(r), ResponsePayload(json))));
 
-    public FakeLlmCompletion Refuse() => Enqueue(_ => Task.FromResult(new LlmCompletionResult(null, true, 800, 0, 0, 1, "msg_refused")));
+    public FakeLlmCompletion Refuse() => Enqueue(r => Task.FromResult(new LlmCompletionResult(null, true, 800, 0, 0, 1, "msg_refused", RequestPayload(r), """{"id":"msg_refused","stop_reason":"refusal","content":[]}""")));
 
     public FakeLlmCompletion Fail(string code, bool retryable, System.Net.HttpStatusCode? status = null) =>
-        Enqueue(_ => throw new LlmCompletionException(code, $"scripted {code}", retryable, status));
+        Enqueue(r => throw new LlmCompletionException(code, $"scripted {code}", retryable, status) { RequestPayload = RequestPayload(r), ResponsePayload = System.Text.Json.JsonSerializer.Serialize(new { type = "error", error = new { type = code, message = "scripted" } }) });
+
+    /// <summary>What the real provider would audit: the whole body as sent (the fake has no system prompt, so the text and the parameters).</summary>
+    private static string RequestPayload(LlmCompletionRequest r) => System.Text.Json.JsonSerializer.Serialize(new { model = r.Model, max_tokens = r.MaxOutputTokens, messages = new[] { new { role = "user", content = r.Text } } });
+
+    private static string ResponsePayload(string json) => System.Text.Json.JsonSerializer.Serialize(new { id = "msg_fake", type = "message", stop_reason = "end_turn", content = new[] { new { type = "text", text = json } } });
 
     public FakeLlmCompletion Enqueue(Func<LlmCompletionRequest, Task<LlmCompletionResult>> answer)
     {
@@ -51,6 +56,6 @@ public sealed class FakeLlmCompletion : ILlmCompletion
         {
             return await scripted(request);
         }
-        return new LlmCompletionResult(DefaultAnswer, false, 812, 0, 0, 96, $"msg_{Guid.NewGuid():N}");
+        return new LlmCompletionResult(DefaultAnswer, false, 812, 0, 0, 96, $"msg_{Guid.NewGuid():N}", RequestPayload(request), ResponsePayload(DefaultAnswer));
     }
 }

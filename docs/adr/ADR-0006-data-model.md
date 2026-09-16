@@ -128,7 +128,8 @@ Legacy `raw_messages.processing_status`, `claimed_by`, `attempts` лишають
 - P09 (`AddAggregateRevisions`): `targets.observation_id uuid NULL` (partial unique, CONCURRENTLY; NULL = рядок legacy loop), `target_tracks`/`air_alerts`:
   `revision int`, `last_event_id uuid`, `last_correlation_id uuid` (causation chain для watchdog-команд). Writers `targets` для не-alert фактів — track-worker,
   для alert — alert-worker; incident/info — лише рядок `targets` до P10.
-- `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; `outcome` ∈ `answered → applied | late`, коди помилок
+- `llm_requests` (P06): +`request_id`, `run_id`, `fencing_token`, `attempt_id`, `provider_request_id`; (`AddLlmPayloads`) +`request_payload jsonb`,
+  `response_payload jsonb` — дослівні тіла запиту/відповіді (або тіло помилки) в обох шляхах; `outcome` ∈ `answered → applied | late`, коди помилок
   провайдера; рядок пишеться autocommit до result-tx. `processing.attempts`: partial unique `(job_key, fencing_token) WHERE fencing_token > 0`
   (lease takeover), job-рядки llm-worker під `subscription_id = 'llm-worker:job'` (не рахуються consumer'ом; `event_id` = `request_id` команди,
   `state` ∈ `running | succeeded | failed | superseded | interrupted` — останнє ставить takeover після `lease_until` або cancel під час виклику).

@@ -1,3 +1,4 @@
+using System.Text.Json;
 namespace Puluj.Domain.Entities;
 
 /// <summary>
@@ -27,6 +28,10 @@ public class LlmRequest
     public required string RequestText { get; set; }
     public required string SystemPrompt { get; set; }
     public string? ResponseText { get; set; }
+    /// <summary>The request body exactly as sent to the provider (model, max_tokens, system, output config/schema, messages) — the whole prompt, not a summary.</summary>
+    public JsonDocument? RequestPayload { get; set; }
+    /// <summary>The provider's response body verbatim (id, model, stop_reason, usage, content blocks); the error body on a failed call.</summary>
+    public JsonDocument? ResponsePayload { get; set; }
     public string? Error { get; set; }
 
     // P06 provenance of a request made by the llm-worker (null for the legacy in-process fallback).

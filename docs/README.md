@@ -152,6 +152,10 @@ Production: `Copy-Item .env.example deploy/.env`, заповнити токен�
 може повертати лише коди з таксономії, невідомі місця відкидаються, ніщо не вигадується. Без ключа тихо вимкнено. Після відповіді 400/401/403 (вичерпаний баланс, недійсний ключ, відхилена схема) модель не викликається
 `Llm__FailurePause` (15 хв), після 429 — хвилину: один WRN із текстом помилки API замість виклику й стек-трейсу на
 кожне повідомлення; метрика `puluj.llm.calls{outcome=paused}`.
+**Аудит LLM**: кожен виклик — рядок `llm_requests` з `request_text`, `system_prompt`, `response_text`, usage/вартістю **і дослівними тілами**:
+`request_payload` (JSON, який SDK відправив: model, max_tokens, system, output_config зі схемою, messages) та `response_payload` (JSON відповіді
+провайдера: id, model, stop_reason, usage, content; для невдалого виклику — тіло помилки API). Обидва шляхи — legacy fallback і `llm-worker`
+(міграція `AddLlmPayloads`). Адмін-панель `/api/admin/ops/llm/requests/{id}` показує рядок повністю.
 
 ## Шлях повідомлення
 

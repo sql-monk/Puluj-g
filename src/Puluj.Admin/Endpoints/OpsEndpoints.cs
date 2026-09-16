@@ -189,6 +189,8 @@ public static partial class OpsEndpoints
             x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, SourceCode = x.Source!.Code, x.Worker, x.Model, x.PromptVersion,
             x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens,
             x.EstimatedCostUsd, x.FactsCount, x.Error, x.RequestText, x.SystemPrompt, x.ResponseText,
+            x.RequestId, x.RunId, x.FencingToken, x.AttemptId, x.ProviderRequestId,
+            RequestPayload = x.RequestPayload, ResponsePayload = x.ResponsePayload, // verbatim bodies (what was sent, what came back)
         }).FirstOrDefaultAsync(ct);
         if (x is null)
         {

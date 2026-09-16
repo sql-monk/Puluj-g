@@ -12,14 +12,26 @@
            Existing Docker volume that contains PostgreSQL data. Defaults to puluj-g-pgdata.
 .PARAMETER InitializeDatabase
            Create DatabaseVolume when it does not exist. Required only for a deliberately new, empty installation.
+.PARAMETER Broker
+           Start the `broker` profile (RabbitMQ + the `messaging` worker: relay, archive, raw-writer, normalizer, parser,
+           llm-worker, finalizer) and route the collectors through the single ingress (MESSAGING_OUTBOX_ENABLED /
+           MESSAGING_INGRESS_ENABLED = true). Without it the platform path is off and the legacy processor writes the domain.
+.PARAMETER DomainWriters
+           P09 cutover (ADR-0009): the legacy `processor` role is stopped and scaled to 0 BEFORE the `messaging` worker
+           gets the track-worker, alert-worker and watchdog roles — never two owners of tracks/alerts over one database.
+           Requires -Broker. Rollback: run again without -DomainWriters (processor back to 2 replicas, writers roles off;
+           the guards in both directions keep the rows consistent).
 #>
 param(
     [switch]$NoBuild,
     [switch]$SkipSql,
     [string[]]$Services = @(),
     [string]$DatabaseVolume = "puluj-g-pgdata",
-    [switch]$InitializeDatabase
+    [switch]$InitializeDatabase,
+    [switch]$Broker,
+    [switch]$DomainWriters
 )
+if ($DomainWriters -and -not $Broker) { throw "-DomainWriters needs -Broker: the writers consume observations.recorded from RabbitMQ (ADR-0009)" }
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 $deploy = Join-Path $root "deploy"
@@ -47,6 +59,23 @@ else {
 $env:PULUJ_PGDATA_VOLUME = $volume
 
 function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
+
+# Platform path (P03–P09): which roles the `messaging` worker runs and how many legacy processors stay. Compose reads
+# these through ${…} substitution, so they are set here per run — the plain run always restores the legacy layout.
+$defaultMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer"
+$profileArgs = @()
+if ($Broker) {
+    $profileArgs = @("--profile", "broker")
+    $env:MESSAGING_OUTBOX_ENABLED = "true"
+    $env:MESSAGING_INGRESS_ENABLED = "true"
+}
+if ($DomainWriters) {
+    $env:MESSAGING_WORKER_ROLES = "$defaultMessagingRoles,track-worker,alert-worker,watchdog"
+    $env:PROCESSOR_REPLICAS = "0"
+} else {
+    $env:MESSAGING_WORKER_ROLES = $defaultMessagingRoles
+    $env:PROCESSOR_REPLICAS = "2"
+}
 function Sql([string]$file) {
     # psql is not installed on the host: the script goes through the postgis container (Cyrillic-safe via stdin).
     Get-Content -Raw -Encoding UTF8 $file | docker exec -i $postgisContainer psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f -
@@ -67,11 +96,22 @@ if ($local) {
     $local | Stop-Process -Force
 }
 
-Step "Building and starting the stack"
+if ($DomainWriters) {
+    # ADR-0009 cutover order: the legacy owner stops first, the writers start after it. The processors' in-flight
+    # transactions finish on SIGTERM; the shared Store lock means a writer can never interleave with a live legacy write.
+    Step "Cutover (ADR-0009): stopping the legacy processor role before the domain writers start"
+    Push-Location $deploy
+    try {
+        & docker compose -p $composeProject @profileArgs stop processor
+        if ($LASTEXITCODE -ne 0) { throw "could not stop the processor service" }
+    } finally { Pop-Location }
+}
+
+Step ("Building and starting the stack" + $(if ($Broker) { " (broker profile" + $(if ($DomainWriters) { ", domain writers" }) + ")" } else { "" }))
 Push-Location $deploy
 try {
     if (-not (Test-Path ".env")) { Write-Warning "deploy/.env is missing: compose will use the defaults from docker-compose.yml (ADMIN_TOKEN empty = panel only from localhost)" }
-    $composeArgs = @("compose", "-p", $composeProject, "up", "-d", "--remove-orphans")
+    $composeArgs = @("compose", "-p", $composeProject) + $profileArgs + @("up", "-d", "--remove-orphans")
     if (-not $NoBuild) { $composeArgs += "--build" }
     $composeArgs += $Services
     & docker @composeArgs
@@ -90,9 +130,11 @@ try {
     docker logs $migrateContainer 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
 
     Step "Containers"
-    docker compose -p $composeProject ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
+    docker compose -p $composeProject @profileArgs ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
     $postgisContainer = ComposeContainerId "postgis"
     $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
+    if ($DomainWriters -and $processorContainers.Count -gt 0) { throw "processor containers are still running after the cutover: $($processorContainers -join ', ')" }
+    $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
 } finally { Pop-Location }
 
 if (-not $SkipSql) {
@@ -113,6 +155,13 @@ foreach ($c in $processorContainers) {
     $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
     if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
 }
+foreach ($c in $messagingContainers) {
+    $roles = docker exec $c printenv Worker__Roles 2>$null
+    Write-Host ("{0}: roles {1}" -f $c, $roles)
+    if ($DomainWriters -and $roles -notmatch "track-worker") { Write-Warning "$c does not run the domain writers (Worker__Roles=$roles)" }
+    $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
+    if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
+}
 foreach ($u in @("http://localhost:8090/api/health", "http://localhost:8091/api/health")) {
     try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 10 $u; Write-Host ("{0} -> {1}" -f $u, $r.StatusCode) }
     catch { Write-Warning "$u -> $($_.Exception.Message)" }
@@ -122,5 +171,12 @@ Step "Queue"
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;
 SELECT count(*) AS text_alerts_ended_before_start FROM air_alerts WHERE ended_at < started_at;
 SELECT key, left(value, 60) AS value FROM app_settings WHERE key LIKE 'Runtime:Worker:%' ORDER BY 1;
+SELECT count(*) FILTER (WHERE observation_id IS NOT NULL) AS targets_by_writers, count(*) FILTER (WHERE observation_id IS NULL) AS targets_by_legacy FROM targets;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
+if ($Broker) {
+@"
+SELECT subscription_id, outcome, count(*) FROM processing.deliveries GROUP BY 1, 2 ORDER BY 1, 2;
+SELECT count(*) AS outbox_unconfirmed FROM messaging.outbox WHERE confirmed_at IS NULL;
+"@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
+}
 Write-Host "`nDone. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green

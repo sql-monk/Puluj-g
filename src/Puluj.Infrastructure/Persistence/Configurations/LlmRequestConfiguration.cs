@@ -18,6 +18,8 @@ public class LlmRequestConfiguration : IEntityTypeConfiguration<LlmRequest>
         b.HasIndex(x => new { x.SourceId, x.OccurredAt });
         b.HasIndex(x => x.RawMessageId);
         b.Property(x => x.ProviderRequestId).HasMaxLength(128);
+        b.Property(x => x.RequestPayload).HasColumnType("jsonb");
+        b.Property(x => x.ResponsePayload).HasColumnType("jsonb");
         b.HasIndex(x => x.RequestId);
         b.HasOne(x => x.RawMessage).WithMany().HasForeignKey(x => x.RawMessageId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Source).WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);

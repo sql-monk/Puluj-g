@@ -195,33 +195,81 @@ public sealed class LlmParser : IParser
     internal static bool LooksLikeTargetReport(NormalizedMessage message) =>
         message.Segments.SelectMany(s => s.Tokens).Any(t => TriggerStems.Any(stem => t.Text.StartsWith(stem, StringComparison.Ordinal)));
 
+    /// <summary>The one request shape both callers send (legacy parser and the llm-worker's <see cref="AnthropicCompletion"/>).</summary>
+    internal static MessageCreateParams CreateParams(string model, int maxTokens, string systemPrompt, string text) => new()
+    {
+        Model = model,
+        MaxTokens = maxTokens,
+        System = new List<TextBlockParam> { new() { Text = systemPrompt, CacheControl = new CacheControlEphemeral() } },
+        OutputConfig = new OutputConfig
+        {
+            Effort = Effort.Low,
+            Format = new JsonOutputFormat { Schema = Schema() },
+        },
+        Messages = [new() { Role = Role.User, Content = text }],
+    };
+
+    /// <summary>The request body verbatim (what the SDK serializes and sends): audited with every call.</summary>
+    internal static string RequestPayload(MessageCreateParams parameters) => JsonSerializer.Serialize(parameters.RawBodyData);
+
+    /// <summary>The response body verbatim (the SDK's backing JSON of the message object).</summary>
+    internal static string ResponsePayload(Message response) => JsonSerializer.Serialize(response.RawData);
+
+    /// <summary>The error body of a failed call, as JSON when the API returned JSON, else the text wrapped in a JSON string.</summary>
+    internal static string? ErrorPayload(AnthropicApiException ex)
+    {
+        if (string.IsNullOrEmpty(ex.ResponseBody))
+        {
+            return null;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(ex.ResponseBody);
+            return doc.RootElement.GetRawText();
+        }
+        catch (JsonException)
+        {
+            return JsonSerializer.Serialize(ex.ResponseBody);
+        }
+    }
+
     private async Task<LlmAnswer> AskAsync(string text, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-        var response = await Client!.Messages.Create(new MessageCreateParams
+        var parameters = CreateParams(_options.Model, 2048, _systemPrompt.Value, text);
+        var requestPayload = RequestPayload(parameters);
+        Message response;
+        try
         {
-            Model = _options.Model,
-            MaxTokens = 2048,
-            System = new List<TextBlockParam> { new() { Text = _systemPrompt.Value, CacheControl = new CacheControlEphemeral() } },
-            OutputConfig = new OutputConfig
-            {
-                Effort = Effort.Low,
-                Format = new JsonOutputFormat { Schema = Schema() },
-            },
-            Messages = [new() { Role = Role.User, Content = text }],
-        }, cancellationToken: timeout.Token);
-
+            response = await Client!.Messages.Create(parameters, cancellationToken: timeout.Token);
+        }
+        catch (AnthropicApiException ex)
+        {
+            _lastRequestPayload = requestPayload; // audited by the catch in ParseAsync together with the error body
+            _lastResponsePayload = ErrorPayload(ex);
+            throw;
+        }
+        catch (Exception)
+        {
+            _lastRequestPayload = requestPayload;
+            _lastResponsePayload = null;
+            throw;
+        }
+        var responsePayload = ResponsePayload(response);
         if (response.StopReason == "refusal")
         {
             _logger.LogInformation("LLM declined to classify the message");
             return new LlmAnswer(new LlmResponse([]), null, true, response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0,
-                response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens);
+                response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens, requestPayload, responsePayload);
         }
         var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(b => b.Text));
         return new LlmAnswer(JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]), json, false,
-            response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0, response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens);
+            response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0, response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens, requestPayload, responsePayload);
     }
+
+    [ThreadStatic] private static string? _lastRequestPayload;
+    [ThreadStatic] private static string? _lastResponsePayload;
 
     /// <summary>Audit must never make an otherwise usable parsing result fail. A cost is an estimate from the exact
     /// provider usage object and the price card active at this instant, kept with the row for historical accuracy.</summary>
@@ -260,8 +308,12 @@ public sealed class LlmParser : IParser
                 RequestText = requestText,
                 SystemPrompt = _systemPrompt.Value,
                 ResponseText = answer?.ResponseText,
+                RequestPayload = ToDocument(answer?.RequestPayload ?? _lastRequestPayload),
+                ResponsePayload = ToDocument(answer?.ResponsePayload ?? _lastResponsePayload),
                 Error = error,
             });
+            _lastRequestPayload = null;
+            _lastResponsePayload = null;
             await db.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -431,7 +483,24 @@ public sealed class LlmParser : IParser
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private sealed record LlmResponse(List<LlmFact>? Facts);
-    private sealed record LlmAnswer(LlmResponse Result, string? ResponseText, bool Refused, long InputTokens, long CacheCreationInputTokens, long CacheReadInputTokens, long OutputTokens);
+    private sealed record LlmAnswer(LlmResponse Result, string? ResponseText, bool Refused, long InputTokens, long CacheCreationInputTokens, long CacheReadInputTokens, long OutputTokens,
+        string? RequestPayload = null, string? ResponsePayload = null);
+
+    internal static JsonDocument? ToDocument(string? json)
+    {
+        if (string.IsNullOrEmpty(json))
+        {
+            return null;
+        }
+        try
+        {
+            return JsonDocument.Parse(json);
+        }
+        catch (JsonException)
+        {
+            return JsonDocument.Parse(JsonSerializer.Serialize(json)); // never lose the bytes: an unparsable body is stored as a JSON string
+        }
+    }
     private sealed record LlmFact(string? EventType, LlmTarget? Target, bool Hedged, int? Count, bool CountApprox, List<LlmPlace>? Places, double? DirectionDeg, bool Launch, int? Segment, string? Quote);
     private sealed record LlmTarget(string? Level, string? Code);
     private sealed record LlmPlace(string? Name, string? Role);

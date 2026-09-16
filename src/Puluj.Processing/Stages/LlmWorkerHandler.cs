@@ -198,7 +198,7 @@ public sealed class LlmWorkerHandler(
             {
                 breaker.Fail();
             }
-            await AuditAsync(conn, raw, envelope, requestId, job, model, promptVersion, normalized.Text, null, ex.Code, (int?)ex.StatusCode, ex.Message, 0, started, ct);
+            await AuditAsync(conn, raw, envelope, requestId, job, model, promptVersion, normalized.Text, null, ex.Code, (int?)ex.StatusCode, ex.Message, 0, started, ct, ex.RequestPayload, ex.ResponsePayload);
             await FinishJobAsync(conn, job.AttemptId, "failed", $"{ex.Code}: {ex.Message}", ct);
             var attempts = failedSoFar + 1;
             if (ex.Retryable && attempts < o.MaxAttempts)
@@ -211,7 +211,7 @@ public sealed class LlmWorkerHandler(
 
         // The paid call is durable before anything else can fail (review B4): audit first, mapping after; a response the
         // mapper cannot use is a terminal `invalid_response`, never a second paid call.
-        var auditId = await AuditAsync(conn, raw, envelope, requestId, job, model, promptVersion, normalized.Text, result, "answered", null, null, 0, started, ct);
+        var auditId = await AuditAsync(conn, raw, envelope, requestId, job, model, promptVersion, normalized.Text, result, "answered", null, null, 0, started, ct, result.RequestPayload, result.ResponsePayload);
         var facts = new JsonArray();
         var outcome = "needs_review";
         if (!result.Refused && result.ResponseJson is not null)
@@ -488,7 +488,7 @@ public sealed class LlmWorkerHandler(
 
     /// <summary>Durable record of the call (autocommit, before the result transaction): the paid request survives any later failure.</summary>
     private async Task<long> AuditAsync(NpgsqlConnection conn, RawMessage raw, Envelope envelope, Guid requestId, Job job, string model, string promptVersion, string requestText,
-        LlmCompletionResult? result, string outcome, int? statusCode, string? error, int factsCount, DateTimeOffset started, CancellationToken ct)
+        LlmCompletionResult? result, string outcome, int? statusCode, string? error, int factsCount, DateTimeOffset started, CancellationToken ct, string? requestPayload = null, string? responsePayload = null)
     {
         var o = options.CurrentValue;
         decimal? cost = result is null ? null : LlmCost.Calculate(o, result.InputTokens, result.CacheCreationInputTokens, result.CacheReadInputTokens, result.OutputTokens);
@@ -496,9 +496,9 @@ public sealed class LlmWorkerHandler(
             """
             INSERT INTO llm_requests (raw_message_id, source_id, occurred_at, worker, model, prompt_version, outcome, status_code, duration_ms,
                 input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens, estimated_cost_usd, facts_count,
-                request_text, system_prompt, response_text, error, request_id, run_id, fencing_token, attempt_id, provider_request_id)
+                request_text, system_prompt, response_text, error, request_id, run_id, fencing_token, attempt_id, provider_request_id, request_payload, response_payload)
             VALUES (@raw, @source, now(), @worker, @model, @prompt, @outcome, @status, @duration, @input, @cw, @cr, @output, @cost, @facts,
-                @text, @system, @response, @error, @request, @run, @token, @attempt, @provider)
+                @text, @system, @response, @error, @request, @run, @token, @attempt, @provider, @request_payload, @response_payload)
             RETURNING llm_request_id
             """, conn);
         cmd.Parameters.AddWithValue("raw", raw.RawMessageId);
@@ -524,6 +524,8 @@ public sealed class LlmWorkerHandler(
         cmd.Parameters.AddWithValue("token", job.Token);
         cmd.Parameters.AddWithValue("attempt", job.AttemptId);
         cmd.Parameters.AddWithValue("provider", (object?)result?.ProviderRequestId ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("request_payload", NpgsqlDbType.Jsonb) { Value = (object?)LlmParser.ToDocument(requestPayload)?.RootElement.GetRawText() ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("response_payload", NpgsqlDbType.Jsonb) { Value = (object?)LlmParser.ToDocument(responsePayload)?.RootElement.GetRawText() ?? DBNull.Value });
         return (long)(await cmd.ExecuteScalarAsync(ct))!;
     }
 

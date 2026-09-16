@@ -6,7 +6,10 @@ namespace Puluj.Processing.Llm;
 public sealed record LlmCompletionRequest(string Text, string Model, string PromptVersion, int MaxOutputTokens, TimeSpan Timeout);
 
 /// <summary>The provider's answer: the JSON of the extraction schema (null when the model refused), usage and its own request id.</summary>
-public sealed record LlmCompletionResult(string? ResponseJson, bool Refused, long InputTokens, long CacheCreationInputTokens, long CacheReadInputTokens, long OutputTokens, string? ProviderRequestId);
+/// <param name="RequestPayload">The request body as sent (JSON) — audited verbatim.</param>
+/// <param name="ResponsePayload">The provider's response body (JSON) — audited verbatim.</param>
+public sealed record LlmCompletionResult(string? ResponseJson, bool Refused, long InputTokens, long CacheCreationInputTokens, long CacheReadInputTokens, long OutputTokens, string? ProviderRequestId,
+    string? RequestPayload = null, string? ResponsePayload = null);
 
 /// <summary>
 /// One call to the model, provider-neutral (plan §6.2: the call is never part of a database transaction). The real
@@ -24,5 +27,8 @@ public sealed class LlmCompletionException(string code, string message, bool ret
     /// <summary>provider_timeout | rate_limited | provider_error | invalid_response | no_api_key (the worker adds its own terminal codes: budget_unavailable, deadline_exceeded, normalization_drift, attempts_exhausted)</summary>
     public string Code { get; } = code;
     public bool Retryable { get; } = retryable;
+    /// <summary>What was sent / what came back (the error body), so a failed call is audited as fully as a successful one.</summary>
+    public string? RequestPayload { get; init; }
+    public string? ResponsePayload { get; init; }
     public HttpStatusCode? StatusCode { get; } = statusCode;
 }

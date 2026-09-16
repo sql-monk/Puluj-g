@@ -40,25 +40,17 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
         }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(request.Timeout);
+        var parameters = LlmParser.CreateParams(request.Model, Math.Clamp(request.MaxOutputTokens, 64, 8192), parser.SystemPrompt, request.Text);
+        var requestPayload = LlmParser.RequestPayload(parameters); // verbatim body, audited even when the call fails
         try
         {
-            var response = await client.Messages.Create(new MessageCreateParams
-            {
-                Model = request.Model,
-                MaxTokens = Math.Clamp(request.MaxOutputTokens, 64, 8192),
-                System = new List<TextBlockParam> { new() { Text = parser.SystemPrompt, CacheControl = new CacheControlEphemeral() } },
-                OutputConfig = new OutputConfig
-                {
-                    Effort = Effort.Low,
-                    Format = new JsonOutputFormat { Schema = LlmParser.OutputSchema() },
-                },
-                Messages = [new() { Role = Role.User, Content = request.Text }],
-            }, cancellationToken: timeout.Token);
+            var response = await client.Messages.Create(parameters, cancellationToken: timeout.Token);
+            var responsePayload = LlmParser.ResponsePayload(response);
             var usage = response.Usage;
             if (response.StopReason == "refusal")
             {
                 logger.LogInformation("LLM declined to classify the message ({RequestId})", response.ID);
-                return new LlmCompletionResult(null, true, usage.InputTokens, usage.CacheCreationInputTokens ?? 0, usage.CacheReadInputTokens ?? 0, usage.OutputTokens, response.ID);
+                return new LlmCompletionResult(null, true, usage.InputTokens, usage.CacheCreationInputTokens ?? 0, usage.CacheReadInputTokens ?? 0, usage.OutputTokens, response.ID, requestPayload, responsePayload);
             }
             var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(b => b.Text));
             try
@@ -67,26 +59,26 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
             }
             catch (JsonException ex)
             {
-                throw new LlmCompletionException("invalid_response", "the model did not return JSON: " + ex.Message, retryable: false, inner: ex);
+                throw new LlmCompletionException("invalid_response", "the model did not return JSON: " + ex.Message, retryable: false, inner: ex) { RequestPayload = requestPayload, ResponsePayload = responsePayload };
             }
-            return new LlmCompletionResult(json, false, usage.InputTokens, usage.CacheCreationInputTokens ?? 0, usage.CacheReadInputTokens ?? 0, usage.OutputTokens, response.ID);
+            return new LlmCompletionResult(json, false, usage.InputTokens, usage.CacheCreationInputTokens ?? 0, usage.CacheReadInputTokens ?? 0, usage.OutputTokens, response.ID, requestPayload, responsePayload);
         }
         catch (AnthropicRateLimitException ex)
         {
-            throw new LlmCompletionException("rate_limited", LlmParser.ProviderErrorMessage(ex), retryable: true, ex.StatusCode, ex);
+            throw new LlmCompletionException("rate_limited", LlmParser.ProviderErrorMessage(ex), retryable: true, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = LlmParser.ErrorPayload(ex) };
         }
         catch (AnthropicApiException ex)
         {
             var retryable = (int)ex.StatusCode >= 500 || ex.StatusCode == HttpStatusCode.RequestTimeout;
-            throw new LlmCompletionException("provider_error", LlmParser.ProviderErrorMessage(ex), retryable, ex.StatusCode, ex);
+            throw new LlmCompletionException("provider_error", LlmParser.ProviderErrorMessage(ex), retryable, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = LlmParser.ErrorPayload(ex) };
         }
         catch (OperationCanceledException ex) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
         {
-            throw new LlmCompletionException("provider_timeout", $"no response within {request.Timeout}", retryable: true, inner: ex);
+            throw new LlmCompletionException("provider_timeout", $"no response within {request.Timeout}", retryable: true, inner: ex) { RequestPayload = requestPayload };
         }
         catch (Exception ex) when (ex is not LlmCompletionException and not OperationCanceledException)
         {
-            throw new LlmCompletionException("provider_error", ex.Message, retryable: true, inner: ex);
+            throw new LlmCompletionException("provider_error", ex.Message, retryable: true, inner: ex) { RequestPayload = requestPayload };
         }
     }
 }

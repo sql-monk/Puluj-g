@@ -75,6 +75,9 @@ declare topology, outbox relay, reconciliation/cleanup, архів `messaging.ev
 ### Доменні writers і watchdog (P09, cutover)
 
 Ролі `track-worker`, `alert-worker`, `watchdog` сервісу `messaging` **вимкнені за замовчуванням**: до cutover домен пише legacy роль `processing`.
+Скриптом: `.\scripts\deploy.ps1 -Broker` — профіль `broker` + single ingress (платформа без writers, legacy пише домен);
+`.\scripts\deploy.ps1 -Broker -DomainWriters` — cutover: скрипт спершу зупиняє `processor`, потім піднімає `messaging` з ролями writers
+(`MESSAGING_WORKER_ROLES`, `PROCESSOR_REPLICAS=0`) і перевіряє, що жоден processor не лишився; rollback — запуск без `-DomainWriters`.
 Cutover (ADR-0009): 1) міграція `AddAggregateRevisions` (індекс `ux_targets_observation_id` будується CONCURRENTLY поза транзакцією; перерваний
 build лишає INVALID індекс — міграція спершу робить `DROP INDEX CONCURRENTLY IF EXISTS`, повторний `migrate` добудовує); 2) зупинити роль `processing` (loop + `TrackWatchdog`; reset заборонено
 під час роботи writers); 3) додати `track-worker,alert-worker,watchdog` до `Worker__Roles` сервісу `messaging`. Worker відмовляється стартувати з
