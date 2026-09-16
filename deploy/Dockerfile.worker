@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Directory.Build.props Directory.Packages.props Puluj.sln ./
+COPY contracts/ contracts/
 COPY src/ src/
 RUN dotnet restore src/Puluj.Worker/Puluj.Worker.csproj
 RUN dotnet publish src/Puluj.Worker/Puluj.Worker.csproj -c Release -o /app --no-restore

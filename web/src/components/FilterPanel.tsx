@@ -30,21 +30,11 @@ interface Props {
 export default function FilterPanel({ route, open, onClose, picking, onPickingChange, onReplay }: Props) {
   const filters = useStore((s) => s.filters)
   const setFilter = useStore((s) => s.setFilter)
-  const sources = useStore((s) => s.sources)
   const lifetimeOptions = useStore((s) => s.mapConfig.lifetimeOptionsMinutes)
   const home = useStore((s) => s.home)
   const trackCount = useStore((s) => Object.keys(s.tracks).length)
   const alertCount = useStore((s) => Object.keys(s.alerts).length)
   const eventCount = useStore((s) => Object.keys(s.events).length)
-
-  const sourceOn = (id: number) => filters.sources === null || filters.sources.includes(id)
-  const toggleSource = (id: number, on: boolean) => {
-    const all = sources.map((s) => s.id)
-    const current = filters.sources === null ? all : filters.sources
-    const next = on ? [...new Set([...current, id])] : current.filter((x) => x !== id)
-    // Every source selected is the same as no filter: stored as null so new sources show up by default.
-    setFilter('sources', all.every((x) => next.includes(x)) ? null : next)
-  }
 
   const box = 'rounded-md border border-slate-300 px-2 py-1 text-sm dark:border-slate-600'
 
@@ -60,7 +50,7 @@ export default function FilterPanel({ route, open, onClose, picking, onPickingCh
     >
       <div>
         <div className="mb-1 flex items-baseline justify-between">
-          <span className="font-medium">Фільтри</span>
+          <span className="font-medium">Відображення на мапі</span>
           <span className="flex items-center gap-2 text-xs text-slate-500">
             {trackCount} об'єктів · {alertCount} тривог · {eventCount} подій
             <button className="rounded px-1.5 py-0.5 text-base leading-none text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200" onClick={onClose} title="Згорнути панель" aria-label="Згорнути панель">
@@ -97,28 +87,6 @@ export default function FilterPanel({ route, open, onClose, picking, onPickingCh
             ))}
           </select>
         </label>
-      </div>
-
-      <div>
-        <div className="mb-1 flex items-baseline justify-between">
-          <span className="font-medium">Джерела</span>
-          {filters.sources !== null && (
-            <button className="text-xs text-slate-500 underline" onClick={() => setFilter('sources', null)}>
-              усі
-            </button>
-          )}
-        </div>
-        {sources.length === 0 && <div className="text-xs text-slate-500">Джерела ще не завантажені.</div>}
-        <div className="flex flex-col gap-1 text-sm">
-          {sources.map((s) => (
-            <label key={s.id} className="flex items-center gap-2" title={s.url ?? s.code}>
-              <input type="checkbox" checked={sourceOn(s.id)} onChange={(e) => toggleSource(s.id, e.target.checked)} />
-              <span className="truncate">{s.name}</span>
-              <span className="ml-auto shrink-0 text-[11px] text-slate-400">довіра {Math.round(s.trustLevel * 100)}%</span>
-            </label>
-          ))}
-        </div>
-        {filters.sources !== null && <div className="mt-1 text-[11px] text-slate-500">Ціль показується, якщо про неї повідомляє хоча б одне з вибраних джерел.</div>}
       </div>
 
       <HomeLocationPicker picking={picking} onPickingChange={onPickingChange} />

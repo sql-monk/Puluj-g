@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openMap, sourceFeatures } from './helpers'
+import { openMap, sourceFeatures, waitForLayer } from './helpers'
 import { storeCall } from './store'
 
 /** E05 (§8.6): legend and filters come from the catalog; catalog visibility and the viewer's filter are two settings; the layer switch restores the legacy markers. */
@@ -26,4 +26,14 @@ test('legend from the catalog, per-kind filter, catalog visibility, layer switch
   await storeCall(page, 'setFilter', 'events', true)
   await expect.poll(async () => (await sourceFeatures(page, 'incident-points')).length).toBe(5)
   await expect.poll(async () => (await sourceFeatures(page, 'events')).map((f) => f.properties.id)).toEqual([1003]) // one switch for both layers; the explosion stays hidden behind its incident
+})
+
+test('the Map navigation item returns directly to the live map', async ({ page }) => {
+  await openMap(page)
+  await page.getByRole('link', { name: 'Цілі і події' }).click()
+  await expect(page).toHaveURL(/#\/entities$/)
+
+  await page.getByRole('link', { name: 'Мапа', exact: true }).click()
+  await expect(page).toHaveURL(/#\/map\/live$/)
+  await waitForLayer(page)
 })
