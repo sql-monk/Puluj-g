@@ -53,6 +53,9 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<QuarantineEntry> Quarantine => Set<QuarantineEntry>();
     public DbSet<Extraction> Extractions => Set<Extraction>();
+    public DbSet<Incident> Incidents => Set<Incident>();
+    public DbSet<IncidentObservation> IncidentObservations => Set<IncidentObservation>();
+    public DbSet<IncidentRevision> IncidentRevisions => Set<IncidentRevision>();
     public DbSet<Observation> Observations => Set<Observation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

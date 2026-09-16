@@ -2,7 +2,7 @@
   // Plan §8.2 initial event catalog. The database owns the rows: the seeder only adds codes that are missing and
   // refreshes presentation/policy fields when policyVersion is newer than the row's. `code` is stable and never edited.
   // `casualties.reported` is deliberately absent: it is a later extension with its own personal-data rules (§8.2).
-  "policyVersion": 1,
+  "policyVersion": 2,
   "kinds": [
     { "code": "target.observed", "nameUk": "Спостереження цілі", "category": "target", "defaultSeverity": "high", "stateModel": "track",
       "requiresLocationForMap": true, "renderMode": "marker", "mapColor": "#e53935", "mapIcon": "target", "mapLifetime": "00:30:00",
@@ -23,27 +23,27 @@
 
     { "code": "air_defence.activity", "nameUk": "Робота ППО", "category": "incident", "defaultSeverity": "medium", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#1e88e5", "mapIcon": "air-defence", "mapLifetime": "01:00:00",
-      "createsIncident": true, "sortOrder": 30, "metadata": { "legacyEventType": "AirDefenseActivity", "rule": "Робота ППО не означає підтверджене збиття" } },
+      "createsIncident": true, "sortOrder": 30, "dedupPolicy": { "windowMinutes": 60, "slackKm": 5 }, "metadata": { "legacyEventType": "AirDefenseActivity", "rule": "Робота ППО не означає підтверджене збиття" } },
     { "code": "air_defence.interception.reported", "nameUk": "Повідомлення про перехоплення", "category": "incident", "defaultSeverity": "medium", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#3949ab", "mapIcon": "interception", "mapLifetime": "01:00:00",
-      "createsIncident": true, "sortOrder": 31, "metadata": { "rule": "Повідомлення джерела, не підтверджене збиття" } },
+      "createsIncident": true, "sortOrder": 31, "dedupPolicy": { "windowMinutes": 60, "slackKm": 5 }, "metadata": { "rule": "Повідомлення джерела, не підтверджене збиття" } },
 
     { "code": "impact.explosion.reported", "nameUk": "Повідомлення про вибух", "category": "incident", "defaultSeverity": "high", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#fb8c00", "mapIcon": "explosion", "mapLifetime": "02:00:00",
-      "createsIncident": true, "sortOrder": 40, "metadata": { "legacyEventType": "ExplosionReport", "rule": "Вибух не автоматично влучання" } },
+      "createsIncident": true, "sortOrder": 40, "dedupPolicy": { "windowMinutes": 120, "slackKm": 5 }, "metadata": { "legacyEventType": "ExplosionReport", "rule": "Вибух не автоматично влучання" } },
     { "code": "impact.confirmed", "nameUk": "Підтверджене влучання", "category": "incident", "defaultSeverity": "critical", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#b71c1c", "mapIcon": "impact", "mapLifetime": "06:00:00",
-      "createsIncident": true, "sortOrder": 41, "metadata": { "rule": "Confirmed потребує явного evidence за policy" } },
+      "createsIncident": true, "sortOrder": 41, "dedupPolicy": { "windowMinutes": 360, "slackKm": 5, "confirms": ["impact.explosion.reported"] }, "metadata": { "rule": "Confirmed потребує явного evidence за policy" } },
 
     { "code": "fire.reported", "nameUk": "Пожежа", "category": "incident", "defaultSeverity": "medium", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#ef6c00", "mapIcon": "fire", "mapLifetime": "06:00:00",
-      "createsIncident": true, "sortOrder": 50, "metadata": { "rule": "Не вигадувати причину пожежі" } },
+      "createsIncident": true, "sortOrder": 50, "dedupPolicy": { "windowMinutes": 360, "slackKm": 5 }, "metadata": { "rule": "Не вигадувати причину пожежі" } },
     { "code": "damage.reported", "nameUk": "Пошкодження", "category": "incident", "defaultSeverity": "medium", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#6d4c41", "mapIcon": "damage", "mapLifetime": "12:00:00",
-      "createsIncident": true, "sortOrder": 51, "metadata": {} },
+      "createsIncident": true, "sortOrder": 51, "dedupPolicy": { "windowMinutes": 720, "slackKm": 5 }, "metadata": {} },
     { "code": "infrastructure.outage", "nameUk": "Відключення інфраструктури", "category": "incident", "defaultSeverity": "medium", "stateModel": "reported_confirmed_resolved",
       "requiresLocationForMap": true, "renderMode": "area", "mapColor": "#546e7a", "mapIcon": "outage", "mapLifetime": "12:00:00",
-      "createsIncident": true, "sortOrder": 52, "metadata": { "rule": "Не вигадувати причину відключення" } },
+      "createsIncident": true, "sortOrder": 52, "dedupPolicy": { "windowMinutes": 720, "slackKm": 5 }, "metadata": { "rule": "Не вигадувати причину відключення" } },
 
     { "code": "civil_defence.notice", "nameUk": "Повідомлення цивільного захисту", "category": "info", "defaultSeverity": "info", "stateModel": "none",
       "requiresLocationForMap": false, "renderMode": "feed", "mapColor": "#757575", "mapIcon": "notice", "mapLifetime": null,

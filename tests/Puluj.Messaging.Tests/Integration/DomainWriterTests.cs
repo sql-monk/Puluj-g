@@ -40,11 +40,13 @@ public sealed class DomainWriterTests(MessagingFixture f)
         {
             await f.TrackWorker.StartAsync(None);
             await f.AlertWorker.StartAsync(None);
+            await f.IncidentWorker.StartAsync(None);
         }
     }
 
     private async Task StopAllAsync()
     {
+        await f.IncidentWorker.StopAsync(None);
         await f.AlertWorker.StopAsync(None);
         await f.TrackWorker.StopAsync(None);
         await f.Finalizer.StopAsync(None);
@@ -100,7 +102,7 @@ public sealed class DomainWriterTests(MessagingFixture f)
             $"extractions: {await f.CountAsync("processing.extractions")} of {messages}");
         if (writers)
         {
-            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "subscription_id IN ('track-worker', 'alert-worker') AND outcome IS NULL") == 0, TimeSpan.FromSeconds(60)),
+            Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("processing.deliveries", "subscription_id IN ('track-worker', 'alert-worker', 'incident-worker') AND outcome IS NULL") == 0, TimeSpan.FromSeconds(60)),
                 "writer deliveries settled");
         }
         Assert.True(await MessagingFixture.WaitUntilAsync(async () => await f.CountAsync("messaging.outbox", "confirmed_at IS NULL") == 0, TimeSpan.FromSeconds(40)));

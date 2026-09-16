@@ -37,7 +37,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
         ["message.analysis.completed"] = ["message-analytics", "archive"],
         ["track.changed"] = ["archive", "projection", "message-analytics"], // v6 (P09): archive keeps the events routable until projection exists
         ["alert.changed"] = ["archive", "projection", "message-analytics"],
-        ["incident.changed"] = ["projection", "message-analytics"],
+        ["incident.changed"] = ["archive", "projection", "message-analytics"], // v7 (P10)
         ["track.expiry.requested"] = ["track-worker"],
         ["alert.expiry.requested"] = ["alert-worker"],
     };
@@ -45,7 +45,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
     [Fact]
     public void T03_RegistryContainsExpectedEventTypesSubscriptionsAndRequiredSets()
     {
-        Assert.Equal(6, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser; v5 finalizer/llm-worker; v6 track/alert-worker
+        Assert.Equal(7, contracts.Topology["topology_version"]!.GetValue<int>()); // v2 archive; v3 raw-writer; v4 normalizer/parser; v5 finalizer/llm-worker; v6 track/alert-worker; v7 incident-worker
         Assert.Equal(ExpectedEventTypes.Order(StringComparer.Ordinal), contracts.Events.Select(e => e.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedSubscriptions.Order(StringComparer.Ordinal), contracts.Subscriptions.Select(s => s.Key).Order(StringComparer.Ordinal));
         Assert.Equal(ExpectedProducerRoles.Order(StringComparer.Ordinal), contracts.ProducerRoles.Select(p => p.Key).Order(StringComparer.Ordinal));
@@ -105,7 +105,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             // (черги для parse.completed/llm.requested існують з P05; active з P06); решта — planned до своїх задач.
             var expectedStatus = subscriptionId switch
             {
-                "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" or "track-worker" or "alert-worker" => "active",
+                "archive" or "raw-writer" or "normalizer" or "parser" or "finalizer" or "llm-worker" or "track-worker" or "alert-worker" or "incident-worker" => "active",
                 _ => "planned",
             };
             Assert.Equal(expectedStatus, subscription["status"]!.GetValue<string>());
@@ -150,7 +150,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
         Assert.True(archive["required"]!.GetValue<bool>());
         // Every replay source is archived; since v6 the archive also takes the aggregate change events (P09: the only active subscriber until projection).
         var bindings = ContractFiles.Strings(archive["bindings"]).Order(StringComparer.Ordinal).ToList();
-        Assert.Equal(replaySources.Concat(["alert.changed", "track.changed"]).Order(StringComparer.Ordinal), bindings);
+        Assert.Equal(replaySources.Concat(["alert.changed", "incident.changed", "track.changed"]).Order(StringComparer.Ordinal), bindings);
     }
 
     [Fact]

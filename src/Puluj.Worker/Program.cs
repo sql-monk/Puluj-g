@@ -54,7 +54,7 @@ if (brokerRoles.Count > 0 && messaging.Enabled)
     {
         builder.Services.AddPulujStages(builder.Configuration, brokerRoles, worker.InstanceName); // P05/P06 stage workers (no legacy loop)
     }
-    if (brokerRoles.Overlaps([WorkerOptions.TrackWorker, WorkerOptions.AlertWorker, WorkerOptions.Watchdog]))
+    if (brokerRoles.Overlaps([WorkerOptions.TrackWorker, WorkerOptions.AlertWorker, WorkerOptions.Watchdog, WorkerOptions.IncidentWorker]))
     {
         if (roles.Contains(WorkerOptions.Processing))
         {

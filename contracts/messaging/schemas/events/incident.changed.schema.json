@@ -76,6 +76,7 @@
       "minimum": 1
     },
     "policy_version": {
+    "suppressed": { "type": "boolean", "description": "P10 (additive): прихований оператором; unsuppress → change updated зі suppressed=false" },
       "type": "string"
     }
   }

@@ -12,7 +12,7 @@ public sealed class TopologyRegistryTests
     {
         var file = TopologyRegistry.Load(Path.Combine(AppContext.BaseDirectory, "contracts", "messaging", "topology.json"));
         Assert.Equal(file.Hash, Registry.Hash);
-        Assert.Equal(6, Registry.TopologyVersion);
+        Assert.Equal(7, Registry.TopologyVersion);
         Assert.Equal("puluj.events", Registry.ExchangeName);
         Assert.Equal(["live", "history", "replay"], Registry.Lanes);
     }
@@ -39,7 +39,7 @@ public sealed class TopologyRegistryTests
         Assert.Equal(["parser"], Registry.ExpectedSubscriptions("message.normalized", "live").Select(s => s.Id));
         Assert.Equal(["finalizer"], Registry.ExpectedSubscriptions("parse.completed", "live").Select(s => s.Id)); // active since v5 (P06)
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "live").Select(s => s.Id)); // domain workers are conditional (by_manifest)
-        Assert.Equal(["archive", "track-worker", "alert-worker"], Registry.ExpectedSubscriptions("observations.recorded", "live", null, null, ["track-worker", "alert-worker", "incident-worker", "nope"]).Select(s => s.Id)); // v6 (P09): named branches that are active; incident-worker still planned
+        Assert.Equal(["archive", "track-worker", "alert-worker", "incident-worker"], Registry.ExpectedSubscriptions("observations.recorded", "live", null, null, ["track-worker", "alert-worker", "incident-worker", "nope"]).Select(s => s.Id)); // v7 (P10): every named branch is active
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("observations.recorded", "replay", null, null, ["track-worker"]).Select(s => s.Id)); // writers do not serve replay (P14)
         Assert.Equal(["archive"], Registry.ExpectedSubscriptions("track.changed", "live").Select(s => s.Id)); // routable through the archive until projection exists
         Assert.Equal(["track-worker"], Registry.ExpectedSubscriptions("track.expiry.requested", "live").Select(s => s.Id));

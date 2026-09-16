@@ -17,8 +17,8 @@
            llm-worker, finalizer) and route the collectors through the single ingress (MESSAGING_OUTBOX_ENABLED /
            MESSAGING_INGRESS_ENABLED = true). Without it the platform path is off and the legacy processor writes the domain.
 .PARAMETER DomainWriters
-           P09 cutover (ADR-0009): the legacy `processor` role is stopped and scaled to 0 BEFORE the `messaging` worker
-           gets the track-worker, alert-worker and watchdog roles — never two owners of tracks/alerts over one database.
+           P09/P10 cutover (ADR-0009/0010): the legacy `processor` role is stopped and scaled to 0 BEFORE the `messaging` worker
+           gets the track-worker, alert-worker, watchdog and incident-worker roles — never two owners of tracks/alerts over one database.
            Requires -Broker. Rollback: run again without -DomainWriters (processor back to 2 replicas, writers roles off;
            the guards in both directions keep the rows consistent).
 #>
@@ -70,7 +70,7 @@ if ($Broker) {
     $env:MESSAGING_INGRESS_ENABLED = "true"
 }
 if ($DomainWriters) {
-    $env:MESSAGING_WORKER_ROLES = "$defaultMessagingRoles,track-worker,alert-worker,watchdog"
+    $env:MESSAGING_WORKER_ROLES = "$defaultMessagingRoles,track-worker,alert-worker,watchdog,incident-worker"
     $env:PROCESSOR_REPLICAS = "0"
 } else {
     $env:MESSAGING_WORKER_ROLES = $defaultMessagingRoles

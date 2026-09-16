@@ -192,10 +192,11 @@ public sealed class FinalizerHandler(IDbContextFactory<PulujDbContext> factory, 
         var branches = new List<string>();
         foreach (var fact in facts)
         {
-            // P09 (ADR-0009): the track-worker is the fact writer of every non-alert observation until the incident owner exists (P10).
+            // Owners (ADR-0009/0010): alerts → alert-worker, incidents → incident-worker (P10), targets and info → track-worker (fact writer).
             var branch = fact?["category"]?.GetValue<string>() switch
             {
                 "alert" => "alert-worker",
+                "incident" => "incident-worker",
                 _ => "track-worker",
             };
             if (branch is not null && !branches.Contains(branch))

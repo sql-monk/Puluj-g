@@ -1,6 +1,6 @@
 {
   "$comment": "P01 registry очікуваних підписок. Єдине джерело для тестів контрактів і для runtime (embedded у Puluj.Infrastructure; P03 TopologyRegistry/TopologyRegistrar). Broker-специфічні аргументи черг (quorum, DLX, delivery-limit) закрив P02. Версія 2 (P03): archive → active; версія 3 (P04): raw-writer → active; версія 4 (P05): normalizer, parser → active, finalizer і llm-worker → paused; версія 5 (P06): finalizer, llm-worker → active; expected set і черги — лише для active/paused підписок (ADR-0002).",
-  "topology_version": 6,
+  "topology_version": 7,
   "status": "accepted",
   "exchange": { "name": "puluj.events", "type": "topic", "durable": true },
   "routing_key_pattern": "puluj.{lane}.{event_type}",
@@ -132,7 +132,8 @@
       "producer": "incident-worker",
       "scope": "aggregate",
       "replay_source": false,
-      "required_subscriptions": ["projection", "message-analytics"],
+      "$comment": "P10: archive у required — див. track.changed.",
+      "required_subscriptions": ["archive", "projection", "message-analytics"],
       "optional_subscriptions": []
     },
     "track.expiry.requested": {
@@ -211,8 +212,8 @@
       "idempotency": "inbox + aggregate_revision"
     },
     "incident-worker": {
-      "role": "consumer", "required": true, "status": "planned", "owner_task": "P10",
-      "bindings": ["observations.recorded"], "lanes": ["live", "history", "replay"],
+      "role": "consumer", "required": true, "status": "active", "owner_task": "P10",
+      "bindings": ["observations.recorded"], "lanes": ["live", "history"],
       "emits": ["incident.changed"], "queue_policy": "required",
       "idempotency": "inbox + aggregate_revision + generation"
     },
@@ -232,7 +233,7 @@
     },
     "archive": {
       "role": "consumer", "required": true, "status": "active", "owner_task": "P03",
-      "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed", "track.changed", "alert.changed"],
+      "bindings": ["ingress.received", "raw.stored", "observations.recorded", "message.analysis.completed", "track.changed", "alert.changed", "incident.changed"],
       "lanes": ["live", "history", "replay"],
       "emits": [], "queue_policy": "required",
       "idempotency": "append-only unique(event_id)",

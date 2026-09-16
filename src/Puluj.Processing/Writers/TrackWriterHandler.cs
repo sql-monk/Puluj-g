@@ -35,6 +35,7 @@ public sealed class TrackWriterHandler(
     public const string Subscription = "track-worker";
     public const string EventType = "track.changed";
     public const string ExpiryCommand = "track.expiry.requested";
+    public const string IncidentBranch = "incident-worker";
 
     public string SubscriptionId => Subscription;
     public string Producer { get; set; } = Subscription;
@@ -67,6 +68,9 @@ public sealed class TrackWriterHandler(
         var targets = new List<Target>();
         var cancellations = new List<(Target, string)>();
         var observations = new List<Guid>();
+        // P10: incident facts have their own owner when the event names it in expected_branches; events published before
+        // (v6 payloads still in the queues) keep the P09 behaviour — the track-worker writes their rows.
+        var incidentOwner = (payload["expected_branches"] as JsonArray)?.Any(b => b?.GetValue<string>() == IncidentBranch) ?? false;
         foreach (var fact in WriterSupport.Facts(envelope))
         {
             var category = TargetMaterializer.Category(fact);
@@ -76,6 +80,10 @@ public sealed class TrackWriterHandler(
                 observations.Add(anyId); // every observation of the event, both branches: the "another set" guard compares whole sets
             }
             // Cancellations by the legacy enum, exactly what the sinks key on (a new rule code with the same legacy meaning behaves the same).
+            if (category == "incident" && incidentOwner)
+            {
+                continue; // the incident-worker writes the row and the aggregate (ADR-0010)
+            }
             if (category == "alert")
             {
                 if (target.EventType == Domain.Enums.EventType.AlertCancelled)

@@ -50,6 +50,8 @@ builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetEvaluator>();
 builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetPreview>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.AdminIndexes>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.KindCorpus>();
+// P10 incident commands: the same state writer as the incident-worker (locks, revisions, incident.changed via the outbox).
+builder.Services.AddSingleton<Puluj.Processing.Incidents.IncidentStateWriter>();
 // Container management through the docker CLI and the mounted socket; off unless Docker__Enabled (the compose stack sets it).
 builder.Services.AddOptions<DockerOptions>().Bind(builder.Configuration.GetSection(DockerOptions.Section));
 builder.Services.AddSingleton<DockerService>();
@@ -72,6 +74,7 @@ app.MapHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = Hea
 app.MapAdminEndpoints();
 app.MapOpsEndpoints();
 Puluj.Admin.Endpoints.RulesetEndpoints.MapRulesetEndpoints(app);
+Puluj.Admin.Endpoints.IncidentEndpoints.MapIncidentEndpoints(app);
 app.MapAnalyticsEndpoints();
 
 // The admin SPA is built as admin.html (second Vite entry of the shared web/ code base).

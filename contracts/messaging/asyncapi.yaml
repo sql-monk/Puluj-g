@@ -3,7 +3,7 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '6.0.0'
+  version: '7.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
@@ -513,7 +513,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/observations_recorded'
-    summary: subscription incident-worker (required=true, owner_task=P10, status=planned)
+    summary: subscription incident-worker (required=true, owner_task=P10, status=active)
     messages:
       - $ref: '#/channels/observations_recorded/messages/observations_recorded'
     bindings:
@@ -521,7 +521,7 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.incident-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history, replay]
+    x-lanes: [live, history]
   receive_projection_track_changed:
     action: receive
     channel:
@@ -698,6 +698,19 @@ operations:
     summary: subscription archive (required=true, owner_task=P03, status=active)
     messages:
       - $ref: '#/channels/alert_changed/messages/alert_changed'
+    bindings:
+      amqp:
+        ack: true
+    x-queue-name-pattern: puluj.archive.{lane}
+    x-queue-policy: required
+    x-lanes: [live, history, replay]
+  receive_archive_incident_changed:
+    action: receive
+    channel:
+      $ref: '#/channels/incident_changed'
+    summary: subscription archive (required=true, owner_task=P03, status=active)
+    messages:
+      - $ref: '#/channels/incident_changed/messages/incident_changed'
     bindings:
       amqp:
         ack: true
@@ -913,7 +926,7 @@ components:
       x-kind: event
       x-schema-version: '1.0'
       x-producer: incident-worker
-      x-required-subscriptions: [projection, message-analytics]
+      x-required-subscriptions: [archive, projection, message-analytics]
       payload:
         allOf:
           - $ref: 'schemas/envelope.schema.json'

@@ -1,0 +1,24 @@
+{
+  "contractVersion": 1,
+  "dataset": { "id": "f14c2b6e-93f4-496f-b7b0-4f7e903cbdac", "kind": "generation", "watermark": "2026-09-15T10:30:00.000Z" },
+  "idPrecision": { "adjacentDecimalIds": ["9007199254740992", "9007199254740993"], "journey": ["json", "hub", "store", "mapClick", "detail", "back"] },
+  "regions": [{ "id": 11, "parentId": null }, { "id": 12, "parentId": 11 }, { "id": 13, "parentId": 12 }],
+  "rawMessages": [
+    { "id": "9007199254740992", "sourceId": 7, "sourceMessageKey": "telegram:42", "sourceRevision": "edit:opaque:2", "publishedAt": "2026-09-15T09:00:00.000Z", "results": ["9007199254740993", "42"] },
+    { "id": "43", "sourceId": 8, "sourceMessageKey": "alerts:sumy:1", "sourceRevision": "snapshot:7f", "publishedAt": "2026-09-15T10:00:00.000Z", "results": [] }
+  ],
+  "observations": [
+    { "id": "9007199254740993", "rawMessageId": "9007199254740992", "eventKind": "target.observed", "categoryId": 1, "regionId": 13, "observedAt": "2026-09-15T09:30:00.000Z", "canonicalRefs": [{ "kind": "track", "id": "77" }], "relations": ["evidence-to-track", "shared-message-with-42", "continuation-from-41"] },
+    { "id": "42", "rawMessageId": "9007199254740992", "eventKind": "impact.explosion.reported", "categoryId": 4, "regionId": 11, "observedAt": "2026-09-15T10:00:00.000Z", "location": { "kind": "Region", "placeId": 11 }, "canonicalRefs": [] },
+    { "id": "44", "rawMessageId": "43", "eventKind": "fire.reported", "eventKindEnabled": false, "modelId": 991, "modelEnabled": false, "observedAt": "2026-09-15T10:00:00.000Z", "location": { "kind": "Point", "point": [33.2, 51.2] }, "lateMembershipAt": "2026-09-15T12:00:00.000Z", "lateLlmRun": "d447b678-55a3-4cea-8ec6-e20fcd63c9e2" }
+  ],
+  "entities": [
+    { "ref": { "kind": "track", "id": "77" }, "status": "closed", "lastSeenAt": "2025-01-01T00:00:00.000Z", "mapLocator": { "at": "2025-01-01T00:00:00.000Z", "regionId": 13 } },
+    { "ref": { "kind": "alert", "id": "88" }, "sourceId": 9, "rawMessageId": null, "placeId": 12 }
+  ],
+  "queryCases": [
+    { "name": "same-evidence-match", "query": "eventKinds=target.observed&regionId=13&from=2026-09-15T09:00:00.000Z&to=2026-09-15T10:00:00.000Z", "includes": ["9007199254740993"], "excludes": ["42"] },
+    { "name": "upper-bound-exclusive", "query": "from=2026-09-15T09:00:00.000Z&to=2026-09-15T10:00:00.000Z", "excludes": ["42"] },
+    { "name": "history-default-at", "query": "#/map/history?from=2026-09-15T09:00:00.000Z&to=2026-09-15T10:00:00.000Z", "expectedAt": "2026-09-15T09:59:59.999Z", "historyBasis": "reconstructed" }
+  ]
+}

@@ -1,5 +1,8 @@
 # Puluj-G — документація
 
+Новий публічний UI: [контракт маршрутів, фільтрів і read-only API](public-ui-contract.md),
+machine-readable приклади — [fixtures/public-ui-contract.fixture.json](fixtures/public-ui-contract.fixture.json).
+
 Єдина програма розвитку: [платформа повідомлень, воркерів, подій та аналітики](plan-message-platform.md).
 Документ самодостатній для нового агента: контекст коду, контракти, backlog, тести, review та handoff.
 Заплановані можливості й статус реалізації позначені окремо від опису поточної системи нижче.

@@ -60,6 +60,8 @@ public sealed class MessagingFixture : IAsyncLifetime
     public SubscriptionConsumer TrackWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Writers.TrackWriterHandler.Subscription);
     public SubscriptionConsumer AlertWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Writers.AlertWriterHandler.Subscription);
     public Puluj.Processing.Writers.DomainWatchdog Watchdog => Services.GetRequiredService<Puluj.Processing.Writers.DomainWatchdog>();
+    public SubscriptionConsumer IncidentWorker => Services.GetServices<SubscriptionConsumer>().Single(c => c.SubscriptionId == Puluj.Processing.Incidents.IncidentWriterHandler.Subscription);
+    public Puluj.Processing.Incidents.IncidentStateWriter Incidents => Services.GetRequiredService<Puluj.Processing.Incidents.IncidentStateWriter>();
     public FakeLlmCompletion Llm { get; } = new();
     public RawMessageProcessor LegacyProcessor => Services.GetRequiredService<RawMessageProcessor>();
     public IndexProvider Indexes => Services.GetRequiredService<IndexProvider>();
@@ -149,7 +151,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         services.AddPulujProcessing(config, "p03-test"); // legacy processor for the parity test (hosted loop is never started here)
         services.AddPulujStages(config, new HashSet<string> { StageRoles.Normalizer, StageRoles.Parser, StageRoles.LlmWorker, StageRoles.Finalizer }, "p03-test");
         // P09 domain writers next to the legacy processor: never started together on the same messages (W06/W07 drive each path explicitly).
-        services.AddPulujDomainWriters(config, new HashSet<string> { StageRoles.TrackWorker, StageRoles.AlertWorker, StageRoles.Watchdog }, "p03-test");
+        services.AddPulujDomainWriters(config, new HashSet<string> { StageRoles.TrackWorker, StageRoles.AlertWorker, StageRoles.Watchdog, StageRoles.IncidentWorker }, "p03-test");
         // The collectors' entry point without the collectors themselves (Telegram needs MTProto, alerts.in.ua a token).
         services.AddSingleton<CollectorStateStore>();
         services.AddSingleton<CollectorIngress>();
@@ -185,7 +187,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         await ExecAsync("""
             TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, messaging.subscriptions, messaging.topology_versions,
                      processing.runs, processing.generations, processing.stage_results, processing.attempts, processing.deliveries, processing.quarantine,
-                     processing.observations, processing.extractions, llm_requests,
+                     processing.observations, processing.extractions, llm_requests, incident_revisions, incident_observations, incidents,
                      collector_states, targets, target_tracks, track_targets, target_track_revisions, target_links, source_daily_stats, source_copies, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE
             """);
         Registrar.Reset();
@@ -198,6 +200,7 @@ public sealed class MessagingFixture : IAsyncLifetime
         Finalizer.ResetCounters();
         TrackWorker.ResetCounters();
         AlertWorker.ResetCounters();
+        IncidentWorker.ResetCounters();
         Watchdog.ResetMemo();
         Llm.Reset();
         Services.GetRequiredService<LlmBreaker>().Reset(); // a 429 in one test must not pause the model for the next
@@ -210,7 +213,7 @@ public sealed class MessagingFixture : IAsyncLifetime
     {
         var connection = await Broker.GetAsync(CancellationToken.None);
         await using var channel = await connection.CreateChannelAsync();
-        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription })
+        foreach (var subscription in new[] { ArchiveHandler.Subscription, RawWriterHandler.Subscription, NormalizerHandler.Subscription, ParserHandler.Subscription, FinalizerHandler.Subscription, LlmWorkerHandler.Subscription, Puluj.Processing.Writers.TrackWriterHandler.Subscription, Puluj.Processing.Writers.AlertWriterHandler.Subscription, Puluj.Processing.Incidents.IncidentWriterHandler.Subscription })
         {
             foreach (var lane in Registry.Subscription(subscription).Lanes)
             {

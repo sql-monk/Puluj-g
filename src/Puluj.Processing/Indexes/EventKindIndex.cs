@@ -40,6 +40,9 @@ public sealed class EventKindIndex
 
     public EventKind? ByCode(string code) => _byCode.GetValueOrDefault(code);
 
+    /// <summary>Code of a catalog id (P10 incidents cite kinds by code), null when the snapshot does not know it.</summary>
+    public string? CodeOf(int eventKindId) => _byCode.Values.FirstOrDefault(k => k.EventKindId == eventKindId)?.Code;
+
     /// <summary>Catalog id for a legacy enum value, or null when the catalog has not been seeded with that code (never a guess).</summary>
     public int? IdForLegacy(EventType type) => _byLegacy.TryGetValue(type, out var id) ? id : null;
 

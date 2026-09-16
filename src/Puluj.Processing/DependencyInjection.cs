@@ -144,6 +144,17 @@ public static class DependencyInjection
             });
             services.AddSubscriptionConsumer<Writers.AlertWriterHandler>(instanceName);
         }
+        if (roles.Contains(StageRoles.IncidentWorker))
+        {
+            services.TryAddSingleton<Incidents.IncidentStateWriter>();
+            services.AddSingleton(sp =>
+            {
+                var handler = ActivatorUtilities.CreateInstance<Incidents.IncidentWriterHandler>(sp);
+                handler.Producer = Puluj.Messaging.DependencyInjection.ConsumerWorker(Incidents.IncidentWriterHandler.Subscription, instanceName);
+                return handler;
+            });
+            services.AddSubscriptionConsumer<Incidents.IncidentWriterHandler>(instanceName);
+        }
         if (roles.Contains(StageRoles.Watchdog))
         {
             services.AddSingleton(sp =>
@@ -168,5 +179,6 @@ public static class StageRoles
     public const string TrackWorker = "track-worker";
     public const string AlertWorker = "alert-worker";
     public const string Watchdog = "watchdog";
-    public static readonly string[] DomainWriters = [TrackWorker, AlertWorker, Watchdog];
+    public const string IncidentWorker = "incident-worker";
+    public static readonly string[] DomainWriters = [TrackWorker, AlertWorker, Watchdog, IncidentWorker];
 }
