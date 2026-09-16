@@ -35,7 +35,7 @@ public class PublicCatalogContractTests
     {
         var id = "9007199254740993";
         var summary = new PublicMessageSummaryDto(id, 7, "source", DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "post-1", "e42", "7:post-1",
-            "completed", "stage_result", "https://example.test/post", 1, 1, 1, 0, true);
+            "completed", "stage_result", "https://example.test/post", "https://example.test/post", 1, 1, 1, 0, "allowed excerpt", true);
         var map = new PublicMapLocatorDto("point", null, null, null, "point", null, DateTimeOffset.UnixEpoch, null);
         var result = new PublicMessageResultDto(id, null, 0, "allowed segment", "event", null, DateTimeOffset.UnixEpoch, "high", 7, true, map, []);
         var detail = new PublicMessageDetailsDto(summary, "available", "allowed full text", new([result], null, 1), new([], null, 0), [], new Dictionary<string, string>());
@@ -43,6 +43,7 @@ public class PublicCatalogContractTests
         ApiDependencyInjection.ConfigureJson(options);
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(detail, options));
         Assert.Equal(JsonValueKind.String, json.RootElement.GetProperty("message").GetProperty("id").ValueKind);
+        Assert.Equal("allowed excerpt", json.RootElement.GetProperty("message").GetProperty("excerpt").GetString());
         Assert.False(json.RootElement.TryGetProperty("rawPayload", out _));
         Assert.False(json.RootElement.TryGetProperty("parserMetadata", out _));
         Assert.False(json.RootElement.TryGetProperty("worker", out _));

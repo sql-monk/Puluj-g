@@ -425,10 +425,12 @@ export interface PublicMessageSummaryDto {
   outcome: string
   outcomeSource: 'stage_result' | 'legacy'
   url?: string
+  urlText?: string
   resultCount: number
   matchedResultCount: number
   locatedResultCount: number
   unlocatedResultCount: number
+  excerpt?: string
   hasText: boolean
 }
 export interface PublicMessagePageDto { from: string; to: string; dataset: string; consistency: string; items: PublicMessageSummaryDto[]; nextCursor?: string; refreshRecommended: boolean }
