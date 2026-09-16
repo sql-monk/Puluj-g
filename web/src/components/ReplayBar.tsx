@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { TimelineBucketDto } from '../api/types'
 import { replay } from '../replay/engine'
 import { useStore } from '../store/useStore'
+import type { HistoryWindow } from '../public/routes'
 
 const PRESETS_H = [1, 3, 6, 12, 24]
 /** Minutes of history per real second. */
@@ -35,12 +36,12 @@ function toLocalInput(d: Date) {
  * moves the markers between reports — a time-lapse, not a slideshow of snapshots. The store's `at` follows the clock
  * once a second (alerts, feed cutoff). Works on both map pages.
  */
-export default function ReplayBar({ onClose }: { onClose: () => void }) {
+export default function ReplayBar({ initialWindow, onClose }: { initialWindow: HistoryWindow; onClose: () => void }) {
   const at = useStore((s) => s.at)
   const setMode = useStore((s) => s.setMode)
   const loading = useStore((s) => s.loading)
-  const [hours, setHours] = useState(6)
-  const [to, setTo] = useState(() => new Date())
+  const [hours, setHours] = useState(() => (initialWindow.to.getTime() - initialWindow.from.getTime()) / 3600_000)
+  const [to, setTo] = useState(() => initialWindow.to)
   const from = useMemo(() => new Date(to.getTime() - hours * 3600_000), [to, hours])
   const [speed, setSpeed] = useState(5)
   const [playing, setPlaying] = useState(false)
@@ -70,7 +71,7 @@ export default function ReplayBar({ onClose }: { onClose: () => void }) {
     replay.pause()
     setWindowLoaded(false)
     const current = useStore.getState().at
-    seek(current && current >= from && current <= to ? current : to)
+    seek(current && current >= from && current < to ? current : new Date(to.getTime() - 1))
     let cancelled = false
     api
       .replay(from, to)

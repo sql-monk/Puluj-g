@@ -1,0 +1,133 @@
+export type PublicSection = 'map' | 'analytics' | 'entities' | 'messages'
+export type MapMode = 'live' | 'history'
+
+export interface PublicRoute {
+  section: PublicSection
+  mapMode?: MapMode
+  /** A legacy Kyiv link is a map presentation preset, not a separate section. */
+  preset?: 'kyiv'
+  detail?: { kind?: string; id: string }
+  query: URLSearchParams
+}
+
+export interface ParsedRoute {
+  route: PublicRoute
+  canonicalHash: string
+  shouldReplace: boolean
+}
+
+export interface HistoryWindow {
+  from: Date
+  to: Date
+  /** The exclusive upper bound is not itself a historical frame. */
+  at: Date
+}
+
+function queryOf(hash: string): URLSearchParams {
+  const index = hash.indexOf('?')
+  return new URLSearchParams(index >= 0 ? hash.slice(index + 1) : '')
+}
+
+function pathOf(hash: string): string {
+  const start = hash.startsWith('#') ? hash.slice(1) : hash
+  return (start.split('?', 1)[0] || '/').replace(/\/+$/, '') || '/'
+}
+
+function isEntityKind(value: string): value is 'track' | 'incident' | 'alert' | 'observation' {
+  return value === 'track' || value === 'incident' || value === 'alert' || value === 'observation'
+}
+
+function analyticsQuery(query: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(query)
+  const legacyTab = next.get('tab')
+  const legacyPreset = next.get('p')
+  if (legacyTab !== null) {
+    next.delete('tab')
+    if (!next.has('metric')) next.set('metric', legacyTab)
+  }
+  if (legacyPreset !== null) {
+    next.delete('p')
+    if (!next.has('preset')) next.set('preset', legacyPreset)
+  }
+  return next
+}
+
+function decodedId(value: string): string | null {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return null
+  }
+}
+
+/** Serializes only routes accepted by the public shell. Query values are kept verbatim for U03's codec. */
+export function publicHash(route: PublicRoute): string {
+  const base =
+    route.section === 'map'
+      ? `#/map/${route.mapMode ?? 'live'}`
+      : route.section === 'entities' && route.detail
+        ? `#/entities/${route.detail.kind ?? 'observation'}/${route.detail.id}`
+        : route.section === 'messages' && route.detail
+          ? `#/messages/${route.detail.id}`
+          : `#/${route.section}`
+  const query = new URLSearchParams(route.query)
+  if (route.preset === 'kyiv') query.set('preset', 'kyiv')
+  const encoded = query.toString()
+  return encoded ? `${base}?${encoded}` : base
+}
+
+/**
+ * Parses canonical routes and preserves legacy query state during a one-time replace normalization.
+ * Query interpretation itself remains the single U03 codec responsibility.
+ */
+export function parsePublicHash(hash: string): ParsedRoute {
+  const query = queryOf(hash)
+  const path = pathOf(hash)
+  let route: PublicRoute
+
+  if (path === '/' || path === '') {
+    route = { section: 'map', mapMode: 'live', query }
+  } else if (path === '/kyiv') {
+    route = { section: 'map', mapMode: 'live', preset: 'kyiv', query }
+  } else if (path === '/stats') {
+    route = { section: 'analytics', query: analyticsQuery(query) }
+  } else if (path === '/map/live' || path === '/map/history') {
+    route = { section: 'map', mapMode: path.endsWith('/history') ? 'history' : 'live', preset: query.get('preset') === 'kyiv' ? 'kyiv' : undefined, query }
+  } else if (path === '/analytics') {
+    route = { section: 'analytics', query: analyticsQuery(query) }
+  } else if (path === '/entities') {
+    route = { section: 'entities', query }
+  } else if (path === '/messages') {
+    route = { section: 'messages', query }
+  } else {
+    const entity = path.match(/^\/entities\/(track|incident|alert|observation)\/([^/]+)$/)
+    const message = path.match(/^\/messages\/([^/]+)$/)
+    const entityId = entity ? decodedId(entity[2]) : null
+    const messageId = message ? decodedId(message[1]) : null
+    if (entity && entityId && isEntityKind(entity[1])) route = { section: 'entities', detail: { kind: entity[1], id: entityId }, query }
+    else if (message && messageId) route = { section: 'messages', detail: { id: messageId }, query }
+    else route = { section: 'map', mapMode: 'live', query: new URLSearchParams() }
+  }
+
+  const canonicalHash = publicHash(route)
+  return { route, canonicalHash, shouldReplace: hash !== canonicalHash }
+}
+
+export function isMapRoute(route: PublicRoute): boolean {
+  return route.section === 'map'
+}
+
+/**
+ * A history hash describes a half-open UTC interval. Until U03 owns the full
+ * filter codec, the shell still needs its stable default and initial frame.
+ */
+export function historyWindow(query: URLSearchParams, now = new Date()): HistoryWindow {
+  const suppliedFrom = query.get('from')
+  const suppliedTo = query.get('to')
+  const from = suppliedFrom ? new Date(suppliedFrom) : null
+  const to = suppliedTo ? new Date(suppliedTo) : null
+  const valid = from && to && !Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from < to
+  const end = valid ? to : new Date(now)
+  const start = valid ? from : new Date(end.getTime() - 24 * 3600_000)
+  return { from: start, to: end, at: new Date(end.getTime() - 1) }
+}

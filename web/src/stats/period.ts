@@ -54,15 +54,15 @@ function isPreset(s: string | null): s is Exclude<Preset, 'custom'> {
 }
 
 /**
- * The route lives in the hash so a view can be linked: `#/stats` (targets, 24 h), `#/stats?tab=alerts&p=7d`,
+ * The route lives in the hash so a view can be linked: `#/analytics` (targets, 24 h), `#/analytics?tab=alerts&p=7d`,
  * `#/stats?tab=sources&from=…&to=…`. Anything unreadable falls back to the targets tab and 24 h.
  */
 export function parseStatsHash(hash: string, now = new Date()): StatsRoute {
   const q = hash.indexOf('?')
   const params = new URLSearchParams(q >= 0 ? hash.slice(q + 1) : '')
-  const tabParam = params.get('tab')
+  const tabParam = params.get('metric') ?? params.get('tab')
   const tab: Tab = isTab(tabParam) ? tabParam : 'targets'
-  const p = params.get('p')
+  const p = params.get('preset') ?? params.get('p')
   if (isPreset(p)) return { tab, period: presetPeriod(p, now) }
   const from = params.get('from')
   const to = params.get('to')
@@ -78,16 +78,16 @@ export function parseStatsHash(hash: string, now = new Date()): StatsRoute {
 
 export function statsHash(route: StatsRoute): string {
   const params = new URLSearchParams()
-  if (route.tab !== 'targets') params.set('tab', route.tab)
+  params.set('metric', route.tab)
   const { period } = route
   if (period.preset === 'custom') {
     params.set('from', period.from.toISOString())
     params.set('to', period.to.toISOString())
   } else if (period.preset !== '24h') {
-    params.set('p', period.preset)
+    params.set('preset', period.preset)
   }
   const q = params.toString()
-  return q ? `#/stats?${q}` : '#/stats'
+  return q ? `#/analytics?${q}` : '#/analytics'
 }
 
 /** Value for an <input type="datetime-local"> in the viewer's local time. */

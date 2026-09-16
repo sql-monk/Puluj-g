@@ -55,6 +55,8 @@ export default function KyivPanel({ open, onClose }: { open: boolean; onClose: (
 
   return (
     <aside
+      data-section-panel={open ? 'open' : 'closed'}
+      inert={!open}
       className={`pointer-events-auto absolute z-10 flex max-h-[60vh] w-full flex-col gap-3 overflow-y-auto rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:left-3 md:top-14 md:max-h-[calc(100vh-5rem)] md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${
         open ? 'bottom-0 translate-y-0' : 'pointer-events-none bottom-0 translate-y-full md:-translate-x-[120%] md:translate-y-0'
       }`}

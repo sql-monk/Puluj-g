@@ -22,16 +22,16 @@ describe('stats hash', () => {
     const r = parseStatsHash('#/stats', NOW)
     expect(r.tab).toBe('targets')
     expect(r.period.preset).toBe('24h')
-    expect(statsHash(r)).toBe('#/stats')
+    expect(statsHash(r)).toBe('#/analytics?metric=targets')
   })
 
   it('reads the tab and the preset and writes them back the same way', () => {
     const r = parseStatsHash('#/stats?tab=alerts&p=7d', NOW)
     expect(r.tab).toBe('alerts')
     expect(r.period.preset).toBe('7d')
-    expect(statsHash(r)).toBe('#/stats?tab=alerts&p=7d')
-    expect(statsHash({ tab: 'sources', period: presetPeriod('24h', NOW) })).toBe('#/stats?tab=sources')
-    expect(statsHash({ tab: 'targets', period: presetPeriod('30d', NOW) })).toBe('#/stats?p=30d')
+    expect(statsHash(r)).toBe('#/analytics?metric=alerts&preset=7d')
+    expect(statsHash({ tab: 'sources', period: presetPeriod('24h', NOW) })).toBe('#/analytics?metric=sources')
+    expect(statsHash({ tab: 'targets', period: presetPeriod('30d', NOW) })).toBe('#/analytics?metric=targets&preset=30d')
   })
 
   it('reads a custom range and keeps it round-trippable', () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api/client'
 import { connectMapHub } from './api/signalr'
 import type { AlertDto, TargetDto, TrackDto } from './api/types'
@@ -7,11 +7,12 @@ import FilterPanel from './components/FilterPanel'
 import KyivPanel from './components/KyivPanel'
 import ReplayBar from './components/ReplayBar'
 import StatsPage from './stats/StatsPage'
-import TopBar, { type Page } from './components/TopBar'
+import TopBar from './components/TopBar'
 import TrackDetailsDrawer from './components/TrackDetailsDrawer'
 import KyivMapView from './map/KyivMapView'
 import MapView from './map/MapView'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
+import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
 
 const TICK_MS = 15_000
 /** Hub events are applied to the store in batches this often: one re-render per batch instead of one per event. */
@@ -28,56 +29,104 @@ export default function App() {
   const setPanelOpen = useStore((s) => s.setPanelOpen)
   // The feed opens folded too: a "Повідомлення (N)" button in the top-right corner unfolds it.
   const [feedOpen, setFeedOpen] = useState(false)
-  const [replay, setReplay] = useState(false)
   const [picking, setPicking] = useState(false)
   // The details panel (left) shows whichever track is selected on the map, as long as it is open.
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [page, setPage] = useState<Page>(() => pageFromHash(window.location.hash))
+  const panelButton = useRef<HTMLButtonElement>(null)
+  const [rememberedRoutes, setRememberedRoutes] = useState<Partial<Record<PublicSection, PublicRoute>>>({})
+  const [route, setRoute] = useState<PublicRoute>(() => parsePublicHash(window.location.hash).route)
   const regionsLoaded = useStore((s) => s.regions.length > 0)
   const dark = themeIsDark(theme)
   const mapDark = themeMapIsDark(theme)
-  const stats = page === 'stats'
+  const mapRoute = isMapRoute(route)
+  const stats = route.section === 'analytics'
+  const replay = mapRoute && route.mapMode === 'history'
+  const kyivPreset = mapRoute && route.preset === 'kyiv'
+  const replayWindow = useMemo(() => (replay ? historyWindow(route.query) : null), [replay, route.query])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
     document.documentElement.dataset.theme = theme
   }, [dark, theme])
 
-  // Fade / ETA depend on wall time: re-render every 15 s.
+  // Fade / ETA are map resources: do not keep a timer while another section is active.
   useEffect(() => {
+    if (!mapRoute) return
     const id = window.setInterval(() => useStore.getState().tick(), TICK_MS)
     return () => window.clearInterval(id)
-  }, [])
+  }, [mapRoute])
 
-  // Hash routes: #/kyiv (the Kyiv page), #/stats… (the statistics page, its period in the query), anything else = the country map.
-  // Back/forward and reloads keep working.
+  // Hash is the public navigation source of truth. Legacy links replace to a canonical route without a second Back entry.
   useEffect(() => {
     const onHash = () => {
-      setPage(pageFromHash(window.location.hash))
+      const parsed = parsePublicHash(window.location.hash)
+      if (parsed.shouldReplace) window.history.replaceState(null, '', parsed.canonicalHash)
+      setRememberedRoutes((current) => ({ ...current, [parsed.route.section]: parsed.route }))
+      setRoute(parsed.route)
     }
+    onHash()
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
-  // Entering the Kyiv page scopes the feed to the city; leaving it clears the scope.
+  // Kyiv is an opt-in preset. Leaving it deliberately preserves region and selected details.
   useEffect(() => {
+    if (!kyivPreset) return
     const s = useStore.getState()
     const kyiv = s.regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ')
-    s.selectRegion(page === 'kyiv' ? (kyiv?.id ?? null) : null)
-    s.select(null)
-  }, [page, regionsLoaded])
-  // Replay is a mode over whichever map page is open; closing it returns to live (which reloads the live feed).
+    if (kyiv) s.selectRegion(kyiv.id)
+  }, [kyivPreset, regionsLoaded])
+  // History is a route, rather than a local switch. ReplayBar owns its detailed clock once mounted.
+  useEffect(() => {
+    if (!mapRoute) return
+    const store = useStore.getState()
+    if (route.mapMode === 'history' && replayWindow) store.setMode('history', replayWindow.at)
+    if (route.mapMode === 'live' && store.mode !== 'live') store.setMode('live')
+  }, [mapRoute, replayWindow, route.mapMode])
+  useEffect(() => {
+    if (!mapRoute) useStore.getState().setError(null)
+  }, [mapRoute])
+  const closePanel = useCallback(() => {
+    setPanelOpen(false)
+    window.setTimeout(() => panelButton.current?.focus(), 0)
+  }, [setPanelOpen])
+  useEffect(() => {
+    if (!panelOpen) return
+    const panel = document.querySelector<HTMLElement>('[data-section-panel="open"]')
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+    window.setTimeout(() => focusable()[0]?.focus(), 0)
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        closePanel()
+      } else if (event.key === 'Tab') {
+        const items = focusable()
+        if (items.length === 0) return
+        const index = items.indexOf(document.activeElement as HTMLElement)
+        if (event.shiftKey && (index <= 0 || index === -1)) {
+          event.preventDefault()
+          items.at(-1)?.focus()
+        } else if (!event.shiftKey && index === items.length - 1) {
+          event.preventDefault()
+          items[0]?.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [closePanel, panelOpen])
+  useEffect(() => {
+    if (!panelOpen || !window.matchMedia('(max-width: 767px)').matches) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previous }
+  }, [panelOpen])
   const toggleReplay = () => {
-    setReplay((r) => {
-      if (r) useStore.getState().setMode('live')
-      return !r
-    })
-  }
-  const goPage = (p: Page) => {
-    window.location.hash = p === 'kyiv' ? '#/kyiv' : p === 'stats' ? '#/stats' : ''
+    window.location.hash = publicHash({ ...route, mapMode: replay ? 'live' : 'history' })
   }
 
-  // Region polygons (alerts, region-level markers), the source list (per-source filter) and the live windows are loaded once.
+  // Region polygons, source filters and live windows are map-only resources.
   useEffect(() => {
+    if (!mapRoute) return
     api
       .mapConfig()
       .then((c) => useStore.getState().setMapConfig(c))
@@ -90,10 +139,14 @@ export default function App() {
       .sources()
       .then((s) => useStore.getState().setSources(s))
       .catch((e: Error) => useStore.getState().setError(`Джерела: ${e.message}`))
-  }, [])
+  }, [mapRoute])
 
   // Snapshot requests can overlap while the timeline slider moves; only the latest one may land in the store.
   const snapshotSeq = useRef(0)
+  useEffect(() => {
+    // Invalidates a late response after navigating away from the map.
+    if (!mapRoute) snapshotSeq.current += 1
+  }, [mapRoute])
   const loadSnapshot = useCallback(async () => {
     const s = useStore.getState()
     const seq = ++snapshotSeq.current
@@ -114,10 +167,12 @@ export default function App() {
 
   // Live: snapshot + realtime. History: snapshot at the selected instant, realtime ignored.
   useEffect(() => {
+    if (!mapRoute) return
     void loadSnapshot()
-  }, [loadSnapshot, mode, at])
+  }, [loadSnapshot, mapRoute, mode, at])
 
   useEffect(() => {
+    if (!mapRoute) return
     const store = useStore.getState()
     // Events are buffered and flushed together: a burst (a busy night, a reprocess) then costs one store update per
     // batch, not one per event. The last state of a track or alert within a batch wins.
@@ -170,7 +225,7 @@ export default function App() {
       if (timer !== null) window.clearTimeout(timer)
       void connection.stop()
     }
-  }, [loadSnapshot])
+  }, [loadSnapshot, mapRoute])
 
   const pickHome = picking
     ? (lon: number, lat: number) => {
@@ -181,16 +236,19 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
-      {page === 'kyiv' ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />}
-      <TopBar page={page} onPage={goPage} menuOpen={panelOpen} onToggleMenu={() => setPanelOpen(!panelOpen)} onReplay={toggleReplay} replay={replay} />
-      {/* The statistics page covers the map (which stays mounted, state and SignalR intact); the map's panels are not drawn under it. */}
+      {mapRoute && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} />)}
+      <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpen(true)} panelButtonRef={panelButton} />
       {stats && <StatsPage />}
-      {stats ? null : page === 'kyiv' ? (
-        <KyivPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
+      {route.section === 'entities' && <SectionPlaceholder title="Цілі і події" text="Каталог з пов’язаними даними буде додано в U08." />}
+      {route.section === 'messages' && <SectionPlaceholder title="Повідомлення" text="Каталог початкових повідомлень буде додано в U09." />}
+      {mapRoute && (kyivPreset ? (
+        <KyivPanel open={panelOpen} onClose={closePanel} />
       ) : (
-        <FilterPanel open={panelOpen} onClose={() => setPanelOpen(false)} picking={picking} onPickingChange={setPicking} onReplay={() => !replay && toggleReplay()} />
-      )}
-      {!stats && !panelOpen && !detailsOpen && (
+        <FilterPanel open={panelOpen} onClose={closePanel} picking={picking} onPickingChange={setPicking} onReplay={() => !replay && toggleReplay()} />
+      ))}
+      {!mapRoute && <SectionPanel open={panelOpen} onClose={closePanel} section={route.section as Exclude<PublicRoute['section'], 'map'>} />}
+      {panelOpen && <button type="button" className="pointer-events-auto absolute inset-0 z-[9] bg-slate-950/35 md:hidden" onClick={closePanel} aria-label="Закрити панель" />}
+      {mapRoute && !panelOpen && !detailsOpen && (
         <button
           className="pointer-events-auto absolute left-3 top-14 z-10 hidden rounded-lg bg-white/95 px-3 py-1.5 text-sm shadow md:block dark:bg-slate-900/95 dark:text-slate-100"
           onClick={() => setPanelOpen(true)}
@@ -199,10 +257,10 @@ export default function App() {
           ☰ Фільтри
         </button>
       )}
-      {replay && !stats && <ReplayBar onClose={toggleReplay} />}
-      {!stats && <FeedPanel open={feedOpen} onToggle={() => setFeedOpen((o) => !o)} />}
-      {detailsOpen && !stats && <TrackDetailsDrawer onClose={() => setDetailsOpen(false)} />}
-      {!stats && selectedTrackId && !selectedTrack && !detailsOpen && (
+      {replay && replayWindow && <ReplayBar key={`${replayWindow.from.toISOString()}-${replayWindow.to.toISOString()}`} initialWindow={replayWindow} onClose={toggleReplay} />}
+      {mapRoute && <FeedPanel open={feedOpen} onToggle={() => setFeedOpen((o) => !o)} />}
+      {detailsOpen && mapRoute && <TrackDetailsDrawer onClose={() => setDetailsOpen(false)} />}
+      {mapRoute && selectedTrackId && !selectedTrack && !detailsOpen && (
         <div className="pointer-events-auto absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded bg-white/90 px-3 py-1 text-xs shadow dark:bg-slate-900/90 dark:text-slate-100">
           Трек більше не відображається.{' '}
           <button className="underline" onClick={() => setDetailsOpen(true)}>
@@ -214,8 +272,11 @@ export default function App() {
   )
 }
 
-function pageFromHash(hash: string): Page {
-  if (hash === '#/kyiv') return 'kyiv'
-  if (hash.startsWith('#/stats')) return 'stats'
-  return 'ukraine'
+function SectionPlaceholder({ title, text }: { title: string; text: string }) {
+  return <main className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-8 pt-28 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900"><h1 className="text-xl font-semibold">{title}</h1><p className="mt-2 text-slate-600 dark:text-slate-300">{text}</p></div></main>
+}
+
+function SectionPanel({ open, onClose, section }: { open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {
+  const label = section === 'analytics' ? 'Фільтри аналітики' : section === 'entities' ? 'Фільтри каталогу' : 'Фільтри повідомлень'
+  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-20 w-full rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><p className="mt-2 text-sm text-slate-500 dark:text-slate-300">Спільний typed filter codec буде підключено в U03.</p></aside>
 }
