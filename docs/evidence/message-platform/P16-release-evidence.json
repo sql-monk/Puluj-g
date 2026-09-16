@@ -1,0 +1,89 @@
+{
+  "$comment": "P16 release-gate facts from real Testcontainers PostGIS/RabbitMQ runs; P03\u2013P15 evidence is stored separately.",
+  "P16-G01": {
+    "roots": 4,
+    "target_writer": "platform observation-backed targets",
+    "legacy_processor_after_canary": "0 effects for every root",
+    "pending_non_analytics_deliveries": 0,
+    "unconfirmed_outbox": 0,
+    "recorded_at": "2026-09-16T21:12:05.7360409\u002B00:00"
+  },
+  "P16-L01": {
+    "workload": "archive-only independent durable branch; real RabbitMQ \u002B PostGIS; no LLM provider",
+    "matrix": [
+      {
+        "replicas": 1,
+        "roots": 96,
+        "committed_outcomes": 96,
+        "drain_ms": 2340,
+        "committed_per_second": 41.02,
+        "commit_latency_ms": {
+          "p50": 835.741,
+          "p95": 1334.01,
+          "p99": 1491.669
+        },
+        "per_consumer_deliveries": [
+          96
+        ]
+      },
+      {
+        "replicas": 2,
+        "roots": 96,
+        "committed_outcomes": 96,
+        "drain_ms": 1936,
+        "committed_per_second": 49.57,
+        "commit_latency_ms": {
+          "p50": 639.356,
+          "p95": 915.615,
+          "p99": 1040.247
+        },
+        "per_consumer_deliveries": [
+          48,
+          48
+        ]
+      },
+      {
+        "replicas": 4,
+        "roots": 96,
+        "committed_outcomes": 96,
+        "drain_ms": 1253,
+        "committed_per_second": 76.58,
+        "commit_latency_ms": {
+          "p50": 274.646,
+          "p95": 833.626,
+          "p99": 912.993
+        },
+        "per_consumer_deliveries": [
+          24,
+          24,
+          24,
+          24
+        ]
+      },
+      {
+        "replicas": 8,
+        "roots": 96,
+        "committed_outcomes": 96,
+        "drain_ms": 1262,
+        "committed_per_second": 76.06,
+        "commit_latency_ms": {
+          "p50": 133.278,
+          "p95": 693.855,
+          "p99": 789.565
+        },
+        "per_consumer_deliveries": [
+          12,
+          12,
+          12,
+          12,
+          12,
+          12,
+          12,
+          12
+        ]
+      }
+    ],
+    "interpretation": "compare this curve with the release environment baseline; it is not an absolute SLO",
+    "recorded_at": "2026-09-16T21:12:16.8101966+00:00"
+  }
+}

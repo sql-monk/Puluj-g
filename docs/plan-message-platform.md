@@ -833,6 +833,17 @@ pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Messaging.Tests --filte
 pwsh -File scripts/with-lock.ps1 dotnet test tests/Puluj.Analytics.Tests --filter "FullyQualifiedName~LifecycleTests"   # L02 backfill/reconciliation, L03 report
 cd web; npx playwright test --project=desktop e2e/A06-lifecycle.e2e.ts   # сторінка «Аналітика повідомлень»
 ```
+
+**P16 (release gate)** — `scripts/test-p16.ps1` запускає Testcontainers PostGIS/RabbitMQ, P16 canary ownership і 1/2/4/8 committed-outcome
+matrix, crash/domain/replay/lifecycle regression, contracts, PostGIS suite, build та web regression. Скрипт очищає
+`PULUJ_TEST_CONNECTION`, щоб не допустити TRUNCATE non-test БД. Runbook і межі target-environment canary —
+[`evidence/message-platform/P16-release-runbook.md`](evidence/message-platform/P16-release-runbook.md):
+
+```powershell
+pwsh -File scripts/test-p16.ps1
+# лише як явно зафіксований skip web/Playwright (не completed release gate):
+pwsh -File scripts/test-p16.ps1 -SkipWeb
+```
 Не вигадувати результати неіснуючого suite.
 Frontend build генерує файли у `src/Puluj.Api/wwwroot` і `src/Puluj.Admin/wwwroot`; узгодити ownership
 генерованих assets і не змішувати результати паралельних збірок.
@@ -912,7 +923,7 @@ Evidence файли можна додавати до `docs/evidence/message-plat
 | P13 | done | Claude Code (p13) | p13_review: план approve after fixes (B1–B4, N1–N16, Q1–Q5); результат approve after fixes (B1, N1–N10, Q1–Q9) → виправлено → re-run зелений | [GitHub P13](https://github.com/sql-monk/Puluj-g/issues/16); [handoff, evidence](evidence/message-platform/P13-handoff.md); ADR-0012; ops snapshot + alarms, lane pause/drain + audit, message explorer, панелі «Черги»/«Повідомлення», Playwright A03/A04; закомічено |
 | P14 | done | Claude Code (p14) | p14_review: план approve after fixes (B1–B3, N1–N13, Q1–Q6); результат request changes (B1, B2, N1–N9, Q1–Q8) → виправлено → re-run зелений | [GitHub P14](https://github.com/sql-monk/Puluj-g/issues/14); [handoff, evidence](evidence/message-platform/P14-handoff.md); ADR-0005 accepted; replay runs (checkpoint, catchup, verify/promote/rollback), topology v9, shadow incident-worker, панель «Replay», R01–R06 + A05; закомічено |
 | P15 | done | Claude Code (p15) | p15_review: план approve after fixes (B1–B4, N1–N14, Q1–Q6); результат request changes (B1, B2, N1–N7, Q1–Q7) → виправлено → re-run зелений | [GitHub P15](https://github.com/sql-monk/Puluj-g/issues/17); [handoff, evidence](evidence/message-platform/P15-handoff.md); ADR-0013; проєкція `analytics.message_lifecycle`, consumer `message-analytics` (topology v10), backfill/reconciliation, звіт і панель «Аналітика повідомлень», L01–L04 + A06; закомічено |
-| P16 | planned | — | — | [GitHub P16](https://github.com/sql-monk/Puluj-g/issues/15); — |
+| P16 | implementation_complete | Codex | independent post-review: 3 P2 findings fixed; release/regression re-run зелений | [GitHub P16](https://github.com/sql-monk/Puluj-g/issues/15); [plan, acceptance matrix, runbook](evidence/message-platform/P16-plan.md); target-environment canary лишається operator-owned gate |
 
 Програма завершена, коли всі tasks прийняті, усі підтримувані джерела проходять надійний ingress,
 підписки переживають відмови, raw/facts не губляться, mixed workload масштабується за погодженим gate,

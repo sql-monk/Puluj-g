@@ -73,14 +73,31 @@ public sealed class PipelineFixture : IAsyncLifetime
         await using var db = await Services.GetRequiredService<IDbContextFactory<PulujDbContext>>().CreateDbContextAsync();
         await db.Database.ExecuteSqlRawAsync("CREATE EXTENSION IF NOT EXISTS postgis");
         await db.Database.MigrateAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents, track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE");
-        // P03 schemas (no FK to raw_messages): the bridge is off here (Messaging:Outbox:Enabled=false) but a leftover row must not survive a rerun.
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, processing.runs, processing.attempts, processing.deliveries, processing.quarantine, processing.stage_results RESTART IDENTITY CASCADE");
+        await ResetDataAsync(db);
         foreach (var seeder in Services.GetServices<ISeeder>().OrderBy(s => s.Order))
         {
             await seeder.SeedAsync(db, CancellationToken.None);
         }
         await Services.GetRequiredService<IndexProvider>().RefreshAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Reset only generated pipeline state while preserving seeded sources, taxonomy and gazetteer. Integration test
+    /// classes share this fixture, so a test that asserts exact aggregate counts must opt in to a fresh state instead
+    /// of depending on xUnit's class execution order.
+    /// </summary>
+    public async Task ResetDataAsync()
+    {
+        await using var db = await Services!.GetRequiredService<IDbContextFactory<PulujDbContext>>().CreateDbContextAsync();
+        await ResetDataAsync(db);
+    }
+
+    private static async Task ResetDataAsync(PulujDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents, track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE");
+        // P03 schemas have no FK to raw_messages; they must be cleared separately. Lifecycle is durable derived data
+        // and must not leak from a prior class into an exact-count pipeline assertion.
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, processing.runs, processing.generations, processing.attempts, processing.deliveries, processing.quarantine, processing.stage_results, processing.extractions, processing.observations, llm_requests, analytics.message_lifecycle RESTART IDENTITY CASCADE");
     }
 
     public async Task DisposeAsync()

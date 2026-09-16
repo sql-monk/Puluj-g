@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using DotNet.Testcontainers.Builders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -375,7 +376,10 @@ public sealed class MessagingCollection : ICollectionFixture<MessagingFixture>
     public const string Name = "messaging";
 }
 
-/// <summary>Committed outcomes of every crash test, written to docs/evidence/message-platform/P03-crash-evidence.json at the end of the run.</summary>
+/// <summary>
+/// Committed outcomes of messaging integration tests. A filtered run must merge its entries into the historical
+/// evidence file: release gates intentionally execute only a subset and must never erase evidence from other tasks.
+/// </summary>
 public sealed class Evidence
 {
     private readonly SortedDictionary<string, object> _entries = new(StringComparer.Ordinal);
@@ -392,14 +396,28 @@ public sealed class Evidence
     {
         lock (_entries)
         {
-            var document = new
+            if (_entries.Count == 0)
             {
-                task = "P03+P04", // one fixture, both tasks' tests write here
+                return;
+            }
+            var root = File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))!.AsObject() : new JsonObject();
+            var tests = root["tests"]?.AsObject() ?? new JsonObject();
+            foreach (var (name, values) in _entries)
+            {
+                tests[name] = JsonSerializer.SerializeToNode(values);
+            }
+
+            // Keep existing historical entries and their original environment context. `last_run` identifies exactly
+            // which Testcontainers environment produced the entries merged by this invocation.
+            root["task"] ??= "P03+P04";
+            root["tests"] = tests;
+            root["last_run"] = JsonSerializer.SerializeToNode(new
+            {
                 generated_at = DateTimeOffset.UtcNow,
                 environment = new { broker_image = MessagingFixture.BrokerImage, broker_version = brokerVersion, postgres_image = "postgis/postgis:17-3.5", os = Environment.OSVersion.ToString(), dotnet = Environment.Version.ToString() },
-                tests = _entries,
-            };
-            File.WriteAllText(path, JsonSerializer.Serialize(document, new JsonSerializerOptions { WriteIndented = true }));
+                merged_tests = _entries.Keys.ToArray(),
+            });
+            File.WriteAllText(path, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine);
         }
     }
 }

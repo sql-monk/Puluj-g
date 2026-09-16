@@ -1,0 +1,70 @@
+name: P16 release gate
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-infrastructure:
+    name: PostGIS + RabbitMQ acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Verify Docker daemon
+        run: docker version --format '{{.Server.Version}}'
+      - name: Messaging crash, replay, lifecycle and P16 gate
+        run: >-
+          dotnet test tests/Puluj.Messaging.Tests/Puluj.Messaging.Tests.csproj
+          --filter 'FullyQualifiedName~P16ReleaseGateTests|FullyQualifiedName~CrashTests|FullyQualifiedName~DomainWriterTests|FullyQualifiedName~FinalizerTests|FullyQualifiedName~ReplayTests|FullyQualifiedName~LifecycleTests'
+          --logger 'trx;LogFileName=p16-messaging.trx'
+          --results-directory docs/evidence/message-platform/test-results
+      - name: Contract and PostGIS regression suites
+        run: |
+          dotnet test tests/Puluj.Messaging.Contracts.Tests/Puluj.Messaging.Contracts.Tests.csproj --logger 'trx;LogFileName=p16-contracts.trx' --results-directory docs/evidence/message-platform/test-results
+          dotnet test tests/Puluj.Integration.Tests/Puluj.Integration.Tests.csproj --logger 'trx;LogFileName=p16-postgis.trx' --results-directory docs/evidence/message-platform/test-results
+          dotnet build Puluj.sln
+      - name: Upload P16 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p16-test-evidence
+          path: |
+            docs/evidence/message-platform/test-results/p16-*.trx
+            docs/evidence/message-platform/P16-release-evidence.json
+          if-no-files-found: warn
+
+  web-regression:
+    name: UI, visual and E2E regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --run
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p16-playwright-report
+          path: web/e2e-report
+          if-no-files-found: warn

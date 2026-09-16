@@ -90,6 +90,10 @@ cd web && npm test                                # ETA / fade
 Команда виконує race-тести, SQL inventory та baseline 1/2/4 workers; результати — у
 [`docs/evidence/message-platform/`](docs/evidence/message-platform/P00-handoff.md).
 
+P16 release gate: `pwsh scripts/test-p16.ps1`. Він запускає на disposable Testcontainers PostGIS/RabbitMQ canary
+ownership, crash/replay/lifecycle regression і матрицю committed-outcome 1/2/4/8; target-environment canary,
+cutover і rollback виконуються лише за [операторським runbook](docs/evidence/message-platform/P16-release-runbook.md).
+
 ## API
 
 | Endpoint | Опис |

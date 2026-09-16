@@ -42,6 +42,7 @@ public sealed class PipelineTests(PipelineFixture fixture)
         {
             return; // neither PULUJ_TEST_CONNECTION nor Docker available
         }
+        await fixture.ResetDataAsync(); // exact aggregate counts must not inherit state from another fixture class
         var factory = _services.GetRequiredService<IDbContextFactory<PulujDbContext>>();
         var ingestor = _services.GetRequiredService<RawMessageIngestor>();
         var processor = _services.GetRequiredService<RawMessageProcessor>();

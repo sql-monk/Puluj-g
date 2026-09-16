@@ -1,6 +1,6 @@
 {
   "task": "P03\u002BP04",
-  "generated_at": "2026-09-16T20:28:00.7530654+00:00",
+  "generated_at": "2026-09-16T20:28:00.7530654\u002B00:00",
   "environment": {
     "broker_image": "rabbitmq:4.3-management",
     "broker_version": "4.3.5",
@@ -56,7 +56,7 @@
         "archive",
         "normalizer"
       ],
-      "outbox_age_seen_s": 1.142333,
+      "outbox_age_seen_s": 1.180725,
       "relay": {
         "Leased": 1,
         "Confirmed": 1,
@@ -96,7 +96,7 @@
       "quarantine_rows": 1,
       "dlq_after_consumer": 0,
       "events": 0,
-      "event_id": "01a0abe7-6fcb-7368-83fa-457992e9f4bc"
+      "event_id": "01a0ac12-483c-7234-be2f-0a71dd05a8cc"
     },
     "P03-C05": {
       "window": "W6b",
@@ -127,7 +127,7 @@
       "backlog_kept": 3,
       "waived": 3,
       "overdue_after_waiver_archive": 0,
-      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T20:27:59.3005105\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
+      "waiver_audit": "{\u0022at\u0022: \u00222026-09-16T21:14:47.1812119\u002B00:00\u0022, \u0022actor\u0022: \u0022operator:test\u0022, \u0022count\u0022: 3, \u0022action\u0022: \u0022waiver\u0022, \u0022reason\u0022: \u0022consumer retired for the maintenance window; evidence kept in raw_messages\u0022}"
     },
     "P03-C08": {
       "window": "W11",
@@ -336,8 +336,8 @@
       "finalizer_noops": 3,
       "extractions": 1,
       "replicas": {
-        "r1": 2,
-        "r2": 2
+        "r1": 3,
+        "r2": 1
       }
     },
     "P06-F07": {
@@ -431,9 +431,9 @@
       "one_category": {
         "label": "uav",
         "messages": 60,
-        "total_ms": 4598,
-        "writers_tail_ms": 1084,
-        "per_observation_ms": 76.6,
+        "total_ms": 4744,
+        "writers_tail_ms": 1070,
+        "per_observation_ms": 79.1,
         "tracks": 6,
         "replica_split": {
           "primary": 30,
@@ -444,10 +444,10 @@
       "two_categories": {
         "label": "uav\u002Bmissile",
         "messages": 60,
-        "total_ms": 4711,
-        "writers_tail_ms": 867,
-        "per_observation_ms": 78.5,
-        "tracks": 10,
+        "total_ms": 4236,
+        "writers_tail_ms": 421,
+        "per_observation_ms": 70.6,
+        "tracks": 6,
         "replica_split": {
           "primary": 30,
           "replica": 30
@@ -580,15 +580,15 @@
       }
     },
     "P14-R01-R03-R04": {
-      "runId": "01a0abe3-7ed0-740b-981d-c8b2d66b5dc0",
+      "runId": "01a0ac0f-a00b-7b18-a11f-2bc3217a0342",
       "live": "6bb9f959-42f5-5e7c-a384-a325e71fa89b",
-      "generation": "01a0abe3-7ed0-7661-af11-6be56feed8d4",
+      "generation": "01a0ac0f-a00b-76d3-894d-fb69f0227b0e",
       "liveRevisions": "1:1,2:1",
-      "report": "{\u0022published\u0022:4,\u0022total\u0022:4,\u0022pending_deliveries\u0022:0,\u0022quarantined\u0022:0,\u0022unconfirmed_outbox\u0022:0,\u0022terminal_deliveries\u0022:36,\u0022stages\u0022:{\u0022finalize:completed\u0022:4,\u0022normalize:completed\u0022:4,\u0022parse:facts\u0022:4},\u0022extractions\u0022:4,\u0022observations\u0022:4,\u0022distinct_raw\u0022:4,\u0022unanalyzed\u0022:0,\u0022incidents_in_generation\u0022:4,\u0022active_incidents_in_window\u0022:4,\u0022active_incidents_outside_scope\u0022:0,\u0022active_incidents_missing_in_generation\u0022:0,\u0022verified_at\u0022:\u00222026-09-16T20:23:35.512734\u002B00:00\u0022}",
+      "report": "{\u0022published\u0022:4,\u0022total\u0022:4,\u0022pending_deliveries\u0022:0,\u0022quarantined\u0022:0,\u0022unconfirmed_outbox\u0022:0,\u0022terminal_deliveries\u0022:36,\u0022stages\u0022:{\u0022finalize:completed\u0022:4,\u0022normalize:completed\u0022:4,\u0022parse:facts\u0022:4},\u0022extractions\u0022:4,\u0022observations\u0022:4,\u0022distinct_raw\u0022:4,\u0022unanalyzed\u0022:0,\u0022incidents_in_generation\u0022:4,\u0022active_incidents_in_window\u0022:4,\u0022active_incidents_outside_scope\u0022:0,\u0022active_incidents_missing_in_generation\u0022:0,\u0022verified_at\u0022:\u00222026-09-16T21:11:47.1011504\u002B00:00\u0022}",
       "audit": "run:create,run:start,run:catchup,run:verify,run:promote,run:rollback"
     },
     "P14-R02": {
-      "runId": "01a0abe3-bb5b-70eb-9dd6-0af072366139",
+      "runId": "01a0ac0f-f07d-710c-9111-4579e8d6ecb5",
       "batches": 9,
       "published": 5,
       "repeated": 2,
@@ -596,12 +596,12 @@
       "normalizer_noops": 2
     },
     "P14-R05": {
-      "superseded": "01a0abe3-61a4-7701-b1a0-7f36fda223ed",
-      "next": "01a0abe3-61ab-7090-8982-fe4fc74cccbb"
+      "superseded": "01a0ac0f-85ee-7d6c-9328-1c7d2aa17161",
+      "next": "01a0ac0f-85f7-7d23-9f1a-df0aa5e1f0ac"
     },
     "P14-R06": {
-      "runId": "01a0abe3-b111-7b17-aaee-d92ab5b1ea08",
-      "generation": "01a0abe3-b111-773a-9b87-d83d53064cc4",
+      "runId": "01a0ac0f-d06a-7389-b5b4-2e2ad0d3f41e",
+      "generation": "01a0ac0f-d06a-718b-aef8-d794f84cb677",
       "promote_waited_ms": "\u003E=1500"
     },
     "P15-L01": {
@@ -632,10 +632,56 @@
         "Outcome": "unsupported"
       },
       "analysisFirst": {
-        "StoredAt": "2026-09-16T20:24:24.125071+00:00",
+        "StoredAt": "2026-09-16T21:12:22.127685\u002B00:00",
         "Outcome": "no_facts"
       },
       "roots": 4
     }
+  },
+  "last_run": {
+    "generated_at": "2026-09-16T21:14:48.5955976\u002B00:00",
+    "environment": {
+      "broker_image": "rabbitmq:4.3-management",
+      "broker_version": "4.3.5",
+      "postgres_image": "postgis/postgis:17-3.5",
+      "os": "Microsoft Windows NT 10.0.26200.0",
+      "dotnet": "10.0.12"
+    },
+    "merged_tests": [
+      "P03-C01",
+      "P03-C02",
+      "P03-C03",
+      "P03-C04",
+      "P03-C05",
+      "P03-C06",
+      "P03-C07",
+      "P03-C08",
+      "P03-C09",
+      "P03-C10",
+      "P06-F01",
+      "P06-F02",
+      "P06-F03",
+      "P06-F04",
+      "P06-F04b",
+      "P06-F05",
+      "P06-F06",
+      "P06-F07",
+      "P06-F08",
+      "P06-F09",
+      "P06-F10",
+      "P09-W01",
+      "P09-W02",
+      "P09-W03",
+      "P09-W04",
+      "P09-W05",
+      "P09-W06",
+      "P09-W07",
+      "P09-W08",
+      "P14-R01-R03-R04",
+      "P14-R02",
+      "P14-R05",
+      "P14-R06",
+      "P15-L01"
+    ]
   }
 }
