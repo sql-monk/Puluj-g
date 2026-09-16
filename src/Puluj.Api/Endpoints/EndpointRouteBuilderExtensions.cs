@@ -118,6 +118,36 @@ public static class EndpointRouteBuilderExtensions
             catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
         });
 
+        // U05 public source-message catalogue. A message row is one saved revision; raw text/payload and worker stage
+        // JSON stay behind the allow-list implemented by PublicMessageQueries.
+        api.MapGet("/public/messages", async (string? q, string? sourceIds, bool? hasResults, string? outcome, string? eventKinds,
+            string? categoryIds, string? classIds, string? familyIds, string? modelIds, int? regionId, string? location, string? confidence,
+            DateTimeOffset? from, DateTimeOffset? to, string? cursor, int? pageSize, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await messages.ListAsync(new PublicMessageQueries.Query(q, sourceIds, hasResults, outcome, eventKinds, categoryIds, classIds, familyIds, modelIds, regionId, location, confidence, from, to, cursor, pageSize, dataset), ct)); }
+            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/messages/{id:long}", async (long id, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
+        {
+            try { return await messages.DetailsAsync(id, dataset, ct) is { } details ? Results.Ok(details) : Results.NotFound(); }
+            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/messages/{id:long}/results", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
+        {
+            try { return await messages.ResultsPageAsync(id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
+            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/messages/{id:long}/revisions", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
+        {
+            try { return await messages.RevisionsPageAsync(id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
+            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+        api.MapGet("/public/messages/{id:long}/text", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
+        {
+            try { return await messages.TextAsync(id, cursor, limit, dataset, ct) is { } text ? Results.Ok(text) : Results.NotFound(); }
+            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
+        });
+
         // Historical disabled models remain available to a detail/catalogue client when explicitly asked; existing UI
         // continues to receive the enabled-only shape by default.
         api.MapGet("/taxonomy", (bool? includeDisabled, ReferenceCache refs) => includeDisabled == true ? refs.HistoricalTaxonomy : refs.Taxonomy);

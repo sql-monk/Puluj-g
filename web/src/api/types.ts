@@ -411,6 +411,30 @@ export interface PublicEntityDetailsDto {
   capabilities: Record<string, boolean>
 }
 
+export interface PublicMessageSummaryDto {
+  id: string
+  sourceId: number
+  sourceCode?: string
+  publishedAt: string
+  receivedAt: string
+  sourceMessageKey: string
+  sourceRevision: string
+  revisionGroup: string
+  outcome: string
+  outcomeSource: 'stage_result' | 'legacy'
+  url?: string
+  resultCount: number
+  matchedResultCount: number
+  locatedResultCount: number
+  unlocatedResultCount: number
+  hasText: boolean
+}
+export interface PublicMessagePageDto { from: string; to: string; dataset: string; consistency: string; items: PublicMessageSummaryDto[]; nextCursor?: string; refreshRecommended: boolean }
+export interface PublicMessageResultDto { targetId: string; observationId?: string; segmentIndex: number; segmentText?: string; catalogKind?: string; classification?: string; at: string; confidence: string; sourceId: number; mapAvailable: boolean; map: PublicMapLocatorDto; relations: PublicEntityRefDto[] }
+export interface PublicMessageRevisionDto { id: string; publishedAt: string; sourceRevision: string; isCurrent: boolean }
+export interface PublicMessageDetailsDto { message: PublicMessageSummaryDto; textState: string; text?: string; results: PublicCollectionPageDto<PublicMessageResultDto>; revisions: PublicCollectionPageDto<PublicMessageRevisionDto>; directRelations: PublicEntityRefDto[]; links: Record<string, string> }
+export interface PublicMessageTextChunkDto { state: string; text?: string; offset: number; totalLength: number; nextCursor?: string }
+
 // Statistics page (GET /api/stats/{targets|alerts|sources|recognition}?from&to): one payload per tab for one period.
 // Per-bucket arrays are aligned with `period.bucketStarts`.
 export type StatsBucketUnit = 'hour' | 'day' | 'week'

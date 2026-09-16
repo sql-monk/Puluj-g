@@ -293,3 +293,29 @@ public sealed record PublicCollectionPageDto<T>(IReadOnlyList<T> Items, string? 
 public sealed record PublicEntityDetailsDto(PublicEntitySummaryDto Entity, PublicCollectionPageDto<PublicEvidenceDto> Evidence,
     PublicCollectionPageDto<PublicMessageRefDto> Messages, PublicCollectionPageDto<PublicEntityRefDto> Relations,
     IReadOnlyDictionary<string, string> Links, IReadOnlyDictionary<string, bool> Capabilities);
+
+// ---- U05 public source-message catalogue ---------------------------------
+// A raw-message id identifies one stored source revision. These contracts intentionally expose neither RawPayload nor
+// any processing-stage JSON/worker detail; the public outcome is a small, documented projection of that state.
+
+public sealed record PublicMessageSummaryDto(
+    string Id, int SourceId, string? SourceCode, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt,
+    string SourceMessageKey, string SourceRevision, string RevisionGroup,
+    string Outcome, string OutcomeSource, string? Url, int ResultCount, int MatchedResultCount,
+    int LocatedResultCount, int UnlocatedResultCount, bool HasText);
+
+public sealed record PublicMessagePageDto(DateTimeOffset From, DateTimeOffset To, string Dataset, string Consistency,
+    IReadOnlyList<PublicMessageSummaryDto> Items, string? NextCursor, bool RefreshRecommended);
+
+public sealed record PublicMessageResultDto(
+    string TargetId, string? ObservationId, int SegmentIndex, string? SegmentText, string? CatalogKind, string? Classification,
+    DateTimeOffset At, string Confidence, int SourceId, bool MapAvailable, PublicMapLocatorDto Map,
+    IReadOnlyList<PublicEntityRefDto> Relations);
+
+public sealed record PublicMessageRevisionDto(string Id, DateTimeOffset PublishedAt, string SourceRevision, bool IsCurrent);
+
+public sealed record PublicMessageDetailsDto(PublicMessageSummaryDto Message, string TextState, string? Text,
+    PublicCollectionPageDto<PublicMessageResultDto> Results, PublicCollectionPageDto<PublicMessageRevisionDto> Revisions,
+    IReadOnlyList<PublicEntityRefDto> DirectRelations, IReadOnlyDictionary<string, string> Links);
+
+public sealed record PublicMessageTextChunkDto(string State, string? Text, int Offset, int TotalLength, string? NextCursor);

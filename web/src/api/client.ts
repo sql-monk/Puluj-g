@@ -1,5 +1,5 @@
 import type { Geometry } from 'geojson'
-import type { AlertDto, EventKindDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, PublicCollectionPageDto, PublicEntityDetailsDto, PublicEntityKind, PublicEntityPageDto, PublicEntityRefDto, PublicEvidenceDto, PublicMessageRefDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
+import type { AlertDto, EventKindDto, MapConfigDto, TargetDto, PlaceDto, PredecessorsDto, PublicCollectionPageDto, PublicEntityDetailsDto, PublicEntityKind, PublicEntityPageDto, PublicEntityRefDto, PublicEvidenceDto, PublicMessageDetailsDto, PublicMessagePageDto, PublicMessageResultDto, PublicMessageRevisionDto, PublicMessageTextChunkDto, PublicMessageRefDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' } })
@@ -46,6 +46,12 @@ export const api = {
   publicEvidence: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEvidenceDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/evidence?${publicQuery({ cursor, dataset })}`),
   publicMessages: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/messages?${publicQuery({ cursor, dataset })}`),
   publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
+  /** U05 source-message catalogue: one row per persisted source revision, with string bigint IDs. */
+  publicMessagesIndex: (params: Record<string, string | number | boolean | undefined> = {}) => get<PublicMessagePageDto>(`/api/public/messages?${publicQuery(params)}`),
+  publicMessage: (id: string, dataset = 'live') => get<PublicMessageDetailsDto>(`/api/public/messages/${encodeURIComponent(id)}?${publicQuery({ dataset })}`),
+  publicMessageResults: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageResultDto>>(`/api/public/messages/${encodeURIComponent(id)}/results?${publicQuery({ cursor, dataset })}`),
+  publicMessageRevisions: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRevisionDto>>(`/api/public/messages/${encodeURIComponent(id)}/revisions?${publicQuery({ cursor, dataset })}`),
+  publicMessageText: (id: string, cursor?: string, dataset = 'live') => get<PublicMessageTextChunkDto>(`/api/public/messages/${encodeURIComponent(id)}/text?${publicQuery({ cursor, dataset })}`),
   /** Alerts of one place over the last `hours`, ended ones included, newest first. */
   alertsHistory: (placeId: number, hours = 24) => get<AlertDto[]>(`/api/alerts/history?placeId=${placeId}&hours=${hours}`),
   searchPlaces: (q: string) => get<PlaceDto[]>(`/api/places/search?q=${encodeURIComponent(q)}&limit=8`),
