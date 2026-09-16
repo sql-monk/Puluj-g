@@ -74,10 +74,10 @@ export const api = {
   publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
   /** U05 source-message catalogue: one row per persisted source revision, with string bigint IDs. */
   publicMessagesIndex: (params: Record<string, string | number | boolean | undefined> = {}, signal?: AbortSignal) => get<PublicMessagePageDto>(`/api/public/messages?${publicQuery(params)}`, signal),
-  publicMessage: (id: string, dataset = 'live') => get<PublicMessageDetailsDto>(`/api/public/messages/${encodeURIComponent(id)}?${publicQuery({ dataset })}`),
-  publicMessageResults: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageResultDto>>(`/api/public/messages/${encodeURIComponent(id)}/results?${publicQuery({ cursor, dataset })}`),
-  publicMessageRevisions: (id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRevisionDto>>(`/api/public/messages/${encodeURIComponent(id)}/revisions?${publicQuery({ cursor, dataset })}`),
-  publicMessageText: (id: string, cursor?: string, dataset = 'live') => get<PublicMessageTextChunkDto>(`/api/public/messages/${encodeURIComponent(id)}/text?${publicQuery({ cursor, dataset })}`),
+  publicMessage: (id: string, dataset = 'live', signal?: AbortSignal) => get<PublicMessageDetailsDto>(`/api/public/messages/${encodeURIComponent(id)}?${publicQuery({ dataset })}`, signal),
+  publicMessageResults: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicCollectionPageDto<PublicMessageResultDto>>(`/api/public/messages/${encodeURIComponent(id)}/results?${publicQuery({ cursor, dataset})}`, signal),
+  publicMessageRevisions: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicCollectionPageDto<PublicMessageRevisionDto>>(`/api/public/messages/${encodeURIComponent(id)}/revisions?${publicQuery({ cursor, dataset})}`, signal),
+  publicMessageText: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicMessageTextChunkDto>(`/api/public/messages/${encodeURIComponent(id)}/text?${publicQuery({ cursor, dataset})}`, signal),
   /** Alerts of one place over the last `hours`, ended ones included, newest first. */
   alertsHistory: (placeId: number, hours = 24) => get<AlertDto[]>(`/api/alerts/history?placeId=${placeId}&hours=${hours}`),
   searchPlaces: (q: string) => get<PlaceDto[]>(`/api/places/search?q=${encodeURIComponent(q)}&limit=8`),

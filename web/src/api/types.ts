@@ -426,6 +426,7 @@ export interface PublicMessageSummaryDto {
   outcome: string
   outcomeSource: 'stage_result' | 'legacy'
   url?: string
+  urlText?: string
   resultCount: number
   matchedResultCount: number
   locatedResultCount: number

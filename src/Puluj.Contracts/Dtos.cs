@@ -300,9 +300,9 @@ public sealed record PublicEntityDetailsDto(PublicEntitySummaryDto Entity, Publi
 
 public sealed record PublicMessageSummaryDto(
     string Id, int SourceId, string? SourceCode, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt,
-    string SourceMessageKey, string SourceRevision, string RevisionGroup, string? Excerpt,
-    string Outcome, string OutcomeSource, string? Url, int ResultCount, int MatchedResultCount,
-    int LocatedResultCount, int UnlocatedResultCount, bool HasText);
+    string SourceMessageKey, string SourceRevision, string RevisionGroup,
+    string Outcome, string OutcomeSource, string? Url, string? UrlText, int ResultCount, int MatchedResultCount,
+    int LocatedResultCount, int UnlocatedResultCount, string? Excerpt, bool HasText);
 
 public sealed record PublicMessagePageDto(DateTimeOffset From, DateTimeOffset To, string Dataset, string Consistency,
     IReadOnlyList<PublicMessageSummaryDto> Items, string? NextCursor, bool RefreshRecommended);

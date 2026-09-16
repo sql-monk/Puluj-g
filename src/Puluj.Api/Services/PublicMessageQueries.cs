@@ -213,16 +213,8 @@ public sealed class PublicMessageQueries(IDbContextFactory<PulujDbContext> facto
     }
 
     private PublicMessageSummaryDto Summary(RawMessage raw, Counts? counts, OutcomeInfo? outcome) => new(raw.RawMessageId.ToString(), raw.SourceId, refs.Sources.GetValueOrDefault(raw.SourceId)?.Code,
-        raw.PublishedAt, raw.ReceivedAt, raw.SourceMessageKey, raw.SourceRevision, $"{raw.SourceId}:{raw.SourceMessageKey}", Excerpt(raw.RawText), outcome?.Value ?? LegacyOutcome(raw.ProcessingStatus),
-        outcome?.FromStage == true ? "stage_result" : "legacy", SafeUrl(raw.Url), counts?.All ?? 0, counts?.Matched ?? 0, counts?.Located ?? 0, counts?.Unlocated ?? 0, raw.RawText is not null);
-
-    private static string? Excerpt(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text)) return null;
-        const int limit = 280;
-        var compact = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return compact.Length <= limit ? compact : compact[..limit] + "…";
-    }
+        raw.PublishedAt, raw.ReceivedAt, raw.SourceMessageKey, raw.SourceRevision, $"{raw.SourceId}:{raw.SourceMessageKey}", outcome?.Value ?? LegacyOutcome(raw.ProcessingStatus),
+        outcome?.FromStage == true ? "stage_result" : "legacy", SafeUrl(raw.Url), raw.Url, counts?.All ?? 0, counts?.Matched ?? 0, counts?.Located ?? 0, counts?.Unlocated ?? 0, Excerpt(raw.RawText), raw.RawText is not null);
 
     private async Task<PublicCollectionPageDto<PublicMessageResultDto>> ResultsAsync(PulujDbContext db, RawMessage raw, string? cursor, int limit, CancellationToken ct)
     {
@@ -275,6 +267,12 @@ public sealed class PublicMessageQueries(IDbContextFactory<PulujDbContext> facto
         refs.Place(placeId)?.Name, refs.RegionOf(placeId)?.Id, IncidentQueries.Precision(kind, accuracy, refs.Place(placeId)), geometry, at, geometry is null && placeId is null ? "no_reported_location" : null);
 
     private string? Classification(int? category, int? @class, int? family, int? model) => model is int m && refs.Models.TryGetValue(m, out var md) ? md.CanonicalName : family is int f && refs.Families.TryGetValue(f, out var fa) ? fa.Name : @class is int c && refs.Classes.TryGetValue(c, out var cl) ? cl.Name : category is int ca ? refs.Categories.GetValueOrDefault(ca)?.Name : null;
+    private static string? Excerpt(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var normalized = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= 280 ? normalized : normalized[..277] + "…";
+    }
     private static string? SafeUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) ? value : null;
     private static string PublicOutcome(string value) => value.ToLowerInvariant() switch { "completed" or "no_facts" or "failed" or "unsupported" => value.ToLowerInvariant(), "awaiting_llm" => "awaiting_llm", _ => "parsed_projection_pending" };
     private static string LegacyOutcome(ProcessingStatus status) => status switch { ProcessingStatus.Pending or ProcessingStatus.InProgress => "pending", ProcessingStatus.Failed => "failed", ProcessingStatus.Skipped => "skipped", ProcessingStatus.Processed => "legacy_processed", _ => "unavailable" };

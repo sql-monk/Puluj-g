@@ -13,7 +13,7 @@ import TrackDetailsDrawer from './components/TrackDetailsDrawer'
 import KyivMapView from './map/KyivMapView'
 import MapView from './map/MapView'
 import EntityCatalogue from './entities/EntityCatalogue'
-import MessagesCatalogue from './messages/MessagesCatalogue'
+import MessageCatalogue from './messages/MessageCatalogue'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
 import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
 import { parseDataQuery } from './public/query'
@@ -298,7 +298,7 @@ export default function App() {
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
       {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} />}
-      {route.section === 'messages' && <MessagesCatalogue route={route} query={dataQuery} />}
+      {route.section === 'messages' && <MessageCatalogue route={route} query={dataQuery} />}
       {mapRoute && (kyivPreset ? (
         <KyivPanel route={route} open={panelOpen} onClose={closePanel} />
       ) : (
