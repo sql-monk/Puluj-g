@@ -145,6 +145,7 @@ function Select-Services {
         'admin' = 'приватна панель керування й діагностики на порту 8091'
         'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
         'messaging' = 'СТАНДАРТНИЙ RabbitMQ pipeline: relay, parsing, LLM та domain writers'
+        'rabbitmq' = 'черга durable messaging pipeline; оберіть разом із messaging, якщо її ще не запущено'
     }
     $available = @($services.Keys)
     Write-Host "`nЩо публікувати:"
@@ -167,56 +168,73 @@ function Invoke-DeploymentWizard {
     $script:Services = @((Select-Services) | Where-Object { $_ })
     $script:selectedServicesOnly = $Services.Count -gt 0
     $script:NoBuild = -not (Read-YesNo "Перебудувати вибрані Docker-образи?" $true)
+    $managesDatabase = -not $selectedServicesOnly -or $Services -contains 'postgis' -or $Services -contains 'migrate'
+    $configuresMessaging = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('rabbitmq', 'messaging', 'collector-telegram', 'collector-alerts') }).Count -gt 0
+    $configuresProcessor = -not $selectedServicesOnly -or $Services -contains 'processor'
 
-    Write-Host "`nБаза даних:"
-    Write-Host "  1. Залишити наявну БД без очищення"
-    Write-Host "  2. Створити новий порожній Docker volume, якщо його ще немає"
-    Write-Host "  3. Повністю очистити ізольоване розгортання і БД"
-    $databaseChoice = Read-Choice "Оберіть 1, 2 або 3" @('1', '2', '3')
-    $defaultVolume = $script:DatabaseVolume
-    $volumeAnswer = (Read-Host "Назва PostgreSQL volume (Enter — $defaultVolume)").Trim()
-    if ($volumeAnswer) { $script:DatabaseVolume = $volumeAnswer }
-    switch ($databaseChoice) {
-        '1' { }
-        '2' { $script:InitializeDatabase = $true }
-        '3' {
-            Write-Host "УВАГА: буде видалено дані БД, Telegram session, логи й RabbitMQ state лише для '$($script:ComposeProject)'." -ForegroundColor Yellow
-            $confirmation = Read-Host "Для підтвердження введіть DELETE $($script:ComposeProject)"
-            if ($confirmation -ne "DELETE $($script:ComposeProject)") { throw "Очищення скасовано: фраза підтвердження не збігається." }
-            $script:ResetDatabase = $true
-            $script:ConfirmReset = $true
+    if ($managesDatabase) {
+        Write-Host "`nБаза даних:"
+        Write-Host "  1. Залишити наявну БД без очищення"
+        Write-Host "  2. Створити новий порожній Docker volume, якщо його ще немає"
+        Write-Host "  3. Повністю очистити ізольоване розгортання і БД"
+        $databaseChoice = Read-Choice "Оберіть 1, 2 або 3" @('1', '2', '3')
+        $defaultVolume = $script:DatabaseVolume
+        $volumeAnswer = (Read-Host "Назва PostgreSQL volume (Enter — $defaultVolume)").Trim()
+        if ($volumeAnswer) { $script:DatabaseVolume = $volumeAnswer }
+        switch ($databaseChoice) {
+            '1' { }
+            '2' { $script:InitializeDatabase = $true }
+            '3' {
+                Write-Host "УВАГА: буде видалено дані БД, Telegram session, логи й RabbitMQ state лише для '$($script:ComposeProject)'." -ForegroundColor Yellow
+                $confirmation = Read-Host "Для підтвердження введіть DELETE $($script:ComposeProject)"
+                if ($confirmation -ne "DELETE $($script:ComposeProject)") { throw "Очищення скасовано: фраза підтвердження не збігається." }
+                $script:ResetDatabase = $true
+                $script:ConfirmReset = $true
+            }
         }
-    }
-
-    Write-Host "Messaging (RabbitMQ + durable domain writers) буде увімкнений за замовчуванням." -ForegroundColor Green
-    $legacyDefault = $script:LegacyProcessor -or $Services -contains 'processor'
-    $script:LegacyProcessor = Read-YesNo "Увімкнути ЗАСТАРІЛИЙ processor замість messaging domain writers?" $legacyDefault
-    if ($script:LegacyProcessor) {
-        $defaultReplicas = if ($script:ProcessorReplicas -gt 0) { $script:ProcessorReplicas } else { 2 }
-        $script:ProcessorReplicas = Read-ProcessorReplicaCount $defaultReplicas
     } else {
-        $script:ProcessorReplicas = 0
+        Write-Host "Часткова публікація: БД, міграції та її volume не змінюються." -ForegroundColor DarkGray
     }
 
-    if (Read-YesNo "Ввести або змінити токени й параметри колекторів/LLM зараз?" $false) {
+    if ($configuresProcessor) {
+        Write-Host "Messaging (RabbitMQ + durable domain writers) буде увімкнений за замовчуванням." -ForegroundColor Green
+        $legacyDefault = $script:LegacyProcessor -or $Services -contains 'processor'
+        $script:LegacyProcessor = Read-YesNo "Увімкнути ЗАСТАРІЛИЙ processor замість messaging domain writers?" $legacyDefault
+        if ($script:LegacyProcessor) {
+            $defaultReplicas = if ($script:ProcessorReplicas -gt 0) { $script:ProcessorReplicas } else { 2 }
+            $script:ProcessorReplicas = Read-ProcessorReplicaCount $defaultReplicas
+        } else {
+            $script:ProcessorReplicas = 0
+        }
+    } elseif ($configuresMessaging) {
+        Write-Host "Messaging (RabbitMQ + durable domain writers) лишається стандартним шляхом." -ForegroundColor Green
+    }
+
+    $canConfigure = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('admin', 'collector-alerts', 'collector-telegram', 'messaging', 'processor') }).Count -gt 0
+    if ($canConfigure -and (Read-YesNo "Ввести або змінити параметри вибраних компонентів зараз?" $false)) {
         $current = Get-DotEnvValues
         Step "Конфігурація (Enter зберігає поточне значення)"
-        Read-Setting $current 'ADMIN_TOKEN' 'Токен доступу до Admin' $true
-        Read-Setting $current 'Collectors__AlertsInUa__Enabled' 'Увімкнути alerts.in.ua (true/false)'
-        Read-Setting $current 'Collectors__AlertsInUa__Token' 'Токен alerts.in.ua' $true
-        Read-Setting $current 'Collectors__Telegram__Enabled' 'Увімкнути Telegram (true/false)'
-        Read-Setting $current 'Collectors__Telegram__ApiId' 'Telegram API ID'
-        Read-Setting $current 'Collectors__Telegram__ApiHash' 'Telegram API hash' $true
-        Read-Setting $current 'Collectors__Telegram__Phone' 'Номер Telegram у міжнародному форматі'
-        Read-Setting $current 'Collectors__Telegram__Password' 'Пароль двофакторного захисту Telegram' $true
-        Read-Setting $current 'Collectors__Telegram__SessionPath' 'Шлях до Telegram session у контейнері'
-        Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
-        Read-Setting $current 'Llm__Model' 'Модель LLM'
-        Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
-        Read-Setting $current 'OTEL_EXPORTER_OTLP_ENDPOINT' 'OTLP endpoint'
+        if (-not $selectedServicesOnly -or $Services -contains 'admin') { Read-Setting $current 'ADMIN_TOKEN' 'Токен доступу до Admin' $true }
+        if (-not $selectedServicesOnly -or $Services -contains 'collector-alerts') {
+            Read-Setting $current 'Collectors__AlertsInUa__Enabled' 'Увімкнути alerts.in.ua (true/false)'
+            Read-Setting $current 'Collectors__AlertsInUa__Token' 'Токен alerts.in.ua' $true
+        }
+        if (-not $selectedServicesOnly -or $Services -contains 'collector-telegram') {
+            Read-Setting $current 'Collectors__Telegram__Enabled' 'Увімкнути Telegram (true/false)'
+            Read-Setting $current 'Collectors__Telegram__ApiId' 'Telegram API ID'
+            Read-Setting $current 'Collectors__Telegram__ApiHash' 'Telegram API hash' $true
+            Read-Setting $current 'Collectors__Telegram__Phone' 'Номер Telegram у міжнародному форматі'
+            Read-Setting $current 'Collectors__Telegram__Password' 'Пароль двофакторного захисту Telegram' $true
+            Read-Setting $current 'Collectors__Telegram__SessionPath' 'Шлях до Telegram session у контейнері'
+        }
+        if (-not $selectedServicesOnly -or $Services -contains 'messaging' -or $Services -contains 'processor') {
+            Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
+            Read-Setting $current 'Llm__Model' 'Модель LLM'
+            Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
+        }
         if ($wizardSettings.Count -gt 0) {
             Update-DotEnv $wizardSettings
-            $script:applyWizardSettingsToDatabase = Read-YesNo "Також застосувати runtime-настройки до app_settings цієї БД?" $true
+            if ($managesDatabase) { $script:applyWizardSettingsToDatabase = Read-YesNo "Також застосувати runtime-настройки до app_settings цієї БД?" $true }
         }
     }
 }
@@ -250,7 +268,9 @@ if (-not $LegacyProcessor -and $Services.Count -gt 0 -and $Services -contains 'p
     throw "processor is obsolete and disabled by default. Use -LegacyProcessor -ProcessorReplicas <1..32> to start it instead of messaging domain writers."
 }
 $changesDomainOwnership = $Services.Count -eq 0 -or $Services -contains 'messaging' -or $Services -contains 'processor'
-$requiresMigrate = $Services.Count -eq 0 -or $Services -contains 'migrate' -or @($Services | Where-Object { $_ -ne 'postgis' }).Count -gt 0
+$managesDatabase = $Services.Count -eq 0 -or $Services -contains 'postgis' -or $Services -contains 'migrate'
+$requiresMigrate = $Services.Count -eq 0 -or $Services -contains 'migrate'
+$partialComponentDeploy = $Services.Count -gt 0 -and -not $managesDatabase
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not found (Docker Desktop is not installed or not in PATH)" }
@@ -259,7 +279,6 @@ if ([string]::IsNullOrWhiteSpace($DatabaseVolume)) { throw "DatabaseVolume must 
 # The Postgres volume is external: Compose must never silently make a fresh database when a volume name was mistyped
 # or the persistent disk was not mounted.  A first install is deliberately opt-in via -InitializeDatabase.
 $volume = $DatabaseVolume.Trim()
-$volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
 $env:PULUJ_PGDATA_VOLUME = $volume
 
 function Assert-ResetTarget {
@@ -281,6 +300,8 @@ function Assert-ResetTarget {
     if ($mounts.Count -ne 1) { throw "Postgis container '$($ids[0])' does not mount verified volume '$volume' at /var/lib/postgresql/data; database was not removed." }
 }
 
+if ($managesDatabase) {
+    $volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
 if ($ResetDatabase) {
     if (-not $volumeExists) { throw "PostgreSQL volume '$volume' does not exist; refusing a reset with an unverified target." }
     Assert-ResetTarget
@@ -309,6 +330,9 @@ elseif (-not $volumeExists) {
 }
 else {
     Write-Host "Using existing PostgreSQL volume '$volume'; migrations will update it in place." -ForegroundColor Green
+}
+} elseif ($ResetDatabase -or $InitializeDatabase) {
+    throw "A database action needs postgis or migrate in -Services. The selected component deploy does not touch the database."
 }
 
 # Messaging owns the durable path and domain writes by default. Legacy processing is opt-in and then messaging remains
@@ -373,11 +397,15 @@ function ComposeContainerId([string]$service) {
     return $ids[0].Trim()
 }
 
-# A local dev-run Worker next to Docker processors means two processor versions over one database and two Telegram
-# clients on one session. A database-only/migrate-only selection does not touch unrelated local development processes.
-$startsApplication = $Services.Count -eq 0 -or @($Services | Where-Object { $_ -notin @('postgis', 'migrate') }).Count -gt 0
-if ($startsApplication) {
-    $local = Get-Process -Name "Puluj.Worker", "Puluj.Api", "Puluj.Admin", "Puluj.Analytics.Worker" -ErrorAction SilentlyContinue
+# Stop only local processes that conflict with the selected components. A partial admin/API deployment must not
+# terminate collectors or workers that are doing useful local work.
+$localProcessNames = [System.Collections.Generic.List[string]]::new()
+if ($Services.Count -eq 0 -or @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts', 'processor', 'messaging') }).Count -gt 0) { $localProcessNames.Add('Puluj.Worker') }
+if ($Services.Count -eq 0 -or $Services -contains 'api') { $localProcessNames.Add('Puluj.Api') }
+if ($Services.Count -eq 0 -or $Services -contains 'admin') { $localProcessNames.Add('Puluj.Admin') }
+if ($Services.Count -eq 0 -or $Services -contains 'analytics') { $localProcessNames.Add('Puluj.Analytics.Worker') }
+if ($localProcessNames.Count -gt 0) {
+    $local = Get-Process -Name @($localProcessNames | Select-Object -Unique) -ErrorAction SilentlyContinue
     if ($local) {
         Step "Stopping local dev-run processes ($($local.Name -join ', '))"
         $local | Stop-Process -Force
@@ -403,12 +431,13 @@ elseif ($changesDomainOwnership) {
     } finally { Pop-Location }
 }
 
-Step ("Building and starting the stack" + $(if ($LegacyProcessor) { " (ЗАСТАРІЛИЙ processor: $ProcessorReplicas реплік)" } else { " (messaging за замовчуванням)" }))
+Step ($(if ($partialComponentDeploy) { "Часткова публікація: $($Services -join ', ') (залежності не змінюються)" } else { "Building and starting the stack" + $(if ($LegacyProcessor) { " (ЗАСТАРІЛИЙ processor: $ProcessorReplicas реплік)" } else { " (messaging за замовчуванням)" }) }))
 Push-Location $deploy
 try {
     if (-not (Test-Path ".env")) { Write-Warning "deploy/.env is missing: compose will use the defaults from docker-compose.yml (ADMIN_TOKEN empty = panel only from localhost)" }
     $composeArgs = @("compose", "-p", $composeProject) + $profileArgs + @("up", "-d", "--remove-orphans")
     if (-not $NoBuild) { $composeArgs += "--build" }
+    if ($partialComponentDeploy) { $composeArgs += "--no-deps" }
     $composeArgs += $Services
     & docker @composeArgs
     if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
@@ -429,11 +458,16 @@ try {
     }
 
     Step "Containers"
-    docker compose -p $composeProject @profileArgs ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
-    $postgisContainer = ComposeContainerId "postgis"
-    $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
-    if ($changesDomainOwnership -and -not $LegacyProcessor -and $processorContainers.Count -gt 0) { throw "obsolete processor containers are still running after the messaging cutover: $($processorContainers -join ', ')" }
-    $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
+    $statusArgs = @("compose", "-p", $composeProject) + $profileArgs + @("ps", "--format", "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}") + $Services
+    & docker @statusArgs
+    $postgisContainer = if ($requiresMigrate) { ComposeContainerId "postgis" } else { $null }
+    $processorContainers = @()
+    $messagingContainers = @()
+    if ($changesDomainOwnership) {
+        $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
+        if (-not $LegacyProcessor -and $processorContainers.Count -gt 0) { throw "obsolete processor containers are still running after the messaging cutover: $($processorContainers -join ', ')" }
+        $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
+    }
 } finally { Pop-Location }
 
 if ($requiresMigrate) { Apply-WizardSettingsToDatabase }
@@ -443,13 +477,15 @@ if (-not $SkipSql -and $requiresMigrate) {
     Sql (Join-Path $root "scripts\requeue-failed.sql")
     Step "One-off SQL: text alerts closed by an out-of-order 'відбій' (ended_at < started_at) reopened for the watchdog"
     Sql (Join-Path $root "scripts\fix-text-alert-ends.sql")
-} elseif (-not $SkipSql) { Write-Host "Пропущено SQL-корекції: обрано лише postgis, без migrate/schema check." -ForegroundColor Yellow }
+} elseif (-not $SkipSql -and $managesDatabase) { Write-Host "Пропущено SQL-корекції: обрано лише postgis, без migrate/schema check." -ForegroundColor Yellow }
 
 Step "Checks"
 if ($processorContainers.Count -gt 0 -or $messagingContainers.Count -gt 0) { Start-Sleep 20 }  # let active workers claim messages
-$since = (Get-Date).AddMinutes(-2).ToUniversalTime().ToString("o")
-$deadlocks = (docker logs --since $since $postgisContainer 2>&1 | Select-String "deadlock detected").Count
-Write-Host ("PostgreSQL deadlocks since restart: {0}" -f $deadlocks) -ForegroundColor ($(if ($deadlocks -eq 0) { "Green" } else { "Red" }))
+if ($postgisContainer) {
+    $since = (Get-Date).AddMinutes(-2).ToUniversalTime().ToString("o")
+    $deadlocks = (docker logs --since $since $postgisContainer 2>&1 | Select-String "deadlock detected").Count
+    Write-Host ("PostgreSQL deadlocks since restart: {0}" -f $deadlocks) -ForegroundColor ($(if ($deadlocks -eq 0) { "Green" } else { "Red" }))
+}
 foreach ($c in $processorContainers) {
     $line = docker logs --tail 200 $c 2>&1 | Select-String "lock wait" | Select-Object -Last 1
     Write-Host ("{0}: {1}" -f $c, $(if ($line) { "new timing format OK (parse / lock wait / store)" } else { "no 'lock wait' line yet (idle, or old image?)" }))
@@ -483,4 +519,4 @@ SELECT subscription_id, outcome, count(*) FROM processing.deliveries GROUP BY 1,
 SELECT count(*) AS outbox_unconfirmed FROM messaging.outbox WHERE confirmed_at IS NULL;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
 }
-Write-Host "`nГотово. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green
+Write-Host "`nГотово." -ForegroundColor Green

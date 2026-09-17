@@ -43,7 +43,8 @@ pwsh scripts/deploy.ps1
 ```
 
 У майстрі перелічені `postgis`, `migrate`, `collector-telegram`,
-`collector-alerts`, `processor`, `api`, `admin`, `analytics` і `messaging`.
+`collector-alerts`, `processor`, `api`, `admin`, `analytics`, `messaging` і
+`rabbitmq`.
 Біля кожного пункту майстер показує короткий опис його ролі, тож вибір не
 потребує знання Compose-імен напам'ять. `messaging` позначено як стандартний
 pipeline, а `processor` — як застарілий і вимкнений за замовчуванням.
@@ -56,6 +57,15 @@ messaging і прибирає його domain-writer ролі. У стандар
 `messaging`, якщо обрано колектор. Повне
 очищення вимагає ввести буквально `DELETE <ComposeProject>` і зберігає
 попередні перевірки володіння томом.
+
+Якщо вибрати лише прикладний сервіс, наприклад `admin`, `api` або `analytics`,
+майстер не питає про БД, processor, черги чи токени інших компонентів. Він
+збирає та перезапускає тільки обраний сервіс з Compose `--no-deps`: `postgis`,
+`migrate`, колектори й messaging не запускаються, не зупиняються та не
+мігруються. Це передбачає, що вже запущені залежності сумісні з новим образом;
+для зміни схеми або нового середовища оберіть `migrate` чи повний стек. Для
+окремого запуску messaging, коли RabbitMQ ще не працює, виберіть одночасно
+`messaging,rabbitmq`.
 
 Майстер може оновити `deploy/.env` для admin token, alerts.in.ua, Telegram
 (enabled, API ID, API hash, номер, 2FA password, session path) та LLM. Значення
