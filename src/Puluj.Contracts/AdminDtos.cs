@@ -61,8 +61,8 @@ public sealed record DbReportDto(
 public sealed record DbQueryResultDto(
     IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string?>> Rows, bool Truncated, long ElapsedMs);
 
-/// <summary>Result of manually refreshing PostgreSQL planner statistics for one application table.</summary>
-public sealed record DbAnalyzeResultDto(string Name, long ElapsedMs);
+/// <summary>Result of a manually invoked PostgreSQL maintenance operation for one application table.</summary>
+public sealed record DbTableMaintenanceResultDto(string Name, string Operation, long ElapsedMs);
 
 /// <summary>Body for the read-only SQL console. The server accepts one SELECT or WITH … SELECT statement only.</summary>
 public sealed record DbQueryRequest(string Sql);

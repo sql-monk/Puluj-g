@@ -17,6 +17,8 @@ const SERVICE_LABEL: Record<string, string> = {
   postgres: 'PostgreSQL / PostGIS',
 }
 
+type TableMaintenance = 'ANALYZE' | 'VACUUM' | 'REINDEX'
+
 /** Scaled processor replicas are `worker:processor-<container id>`: labelled by the prefix, the id kept as detail. */
 function serviceLabel(name: string): string {
   if (SERVICE_LABEL[name]) return SERVICE_LABEL[name]
@@ -152,8 +154,8 @@ export function DbPanel() {
   const [tableRows, setTableRows] = useState<DbQueryResultDto | null>(null)
   const [tableError, setTableError] = useState<string | null>(null)
   const [loadingTable, setLoadingTable] = useState(false)
-  const [analyzingTable, setAnalyzingTable] = useState<string | null>(null)
-  const [analyzeMessage, setAnalyzeMessage] = useState<string | null>(null)
+  const [maintenanceInProgress, setMaintenanceInProgress] = useState<{ name: string; operation: TableMaintenance } | null>(null)
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null)
   const [sql, setSql] = useState('')
   const [queryResult, setQueryResult] = useState<DbQueryResultDto | null>(null)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -191,17 +193,17 @@ export function DbPanel() {
     }
   }
 
-  const analyzeTable = async (name: string) => {
-    setAnalyzingTable(name)
-    setAnalyzeMessage(null)
+  const maintainTable = async (name: string, operation: TableMaintenance) => {
+    setMaintenanceInProgress({ name, operation })
+    setMaintenanceMessage(null)
     try {
-      const result = await admin.ops.analyzeTable(name)
-      setAnalyzeMessage(`ANALYZE для ${result.name} виконано за ${fmtNum(result.elapsedMs)} мс.`)
+      const result = await admin.ops.maintainTable(name, operation.toLowerCase() as Lowercase<TableMaintenance>)
+      setMaintenanceMessage(`${result.operation} для ${result.name} виконано за ${fmtNum(result.elapsedMs)} мс.`)
       reload()
     } catch (e) {
-      setAnalyzeMessage(`Помилка ANALYZE: ${e instanceof Error ? e.message : String(e)}`)
+      setMaintenanceMessage(`Помилка ${operation}: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
-      setAnalyzingTable(null)
+      setMaintenanceInProgress(null)
     }
   }
 
@@ -294,9 +296,10 @@ export function DbPanel() {
                     </td>
                     <td className="pr-2 text-right">
                       <div className="flex justify-end gap-1">
-                        <button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] disabled:opacity-50 dark:border-slate-600" onClick={() => void analyzeTable(t.name)} disabled={analyzingTable !== null}>
-                          {analyzingTable === t.name ? 'ANALYZE…' : 'ANALYZE'}
-                        </button>
+                        {(['ANALYZE', 'VACUUM', 'REINDEX'] as const).map((operation) => {
+                          const running = maintenanceInProgress?.name === t.name && maintenanceInProgress.operation === operation
+                          return <button key={operation} className="rounded border border-slate-300 px-2 py-0.5 text-[11px] disabled:opacity-50 dark:border-slate-600" title={operation === 'REINDEX' ? 'Перебудовує індекси без блокування звичайних записів' : undefined} onClick={() => void maintainTable(t.name, operation)} disabled={maintenanceInProgress !== null}>{running ? `${operation}…` : operation}</button>
+                        })}
                         <button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-600" onClick={() => void openTable(t.name)}>Дані</button>
                       </div>
                     </td>
@@ -308,7 +311,7 @@ export function DbPanel() {
           </>
         )}
       </Section>
-      {analyzeMessage && <div className={analyzeMessage.startsWith('Помилка') ? 'text-xs text-red-600' : 'text-xs text-emerald-700 dark:text-emerald-400'}>{analyzeMessage}</div>}
+      {maintenanceMessage && <div className={maintenanceMessage.startsWith('Помилка') ? 'text-xs text-red-600' : 'text-xs text-emerald-700 dark:text-emerald-400'}>{maintenanceMessage}</div>}
       {selectedTable && (
         <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={`${fmtNum(tableRows.rows.length)} рядків`} />}>
           <p className="text-xs text-slate-500">Перші 50 рядків. Значення секретних полів приховано.</p>
