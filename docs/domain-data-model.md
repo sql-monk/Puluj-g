@@ -22,14 +22,13 @@ Puluj-G зберігає незмінний вхід (`raw_messages`) окрем
 
 Поруч з ними `collector_states` тримає cursor і health колектора,
 `processing_errors` — помилки legacy-обробки, `llm_requests` — аудит LLM, а
-`app_settings` — runtime settings. `source_copies` і `source_daily_stats`
-зберігають похідну статистику джерел; це не нові первинні повідомлення.
+`app_settings` — runtime settings.
 
 Платформа повідомлень має `messaging` (`outbox`, `inbox`, архів, registry
 підписок, керування lanes), а pipeline — `processing` (runs/generations,
 stage results, attempts/deliveries, extractions та observations). Аналітика
-власноруч мігрує схему `analytics`: `messages`, `copies`, `track_firsts`,
-`runs`, `state`; lifecycle-проєкція також зберігається як
+власноруч мігрує схему `analytics`: `messages`, `track_firsts`, `runs`,
+`state`; lifecycle-проєкція також зберігається як
 `analytics.message_lifecycle`. Її поля з невідомим старим таймінгом лишають
 `timings_available = false`, а не заповнюються вигаданими значеннями.
 

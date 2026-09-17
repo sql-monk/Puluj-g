@@ -13,13 +13,22 @@
 
 Редагована схема: [analytics-data-flow-schema-boundary.drawio](diagrams/analytics-data-flow-schema-boundary.drawio).
 
-## Text/copy reporting
+## Індекс повідомлень і звіт
 
-Loop бере raw rows у порядку ID, старші за `Analytics:SafetyLag`, і рухає watermark транзакційно разом з index/pairs. PostgreSQL advisory lock не дає двом instances виконувати один run. Після crash незакомічена batch повторюється; це не exactly-once гарантія для зовнішніх систем.
+Воркер бере `raw_messages` за зростанням ID, старші за `Analytics:SafetyLag`,
+і в одній транзакції записує індекс та новий watermark. PostgreSQL advisory lock
+не дає двом інстансам виконувати один прогін. Після збою незакомічений пакет
+повторюється; це не гарантія «рівно одного» звернення до зовнішньої системи.
 
-Пара виникає лише коли обидва повідомлення мають сумісні **розпарсені факти**: event type/category і перевірка часу, місця, напрямку та кількості у `EventWindow`. Text fingerprints, Jaccard і containment — діагностичні докази вже прийнятої semantic pair. Повідомлення без фактів не парується, тож `near`, `verbatim`, `forward` — аналітична оцінка/класифікація, не доказ копіювання чи першоджерела. «Original» обирається за ранішим published time (при рівності — меншим raw ID): це технічне упорядкування, не авторський факт.
+Індекс містить відомості про повідомлення, потрібні для стану воркера і
+`track_firsts`. `track_firsts` періодично перебудовується за налаштованим
+періодом. Аналітика не визначає копії,
+першоджерело, пари джерел або рейтинг джерел; схожий текст сам по собі не є
+таким контрактом.
 
-Read-only admin API: `/api/admin/analytics/status`, `/report`, `/recent`, `/pairs/{copierId}/{originalId}`. Status показує watermark, backlog, heartbeat, runs та instance status; звіт має джерела, пари, forwards і `track_firsts`. Значення залежать від надходження, parsing і watermark, тому не гарантують completeness/freshness у реальному часі.
+Read-only admin API `/api/admin/analytics/status` показує watermark, backlog,
+heartbeat, прогін та стан інстансу. Значення залежать від надходження даних і
+watermark, тому не гарантують повноту або актуальність у реальному часі.
 
 ## Lifecycle projection, backfill і reconciliation
 
@@ -39,4 +48,8 @@ Worker у кожному циклі виконує bounded backfill за cursor,
 
 ## Перевірка і межі
 
-`tests/Puluj.Analytics.Tests` перевіряє normalizer, semantic copy detection, pair delays, runner і lifecycle; `web/e2e/A06-lifecycle.e2e.ts` перевіряє операторський lifecycle UI. `POST /api/admin/analytics/reset` видаляє analytics index/copies/track_firsts і повертає watermark для rebuild; endpoint існує, але не вимагає actor/reason і не пише `ControlAudit`, тому це не безпечна рутинна дія.
+`tests/Puluj.Analytics.Tests` перевіряє runner, індекс, `track_firsts` і lifecycle;
+`web/e2e/A06-lifecycle.e2e.ts` перевіряє операторський lifecycle UI.
+`POST /api/admin/analytics/reset` видаляє незалежний індекс і `track_firsts`,
+після чого повертає watermark для повторної побудови. Endpoint існує, але не
+вимагає actor/reason і не пише `ControlAudit`, тому це не безпечна рутинна дія.
