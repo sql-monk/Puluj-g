@@ -114,13 +114,15 @@ export function CollectorsPanel() {
               <th className="pr-2">Повідомлення</th>
               <th className="pr-2">За 24 год</th>
               <th className="pr-2">Помилка</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             {list.map((c) => (
               <tr key={c.sourceId} className={`border-t border-slate-100 dark:border-slate-800 ${c.enabled ? '' : 'opacity-50'}`}>
                 <td className="py-1.5 pr-2">
-                  {c.name} <span className="text-slate-400">{c.code}</span>
+                  <div>{c.name} <span className="text-slate-400">{c.code}</span></div>
+                  {c.type === 'Telegram' && (c.channelTitle || c.subscriberCount != null) && <div className="text-slate-400">{c.channelTitle ?? 'назву не отримано'}{c.subscriberCount != null ? ` · ${c.subscriberCount.toLocaleString('uk-UA')} підписників` : ''}</div>}
                 </td>
                 <td className="pr-2">{c.type}</td>
                 <td className="pr-2">
@@ -138,6 +140,7 @@ export function CollectorsPanel() {
                 <td className="max-w-xs truncate pr-2 text-red-600" title={c.lastError}>
                   {c.lastError ?? ''}
                 </td>
+                <td className="whitespace-nowrap">{c.type === 'Telegram' && <a className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceIds=${c.sourceId}`}>Дивитись повідомлення</a>}</td>
               </tr>
             ))}
           </tbody>

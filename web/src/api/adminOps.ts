@@ -137,6 +137,14 @@ export interface MessageSearchRowDto {
   method?: string | null
   lastOutcome?: string | null
   textPreview: string
+  reactions: { kind: string; value: string; count: number }[]
+}
+
+export interface MessageSearchPageDto {
+  items: MessageSearchRowDto[]
+  totalCount: number
+  page: number
+  pageSize: number
 }
 
 export interface LifecycleAttemptDto {
@@ -238,7 +246,9 @@ export const adminOps = {
   waive: (quarantineId: number, actor: string, reason: string) => adminCall<{ ok: boolean; waived: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/waive`, { actor, reason }),
   scale: (service: 'processor' | 'messaging', replicas: number, actor: string, reason: string) =>
     adminCall<{ ok: boolean; message: string; output: string }>('POST', '/api/admin/ops/messaging/scale', { service, replicas, actor, reason }),
-  search: (q: string, hours: number, view: MessageView = 'all', sourceId?: number, limit = 50) =>
-    adminCall<MessageSearchRowDto[]>('GET', `/api/admin/messages?q=${encodeURIComponent(q)}&hours=${hours}&view=${view}&limit=${limit}${sourceId ? `&sourceId=${sourceId}` : ''}`),
+  search: (q: string, hours: number, view: MessageView = 'all', sourceIds: number[] = [], page = 1, sort = 'receivedAt', direction: 'asc' | 'desc' = 'desc', limit = 100) => {
+    const sources = sourceIds.map((id) => `sourceIds=${encodeURIComponent(id)}`).join('&')
+    return adminCall<MessageSearchPageDto>('GET', `/api/admin/messages?q=${encodeURIComponent(q)}&hours=${hours}&view=${view}&limit=${limit}&page=${page}&sort=${encodeURIComponent(sort)}&direction=${direction}${sources ? `&${sources}` : ''}`)
+  },
   lifecycle: (rawId: number) => adminCall<MessageLifecycleDto>('GET', `/api/admin/messages/${rawId}/lifecycle`),
 }

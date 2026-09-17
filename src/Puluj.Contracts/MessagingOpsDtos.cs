@@ -126,8 +126,14 @@ public sealed record ControlAuditDto(long AuditId, string Action, string? Subscr
 /// One row in the operator's message list.  Counts are durable evidence, not guesses: a target is a legacy target
 /// projection, an observation is a catalog event fact, and an LLM call is an immutable provider audit row.
 /// </summary>
+public sealed record MessageReactionDto(string Kind, string Value, int Count);
+
 public sealed record MessageSearchRowDto(long RawMessageId, int SourceId, string SourceCode, string SourceMessageId, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string Status,
-    int Extractions, int Observations, int Targets, int LlmCalls, string? AnalysisOutcome, string? Method, string? LastOutcome, string TextPreview);
+    int Extractions, int Observations, int Targets, int LlmCalls, string? AnalysisOutcome, string? Method, string? LastOutcome, string TextPreview,
+    IReadOnlyList<MessageReactionDto> Reactions);
+
+/// <summary>A bounded, stable page of raw-message revisions for the operator explorer.</summary>
+public sealed record MessageSearchPageDto(IReadOnlyList<MessageSearchRowDto> Items, long TotalCount, int Page, int PageSize);
 
 public sealed record LifecycleAttemptDto(long AttemptId, string Worker, string State, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string? Error, long? RetryOfAttemptId, string? RetryReason);
 

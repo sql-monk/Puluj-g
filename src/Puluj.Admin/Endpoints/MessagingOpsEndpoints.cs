@@ -127,13 +127,23 @@ public static class MessagingOpsEndpoints
         });
 
         // Message explorer.
-        g.MapGet("/messages", async (string? q, int? sourceId, int? hours, int? limit, string? view, MessageExplorer explorer, CancellationToken ct) =>
+        g.MapGet("/messages", async (string? q, int? sourceId, int[]? sourceIds, int? hours, int? page, int? limit, string? view, string? sort, string? direction, MessageExplorer explorer, CancellationToken ct) =>
         {
             if (!MessageExplorer.IsValidView(view))
             {
                 return Results.BadRequest(new { error = $"view має бути одним із: {string.Join(", ", MessageExplorer.Views)}" });
             }
-            return Results.Ok(await explorer.SearchAsync(q, sourceId, hours, limit, view, ct));
+            if (!MessageExplorer.IsValidSort(sort) || !MessageExplorer.IsValidDirection(direction))
+            {
+                return Results.BadRequest(new { error = $"sort має бути одним із: {string.Join(", ", MessageExplorer.Sorts)}; direction — asc або desc" });
+            }
+            // sourceId stays accepted for existing deep links; sourceIds permits one, several, or every source.
+            var selected = (sourceIds ?? []).Where(id => id > 0).Distinct().ToList();
+            if (sourceId is > 0 && !selected.Contains(sourceId.Value))
+            {
+                selected.Add(sourceId.Value);
+            }
+            return Results.Ok(await explorer.SearchPageAsync(q, selected, hours, page, limit, view, sort, direction, ct));
         });
         g.MapGet("/messages/{rawId:long}/lifecycle", async (long rawId, MessageExplorer explorer, CancellationToken ct) =>
             await explorer.LifecycleAsync(rawId, ct) is { } card ? Results.Ok(card) : Results.NotFound());

@@ -62,6 +62,8 @@ const lifecycle = {
   eventsTruncated: false,
   extractions: [],
   observations: [],
+  targets: [],
+  llmRequests: [],
   derived: [{ kind: 'track', id: 9, label: 'track #9 (target #55)' }],
   quarantine: [{ quarantineId: 5, subscriptionId: 'normalizer', lane: 'live', reason: 'attempts_exhausted', error: 'System.NullReferenceException: Object reference not set to an instance of an object.', quarantinedAt: '2026-09-16T11:00:09Z', resolvedAt: null, resolution: null, envelopePreview: '{"event_id":"e1"}', envelopeTruncated: false }],
   summary: { completion: 'needs_attention', waiting: ['parser/live'], completed: ['archive/live'], failed: ['normalizer/live'] },
@@ -82,7 +84,7 @@ async function mockAdmin(page: Page, posts: { url: string; body: unknown }[]) {
     if (path.endsWith('/audit')) return json(r, [{ auditId: 1, action: 'pause', subscriptionId: 'parser', lane: 'history', actor: 'ops', reason: 'backfill window', at: '2026-09-16T11:00:00Z' }])
     return json(r, snapshot)
   })
-  await page.route('**/api/admin/messages?**', (r) => json(r, [{ rawMessageId: 777, sourceId: 1, sourceCode: 'tg_kpszsu', sourceMessageId: '4242', publishedAt: '2026-09-16T11:00:00Z', receivedAt: '2026-09-16T11:00:05Z', status: 'processed', extractions: 1, observations: 2, lastOutcome: 'quarantined', textPreview: 'Шахеди на Сумщині' }]))
+  await page.route('**/api/admin/messages?**', (r) => json(r, { items: [{ rawMessageId: 777, sourceId: 1, sourceCode: 'tg_kpszsu', sourceMessageId: '4242', publishedAt: '2026-09-16T11:00:00Z', receivedAt: '2026-09-16T11:00:05Z', status: 'processed', extractions: 1, observations: 2, lastOutcome: 'quarantined', textPreview: 'Шахеди на Сумщині', reactions: [{ kind: 'emoji', value: '👍', count: 12 }] }], totalCount: 1, page: 1, pageSize: 100 }))
   await page.route('**/api/admin/messages/777/lifecycle', (r) => json(r, lifecycle))
 }
 

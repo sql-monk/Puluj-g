@@ -401,6 +401,7 @@ public static partial class OpsEndpoints
         var firstHour = new DateTime(now.UtcDateTime.Year, now.UtcDateTime.Month, now.UtcDateTime.Day, now.UtcDateTime.Hour, 0, 0, DateTimeKind.Utc).AddHours(-23);
         var sources = await db.Sources.AsNoTracking().OrderByDescending(s => s.Enabled).ThenByDescending(s => s.Priority).ToListAsync(ct);
         var states = await db.CollectorStates.AsNoTracking().ToDictionaryAsync(c => c.SourceId, ct);
+        var telegram = await AdminEndpoints.LatestTelegramInfoAsync(db, ct);
         var counts = await db.Database.SqlQuery<HourCount>($"""
             SELECT source_id, date_trunc('hour', received_at)::timestamp AS hour, count(*)::int AS count
             FROM raw_messages
@@ -423,7 +424,7 @@ public static partial class OpsEndpoints
             }
             return new CollectorStatusDto(s.SourceId, s.Code, s.Name, s.Type.ToString(), s.Enabled,
                 st?.LastPolledAt, st?.LastSuccessAt, st?.LastMessageAt, st?.LastError, st?.ConsecutiveFailures ?? 0,
-                perHour.Sum(), perHour);
+                perHour.Sum(), perHour, telegram.GetValueOrDefault(s.SourceId)?.ChannelTitle, telegram.GetValueOrDefault(s.SourceId)?.SubscriberCount);
         }).ToList();
         return Results.Ok(list);
     }

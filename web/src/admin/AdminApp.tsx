@@ -163,7 +163,7 @@ export default function AdminApp() {
                 {section === 'overview' && <OverviewPanel />}
                 {section === 'workers' && <WorkersPanel />}
                 {section === 'queues' && <QueuesPanel />}
-                {section === 'messages' && <MessagesPanel />}
+                {section === 'messages' && <MessagesPanel sources={sources} />}
                 {section === 'replay' && <ReplayPanel />}
                 {section === 'collectors' && <CollectorsPanel />}
                 {section === 'pipeline' && <PipelinePanel />}

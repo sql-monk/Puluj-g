@@ -285,6 +285,8 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                     <div className="font-medium">{s.name}</div>
                     <div className="text-slate-400">
                       {s.channel ? `@${s.channel}` : (s.url ?? s.code)}
+                      {s.type === 'Telegram' && s.channelTitle && ` · ${s.channelTitle}`}
+                      {s.type === 'Telegram' && s.subscriberCount != null && ` · ${s.subscriberCount.toLocaleString('uk-UA')} підписників`}
                       {s.homeRegion && ` · ${s.homeRegion}`}
                       {s.type !== 'Telegram' && (s.hasToken ? ' · токен ✓' : ' · без токена')}
                     </div>
@@ -303,6 +305,7 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                   </td>
                   <td className="pr-2">{s.rawMessageCount}</td>
                   <td className="whitespace-nowrap text-right">
+                    {s.type === 'Telegram' && <a className="mr-1 inline-block rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceIds=${s.id}`}>Дивитись повідомлення</a>}
                     <button className="mr-1 rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" onClick={() => startEdit(s)}>
                       Редагувати
                     </button>

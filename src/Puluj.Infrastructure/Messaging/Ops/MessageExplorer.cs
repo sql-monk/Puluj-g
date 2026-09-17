@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Puluj.Contracts;
 using Puluj.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace Puluj.Infrastructure.Messaging.Ops;
 
@@ -17,22 +18,38 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
 {
     public const int MaxLimit = 100, MaxEvents = 200, MaxAttempts = 20, MaxTextHours = 168, MaxHours = 720, EnvelopePreview = 2000;
     public static readonly string[] Views = ["all", "ignored", "llm", "targets", "events", "failed"];
+    public static readonly string[] Sorts = ["receivedAt", "publishedAt", "rawMessageId", "source", "sourceMessageId", "status"];
 
     public static bool IsValidView(string? view) => string.IsNullOrWhiteSpace(view) || Views.Contains(view, StringComparer.Ordinal);
+    public static bool IsValidSort(string? sort) => string.IsNullOrWhiteSpace(sort) || Sorts.Contains(sort, StringComparer.Ordinal);
+    public static bool IsValidDirection(string? direction) => string.IsNullOrWhiteSpace(direction) || direction is "asc" or "desc";
 
     /// <summary>Compatibility overload for existing operator tools: an unqualified search means every outcome.</summary>
     public Task<IReadOnlyList<MessageSearchRowDto>> SearchAsync(string? q, int? sourceId, int? hours, int? limit, CancellationToken ct) =>
         SearchAsync(q, sourceId, hours, limit, "all", ct);
 
     public async Task<IReadOnlyList<MessageSearchRowDto>> SearchAsync(string? q, int? sourceId, int? hours, int? limit, string? view, CancellationToken ct)
+        => (await SearchPageAsync(q, sourceId is { } id ? [id] : null, hours, 1, limit, view, "receivedAt", "desc", ct)).Items;
+
+    /// <summary>Reads a page of immutable raw-message revisions.  Sort choices are an allow-list so no request value
+    /// becomes SQL syntax; source filters are bound as a PostgreSQL array.</summary>
+    public async Task<MessageSearchPageDto> SearchPageAsync(string? q, IReadOnlyCollection<int>? sourceIds, int? hours, int? page, int? limit, string? view, string? sort, string? direction, CancellationToken ct)
     {
-        var take = Math.Clamp(limit ?? 50, 1, MaxLimit);
+        var take = Math.Clamp(limit ?? MaxLimit, 1, MaxLimit);
+        var pageNumber = Math.Clamp(page ?? 1, 1, 1_000_000);
         var span = Math.Clamp(hours ?? 24, 1, MaxHours);
+        var sources = sourceIds?.Where(x => x > 0).Distinct().ToArray() ?? [];
         q = q?.Trim();
         view = string.IsNullOrWhiteSpace(view) ? "all" : view;
+        sort = string.IsNullOrWhiteSpace(sort) ? "receivedAt" : sort;
+        direction = string.IsNullOrWhiteSpace(direction) ? "desc" : direction;
         if (!IsValidView(view))
         {
             throw new ArgumentException($"unknown message view '{view}'", nameof(view));
+        }
+        if (!IsValidSort(sort) || !IsValidDirection(direction))
+        {
+            throw new ArgumentException("unknown message sort", nameof(sort));
         }
         if (q is { Length: > 200 })
         {
@@ -40,7 +57,7 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
         }
         var byId = long.TryParse(q, out var rawId);
         // A free-text search is the only unindexed path (ILIKE over raw_text): bounded to a week unless a key/id narrows it.
-        if (!string.IsNullOrEmpty(q) && !byId && sourceId is null)
+        if (!string.IsNullOrEmpty(q) && !byId && sources.Length == 0)
         {
             span = Math.Min(span, MaxTextHours);
         }
@@ -50,6 +67,40 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
         await using var tx = await conn.BeginTransactionAsync(ct);
         await Exec(conn, tx, "SET TRANSACTION READ ONLY", ct);
         await Exec(conn, tx, "SET LOCAL statement_timeout = '10s'", ct);
+        var where = $"""
+            WHERE r.received_at >= now() - make_interval(hours => @hours)
+              {(sources.Length == 0 ? "" : "AND r.source_id = ANY(@sources)")}
+              {(string.IsNullOrEmpty(q) ? "" : byId ? "AND (r.raw_message_id = @id OR r.source_message_id = @q)" : "AND (r.source_message_id = @q OR r.source_message_key = @q OR r.raw_text ILIKE @like)")}
+              {ViewSql(view)}
+            """;
+
+        void Bind(NpgsqlCommand command)
+        {
+            command.Parameters.AddWithValue("hours", span);
+            if (sources.Length > 0)
+            {
+                command.Parameters.AddWithValue("sources", sources);
+            }
+            if (!string.IsNullOrEmpty(q))
+            {
+                command.Parameters.AddWithValue("q", q);
+                if (byId)
+                {
+                    command.Parameters.AddWithValue("id", rawId);
+                }
+                else
+                {
+                    command.Parameters.AddWithValue("like", "%" + q.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%");
+                }
+            }
+        }
+
+        long total;
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM raw_messages r JOIN sources s ON s.source_id = r.source_id {where}", conn, tx))
+        {
+            Bind(count);
+            total = Convert.ToInt64(await count.ExecuteScalarAsync(ct));
+        }
         await using var cmd = new NpgsqlCommand(
             $"""
             SELECT r.raw_message_id, r.source_id, s.code, r.source_message_id, r.published_at, r.received_at, r.processing_status,
@@ -60,42 +111,65 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
                    (SELECT x.outcome FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id ORDER BY x.created_at DESC LIMIT 1),
                    (SELECT x.method FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id ORDER BY x.created_at DESC LIMIT 1),
                    (SELECT d.outcome FROM messaging.events e JOIN processing.deliveries d ON d.event_id = e.event_id WHERE e.raw_message_id = r.raw_message_id ORDER BY d.completed_at DESC NULLS FIRST LIMIT 1),
-                   left(coalesce(r.raw_text, ''), 160)
+                   left(coalesce(r.raw_text, ''), 160),
+                   coalesce(r.raw_payload -> 'reactions', '[]'::jsonb)::text
             FROM raw_messages r JOIN sources s ON s.source_id = r.source_id
-            WHERE r.received_at >= now() - make_interval(hours => @hours)
-              {(sourceId is null ? "" : "AND r.source_id = @source")}
-              {(string.IsNullOrEmpty(q) ? "" : byId ? "AND (r.raw_message_id = @id OR r.source_message_id = @q)" : "AND (r.source_message_id = @q OR r.source_message_key = @q OR r.raw_text ILIKE @like)")}
-              {ViewSql(view)}
-            ORDER BY r.received_at DESC
-            LIMIT @take
+            {where}
+            ORDER BY {OrderSql(sort, direction)}, r.raw_message_id DESC
+            LIMIT @take OFFSET @offset
             """, conn, tx);
-        cmd.Parameters.AddWithValue("hours", span);
+        Bind(cmd);
         cmd.Parameters.AddWithValue("take", take);
-        if (sourceId is not null)
-        {
-            cmd.Parameters.AddWithValue("source", sourceId.Value);
-        }
-        if (!string.IsNullOrEmpty(q))
-        {
-            cmd.Parameters.AddWithValue("q", q);
-            if (byId)
-            {
-                cmd.Parameters.AddWithValue("id", rawId);
-            }
-            else
-            {
-                cmd.Parameters.AddWithValue("like", "%" + q.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%");
-            }
-        }
+        cmd.Parameters.AddWithValue("offset", (long)(pageNumber - 1) * take);
         var rows = new List<MessageSearchRowDto>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
             rows.Add(new MessageSearchRowDto(reader.GetInt64(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4), reader.GetFieldValue<DateTimeOffset>(5),
                 StatusName(reader.GetInt32(6)), reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10), reader.IsDBNull(11) ? null : reader.GetString(11), reader.IsDBNull(12) ? null : reader.GetString(12),
-                reader.IsDBNull(13) ? null : reader.GetString(13), reader.GetString(14)));
+                reader.IsDBNull(13) ? null : reader.GetString(13), reader.GetString(14), Reactions(reader.GetString(15))));
         }
-        return rows;
+        return new MessageSearchPageDto(rows, total, pageNumber, take);
+    }
+
+    private static string OrderSql(string sort, string direction) => (sort, direction) switch
+    {
+        ("receivedAt", "asc") => "r.received_at ASC",
+        ("receivedAt", _) => "r.received_at DESC",
+        ("publishedAt", "asc") => "r.published_at ASC",
+        ("publishedAt", _) => "r.published_at DESC",
+        ("rawMessageId", "asc") => "r.raw_message_id ASC",
+        ("rawMessageId", _) => "r.raw_message_id DESC",
+        ("source", "asc") => "s.code ASC",
+        ("source", _) => "s.code DESC",
+        ("sourceMessageId", "asc") => "r.source_message_id ASC",
+        ("sourceMessageId", _) => "r.source_message_id DESC",
+        ("status", "asc") => "r.processing_status ASC",
+        ("status", _) => "r.processing_status DESC",
+        _ => "r.received_at DESC",
+    };
+
+    private static IReadOnlyList<MessageReactionDto> Reactions(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+            return document.RootElement.EnumerateArray()
+                .Where(x => x.ValueKind == JsonValueKind.Object
+                    && x.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String
+                    && x.TryGetProperty("value", out var value) && value.ValueKind == JsonValueKind.String
+                    && x.TryGetProperty("count", out var count) && count.TryGetInt32(out _))
+                .Select(x => new MessageReactionDto(x.GetProperty("kind").GetString()!, x.GetProperty("value").GetString()!, x.GetProperty("count").GetInt32()))
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
     }
 
     public async Task<MessageLifecycleDto?> LifecycleAsync(long rawMessageId, CancellationToken ct)

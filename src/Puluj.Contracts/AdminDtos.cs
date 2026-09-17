@@ -8,7 +8,8 @@ public sealed record SettingsUpdateRequest(Dictionary<string, string?> Values);
 public sealed record AdminSourceDto(
     int Id, string Code, string Name, string Type, bool Enabled, double TrustLevel, int Priority, string? Url, string? Channel,
     int? PollingIntervalSeconds, string? HomeRegion, bool HasToken, long RawMessageCount,
-    DateTimeOffset? LastSuccessAt, DateTimeOffset? LastMessageAt, int ConsecutiveFailures, string? LastError, string Status);
+    DateTimeOffset? LastSuccessAt, DateTimeOffset? LastMessageAt, int ConsecutiveFailures, string? LastError, string Status,
+    string? ChannelTitle = null, int? SubscriberCount = null);
 
 /// <param name="Token">API token stored on the source (write-only: the DTO only says whether one is set). Empty string removes it.</param>
 public sealed record SourceUpdateRequest(bool? Enabled, double? TrustLevel, string? Name, int? Priority, int? PollingIntervalSeconds, string? Channel, string? Url, string? HomeRegion, string? Token);
@@ -37,7 +38,7 @@ public sealed record OpsOverviewDto(DateTimeOffset GeneratedAt, IReadOnlyList<Se
 public sealed record CollectorStatusDto(
     int SourceId, string Code, string Name, string Type, bool Enabled,
     DateTimeOffset? LastPolledAt, DateTimeOffset? LastSuccessAt, DateTimeOffset? LastMessageAt, string? LastError, int ConsecutiveFailures,
-    long Messages24h, IReadOnlyList<int> PerHour);
+    long Messages24h, IReadOnlyList<int> PerHour, string? ChannelTitle = null, int? SubscriberCount = null);
 
 public sealed record ProcessingErrorDto(long Id, DateTimeOffset OccurredAt, string Stage, string Message, int? SourceId, long? RawMessageId, string? Exception);
 

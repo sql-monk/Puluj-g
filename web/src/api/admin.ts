@@ -29,6 +29,9 @@ export interface AdminSourceDto {
   consecutiveFailures: number
   lastError?: string
   status: 'disabled' | 'idle' | 'stale' | 'ok'
+  /** Latest channel metadata disclosed by Telegram in a collected post. */
+  channelTitle?: string
+  subscriberCount?: number
 }
 
 export interface SourcePatch {
@@ -88,6 +91,9 @@ export interface CollectorStatusDto {
   messages24h: number
   /** Messages received per hour for the last 24 hours, oldest first. */
   perHour: number[]
+  /** Latest channel metadata disclosed by Telegram in a collected post. */
+  channelTitle?: string
+  subscriberCount?: number
 }
 export interface ProcessingErrorDto {
   id: number

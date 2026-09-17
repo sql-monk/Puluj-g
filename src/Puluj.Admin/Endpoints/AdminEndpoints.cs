@@ -171,8 +171,9 @@ public static class AdminEndpoints
             await using var db = await factory.CreateDbContextAsync(ct);
             var rows = await db.Sources.AsNoTracking().Include(s => s.CollectorState).OrderByDescending(s => s.Priority).ThenBy(s => s.Name).ToListAsync(ct);
             var counts = await db.RawMessages.GroupBy(r => r.SourceId).Select(g => new { g.Key, Count = g.LongCount() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+            var telegram = await LatestTelegramInfoAsync(db, ct);
             var now = clock.GetUtcNow();
-            return rows.Select(s => ToDto(s, now, counts.GetValueOrDefault(s.SourceId))).ToList();
+            return rows.Select(s => ToDto(s, now, counts.GetValueOrDefault(s.SourceId), telegram.GetValueOrDefault(s.SourceId))).ToList();
         });
 
         admin.MapPut("/sources/{id:int}", async (int id, SourceUpdateRequest req, IDbContextFactory<PulujDbContext> factory, TimeProvider clock, CancellationToken ct) =>
@@ -246,7 +247,8 @@ public static class AdminEndpoints
             }
             await db.SaveChangesAsync(ct);
             var count = await db.RawMessages.LongCountAsync(r => r.SourceId == id, ct);
-            return Results.Ok(ToDto(s, clock.GetUtcNow(), count));
+            var telegram = await LatestTelegramInfoAsync(db, ct);
+            return Results.Ok(ToDto(s, clock.GetUtcNow(), count, telegram.GetValueOrDefault(s.SourceId)));
         });
 
         admin.MapPost("/sources", async (SourceCreateRequest req, IDbContextFactory<PulujDbContext> factory, TimeProvider clock, CancellationToken ct) =>
@@ -371,7 +373,26 @@ public static class AdminEndpoints
         return source?.Secret("token") is { Length: > 0 } t ? t : config["Collectors:AlertsInUa:Token"];
     }
 
-    private static AdminSourceDto ToDto(Source s, DateTimeOffset now, long rawCount)
+    internal sealed record TelegramChannelInfo(int SourceId, string? ChannelTitle, int? SubscriberCount);
+
+    /// <summary>The latest channel metadata observed in a Telegram post.  It is evidence from collection time,
+    /// not a fresh network lookup, so the admin UI never adds Telegram API traffic.</summary>
+    internal static async Task<IReadOnlyDictionary<int, TelegramChannelInfo>> LatestTelegramInfoAsync(PulujDbContext db, CancellationToken ct)
+    {
+        var rows = await db.Database.SqlQuery<TelegramChannelInfo>($"""
+            SELECT DISTINCT ON (r.source_id)
+                r.source_id AS "SourceId",
+                r.raw_payload ->> 'channelTitle' AS "ChannelTitle",
+                NULLIF(r.raw_payload ->> 'subscriberCount', '')::int AS "SubscriberCount"
+            FROM raw_messages r
+            WHERE r.raw_payload IS NOT NULL
+              AND (r.raw_payload ? 'channelTitle' OR r.raw_payload ? 'subscriberCount')
+            ORDER BY r.source_id, r.received_at DESC, r.raw_message_id DESC
+            """).ToListAsync(ct);
+        return rows.ToDictionary(x => x.SourceId);
+    }
+
+    private static AdminSourceDto ToDto(Source s, DateTimeOffset now, long rawCount, TelegramChannelInfo? telegram = null)
     {
         var st = s.CollectorState;
         var interval = s.PollingInterval ?? TimeSpan.FromMinutes(5);
@@ -382,6 +403,6 @@ public static class AdminEndpoints
         string? Str(string name) => s.Config is not null && s.Config.RootElement.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
         return new AdminSourceDto(s.SourceId, s.Code, s.Name, s.Type.ToString(), s.Enabled, s.TrustLevel, s.Priority, s.Url, Str("channel"),
             s.PollingInterval is { } pi ? (int)pi.TotalSeconds : null, Str("homeRegion"), !string.IsNullOrEmpty(s.Secret("token")), rawCount,
-            st?.LastSuccessAt, st?.LastMessageAt, st?.ConsecutiveFailures ?? 0, st?.LastError, status);
+            st?.LastSuccessAt, st?.LastMessageAt, st?.ConsecutiveFailures ?? 0, st?.LastError, status, telegram?.ChannelTitle, telegram?.SubscriberCount);
     }
 }

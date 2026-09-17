@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { admin, type LlmRequestDetailDto } from '../api/admin'
-import { adminOps, type LifecycleEventDto, type LifecycleLlmRequestDto, type MessageLifecycleDto, type MessageSearchRowDto, type MessageView } from '../api/adminOps'
+import { admin, type AdminSourceDto, type LlmRequestDetailDto } from '../api/admin'
+import { adminOps, type LifecycleEventDto, type LifecycleLlmRequestDto, type MessageLifecycleDto, type MessageSearchPageDto, type MessageSearchRowDto, type MessageView } from '../api/adminOps'
 import { Badge, Section } from '../components/settings/fields'
 import { fmtTime } from './shared'
 
@@ -29,16 +29,24 @@ function rawFromHash(): number | null {
   return m ? Number(m[1]) : null
 }
 
+function sourceIdsFromHash(): number[] {
+  const query = window.location.hash.split('?')[1] ?? ''
+  return [...new Set(new URLSearchParams(query).getAll('sourceIds').map(Number).filter((id) => Number.isInteger(id) && id > 0))]
+}
+
 /**
  * Панель «Повідомлення» (P13, §8.7): пошук raw-повідомлення (id / ключ джерела / текст) і одна картка всього lifecycle —
  * події → доставки з квитанціями і attempts (помилки повністю), extractions/observations, похідні (tracks/alerts/incidents),
  * карантин, підсумок «хто чекає / хто завершив / хто помилився». Текст джерела — лише текст (React екранує); посилання — лише http(s).
  */
-export function MessagesPanel() {
+export function MessagesPanel({ sources }: { sources: AdminSourceDto[] }) {
   const [q, setQ] = useState('')
   const [hours, setHours] = useState<24 | 168 | 720>(24)
   const [view, setView] = useState<MessageView>('all')
-  const [rows, setRows] = useState<MessageSearchRowDto[] | null>(null)
+  const [sourceIds, setSourceIds] = useState<number[]>(sourceIdsFromHash)
+  const [results, setResults] = useState<MessageSearchPageDto | null>(null)
+  const [sort, setSort] = useState('receivedAt')
+  const [direction, setDirection] = useState<'asc' | 'desc'>('desc')
   const [card, setCard] = useState<MessageLifecycleDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -54,16 +62,22 @@ export function MessagesPanel() {
       setBusy(false)
     }
   }, [])
-  const search = async () => {
+  const search = async (page = 1, nextSort = sort, nextDirection = direction) => {
     setBusy(true)
     try {
-      setRows(await adminOps.search(q.trim(), hours, view))
+      setResults(await adminOps.search(q.trim(), hours, view, sourceIds, page, nextSort, nextDirection))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
     }
+  }
+  const changeSort = (key: string) => {
+    const nextDirection: 'asc' | 'desc' = key === sort ? (direction === 'asc' ? 'desc' : 'asc') : key === 'source' || key === 'sourceMessageId' || key === 'status' ? 'asc' : 'desc'
+    setSort(key)
+    setDirection(nextDirection)
+    void search(1, key, nextDirection)
   }
   useEffect(() => {
     const follow = () => {
@@ -77,6 +91,11 @@ export function MessagesPanel() {
       window.removeEventListener('hashchange', follow)
     }
   }, [open])
+  useEffect(() => {
+    void search()
+    // The default operator view is always the latest 100 revisions; filters apply only after their form is submitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div className="space-y-4 text-sm" data-testid="messages-panel">
@@ -106,6 +125,13 @@ export function MessagesPanel() {
               {VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
             </select>
           </label>
+          <label>
+            Джерела
+            <select multiple className="ml-1 min-h-16 min-w-48 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" value={sourceIds.map(String)} onChange={(e) => setSourceIds([...e.currentTarget.selectedOptions].map((o) => Number(o.value)))} aria-label="джерела">
+              {sources.map((source) => <option key={source.id} value={source.id}>{source.channelTitle ?? source.name} · {source.code}</option>)}
+            </select>
+            <span className="ml-1 text-slate-500">без вибору — усі</span>
+          </label>
           <button type="submit" className="rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900" disabled={busy}>
             Шукати
           </button>
@@ -115,26 +141,29 @@ export function MessagesPanel() {
             {error}
           </p>
         )}
-        {rows && (
+        {results && (
           <div className="overflow-x-auto">
-            {rows.length === 0 ? (
+            <Pager results={results} busy={busy} onPage={(page) => void search(page)} />
+            {results.items.length === 0 ? (
               <p className="text-xs text-slate-500">Нічого не знайдено.</p>
             ) : (
               <table className="w-full text-xs" data-testid="search-results">
                 <thead className="text-left text-[10px] uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="py-1 pr-2">raw</th>
-                    <th className="pr-2">Джерело</th>
-                    <th className="pr-2">Ключ</th>
-                    <th className="pr-2">Опубліковано</th>
-                    <th className="pr-2">Статус</th>
+                    <SortableHeader label="raw" column="rawMessageId" current={sort} direction={direction} onSort={changeSort} />
+                    <SortableHeader label="Джерело" column="source" current={sort} direction={direction} onSort={changeSort} />
+                    <SortableHeader label="Ключ" column="sourceMessageId" current={sort} direction={direction} onSort={changeSort} />
+                    <SortableHeader label="Опубліковано" column="publishedAt" current={sort} direction={direction} onSort={changeSort} />
+                    <SortableHeader label="Отримано" column="receivedAt" current={sort} direction={direction} onSort={changeSort} />
+                    <SortableHeader label="Статус" column="status" current={sort} direction={direction} onSort={changeSort} />
                     <th className="pr-2">Результат</th>
                     <th className="pr-2">Остання квитанція</th>
+                    <th className="pr-2">Реакції</th>
                     <th>Текст</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {results.items.map((r) => (
                     <tr key={r.rawMessageId} className="border-t border-slate-100 dark:border-slate-800">
                       <td className="py-1 pr-2">
                         <button className="font-mono underline" onClick={() => void open(r.rawMessageId)}>
@@ -144,15 +173,18 @@ export function MessagesPanel() {
                       <td className="pr-2 font-mono">{r.sourceCode}</td>
                       <td className="pr-2 font-mono">{r.sourceMessageId}</td>
                       <td className="pr-2">{fmtTime(r.publishedAt)}</td>
+                      <td className="pr-2">{fmtTime(r.receivedAt)}</td>
                       <td className="pr-2">{r.status}</td>
                       <td className="pr-2"><SearchOutcome row={r} /></td>
                       <td className="pr-2">{r.lastOutcome ? OUTCOME[r.lastOutcome] ?? r.lastOutcome : 'очікує'}</td>
+                      <td className="max-w-40 pr-2">{r.reactions?.length ? r.reactions.map((reaction) => <span key={`${reaction.kind}:${reaction.value}`} className="mr-1 whitespace-nowrap" title={reaction.kind}>{reaction.value} {reaction.count}</span>) : '—'}</td>
                       <td className="max-w-md truncate">{r.textPreview}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+            <Pager results={results} busy={busy} onPage={(page) => void search(page)} />
           </div>
         )}
       </Section>
@@ -160,6 +192,15 @@ export function MessagesPanel() {
       {card && <LifecycleCard card={card} />}
     </div>
   )
+}
+
+function SortableHeader({ label, column, current, direction, onSort }: { label: string; column: string; current: string; direction: 'asc' | 'desc'; onSort: (column: string) => void }) {
+  return <th className="pr-2"><button className="uppercase" onClick={() => onSort(column)}>{label}{current === column ? (direction === 'asc' ? ' ↑' : ' ↓') : ''}</button></th>
+}
+
+function Pager({ results, busy, onPage }: { results: MessageSearchPageDto; busy: boolean; onPage: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(results.totalCount / results.pageSize))
+  return <div className="my-2 flex items-center gap-2 text-xs"><span>{results.totalCount.toLocaleString('uk-UA')} повідомлень · сторінка {results.page} з {pages}</span><button className="rounded border border-slate-300 px-2 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={busy || results.page <= 1} onClick={() => onPage(results.page - 1)}>← Попередня</button><button className="rounded border border-slate-300 px-2 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={busy || results.page >= pages} onClick={() => onPage(results.page + 1)}>Наступна →</button></div>
 }
 
 function LifecycleCard({ card }: { card: MessageLifecycleDto }) {
