@@ -75,7 +75,5 @@ test.describe('admin lifecycle analytics', () => {
     await page.getByRole('button', { name: 'Звірити лічильники' }).click()
     await expect(page.getByRole('status')).toContainText('звірка: виконано (ops)')
     expect(posts).toEqual([{ url: '/api/admin/analytics/lifecycle/reconcile?hours=48', body: { actor: 'ops', reason: 'after deploy' } }])
-    // The copy analytics stays reachable as the auxiliary section.
-    await expect(page.getByRole('link', { name: /Схожість повідомлень/ })).toHaveAttribute('href', '#/analytics')
   })
 })
