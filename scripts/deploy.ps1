@@ -31,6 +31,9 @@
            gets the track-worker, alert-worker, watchdog and incident-worker roles — never two owners of tracks/alerts over one database.
            Requires -Broker. Rollback: run again without -DomainWriters (processor back to 2 replicas, writers roles off;
            the guards in both directions keep the rows consistent).
+.PARAMETER ProcessorReplicas
+           Number of legacy `processor` replicas (0–32). Defaults to 2. Domain writers always set this to 0 because
+           the messaging worker is then the only owner of tracks, alerts and incidents.
 .PARAMETER Wizard
            Force the interactive wizard even when other command-line parameters were supplied.
 .PARAMETER NonInteractive
@@ -47,6 +50,8 @@ param(
     [string]$ComposeProject = "puluj-g",
     [switch]$Broker,
     [switch]$DomainWriters,
+    [ValidateRange(0, 32)]
+    [int]$ProcessorReplicas = 2,
     [switch]$Wizard,
     [switch]$NonInteractive
 )
@@ -74,6 +79,16 @@ function Read-YesNo([string]$Prompt, [bool]$Default = $true) {
     if ($answer -match '^(n|no|н|ні)$') { return $false }
     Write-Warning "Введіть Y або N."
     return Read-YesNo $Prompt $Default
+}
+
+function Read-ProcessorReplicaCount([int]$Default) {
+    do {
+        $answer = (Read-Host "Кількість processor-реплік 0–32 (Enter — $Default)").Trim()
+        if ([string]::IsNullOrEmpty($answer)) { return $Default }
+        $parsed = 0
+        if ([int]::TryParse($answer, [ref]$parsed) -and $parsed -ge 0 -and $parsed -le 32) { return $parsed }
+        Write-Warning "Введіть ціле число від 0 до 32. 0 зупиняє legacy processor."
+    } while ($true)
 }
 
 function Get-DotEnvValues {
@@ -120,10 +135,21 @@ function Update-DotEnv([System.Collections.IDictionary]$Values) {
 }
 
 function Select-Services {
-    $available = @('postgis', 'migrate', 'collector-telegram', 'collector-alerts', 'processor', 'api', 'admin', 'analytics', 'messaging')
+    $services = [ordered]@{
+        'postgis' = 'PostgreSQL/PostGIS: постійні дані, геометрія та черги'
+        'migrate' = 'одноразово застосовує EF-міграції й seed-дані'
+        'collector-telegram' = 'зчитує повідомлення з Telegram-каналів'
+        'collector-alerts' = 'отримує повітряні тривоги з alerts.in.ua'
+        'processor' = 'обробляє raw-повідомлення, треки, alerts та incidents'
+        'api' = 'публічна карта й read-only HTTP API на порту 8090'
+        'admin' = 'приватна панель керування й діагностики на порту 8091'
+        'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
+        'messaging' = 'RabbitMQ pipeline: relay, parsing, LLM та domain writers'
+    }
+    $available = @($services.Keys)
     Write-Host "`nЩо публікувати:"
-    Write-Host "  0. Увесь стек"
-    for ($i = 0; $i -lt $available.Count; $i++) { Write-Host ("  {0}. {1}" -f ($i + 1), $available[$i]) }
+    Write-Host "  0. Увесь стек (усі компоненти, потрібні для повної роботи платформи)"
+    for ($i = 0; $i -lt $available.Count; $i++) { Write-Host ("  {0}. {1} ({2})" -f ($i + 1), $available[$i], $services[$available[$i]]) }
     do {
         $answer = (Read-Host "Номери через кому").Trim()
         if ($answer -eq '0') { return @() }
@@ -165,6 +191,12 @@ function Invoke-DeploymentWizard {
     $script:Broker = Read-YesNo "Увімкнути broker profile (RabbitMQ + messaging)?" ([bool]$script:Broker)
     if ($script:Broker) { $script:DomainWriters = Read-YesNo "Передати domain writers у messaging (зупиняє legacy processor)?" ([bool]$script:DomainWriters) }
     else { $script:DomainWriters = $false }
+    if ($script:DomainWriters) {
+        $script:ProcessorReplicas = 0
+        Write-Host "Domain writers увімкнені: processor встановлено в 0, щоб не було двох writer-ів над однією БД." -ForegroundColor Yellow
+    } else {
+        $script:ProcessorReplicas = Read-ProcessorReplicaCount $script:ProcessorReplicas
+    }
 
     if (Read-YesNo "Ввести або змінити токени й параметри колекторів/LLM зараз?" $false) {
         $current = Get-DotEnvValues
@@ -287,7 +319,7 @@ if ($DomainWriters) {
     $env:PROCESSOR_REPLICAS = "0"
 } else {
     $env:MESSAGING_WORKER_ROLES = $defaultMessagingRoles
-    $env:PROCESSOR_REPLICAS = "2"
+    $env:PROCESSOR_REPLICAS = "$ProcessorReplicas"
 }
 function Sql([string]$file) {
     # psql is not installed on the host: the script goes through the postgis container (Cyrillic-safe via stdin).

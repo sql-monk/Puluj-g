@@ -43,6 +43,12 @@ pwsh scripts/deploy.ps1
 
 У майстрі перелічені `postgis`, `migrate`, `collector-telegram`,
 `collector-alerts`, `processor`, `api`, `admin`, `analytics` і `messaging`.
+Біля кожного пункту майстер показує короткий опис його ролі, тож вибір не
+потребує знання Compose-імен напам'ять. Для legacy `processor` він також
+запитує кількість реплік від 0 до 32 (типово 2); `0` свідомо зупиняє legacy
+обробку. У non-interactive запуску використовуйте
+`-ProcessorReplicas <0..32>`. Під час `-DomainWriters` кількість примусово
+стає `0`, щоб одночасно не працювали два власники доменних записів.
 Для нової або очищеної БД він автоматично додає `migrate`; у broker-режимі
 автоматично додає `messaging`, якщо обрано колектор або domain writers. Повне
 очищення вимагає ввести буквально `DELETE <ComposeProject>` і зберігає
