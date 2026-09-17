@@ -35,6 +35,7 @@ PNG. Попередній набір збережено в [архіві](../../
 | Ruleset lifecycle | draft, publish, rollback і audit | [D08](../admin-operations.md) | [Draw.io](ruleset-change-lifecycle.drawio) | [PNG](ruleset-change-lifecycle.png) |
 | Run і replay | preconditions, completion і recovery | [D08](../admin-operations.md) | [Draw.io](run-replay-lifecycle.drawio) | [PNG](run-replay-lifecycle.png) |
 | Runtime configuration | env, appsettings, БД і сервіси | [D02](../deployment-operations.md) | [Draw.io](runtime-configuration.drawio) | [PNG](runtime-configuration.png) |
+| Огляд системи | джерела, pipeline, read-side та operations | [README](../../README.md) | [Draw.io](system-overview.drawio) | [PNG](system-overview.png) |
 | Track lifecycle | revisions, watchdog і closure | [D06](../correlation-tracks-incidents.md) | [Draw.io](track-lifecycle-revisions.drawio) | [PNG](track-lifecycle-revisions.png) |
 
 Вимоги до пари та імені визначені у [правилах](../naming.md); фіксований
