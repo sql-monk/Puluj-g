@@ -9,6 +9,35 @@ namespace Puluj.Collectors.Tests;
 public class TelegramBackfillSchedulerTests
 {
     [Fact]
+    public void Message_payload_preserves_audience_reactions_and_comment_summary()
+    {
+        var message = new Message
+        {
+            id = 17,
+            date = new DateTime(2026, 9, 17, 10, 0, 0, DateTimeKind.Utc),
+            peer_id = new PeerChannel { channel_id = 9876543210 },
+            message = "test",
+            reactions = new MessageReactions
+            {
+                results = [new ReactionCount { reaction = new ReactionEmoji { emoticon = "👍" }, count = 12 }],
+            },
+            replies = new MessageReplies { replies = 3, channel_id = 9876543211 },
+        };
+
+        var payload = TelegramMessagePayload.From(message, "example_channel", subscriberCount: 42_000);
+        using var json = payload.ToDocument();
+
+        Assert.Equal(42_000, payload.SubscriberCount);
+        var reaction = Assert.Single(payload.Reactions);
+        Assert.Equal("emoji", reaction.Kind);
+        Assert.Equal("👍", reaction.Value);
+        Assert.Equal(12, reaction.Count);
+        Assert.Equal(3, payload.CommentCount);
+        Assert.Equal("9876543211", payload.DiscussionChannelId);
+        Assert.Equal("9876543211", json.RootElement.GetProperty("discussionChannelId").GetString());
+    }
+
+    [Fact]
     public void Legacy_cursor_is_upgraded_without_losing_progress()
     {
         var legacy = new TelegramHistoryState(0, new DateTimeOffset(2022, 2, 24, 0, 0, 0, TimeSpan.Zero), 42, 99, 0, false, null, 0, null);
