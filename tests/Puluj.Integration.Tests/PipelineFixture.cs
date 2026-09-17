@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Puluj.Domain.Entities;
+using Puluj.Domain.Enums;
 using Puluj.Infrastructure;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Seeding;
@@ -78,6 +80,7 @@ public sealed class PipelineFixture : IAsyncLifetime
         {
             await seeder.SeedAsync(db, CancellationToken.None);
         }
+        await EnsureDeterministicGazetteerAsync(db);
         await Services.GetRequiredService<IndexProvider>().RefreshAsync(CancellationToken.None);
     }
 
@@ -98,6 +101,79 @@ public sealed class PipelineFixture : IAsyncLifetime
         // P03 schemas have no FK to raw_messages; they must be cleared separately. Lifecycle is durable derived data
         // and must not leak from a prior class into an exact-count pipeline assertion.
         await db.Database.ExecuteSqlRawAsync("TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, processing.runs, processing.generations, processing.attempts, processing.deliveries, processing.quarantine, processing.stage_results, processing.extractions, processing.observations, llm_requests, analytics.message_lifecycle RESTART IDENTITY CASCADE");
+    }
+
+    /// <summary>
+    /// The full administrative boundary files are deliberately downloaded rather than committed.  A clean clone
+    /// therefore still needs a small, real PostGIS geometry set for integration tests; without it the apparently
+    /// provider-backed suite silently loses every region scenario.  Keep this fallback test-only and only use it when
+    /// the optional boundary import produced no regions.
+    /// </summary>
+    private static async Task EnsureDeterministicGazetteerAsync(PulujDbContext db)
+    {
+        if (await db.Places.AnyAsync(p => p.Level == PlaceLevel.Region))
+        {
+            return;
+        }
+
+        Place Region(string key, string name, string[] variants, double lon, double lat, double halfWidth = 0.45, double halfHeight = 0.35) => new()
+        {
+            Name = name,
+            NameVariants = variants,
+            Level = PlaceLevel.Region,
+            CountryCode = "UA",
+            ExternalKey = $"test:{key}",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(lon - halfWidth, lat - halfHeight), new(lon + halfWidth, lat - halfHeight),
+                new(lon + halfWidth, lat + halfHeight), new(lon - halfWidth, lat + halfHeight), new(lon - halfWidth, lat - halfHeight),
+            ]),
+            Centroid = Geo.Point(lon, lat),
+            // Coarse region anchors must not create a path from centre-to-centre.  The fallback boundaries are
+            // intentionally small rectangles, so retain an oblast-scale accuracy radius independently of them.
+            RadiusKm = 180,
+        };
+
+        var kyiv = Region("UA-32", "Київська область", ["київськ обл", "київщин", "київськ"], 30.5, 50.45);
+        var poltava = Region("UA-53", "Полтавська область", ["полтавськ обл", "полтавщин", "полтавськ"], 34.55, 49.6);
+        // These two oblasts intentionally overlap in the miniature geometry.  The pipeline regression verifies
+        // that an ambiguous coarse region pair does not fabricate a route line between their centroids.
+        var sumy = Region("UA-59", "Сумська область", ["сумськ обл", "сумщин", "сумськ"], 34.8, 51.0, 1.0, 1.3);
+        var kirovohrad = Region("UA-35", "Кіровоградська область", ["кіровоградськ обл", "кіровоградщин", "кіровоградськ"], 32.25, 48.5);
+        var kharkiv = Region("UA-63", "Харківська область", ["харківськ обл", "харківщин", "харківськ"], 36.45, 49.95);
+        db.Places.AddRange(kyiv, poltava, sumy, kirovohrad, kharkiv);
+        await db.SaveChangesAsync();
+
+        var boryspil = new Place
+        {
+            Name = "Броварський район",
+            NameVariants = ["броварськ район", "броварськ"],
+            Level = PlaceLevel.District,
+            ParentId = kyiv.PlaceId,
+            CountryCode = "UA",
+            ExternalKey = "test:UA-32-brovary",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(30.5, 50.35), new(30.9, 50.35), new(30.9, 50.65), new(30.5, 50.65), new(30.5, 50.35),
+            ]),
+            Centroid = Geo.Point(30.7, 50.5),
+            RadiusKm = 25,
+        };
+        db.Places.Add(boryspil);
+        await db.SaveChangesAsync();
+        db.Places.Add(new Place
+        {
+            Name = "Тестова громада",
+            NameVariants = ["тестов гром"],
+            Level = PlaceLevel.Hromada,
+            ParentId = boryspil.PlaceId,
+            CountryCode = "UA",
+            ExternalKey = "test:UA-32-brovary-hromada",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(30.6, 50.4), new(30.8, 50.4), new(30.8, 50.55), new(30.6, 50.55), new(30.6, 50.4),
+            ]),
+            Centroid = Geo.Point(30.7, 50.475),
+            RadiusKm = 15,
+        });
+        await db.SaveChangesAsync();
     }
 
     public async Task DisposeAsync()

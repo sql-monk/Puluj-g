@@ -12,7 +12,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1, // one WebGL map at a time against one dev server: parallel workers starve each other into timeouts
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }]],
+  reporter: [['list'], ['html', { open: 'never', outputFolder: process.env.PLAYWRIGHT_HTML_OUTPUT_DIR ?? 'e2e-report' }]],
   use: {
     baseURL: 'http://localhost:5183',
     trace: 'retain-on-failure',
