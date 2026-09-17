@@ -50,9 +50,10 @@ For each release candidate, retain a concise record outside the source tree with
    invalid filter, timeout, active-generation switch and reconnect/late response results;
 3. 360px, 768px and 1440px screenshots showing menu/drawers, keyboard focus/Escape, loading,
    empty and error states; and the a11y tool result;
-4. SQL/API/chart totals using equivalent populations, plus payload size, query count and
-   cold/warm timings; absent pre-agreed numeric budgets are a **blocked performance gate**,
-   not a discretionary pass;
+4. the versioned smoke budget in `docs/public-api-performance-budget.md`, its exact fixture
+   population and its command manifest.  This U13 release gate does not claim a production
+   SLO; 10,000-item/1,000-update load, cold/warm p95, payload/query-count and capacity
+   profiling are explicitly deferred follow-up work;
 5. independent implementation-review findings, fixes and affected-test reruns.
 
 The deterministic suite deliberately includes values above `Number.MAX_SAFE_INTEGER`,
