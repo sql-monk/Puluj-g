@@ -13,8 +13,9 @@ Compose-проєкт має ім'я `puluj-g`. `postgis` зберігає дан
 `puluj-g-pgdata` (або значенні `PULUJ_PGDATA_VOLUME`) і є доступним з хоста на
 `5442`. Публічна API має `8090`, admin — `8091`; analytics не публікує порт.
 `logs` — спільний том журналів, а `tgsession` доступний лише Telegram
-колектору. За профілем `broker` додається RabbitMQ з портами за змінними
-`RABBITMQ_PORT` і `RABBITMQ_MANAGEMENT_PORT` (типові значення 5672 і 15672).
+колектору. RabbitMQ є частиною стандартного стеку messaging і доступний за
+змінними `RABBITMQ_PORT` і `RABBITMQ_MANAGEMENT_PORT` (типові значення 5672 і
+15672).
 
 API працює від ролі `puluj_reader`; admin — від `puluj_admin`. Міграція
 створює ролі й дані до запуску залежних сервісів. Admin-контейнер монтує
@@ -30,8 +31,8 @@ root-еквівалентний доступ до хоста через сам s
 ## Перший install і оновлення
 
 З кореня репозиторію штатна команда — `pwsh scripts/deploy.ps1`. Вона відкриває
-інтерактивний майстер: вибір сервісів, перебудови образів, режиму broker,
-дій з БД і введення конфігурації. Скрипт відмовляється непомітно створювати
+інтерактивний майстер: вибір сервісів, перебудови образів, дій з БД і введення
+конфігурації. Messaging є стандартним режимом; скрипт відмовляється непомітно створювати
 порожній PostgreSQL-том. Для навмисно нової інсталяції в майстрі потрібно
 вибрати відповідний пункт; для наявних даних — лишити наявний том або вказати
 `-DatabaseVolume <наявний-том>` (за замовчуванням `puluj-g-pgdata`).
@@ -44,13 +45,15 @@ pwsh scripts/deploy.ps1
 У майстрі перелічені `postgis`, `migrate`, `collector-telegram`,
 `collector-alerts`, `processor`, `api`, `admin`, `analytics` і `messaging`.
 Біля кожного пункту майстер показує короткий опис його ролі, тож вибір не
-потребує знання Compose-імен напам'ять. Для legacy `processor` він також
-запитує кількість реплік від 0 до 32 (типово 2); `0` свідомо зупиняє legacy
-обробку. У non-interactive запуску використовуйте
-`-ProcessorReplicas <0..32>`. Під час `-DomainWriters` кількість примусово
-стає `0`, щоб одночасно не працювали два власники доменних записів.
-Для нової або очищеної БД він автоматично додає `migrate`; у broker-режимі
-автоматично додає `messaging`, якщо обрано колектор або domain writers. Повне
+потребує знання Compose-імен напам'ять. `messaging` позначено як стандартний
+pipeline, а `processor` — як застарілий і вимкнений за замовчуванням.
+Щоб увімкнути його як контрольований rollback, майстер прямо запитає це та
+кількість реплік 1–32; у non-interactive запуску використовуйте
+`-LegacyProcessor -ProcessorReplicas <1..32>`. Тоді скрипт спочатку зупиняє
+messaging і прибирає його domain-writer ролі. У стандартному режимі він перед
+стартом messaging зупиняє processor і залишає йому 0 реплік. Для нової або
+очищеної БД він автоматично додає `migrate`; також автоматично додає
+`messaging`, якщо обрано колектор. Повне
 очищення вимагає ввести буквально `DELETE <ComposeProject>` і зберігає
 попередні перевірки володіння томом.
 
@@ -128,20 +131,22 @@ retention, доступ, rate limits або історичні обмеженн�
 
 Редагована схема: [deployment-lifecycle.drawio](diagrams/deployment-lifecycle.drawio).
 
-## Ролі та режим broker
+## Ролі: messaging за замовчуванням, processor лише для rollback
 
-Один образ Worker запускається різними ролями: `migrate`, `telegram`,
-`alerts`, `processing`; за broker-профілем — `relay`, `archive`,
+Один образ Worker запускається різними ролями. Типовий Compose-запуск має
+`migrate`, `telegram`, `alerts` і messaging-ролі `relay`, `archive`,
 `raw-writer`, `normalizer`, `parser`, `llm-worker`, `finalizer`, `projection`,
-`replay`, `message-analytics`. Доменно-пишучі ролі (`track-worker`,
-`alert-worker`, `watchdog`, `incident-worker`) вмикає
-`pwsh scripts/deploy.ps1 -Broker -DomainWriters`.
+`replay`, `message-analytics`, `track-worker`, `alert-worker`, `watchdog` та
+`incident-worker`. Отже messaging за замовчуванням є єдиним власником доменних
+записів.
 
-Цей cutover перед запуском доменних writer-ів зупиняє та масштабує legacy
-`processor` до нуля. Не запускайте `processing` разом із цими writer-ролями
-проти однієї БД: код прямо відхиляє таку комбінацію в одному процесі, а
-deploy-скрипт охороняє порядок зміни власника. Без `-Broker` платформа
-повідомлень вимкнена і legacy processor лишається власником доменних записів.
+`processor` з роллю `processing` — застарілий монолітний fallback, який за
+замовчуванням має 0 реплік. Для контрольованого rollback використовуйте
+`pwsh scripts/deploy.ps1 -LegacyProcessor -ProcessorReplicas 2`. Скрипт
+зупиняє messaging до старту processor і запускає messaging лише у stage-only
+режимі. Повернення до стандартного messaging робиться звичайним
+`pwsh scripts/deploy.ps1`: він спочатку зупиняє processor. Не запускайте обох
+власників доменних записів одночасно проти однієї БД.
 
 ## Ефективна конфігурація
 
@@ -166,8 +171,8 @@ Telegram session-файли до `.env`, `appsettings*.json`, документа
 Почніть з `docker compose -p puluj-g ps`, журналу `migrate` та health endpoint-ів
 вище. Для конкретного сервісу використовуйте `docker logs <контейнер>`;
 спільні файлові журнали доступні в томі `logs`. Скрипт deploy також перевіряє
-групи статусів `raw_messages`, а в broker-режимі — непідтверджений outbox і
-delivery outcomes. Значення `Runtime:Worker:*` у `app_settings` — поточні
+групи статусів `raw_messages`, непідтверджений outbox і delivery outcomes.
+Значення `Runtime:Worker:*` у `app_settings` — поточні
 статуси для панелі, а не параметри, які слід вручну копіювати в конфігурацію.
 
 ## Відомі межі

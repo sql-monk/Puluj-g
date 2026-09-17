@@ -25,7 +25,7 @@ public sealed class DockerOptions
     /// <summary>The compose service that is scaled from the panel.</summary>
     public string ScalableService { get; set; } = "processor";
 
-    /// <summary>Services the P13 messaging panel may scale (`--scale &lt;service&gt;=N`); `messaging` is under the `broker` profile — compose enables it for an explicitly named service.</summary>
+    /// <summary>Services the P13 messaging panel may scale (`--scale &lt;service&gt;=N`); messaging is the standard Compose pipeline.</summary>
     public List<string> ScalableServices { get; set; } = ["processor", "messaging"];
 
     public int MaxReplicas { get; set; } = 8;

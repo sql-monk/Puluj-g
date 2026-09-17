@@ -3,7 +3,7 @@
 asyncapi: 3.0.0
 info:
   title: Puluj message platform
-  version: '8.0.0'
+  version: '10.0.0'
   description: |
     Транспортні події та команди між collectors, воркерами й read-side (plan §3–6).
     Envelope — schemas/envelope.schema.json; payload кожного типу — schemas/events/*.schema.json.
@@ -13,7 +13,7 @@ servers:
   local:
     host: localhost:5672
     protocol: amqp
-    description: Один RabbitMQ контейнер для розробки (ADR-0001, dev profile закріплено P02: rabbitmq:4.3-management, Compose profile broker; HA — P16).
+    description: Один RabbitMQ контейнер для стандартного messaging pipeline (ADR-0001: rabbitmq:4.3-management; HA — P16).
 channels:
   ingress_received:
     address: puluj.{lane}.ingress.received
@@ -521,7 +521,7 @@ operations:
         ack: true
     x-queue-name-pattern: puluj.incident-worker.{lane}
     x-queue-policy: required
-    x-lanes: [live, history]
+    x-lanes: [live, history, replay]
   receive_projection_track_changed:
     action: receive
     channel:
@@ -565,7 +565,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/raw_stored'
-    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    summary: subscription message-analytics (required=true, owner_task=P15, status=active)
     messages:
       - $ref: '#/channels/raw_stored/messages/raw_stored'
     bindings:
@@ -578,7 +578,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/message_analysis_completed'
-    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    summary: subscription message-analytics (required=true, owner_task=P15, status=active)
     messages:
       - $ref: '#/channels/message_analysis_completed/messages/message_analysis_completed'
     bindings:
@@ -591,7 +591,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/track_changed'
-    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    summary: subscription message-analytics (required=true, owner_task=P15, status=active)
     messages:
       - $ref: '#/channels/track_changed/messages/track_changed'
     bindings:
@@ -604,7 +604,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/alert_changed'
-    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    summary: subscription message-analytics (required=true, owner_task=P15, status=active)
     messages:
       - $ref: '#/channels/alert_changed/messages/alert_changed'
     bindings:
@@ -617,7 +617,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/incident_changed'
-    summary: subscription message-analytics (required=true, owner_task=P15, status=planned)
+    summary: subscription message-analytics (required=true, owner_task=P15, status=active)
     messages:
       - $ref: '#/channels/incident_changed/messages/incident_changed'
     bindings:

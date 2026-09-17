@@ -44,7 +44,7 @@ if (roles.Contains(WorkerOptions.Processing))
 {
     builder.Services.AddPulujProcessing(builder.Configuration, worker.InstanceName);
 }
-// Broker roles (P03): only with Messaging:Enabled — a plain local run has no RabbitMQ and must keep working.
+// Broker roles are the default durable path. They are skipped only when an operator explicitly disables Messaging.
 var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
 var brokerRoles = roles.Intersect(WorkerOptions.BrokerRoles).ToHashSet();
 if (brokerRoles.Count > 0 && messaging.Enabled)

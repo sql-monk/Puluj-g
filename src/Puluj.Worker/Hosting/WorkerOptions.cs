@@ -2,7 +2,8 @@ namespace Puluj.Worker.Hosting;
 
 /// <summary>
 /// Which parts of the Worker this process runs. One image, several containers: each takes a subset of the roles
-/// (see deploy/docker-compose.yml). No roles configured = everything in one process (local development).
+/// (see deploy/docker-compose.yml). The default appsettings list durable messaging roles and deliberately exclude
+/// obsolete <c>processing</c>; an empty role list follows the same messaging-first default.
 /// </summary>
 public sealed class WorkerOptions
 {
@@ -38,7 +39,9 @@ public sealed class WorkerOptions
     public const string MessageAnalytics = "message-analytics";
 
     public static readonly string[] AllRoles = [Migrate, Telegram, Alerts, Processing, Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker, Projection, Replay, MessageAnalytics];
-    /// <summary>Roles that talk to the broker: skipped with a warning unless Messaging:Enabled (a plain local run has no RabbitMQ).</summary>
+    /// <summary>Messaging-first default roles. The obsolete monolithic processing role is opt-in.</summary>
+    public static readonly string[] DefaultRoles = [Migrate, Telegram, Alerts, Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker, Projection, Replay, MessageAnalytics];
+    /// <summary>Roles that talk to the broker: skipped with a warning only when Messaging:Enabled was explicitly disabled.</summary>
     public static readonly string[] BrokerRoles = [Relay, Archive, RawWriter, Normalizer, Parser, LlmWorker, Finalizer, TrackWorker, AlertWorker, Watchdog, IncidentWorker, Projection, Replay, MessageAnalytics];
 
     /// <summary>Instance name for the heartbeat, logs, telemetry and claims (`worker`, `processor`, `collector-telegram`…); see <see cref="InstanceName"/>.</summary>
@@ -53,7 +56,7 @@ public sealed class WorkerOptions
     /// <summary>Name of this running instance: <see cref="Name"/>, plus the host name when <see cref="AppendHostName"/>.</summary>
     public string InstanceName => AppendHostName ? $"{Name}-{Environment.MachineName.ToLowerInvariant()}" : Name;
 
-    /// <summary>Comma-separated roles; empty means all of them.</summary>
+    /// <summary>Comma-separated roles; empty means the messaging-first <see cref="DefaultRoles"/> set.</summary>
     public string? Roles { get; set; }
 
     public IReadOnlySet<string> RoleSet
@@ -67,7 +70,7 @@ public sealed class WorkerOptions
             {
                 throw new InvalidOperationException($"Unknown Worker:Roles value(s): {string.Join(", ", unknown)}. Known: {string.Join(", ", AllRoles)}.");
             }
-            return roles.Count == 0 ? AllRoles.ToHashSet() : roles;
+            return roles.Count == 0 ? DefaultRoles.ToHashSet() : roles;
         }
     }
 

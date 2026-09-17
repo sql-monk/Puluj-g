@@ -31,9 +31,11 @@ Sequence-діаграма нижче фіксує часовий порядок 
 `raw-writer` споживає цей event та фіксує raw row і наступні outbox rows; stages
 `normalizer`, `parser`, `llm-worker`, `finalizer` послідовно створюють наступний
 event. Domain writers (track, alert, watchdog, incident) є окремими durable
-підписниками. Для legacy/local режиму існує `processing` role: він claim-ить
-`raw_messages` у БД і виконує монолітний processor. Її не можна запускати разом
-з P09 domain-writer roles, щоб два власники не записували ті самі доменні рядки.
+підписниками. Застаріла `processing` role claim-ить `raw_messages` у БД і
+виконує монолітний processor. Вона вимкнена за замовчуванням: Compose запускає
+durable messaging stages і domain writers. `processing` дозволена лише як
+явний контрольований rollback і її не можна запускати разом з domain-writer
+roles, щоб два власники не записували ті самі доменні рядки.
 
 `RawMessageClaims` робить claim одним `UPDATE … FOR UPDATE SKIP LOCKED`: статус
 переходить `Pending → InProgress`. Lease sweep повертає прострочений claim у
@@ -121,5 +123,5 @@ durable work: loop опитує `Pending` rows, а API надсилає `Resync`
 
 Контракт стійкий до відомих redelivery crash windows завдяки event ID та inbox,
 але не обіцяє exactly-once, порядок між queues або delivery у SignalR. Старий
-monolithic processor залишається для режиму без broker; він не є описом durable
-RabbitMQ pipeline.
+monolithic processor лишається лише для явного rollback; він не є fallback за
+замовчуванням і не є описом durable RabbitMQ pipeline.

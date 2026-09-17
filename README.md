@@ -9,7 +9,7 @@ pwsh scripts/deploy.ps1
 ```
 
 Він дозволяє вибрати сервіси для публікації, перебудову образів, збереження,
-створення або повне очищення ізольованої БД, broker-режим і потрібні токени,
+створення або повне очищення ізольованої БД, стандартний messaging pipeline і потрібні токени,
 Telegram API ID/API hash/номер/2FA та LLM-конфігурацію. Секрети не виводяться.
 Для наявної БД майстер окремо пропонує записати runtime-параметри в
 `app_settings`, бо вони мають пріоритет над `.env`.
@@ -37,7 +37,7 @@ pwsh scripts/deploy.ps1 -NonInteractive
 Скрипт відмовиться непомітно ініціалізувати порожню БД. Якщо наявний том має
 іншу назву, передайте її явно через `-DatabaseVolume <name>`. Перед оновленням
 із ризиком для даних підготуйте перевірену резервну копію. Деталі про ролі,
-конфігурацію, broker-профіль і діагностику — у
+конфігурацію, messaging pipeline і діагностику — у
 [посібнику з розгортання та експлуатації](docs/deployment-operations.md).
 
 ## Що таке Puluj-G
@@ -56,10 +56,11 @@ Puluj-G збирає повідомлення з первинних джерел
 
 ## Як це працює
 
-Первинні джерела надходять через колектори до PostgreSQL як незмінні raw
-повідомлення. Далі legacy processor або, у broker-режимі, durable event stages
-нормалізують і розбирають дані; доменні writers створюють tracks, alerts та
-incidents з provenance. API віддає read-side і realtime-сповіщення публічній
+Первинні джерела надходять через колектори до durable messaging pipeline:
+PostgreSQL outbox, RabbitMQ та окремі stages нормалізації, розбору і domain
+writers створюють tracks, alerts та incidents з provenance. Застарілий
+monolithic `processor` вимкнений за замовчуванням і доступний лише як явний
+контрольований rollback. API віддає read-side і realtime-сповіщення публічній
 карті, а admin і analytics працюють з операційними та похідними даними.
 
 ![Огляд системи Puluj-G](docs/diagrams/system-overview.png)

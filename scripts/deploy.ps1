@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS  Interactive deployment wizard and non-interactive Docker deployment command for the Puluj-G Compose stack.
-           With no parameters it lets an operator choose services, image rebuild, database handling, optional broker
-           mode, and runtime credentials. Existing command-line parameters remain available for CI and runbooks.
+           Messaging (RabbitMQ, durable stages and domain writers) is the default. The obsolete legacy processor is
+           opt-in and is never allowed to write tracks, alerts or incidents at the same time as messaging.
            The steps are idempotent: a second run rebuilds what changed and applies outstanding migrations to the
            existing database; it never replaces its data or settings.
 .PARAMETER NoBuild   Restart with the existing images (no `--build`).
@@ -23,17 +23,15 @@
            Isolated Compose project name. Defaults to puluj-g. Only names beginning with puluj-g are accepted, and a
            reset accepts only its matching '<ComposeProject>-pgdata' database volume.
 .PARAMETER Broker
-           Start the `broker` profile (RabbitMQ + the `messaging` worker: relay, archive, raw-writer, normalizer, parser,
-           llm-worker, finalizer) and route the collectors through the single ingress (MESSAGING_OUTBOX_ENABLED /
-           MESSAGING_INGRESS_ENABLED = true). Without it the platform path is off and the legacy processor writes the domain.
+           Deprecated compatibility switch. RabbitMQ and `messaging` are now started by default.
 .PARAMETER DomainWriters
-           P09/P10 cutover (ADR-0009/0010): the legacy `processor` role is stopped and scaled to 0 BEFORE the `messaging` worker
-           gets the track-worker, alert-worker, watchdog and incident-worker roles — never two owners of tracks/alerts over one database.
-           Requires -Broker. Rollback: run again without -DomainWriters (processor back to 2 replicas, writers roles off;
-           the guards in both directions keep the rows consistent).
+           Deprecated compatibility switch. Messaging domain writers are now the default.
+.PARAMETER LegacyProcessor
+           Explicitly enable the obsolete monolithic `processor` service. This switches messaging into stage-only mode
+           and stops messaging before the processor starts, so there is only one domain writer owner.
 .PARAMETER ProcessorReplicas
-           Number of legacy `processor` replicas (0–32). Defaults to 2. Domain writers always set this to 0 because
-           the messaging worker is then the only owner of tracks, alerts and incidents.
+           Number of obsolete legacy `processor` replicas (0–32). Defaults to 0; a positive explicit value also enables
+           LegacyProcessor for compatibility. LegacyProcessor itself requires at least one replica.
 .PARAMETER Wizard
            Force the interactive wizard even when other command-line parameters were supplied.
 .PARAMETER NonInteractive
@@ -50,8 +48,10 @@ param(
     [string]$ComposeProject = "puluj-g",
     [switch]$Broker,
     [switch]$DomainWriters,
+    [Alias('Processor')]
+    [switch]$LegacyProcessor,
     [ValidateRange(0, 32)]
-    [int]$ProcessorReplicas = 2,
+    [int]$ProcessorReplicas = 0,
     [switch]$Wizard,
     [switch]$NonInteractive
 )
@@ -83,11 +83,11 @@ function Read-YesNo([string]$Prompt, [bool]$Default = $true) {
 
 function Read-ProcessorReplicaCount([int]$Default) {
     do {
-        $answer = (Read-Host "Кількість processor-реплік 0–32 (Enter — $Default)").Trim()
+        $answer = (Read-Host "Кількість ЗАСТАРІЛИХ processor-реплік 1–32 (Enter — $Default)").Trim()
         if ([string]::IsNullOrEmpty($answer)) { return $Default }
         $parsed = 0
-        if ([int]::TryParse($answer, [ref]$parsed) -and $parsed -ge 0 -and $parsed -le 32) { return $parsed }
-        Write-Warning "Введіть ціле число від 0 до 32. 0 зупиняє legacy processor."
+        if ([int]::TryParse($answer, [ref]$parsed) -and $parsed -ge 1 -and $parsed -le 32) { return $parsed }
+        Write-Warning "Введіть ціле число від 1 до 32. За замовчуванням legacy processor вимкнений."
     } while ($true)
 }
 
@@ -140,11 +140,11 @@ function Select-Services {
         'migrate' = 'одноразово застосовує EF-міграції й seed-дані'
         'collector-telegram' = 'зчитує повідомлення з Telegram-каналів'
         'collector-alerts' = 'отримує повітряні тривоги з alerts.in.ua'
-        'processor' = 'обробляє raw-повідомлення, треки, alerts та incidents'
+        'processor' = 'ЗАСТАРІЛИЙ monolith для raw/треки/alerts/incidents; вимкнений стандартно'
         'api' = 'публічна карта й read-only HTTP API на порту 8090'
         'admin' = 'приватна панель керування й діагностики на порту 8091'
         'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
-        'messaging' = 'RabbitMQ pipeline: relay, parsing, LLM та domain writers'
+        'messaging' = 'СТАНДАРТНИЙ RabbitMQ pipeline: relay, parsing, LLM та domain writers'
     }
     $available = @($services.Keys)
     Write-Host "`nЩо публікувати:"
@@ -188,14 +188,14 @@ function Invoke-DeploymentWizard {
         }
     }
 
-    $script:Broker = Read-YesNo "Увімкнути broker profile (RabbitMQ + messaging)?" ([bool]$script:Broker)
-    if ($script:Broker) { $script:DomainWriters = Read-YesNo "Передати domain writers у messaging (зупиняє legacy processor)?" ([bool]$script:DomainWriters) }
-    else { $script:DomainWriters = $false }
-    if ($script:DomainWriters) {
-        $script:ProcessorReplicas = 0
-        Write-Host "Domain writers увімкнені: processor встановлено в 0, щоб не було двох writer-ів над однією БД." -ForegroundColor Yellow
+    Write-Host "Messaging (RabbitMQ + durable domain writers) буде увімкнений за замовчуванням." -ForegroundColor Green
+    $legacyDefault = $script:LegacyProcessor -or $Services -contains 'processor'
+    $script:LegacyProcessor = Read-YesNo "Увімкнути ЗАСТАРІЛИЙ processor замість messaging domain writers?" $legacyDefault
+    if ($script:LegacyProcessor) {
+        $defaultReplicas = if ($script:ProcessorReplicas -gt 0) { $script:ProcessorReplicas } else { 2 }
+        $script:ProcessorReplicas = Read-ProcessorReplicaCount $defaultReplicas
     } else {
-        $script:ProcessorReplicas = Read-ProcessorReplicaCount $script:ProcessorReplicas
+        $script:ProcessorReplicas = 0
     }
 
     if (Read-YesNo "Ввести або змінити токени й параметри колекторів/LLM зараз?" $false) {
@@ -224,26 +224,32 @@ function Invoke-DeploymentWizard {
 $runWizard = $Wizard -or (-not $NonInteractive -and $PSBoundParameters.Count -eq 0)
 if ($runWizard) { Invoke-DeploymentWizard }
 
-if ($DomainWriters -and -not $Broker) { throw "-DomainWriters needs -Broker: the writers consume observations.recorded from RabbitMQ (ADR-0009)" }
+if ($Broker) { Write-Warning "-Broker is no longer needed: RabbitMQ and messaging are enabled by default." }
+if ($DomainWriters) { Write-Warning "-DomainWriters is no longer needed: messaging domain writers are enabled by default." }
+if (-not $LegacyProcessor -and $PSBoundParameters.ContainsKey('ProcessorReplicas') -and $ProcessorReplicas -gt 0) {
+    $LegacyProcessor = $true
+    Write-Warning "Ненульове -ProcessorReplicas увімкнуло застарілий LegacyProcessor для сумісності. Надалі використовуйте -LegacyProcessor явно."
+}
+if ($LegacyProcessor -and $ProcessorReplicas -lt 1) { throw "-LegacyProcessor requires -ProcessorReplicas from 1 to 32." }
+if (-not $LegacyProcessor) { $ProcessorReplicas = 0 }
 $expectedVolume = "$ComposeProject-pgdata"
 if ($ComposeProject -notmatch '^puluj-g(?:-[a-z0-9][a-z0-9-]*)?$') { throw "ComposeProject '$ComposeProject' is not an isolated Puluj-G project name." }
 if ($ResetDatabase -and -not $ConfirmReset) { throw "-ResetDatabase is destructive and requires -ConfirmReset. Nothing was deleted." }
 if ($ResetDatabase -and $InitializeDatabase) { throw "Use either -ResetDatabase or -InitializeDatabase, not both." }
 if ($ResetDatabase -and $DatabaseVolume.Trim() -ne $expectedVolume) { throw "Reset only accepts the exact database volume '$expectedVolume' for Compose project '$ComposeProject'; refusing '$DatabaseVolume'." }
-if ($Services -contains 'messaging' -and -not $Broker) { throw "The 'messaging' service belongs to the broker profile; enable -Broker or select it in the wizard." }
 if (($ResetDatabase -or $InitializeDatabase) -and $Services.Count -gt 0 -and $Services -notcontains 'migrate') {
     # A new database must receive schema and seed data even when the operator publishes only one service.
     $Services += 'migrate'
     Write-Host "Додано migrate: порожня або очищена БД спершу має отримати схему й seed-дані." -ForegroundColor Yellow
 }
-if ($Broker -and $Services.Count -gt 0 -and @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts') }).Count -gt 0 -and $Services -notcontains 'messaging') {
+if ($Services.Count -gt 0 -and @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts') }).Count -gt 0 -and $Services -notcontains 'messaging') {
     $Services += 'messaging'
-    Write-Host "Додано messaging: колектори у broker-режимі мають передавати дані до єдиного ingress." -ForegroundColor Yellow
+    Write-Host "Додано messaging: колектори за замовчуванням передають дані до єдиного durable ingress." -ForegroundColor Yellow
 }
-if ($DomainWriters -and $Services.Count -gt 0 -and $Services -notcontains 'messaging') {
-    $Services += 'messaging'
-    Write-Host "Додано messaging: він виконує обрані domain writer ролі." -ForegroundColor Yellow
+if (-not $LegacyProcessor -and $Services.Count -gt 0 -and $Services -contains 'processor') {
+    throw "processor is obsolete and disabled by default. Use -LegacyProcessor -ProcessorReplicas <1..32> to start it instead of messaging domain writers."
 }
+$changesDomainOwnership = $Services.Count -eq 0 -or $Services -contains 'messaging' -or $Services -contains 'processor'
 $requiresMigrate = $Services.Count -eq 0 -or $Services -contains 'migrate' -or @($Services | Where-Object { $_ -ne 'postgis' }).Count -gt 0
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
@@ -305,21 +311,19 @@ else {
     Write-Host "Using existing PostgreSQL volume '$volume'; migrations will update it in place." -ForegroundColor Green
 }
 
-# Platform path (P03–P09): which roles the `messaging` worker runs and how many legacy processors stay. Compose reads
-# these through ${…} substitution, so they are set here per run — the plain run always restores the legacy layout.
-$defaultMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics"
+# Messaging owns the durable path and domain writes by default. Legacy processing is opt-in and then messaging remains
+# stage-only. Compose reads the values through ${…} substitution.
+$stageMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics"
+$defaultMessagingRoles = "$stageMessagingRoles,track-worker,alert-worker,watchdog,incident-worker"
 $profileArgs = @()
-if ($Broker) {
-    $profileArgs = @("--profile", "broker")
-    $env:MESSAGING_OUTBOX_ENABLED = "true"
-    $env:MESSAGING_INGRESS_ENABLED = "true"
-}
-if ($DomainWriters) {
-    $env:MESSAGING_WORKER_ROLES = "$defaultMessagingRoles,track-worker,alert-worker,watchdog,incident-worker"
-    $env:PROCESSOR_REPLICAS = "0"
+$env:MESSAGING_OUTBOX_ENABLED = "true"
+$env:MESSAGING_INGRESS_ENABLED = "true"
+if ($LegacyProcessor) {
+    $env:MESSAGING_WORKER_ROLES = $stageMessagingRoles
+    $env:PROCESSOR_REPLICAS = "$ProcessorReplicas"
 } else {
     $env:MESSAGING_WORKER_ROLES = $defaultMessagingRoles
-    $env:PROCESSOR_REPLICAS = "$ProcessorReplicas"
+    $env:PROCESSOR_REPLICAS = "0"
 }
 function Sql([string]$file) {
     # psql is not installed on the host: the script goes through the postgis container (Cyrillic-safe via stdin).
@@ -380,18 +384,26 @@ if ($startsApplication) {
     }
 }
 
-if ($DomainWriters) {
-    # ADR-0009 cutover order: the legacy owner stops first, the writers start after it. The processors' in-flight
-    # transactions finish on SIGTERM; the shared Store lock means a writer can never interleave with a live legacy write.
-    Step "Cutover (ADR-0009): stopping the legacy processor role before the domain writers start"
+if ($changesDomainOwnership -and $LegacyProcessor) {
+    # The messaging consumers can have in-flight domain writes. Stop them before the obsolete owner starts.
+    Step "Перемикання на ЗАСТАРІЛИЙ processor: зупиняємо messaging перед його запуском"
     Push-Location $deploy
     try {
-        & docker compose -p $composeProject @profileArgs stop processor
+        & docker compose -p $composeProject stop messaging
+        if ($LASTEXITCODE -ne 0) { throw "could not stop the messaging service" }
+    } finally { Pop-Location }
+}
+elseif ($changesDomainOwnership) {
+    # Default cutover: legacy processor must finish before messaging becomes the only domain writer owner.
+    Step "Перемикання на messaging за замовчуванням: зупиняємо застарілий processor"
+    Push-Location $deploy
+    try {
+        & docker compose -p $composeProject stop processor
         if ($LASTEXITCODE -ne 0) { throw "could not stop the processor service" }
     } finally { Pop-Location }
 }
 
-Step ("Building and starting the stack" + $(if ($Broker) { " (broker profile" + $(if ($DomainWriters) { ", domain writers" }) + ")" } else { "" }))
+Step ("Building and starting the stack" + $(if ($LegacyProcessor) { " (ЗАСТАРІЛИЙ processor: $ProcessorReplicas реплік)" } else { " (messaging за замовчуванням)" }))
 Push-Location $deploy
 try {
     if (-not (Test-Path ".env")) { Write-Warning "deploy/.env is missing: compose will use the defaults from docker-compose.yml (ADMIN_TOKEN empty = panel only from localhost)" }
@@ -420,7 +432,7 @@ try {
     docker compose -p $composeProject @profileArgs ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
     $postgisContainer = ComposeContainerId "postgis"
     $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
-    if ($DomainWriters -and $processorContainers.Count -gt 0) { throw "processor containers are still running after the cutover: $($processorContainers -join ', ')" }
+    if ($changesDomainOwnership -and -not $LegacyProcessor -and $processorContainers.Count -gt 0) { throw "obsolete processor containers are still running after the messaging cutover: $($processorContainers -join ', ')" }
     $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
 } finally { Pop-Location }
 
@@ -447,7 +459,7 @@ foreach ($c in $processorContainers) {
 foreach ($c in $messagingContainers) {
     $roles = docker exec $c printenv Worker__Roles 2>$null
     Write-Host ("{0}: roles {1}" -f $c, $roles)
-    if ($DomainWriters -and $roles -notmatch "track-worker") { Write-Warning "$c does not run the domain writers (Worker__Roles=$roles)" }
+    if ($changesDomainOwnership -and -not $LegacyProcessor -and $roles -notmatch "track-worker") { Write-Warning "$c does not run the default messaging domain writers (Worker__Roles=$roles)" }
     $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
     if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
 }
@@ -466,11 +478,9 @@ SELECT count(*) AS text_alerts_ended_before_start FROM air_alerts WHERE ended_at
 SELECT key, left(value, 60) AS value FROM app_settings WHERE key LIKE 'Runtime:Worker:%' ORDER BY 1;
 SELECT count(*) FILTER (WHERE observation_id IS NOT NULL) AS targets_by_writers, count(*) FILTER (WHERE observation_id IS NULL) AS targets_by_legacy FROM targets;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
-if ($Broker) {
 @"
 SELECT subscription_id, outcome, count(*) FROM processing.deliveries GROUP BY 1, 2 ORDER BY 1, 2;
 SELECT count(*) AS outbox_unconfirmed FROM messaging.outbox WHERE confirmed_at IS NULL;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
-}
 }
 Write-Host "`nГотово. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green

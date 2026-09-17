@@ -1,10 +1,10 @@
 # One container per service. The Worker image is built once and started with different Worker__Roles
-# (migrate | telegram | alerts | processing); the containers talk to each other only through PostgreSQL
-# (raw messages + NOTIFY), so any of them can be restarted, scaled down or moved independently.
+# (migrate | telegram | alerts | messaging | processing). Messaging is the default durable pipeline; the obsolete
+# `processor` is explicitly scaled to zero unless an operator enables legacy mode.
 #
 #   postgis ─┬─ migrate (one-shot: migrations + seed) ─┬─ collector-telegram ─┐
-#            │                                          ├─ collector-alerts   ─┼─ raw_messages → processor × N
-#            │                                          ├─ processor (replicas)             (NOTIFY wakes them)
+#            │                                          ├─ collector-alerts   ─┼─ ingress → outbox → RabbitMQ → messaging
+#            │                                          ├─ processor (obsolete; 0 replicas by default)
 #            │                                          ├─ api    (public map, read-only role)
 #            │                                          ├─ admin  (settings, status, logs)
 #            │                                          └─ analytics (source analytics: who copies whom; own schema)
@@ -46,13 +46,10 @@ services:
       timeout: 5s
       retries: 20
 
-  # RabbitMQ dev profile (ADR-0001, P02 spike): single node, quorum queues, management UI on 15672.
-  # Opt-in (`docker compose --profile broker up -d`): the default deploy is unchanged. With the profile, `messaging` runs
-  # the outbox relay + archive consumer, and MESSAGING_OUTBOX_ENABLED=true makes the collectors commit `raw.stored` to
-  # messaging.outbox next to the raw row (P03 bridge, plan §11). HA (3 fault domains) is not provided by this profile.
+  # Default durable transport: one RabbitMQ node with quorum queues and management UI on 15672. It is intentionally
+  # part of the normal Compose stack; HA across three fault domains is still not provided by this local topology.
   rabbitmq:
     image: rabbitmq:4.3-management
-    profiles: ["broker"]
     hostname: puluj-rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-puluj}
@@ -70,21 +67,20 @@ services:
       retries: 12
     restart: unless-stopped
 
-  # P03–P06 broker roles: topology declare, outbox relay, reconciliation/cleanup (`relay`), the archive (`archive`), raw-writer
+  # Default P03–P15 pipeline: topology declare, outbox relay, reconciliation/cleanup (`relay`), archive (`archive`), raw-writer
   # (`raw-writer`), normalizer and rules/structured parser (`normalizer`, `parser`), the LLM worker (`llm-worker`, needs Llm__Enabled +
   # ANTHROPIC_API_KEY to actually call the model) and the extraction finalizer (`finalizer`) with one DLQ consumer for all.
-  # The stages run next to the legacy `processor` (shadow: stage results and events only, no domain writes) until the cutover.
-  # Scale with more replicas (relay leases rows with SKIP LOCKED; consumers share the queues).
+  # By default this service also owns tracks, alerts and incidents. Legacy mode removes those roles and explicitly
+  # enables the obsolete `processor` instead; they must never own the same rows concurrently.
   messaging:
     <<: *worker
-    profiles: ["broker"]
     environment:
       <<: *worker-env
       Worker__Name: messaging
       Worker__AppendHostName: "true"
-      # P09 cutover (ADR-0009): scripts/deploy.ps1 -Broker -DomainWriters sets MESSAGING_WORKER_ROLES with
-      # track-worker,alert-worker,watchdog,incident-worker and PROCESSOR_REPLICAS=0 — never both owners over one database.
-      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics}
+      # Default: messaging owns the domain writers and processor stays at 0. scripts/deploy.ps1 -LegacyProcessor
+      # removes the writer roles here before starting the obsolete processor.
+      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics,track-worker,alert-worker,watchdog,incident-worker}
       Messaging__Enabled: "true"
       Messaging__Broker__Host: rabbitmq
       Messaging__Broker__Port: "5672"
@@ -120,8 +116,8 @@ services:
     environment:
       <<: *worker-env
       Worker__Name: collector-telegram
-      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
-      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-true}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}
       Worker__Roles: telegram
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-telegram-.log
     volumes:
@@ -134,12 +130,14 @@ services:
     environment:
       <<: *worker-env
       Worker__Name: collector-alerts
-      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-false}
-      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-true}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}
       Worker__Roles: alerts
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-alerts-.log
 
-  # Parsing, correlation, track watchdog (and the LLM fallback). Scales horizontally: every replica claims messages
+  # OBSOLETE monolithic path. It is disabled by default; use scripts/deploy.ps1 -LegacyProcessor -ProcessorReplicas N
+  # only for a controlled rollback. It claims raw messages directly and owns the same domain rows as messaging normally does.
+  # Parsing, correlation, track watchdog (and the LLM fallback). Every replica claims messages
   # from raw_messages (status InProgress + claimed_by), so a message is processed exactly once; parsing runs in
   # parallel, while only messages that touch the same track category or alert region are serialised. Worker__AppendHostName gives each replica its own name
   # (heartbeat, claimed_by, `app` in the shared log file). Processing__Concurrency = workers per replica.
@@ -147,7 +145,7 @@ services:
   processor:
     <<: *worker
     deploy:
-      replicas: ${PROCESSOR_REPLICAS:-2}  # 0 after the P09 cutover (scripts/deploy.ps1 -DomainWriters)
+      replicas: ${PROCESSOR_REPLICAS:-0}
     environment:
       <<: *worker-env
       Worker__Name: processor
@@ -195,7 +193,7 @@ services:
       ASPNETCORE_URLS: http://+:8081
       Admin__ApiUrl: http://api:8080
       Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
-      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-false}  # /dev/ingest takes the collectors' path (P04)
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}  # /dev/ingest takes the durable collectors' path
       # P13: optional second source for the queues panel (ready/unacked per queue, node alarms); the AMQP user needs the `management` tag.
       Messaging__Broker__ManagementUrl: ${RABBITMQ_MANAGEMENT_URL:-}
       Messaging__Broker__User: ${RABBITMQ_USER:-puluj}

@@ -19,7 +19,7 @@ A("servers:")
 A("  local:")
 A("    host: localhost:5672")
 A("    protocol: amqp")
-A("    description: Один RabbitMQ контейнер для розробки (ADR-0001, dev profile закріплено P02: rabbitmq:4.3-management, Compose profile broker; HA — P16).")
+A("    description: Один RabbitMQ контейнер для стандартного messaging pipeline (ADR-0001: rabbitmq:4.3-management; HA — P16).")
 A("channels:")
 for et, ev in top["events"].items():
     cid = et.replace(".", "_")
