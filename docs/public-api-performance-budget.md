@@ -1,36 +1,39 @@
-# U13 public API: provisional performance budget
+# U13 public API: попередній бюджет перевірки швидкодії
 
-## Decision and scope
+## Для чого цей документ
 
-This is a **repeatable release-smoke budget**, not a production SLO or capacity
-claim.  The U13 release scope is explicitly limited to the disposable real-stack
-acceptance runner in `scripts/test-u13-actual.ps1`: PostGIS, worker migration and
-seed, the compiled API/static SPA, real public HTTP endpoints and a browser
-journey.  A future load/capacity task must replace this document with measured
-10,000-item / 1,000-update production-like results before any production SLO is
-advertised.
+Це повторювана перевірка перед релізом, а не production SLO і не оцінка
+пропускної здатності. Користуйтеся нею, щоб переконатися: зібрані API та
+статичний клієнт працюють разом із реальною тимчасовою БД. Результат — артефакти
+з точним commit, командами, журналами та браузерною перевіркою. Він не дозволяє
+робити висновок про навантаження production.
 
-## Version 1 budget
+## Що саме перевіряє U13
 
-| Operation | Population / bound | Budget | Evidence |
+Запустіть з кореня репозиторію `pwsh scripts/test-u13-actual.ps1`.
+Скрипт піднімає disposable PostGIS, запускає міграції та seed воркера, зібрані
+API/SPA, реальні публічні HTTP endpoints і браузерний сценарій. Якщо Docker,
+міграція, fixture, API, браузерна подорож або перевірка нижче недоступні чи
+завершилися помилкою, gate не пройдено.
+
+| Операція | Набір даних або межа | Очікуваний результат | Доказ |
 | --- | --- | --- | --- |
-| Schema + deterministic fixture | Disposable PostGIS; 123 raw messages, 123 facts, active track/incident/alert, located and unlocated facts | must complete; no fallback DB | `test-u13-actual.ps1` command manifest |
-| Public messages | 100-item page plus opaque continuation; same fixed `from/to` window | HTTP 200, exactly 100 first-page rows, continuation accepted | runner preflight and actual API |
-| Message detail | Saved revision chain and exact 64-bit target ID | HTTP 200, 2 revisions, decimal ID unchanged | runner preflight and Playwright API contract |
-| Entity catalogue | Track, incident and alert fixture rows; active filter; historical track detail | HTTP 200 and all three aggregate kinds visible | runner preflight |
-| Browser public UI | Built SPA served by the API, desktop viewport | routes to messages and entities; aXe has zero violations | `E13-actual-api.e2e.ts` and screenshot/report |
-| Map hub reachability | Real API SignalR negotiate endpoint | HTTP 200 with a connection id | `E13-actual-api.e2e.ts` |
+| Схема й детермінований fixture | Тимчасовий PostGIS; 123 raw-повідомлення, 123 факти, активні track/incident/alert, факти з координатами й без них | Успішне завершення без fallback-БД | Маніфест `test-u13-actual.ps1` |
+| Публічні повідомлення | Сторінка 100 елементів і непрозоре продовження у фіксованому вікні `from/to` | HTTP 200, рівно 100 рядків на першій сторінці, continuation приймається | Preflight runner-а та реальний API |
+| Деталі повідомлення | Збережений ланцюг revision і точний 64-бітний ID target | HTTP 200, 2 revision, десятковий ID не змінюється | Preflight і API-контракт Playwright |
+| Каталог сутностей | Fixture для track, incident, alert; active-фільтр і історичні деталі track | HTTP 200, видно всі три види агрегатів | Preflight runner-а |
+| Публічний UI у браузері | Зібрана SPA, яку віддає API, desktop viewport | Доступні маршрути messages/entities; aXe не знаходить порушень | `E13-actual-api.e2e.ts`, screenshot і report |
+| Досяжність hub карти | Реальний endpoint SignalR negotiate | HTTP 200 із connection id | `E13-actual-api.e2e.ts` |
 
-The runner records the commit, command start/end times, exit codes, the built
-asset path, API logs, screenshot and Playwright HTML output in
-`../artifacts/u13-actual/`.  An unavailable Docker daemon, migration, fixture,
-API, browser journey or threshold is a failed smoke gate.
+Runner зберігає commit, час старту/завершення команд, коди завершення, шлях до
+зібраних assets, журнали API, screenshot і HTML-вивід Playwright у
+`../artifacts/u13-actual/`.
 
-## Explicit non-goals
+## Чого перевірка не доводить
 
-- No cold/warm p95, response-byte, query-count or hardware SLO is asserted.
-- No 10,000 map-item or 1,000 update-burst load result is claimed.
-- No production environment or capacity conclusion follows from this evidence.
+- Вона не вимірює cold/warm p95, розмір відповіді, кількість SQL-запитів або hardware SLO.
+- Вона не перевіряє карту з 10 000 об'єктів чи burst із 1 000 оновлень.
+- Вона не підтверджує production-середовище або його місткість.
 
-Those measurements remain valuable follow-up work, but are not a prerequisite
-for this narrowed U13 release acceptance.
+Для таких висновків потрібна окрема задача з виміряними результатами на
+наближеному до production навантаженні.

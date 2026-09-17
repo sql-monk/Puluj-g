@@ -1,5 +1,12 @@
 # Web-клієнти: публічна карта і адмін-панель
 
+## Для чого ця сторінка
+
+Тут описано, звідки збираються два клієнти, який API вони читають і що саме
+лишається лише в браузері. Користуйтеся нею перед зміною маршруту, збірки або
+відображення карти. Результат — сумісний build і клієнт, який не втрачає великі
+ID, не декодує cursor та не надсилає координати домівки на сервер.
+
 ## Точки входу та доставка
 
 `web/` — спільний React/TypeScript код з Vite і двома builds. `main.tsx` збирає публічну карту в `src/Puluj.Api/wwwroot`; `admin/main.tsx` збирає admin SPA з `admin.html` у `src/Puluj.Admin/wwwroot`. Vite dev servers: 5183 → Api (включно `/hubs`), 5184 → Admin (`/api`). Production static files віддають відповідні .NET-сервіси. `npm run build` виконує typecheck та обидва Vite builds; MapLibre не prebundle-иться, щоб зберегти worker.

@@ -1,78 +1,79 @@
-# Public UI: release acceptance and rollback
+# Публічний UI: приймання релізу й відкат
 
-## Reproducible gate
+## Для кого і який результат
 
-Run `pwsh scripts/test-u13.ps1` from the repository root. It deliberately clears
-`PULUJ_TEST_CONNECTION` and `PULUJ_TEST_ALLOW_RESET`; `PipelineFixture` therefore uses
-its disposable Testcontainers PostGIS instance. The command writes TRX, Playwright output,
-an HTML report and a manifest to `../artifacts/u13-release/` (outside the source tree). A missing Docker daemon or a
-failing test is a failed gate, not a pass.
+Ця сторінка потрібна тому, хто готує реліз публічної карти. Вона дає
+відтворювану перевірку, перелік того, що слід зафіксувати, і безпечний порядок
+відкату. Результат перевірки — локальні артефакти; це не підтвердження того,
+що production-середовище вже пройшло smoke-тест.
 
-The runner has two kinds of evidence:
+## Відтворюваний gate
 
-- `u13-api.trx` and `u13-postgis.trx` exercise the actual .NET services and PostGIS provider;
-- the Playwright suite exercises the built React application, navigation, visual snapshots and
-  accessibility against deterministic API fixtures.
+Запустіть із кореня репозиторію:
 
-The latter is UI-contract regression coverage, not evidence that a browser has reached a
-production-like backend. Before a release candidate, record a separate environment run with
-its commit/image digest, URL, browser version, redacted screenshots, API timings and the
-same journeys. Do not substitute a skipped browser, mock-only request, or unavailable
-projection for a passed release condition.
+```powershell
+pwsh scripts/test-u13.ps1
+```
 
-## Public contract
+Скрипт очищає `PULUJ_TEST_CONNECTION` та `PULUJ_TEST_ALLOW_RESET`, тому
+`PipelineFixture` використовує тимчасовий Testcontainers PostGIS. TRX, вивід
+Playwright, HTML-report і маніфест пишуться поза source tree у
+`../artifacts/u13-release/`. Відсутній Docker daemon або помилка тесту означають,
+що gate не пройдено.
 
-Routes are hash-based and compatible with existing links:
+`u13-api.trx` і `u13-postgis.trx` перевіряють реальні .NET-сервіси та PostGIS.
+Playwright перевіряє зібраний React-клієнт, навігацію, visual snapshots і
+доступність на детермінованих API fixtures. Це захищає UI-контракт, але не
+доводить доступність production-like backend. Для release candidate окремо
+запишіть commit/image digest, URL, версію браузера, замасковані screenshot,
+API timings і ті самі сценарії для цільового середовища. Пропущений браузер,
+mock-only запит або недоступна проєкція не є успішним gate.
 
-| Area | Route | State carried in URL |
+## Контракт, який не можна зламати
+
+Маршрути зберігаються як hash і сумісні з наявними посиланнями:
+
+| Частина | Маршрут | Стан в URL |
 | --- | --- | --- |
-| Live map | `#/map/live` | canonical common filters and optional map selection |
-| History map | `#/map/history` | common filters, `at`, selection and returned context |
-| Entities | `#/entities` and `#/entities/{kind}/{id}` | collection filters, opaque cursor, `dataset` |
-| Messages | `#/messages` and `#/messages/{id}` | source/outcome/time filters, opaque cursor, `dataset` |
-| Analytics | `#/analytics` | metric, common filters and UTC period |
+| Поточна карта | `#/map/live` | спільні канонічні фільтри та, за потреби, вибраний об'єкт |
+| Історична карта | `#/map/history` | спільні фільтри, `at`, вибір і повернений context |
+| Сутності | `#/entities`, `#/entities/{kind}/{id}` | фільтри колекції, непрозорий `cursor`, `dataset` |
+| Повідомлення | `#/messages`, `#/messages/{id}` | фільтри джерела/результату/часу, непрозорий `cursor`, `dataset` |
+| Аналітика | `#/analytics` | метрика, спільні фільтри й UTC-період |
 
-IDs stay decimal strings through DTO, URL, SignalR and GeoJSON boundaries. Cursors are
-opaque: callers may retain and resend them, but may not parse, sort or numeric-cast them.
-Raw-message aggregation uses `PublishedAt UTC`; fact/track aggregation uses `ObservedAt
-UTC`. Analytics responses label both populations where they are displayed together.
+ID лишаються десятковими рядками в DTO, URL, SignalR і GeoJSON. Cursor є
+непрозорим: його можна зберегти і надіслати повторно, але не можна декодувати,
+сортувати чи перетворювати на число. Агрегація raw-повідомлень використовує
+`PublishedAt UTC`, а фактів/треків — `ObservedAt UTC`.
 
-The public surface is read-only. It uses the public allowlisted DTOs, renders raw text as
-text rather than HTML, and makes source links safe external links. No admin token, mutation
-or configuration control belongs in the map bundle.
+Публічна поверхня лише для читання. Вона використовує allow-list DTO, показує
+raw-текст як текст, а посилання на джерела відкриває як безпечні зовнішні
+посилання. Токен admin, мутації та керування конфігурацією не належать до
+bundle карти.
 
-## Acceptance record
+## Що записати після перевірки
 
-For each release candidate, retain a concise record outside the source tree with:
+Збережіть поза source tree commit/image digest, середовище, розмір dataset і
+коди завершення команд. Додайте результати Back/Forward, посторінкової навігації
+понад 100 рядків, відсутньої геометрії, 0 результатів, 404, некоректних
+фільтрів, timeout, зміни active generation і reconnect/late response.
+Потрібні screenshots 360px, 768px і 1440px зі станами loading/empty/error та
+результатом a11y-інструмента. Додайте [бюджет перевірки](public-api-performance-budget.md),
+точний fixture і маніфест команди.
 
-1. commit/image digest, environment, hardware, dataset cardinalities and command exit codes;
-2. all journeys, including Back/Forward, >100-row paging, missing geometry, 0 results, 404,
-   invalid filter, timeout, active-generation switch and reconnect/late response results;
-3. 360px, 768px and 1440px screenshots showing menu/drawers, keyboard focus/Escape, loading,
-   empty and error states; and the a11y tool result;
-4. the versioned smoke budget in `docs/public-api-performance-budget.md`, its exact fixture
-   population and its command manifest.  This U13 release gate does not claim a production
-   SLO; 10,000-item/1,000-update load, cold/warm p95, payload/query-count and capacity
-   profiling are explicitly deferred follow-up work;
-5. independent implementation-review findings, fixes and affected-test reruns.
+## Розгортання й безпечний відкат
 
-The deterministic suite deliberately includes values above `Number.MAX_SAFE_INTEGER`,
-structured/no-text raws, revisions, differing sources with the same text, incidents,
-alerts, tracks, unlocated locations and catalog changes. Small fixtures validate semantics;
-they do not establish a production SLO.
+1. Зберіть і опублікуйте backend, застосуйте additive-міграції й дочекайтеся
+   готовності схеми. Перевірте read-only облікові дані та allow-list.
+2. Лише після healthy endpoints і DTO опублікуйте відповідні frontend assets.
+   Під час вікна сумісності не ламайте старі hash-маршрути й поля API.
+3. Smoke-тестом перевірте поточну та історичну карту, деталі entity/message,
+   аналітику й посилання на джерело. Зафіксуйте hashes assets і active generation.
+4. Щоб відкотити UI, відновіть попередній набір static assets, сумісний із
+   поточним backend. Не відкочуйте дані БД лише заради frontend assets.
+5. Якщо треба відкочувати контракт API, спершу приберіть нові frontend assets,
+   зупиніть або вимкніть несумісний трафік і використайте задокументований
+   generation rollback. Не видаляйте докази приймання; дослідіть розбіжність
+   версій клієнта й API.
 
-## Rollout and rollback
-
-1. Build and publish backend first, apply additive migrations, and wait for schema readiness.
-   Verify public read-only credentials and allowlist before serving traffic.
-2. Publish the matching frontend assets only after the backend endpoints and DTOs are healthy.
-   Preserve old hash routes and API fields during the compatibility window.
-3. Smoke test a live map, history map, entity/message detail, analytics and a source link.
-   Record the asset hashes and active generation before increasing traffic.
-4. To roll back the UI, restore the previous static asset set that matches a still-compatible
-   backend contract. Do not roll back database data merely to restore a frontend asset.
-5. If an API contract must be rolled back, first remove the new frontend assets, drain or
-   disable incompatible traffic, and use the documented generation rollback. Preserve the
-   acceptance evidence and investigate any client/API version mismatch.
-
-Deployment itself is intentionally out of U13 scope.
+Саме розгортання Docker описано в [операціях розгортання](deployment-operations.md).

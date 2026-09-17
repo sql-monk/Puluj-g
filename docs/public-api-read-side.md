@@ -8,6 +8,11 @@ PostgreSQL read models; worker/admin API виконує мутації окре�
 read-only DB role має бути обмежений саме цією межею. У Development доступний
 OpenAPI endpoint; не слід публікувати вигадані request examples, IDs чи секрети.
 
+Сторінка допомагає клієнту вибрати чинний endpoint і правильно обробити його
+межі. Результат запиту — DTO лише для читання; він не дає права змінювати дані.
+Для нового інтеграційного сценарію спершу звірте маршрут, обмеження параметрів
+і поведінку помилки в таблиці нижче.
+
 ![Read-side interaction](diagrams/read-side-interaction.png)
 
 Редагована схема: [read-side-interaction.drawio](diagrams/read-side-interaction.drawio).
@@ -23,10 +28,10 @@ OpenAPI endpoint; не слід публікувати вигадані request 
 | Reference | `/api/taxonomy`, `/api/event-kinds`, `/api/sources`, `/api/places/search`, `/api/places/{id}`, `/api/places/regions`, `/api/places/{id}/geometry` | taxonomy/event kinds accept `includeDisabled`; place search needs `q` and optional `limit`. Not found is `404`. |
 | Statistics | `/api/stats/targets`, `/api/stats/alerts`, `/api/stats/sources`, `/api/stats/recognition` | optional `from`,`to` and supported filters; `to <= from` is validation problem. Responses cache publicly for 60 s. |
 
-The standard error surface is `404` for absent resources, `400`/validation for
-route/query constraints and RFC problem responses for public catalogue/message
-query failures. A dataset/cursor that no longer matches the active generation
-returns `409`; clients reload instead of trying to edit/decode a cursor.
+Стандартна помилка для відсутнього ресурсу — `404`, для некоректного маршруту
+чи параметрів — `400`/validation і RFC problem response. Якщо `dataset` або
+`cursor` більше не відповідає active generation, API повертає `409`; клієнт
+перезавантажує дані, а не намагається змінити чи декодувати cursor.
 
 ## Time, cursor, ID і provenance contracts
 
