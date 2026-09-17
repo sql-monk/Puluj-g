@@ -39,11 +39,11 @@ public static class StatsFolds
             byRegion[region.Id] = (region.Name, byRegion.GetValueOrDefault(region.Id).Count + count);
         }
         var ordered = byRegion.OrderByDescending(kv => kv.Value.Count).ThenBy(kv => kv.Value.Name).ToList();
-        var result = ordered.Take(top).Select(kv => new StatsRegionDto(kv.Key, kv.Value.Name, (int)kv.Value.Count)).ToList();
+        var result = ordered.Take(top).Select(kv => new StatsRegionDto(kv.Key, kv.Value.Name, kv.Value.Count)).ToList();
         var rest = ordered.Skip(top).Sum(kv => kv.Value.Count);
         if (rest > 0)
         {
-            result.Add(new StatsRegionDto(null, OtherName, (int)rest));
+            result.Add(new StatsRegionDto(null, OtherName, rest));
         }
         return (result, unlocated);
     }
@@ -63,7 +63,7 @@ public static class StatsFolds
         }
         return pairs.OrderByDescending(kv => kv.Value.Count).ThenBy(kv => kv.Value.From).ThenBy(kv => kv.Value.To)
             .Take(cap)
-            .Select(kv => new StatsRouteDto(kv.Key.Item1, kv.Value.From, kv.Key.Item2, kv.Value.To, (int)kv.Value.Count))
+            .Select(kv => new StatsRouteDto(kv.Key.Item1, kv.Value.From, kv.Key.Item2, kv.Value.To, kv.Value.Count))
             .ToList();
     }
 
@@ -111,7 +111,7 @@ public static class StatsFolds
     {
         var counts = rows.GroupBy(r => r.Value).ToDictionary(g => g.Key, g => g.Sum(r => r.Count));
         return Enum.GetValues<T>()
-            .Select(v => new StatsSliceDto(v.ToString(), labels.GetValueOrDefault(v, v.ToString()), (int)counts.GetValueOrDefault(Convert.ToInt32(v))))
+            .Select(v => new StatsSliceDto(v.ToString(), labels.GetValueOrDefault(v, v.ToString()), counts.GetValueOrDefault(Convert.ToInt32(v))))
             .Where(s => s.Count > 0)
             .ToList();
     }

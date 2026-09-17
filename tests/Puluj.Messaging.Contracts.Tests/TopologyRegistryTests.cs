@@ -353,7 +353,7 @@ public sealed class TopologyRegistryTests(ContractFiles contracts)
             }
         }
         // Внутрішні $ref (#/channels/x, #/components/messages/x) вказують на визначені channel ids.
-        var channelIds = System.Text.RegularExpressions.Regex.Matches(yaml, @"^  ([a-z_]+):\n    address:", System.Text.RegularExpressions.RegexOptions.Multiline)
+        var channelIds = System.Text.RegularExpressions.Regex.Matches(yaml, @"^  ([a-z_]+):\r?\n    address:", System.Text.RegularExpressions.RegexOptions.Multiline)
             .Select(m => m.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
         Assert.Equal(contracts.Events.Count(), channelIds.Count);
         foreach (var m in System.Text.RegularExpressions.Regex.Matches(yaml, @"\$ref: '#/channels/([a-z_]+)").Select(m => m.Groups[1].Value))

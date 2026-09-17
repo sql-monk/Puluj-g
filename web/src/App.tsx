@@ -17,6 +17,8 @@ import MessageCatalogue from './messages/MessageCatalogue'
 import { themeIsDark, themeMapIsDark, useStore } from './store/useStore'
 import { historyWindow, isMapRoute, parsePublicHash, publicHash, type PublicRoute, type PublicSection } from './public/routes'
 import { parseDataQuery } from './public/query'
+import { parseMapReturn, parseMapSelection } from './public/mapLink'
+import { useMapFocus } from './public/useMapFocus'
 
 const TICK_MS = 15_000
 /** Hub events are applied to the store in batches this often: one re-render per batch instead of one per event. */
@@ -45,13 +47,15 @@ export default function App() {
   const dark = themeIsDark(theme)
   const mapDark = themeMapIsDark(theme)
   const mapRoute = isMapRoute(route)
+  const mapSelection = mapRoute ? parseMapSelection(route.query) : null
   const stats = route.section === 'analytics'
   const replay = mapRoute && route.mapMode === 'history'
-  const kyivPreset = mapRoute && route.preset === 'kyiv'
+  // A deep-linked selection takes precedence over the presentation preset; otherwise Kyiv could hide its evidence.
+  const kyivPreset = mapRoute && route.preset === 'kyiv' && !mapSelection
   const replayWindow = useMemo(() => (replay ? historyWindow(route.query) : null), [replay, route.query])
+  const mapFocus = useMapFocus(mapSelection, route.query.get('dataset') ?? undefined, replayWindow?.at.toISOString())
   const panelOpen = panelOpenBySection[route.section] ?? legacyPanelOpen
   const dataQuery = useMemo(() => parseDataQuery(route.query).value, [route.query])
-  const analyticsFilterUnavailable = Boolean(dataQuery.eventKinds.length || dataQuery.entityKinds.length || dataQuery.eventCategories.length || dataQuery.categoryIds.length || dataQuery.classIds.length || dataQuery.familyIds.length || dataQuery.modelIds.length || dataQuery.sourceIds.length || dataQuery.regionId || dataQuery.q || dataQuery.status || dataQuery.confidence || dataQuery.location || dataQuery.hasResults !== undefined || dataQuery.sort || dataQuery.cursor)
   const activeMap = mapRoute
 
   useEffect(() => {
@@ -163,6 +167,13 @@ export default function App() {
     query.set('at', history.at.toISOString())
     const next = publicHash({ ...route, mapMode: 'history', query })
     if (window.location.hash !== next) window.location.hash = next
+  }, [route])
+  const dismissMapSelection = useCallback(() => {
+    const back = parseMapReturn(route.query)
+    if (back) { window.location.hash = back; return }
+    const query = new URLSearchParams(route.query)
+    query.delete('select'); query.delete('return')
+    window.location.hash = publicHash({ ...route, query })
   }, [route])
 
   // Region polygons, source filters and live windows are map-only resources.
@@ -294,9 +305,9 @@ export default function App() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
-      {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} />)}
+      {activeMap && (kyivPreset ? <KyivMapView dark={mapDark} theme={theme} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} /> : <MapView dark={mapDark} theme={theme} onPickHome={pickHome} onDetails={() => setDetailsOpen(true)} layoutKey={`${panelOpen}-${feedOpen}-${replay}-${detailsOpen}`} focus={mapFocus.focus} />)}
       <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
-      {stats && <StatsPage filterUnavailable={analyticsFilterUnavailable} />}
+      {stats && <StatsPage filter={dataQuery} />}
       {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} />}
       {route.section === 'messages' && <MessageCatalogue route={route} query={dataQuery} />}
       {mapRoute && (kyivPreset ? (
@@ -324,6 +335,15 @@ export default function App() {
           <button className="underline" onClick={() => setDetailsOpen(true)}>
             Деталі
           </button>
+        </div>
+      )}
+      {mapRoute && mapSelection && (
+        <div className="pointer-events-auto absolute bottom-3 left-1/2 z-20 max-w-md -translate-x-1/2 rounded bg-white/95 px-3 py-2 text-xs shadow dark:bg-slate-900/95 dark:text-slate-100" role={mapFocus.error ? 'alert' : 'status'}>
+          <h2 className="font-semibold">{mapFocus.loading ? 'Відкриваємо вибраний контекст…' : mapFocus.focus?.label ?? 'Вибраний контекст'}</h2>
+          {mapFocus.focus?.locators[0] && <p>{mapFocus.focus.locators[0].placeName ?? 'Локація без назви'}{mapFocus.focus.locators[0].at ? ` · ${new Intl.DateTimeFormat('uk-UA', { timeZone: 'Europe/Kyiv', dateStyle: 'short', timeStyle: 'short' }).format(new Date(mapFocus.focus.locators[0].at))}` : ''}</p>}
+          {mapFocus.error && <p>Недоступно: {mapFocus.error}</p>}
+          {mapFocus.focus?.unavailable && <p>{mapFocus.focus.unavailable}</p>}
+          <button className="ml-2 underline" onClick={dismissMapSelection}>Повернутися</button>
         </div>
       )}
     </div>

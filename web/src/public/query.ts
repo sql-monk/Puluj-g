@@ -22,6 +22,7 @@ export interface DataQuery {
   sort?: string
   cursor?: string
   pageSize?: number
+  dataset?: string
 }
 
 export interface ParsedDataQuery {
@@ -76,6 +77,8 @@ export function parseDataQuery(params: URLSearchParams): ParsedDataQuery {
   }
   value.regionId = numberParam(params, 'regionId', errors)
   value.pageSize = numberParam(params, 'pageSize', errors)
+  const dataset = params.get('dataset')?.trim()
+  if (dataset) value.dataset = dataset
   const fromRaw = params.get('from')
   const toRaw = params.get('to')
   if (fromRaw || toRaw) {
@@ -155,6 +158,7 @@ export function serializeDataQuery(base: URLSearchParams, value: DataQuery): URL
   for (const key of ['status', 'confidence', 'location', 'outcome', 'sort', 'cursor'] as const) if (value[key]) params.set(key, value[key])
   if (value.hasResults !== undefined) params.set('hasResults', String(value.hasResults))
   if (value.pageSize) params.set('pageSize', String(value.pageSize))
+  if (value.dataset) params.set('dataset', value.dataset)
   return canonicalizeQuery(params)
 }
 

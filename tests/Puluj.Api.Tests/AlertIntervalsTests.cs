@@ -153,6 +153,25 @@ public class AlertIntervalsTests
     }
 
     [Fact]
+    public void Summarize_UsesTheUnionOfOverlappingIntervalsPerRegion()
+    {
+        var from = Utc("2026-09-14T00:00:00Z");
+        var to = Utc("2026-09-14T05:00:00Z");
+        var starts = StatsBuckets.Starts(from, to, StatsBucket.Hour);
+        var s = AlertIntervals.Summarize(
+        [
+            new AlertInterval(1, Utc("2026-09-14T00:00:00Z"), Utc("2026-09-14T03:00:00Z")),
+            new AlertInterval(1, Utc("2026-09-14T01:00:00Z"), Utc("2026-09-14T04:00:00Z")),
+            new AlertInterval(1, Utc("2026-09-14T02:00:00Z"), Utc("2026-09-14T02:30:00Z")),
+        ], from, to, starts, PlaceOf);
+
+        Assert.Equal(3, s.Count); // declarations remain individual evidence records
+        Assert.Equal(4.0, s.Hours); // coverage is [00:00, 04:00), not 6.5 accumulated hours
+        Assert.Equal([1.0, 1.0, 1.0, 1.0, 0.0], s.HoursPerBucket);
+        Assert.Equal(4.0, Assert.Single(s.ByRegion).Hours);
+    }
+
+    [Fact]
     public void IsRegionLevel_AcceptsOblastsAndParentlessCities()
     {
         Assert.True(AlertIntervals.IsRegionLevel(Place(1, "Сумська область", PlaceLevel.Region)));

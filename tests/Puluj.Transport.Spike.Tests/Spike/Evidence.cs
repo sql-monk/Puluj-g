@@ -18,7 +18,17 @@ public static class Evidence
         return dir?.FullName ?? throw new InvalidOperationException("Puluj.sln not found above " + AppContext.BaseDirectory);
     }
 
-    public static string Path_(string file) => Path.Combine(RepoRoot(), "docs", "evidence", "message-platform", file);
+    public static string Path_(string file)
+    {
+        // Release-gate runs keep generated evidence in their ignored artifact folder.
+        // Historical evidence remains the default for dedicated P02 maintenance runs.
+        var directory = Environment.GetEnvironmentVariable("PULUJ_TEST_EVIDENCE_DIR");
+        directory = string.IsNullOrWhiteSpace(directory)
+            ? Path.Combine(RepoRoot(), "docs", "evidence", "message-platform")
+            : directory;
+        Directory.CreateDirectory(directory);
+        return Path.Combine(directory, file);
+    }
 
     public static void Record(string test, object facts)
     {

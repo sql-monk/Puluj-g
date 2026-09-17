@@ -5,6 +5,8 @@ import type { MapLayerMouseEvent } from 'maplibre-gl'
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MapId, RegionDto } from '../api/types'
+import type { MapFocus } from '../public/mapLink'
+import { geometryForFocus } from '../public/mapLink'
 import type { MapPalette } from './palette'
 import LinkPopup from '../components/LinkPopup'
 import EventPopup from '../components/EventPopup'
@@ -19,7 +21,7 @@ import { effectiveNow, useStore, type Theme } from '../store/useStore'
 import { getPalette } from './palette'
 import { replay } from '../replay/engine'
 import { buildAlertLayer, buildEventLayer, buildReplayLayers, buildTrackLayers, emptyCollection, visibleTracks } from './geojson'
-import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
+import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addSelectionLayers, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
 import { useRegionCamera } from './useRegionCamera'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
@@ -32,10 +34,11 @@ interface Props {
   onPickHome: ((lon: number, lat: number) => void) | null
   onDetails: (trackId: MapId) => void
   layoutKey: string
+  focus: MapFocus | null
 }
 
 /** Country-wide MapLibre map with all Puluj layers. Data flows one way: store -> GeoJSON sources. */
-export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey }: Props) {
+export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey, focus }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
@@ -83,6 +86,13 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
   const selectedRegion = regionsById.get(selectedRegionId ?? -1)
   useRegionCamera({ map: mapInstance, container, geometry: selectedRegion?.geometry ?? (selectedRegionId === null ? undefined : placeGeometries[selectedRegionId]), placeId: selectedRegionId, ensureGeometry: ensurePlaceGeometry, request: regionCameraRequest, layoutKey })
+  const focusPlaceId = focus?.locators.find((locator) => locator.placeId !== undefined)?.placeId ?? null
+  const focusGeometry = geometryForFocus(focus?.locators ?? []) ?? geometryForFocus((focus?.locators ?? []).flatMap((locator) => locator.placeId === undefined ? [] : [{ geometry: regionsById.get(locator.placeId)?.geometry ?? placeGeometries[locator.placeId] }]))
+  useRegionCamera({ map: mapInstance, container, geometry: focusGeometry, placeId: focusPlaceId, ensureGeometry: ensurePlaceGeometry, request: focus ? `${focus.selection.kind}:${focus.selection.id}` : '', layoutKey })
+  useEffect(() => {
+    if (!focus) return
+    for (const placeId of new Set(focus.locators.map((locator) => locator.placeId).filter((placeId): placeId is number => placeId !== undefined))) void ensurePlaceGeometry(placeId)
+  }, [ensurePlaceGeometry, focus])
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
   // The alert fill (one feature per alerted place, nested polygons cut out) is rebuilt only when alerts change:
@@ -236,10 +246,11 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey 
       const selected = regionsById.get(selectedRegionId ?? -1)
       setData(map, 'selected-region', selected ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: selected.geometry, properties: {} }] } : emptyCollection())
       setData(map, 'home', home ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [home.lon, home.lat] }, properties: {} }] } : emptyCollection())
+      setData(map, 'selected-evidence', focusGeometry ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: focusGeometry, properties: { key: focus ? `${focus.selection.kind}:${focus.selection.id}` : '' } }] } : emptyCollection())
     }
     if (styleLoaded.current) apply()
     else map.once('style.load', apply)
-  }, [mode, tracks, legacyEvents, incidentCatalog, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
+  }, [mode, tracks, legacyEvents, incidentCatalog, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry, focus, focusGeometry])
 
   // Replay: every frame of the replay clock moves the markers, straight into the source, without a render.
   useEffect(() => {
@@ -319,4 +330,5 @@ function addLayers(map: maplibregl.Map, p: MapPalette) {
   map.addLayer({ id: 'alerts-line', type: 'line', source: 'alerts', paint: { 'line-color': alert.line, 'line-opacity': 0.9, 'line-width': 1.4 } }, firstSymbol)
 
   addTrackLayers(map, p)
+  addSelectionLayers(map, p)
 }

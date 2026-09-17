@@ -9,27 +9,30 @@ import RecognitionTab from './tabs/RecognitionTab'
 import SourcesTab from './tabs/SourcesTab'
 import TargetsTab from './tabs/TargetsTab'
 import { useStatsRoute } from './useStatsRoute'
+import type { DataQuery } from '../public/query'
 
 /**
  * The statistics page: four tabs, each answering one question with its own payload, one period for all of them,
  * and a live line from the store. Sits over the map (which stays mounted underneath) and scrolls on its own; the
  * chart colours of the current theme are CSS variables on this root.
  */
-export default function StatsPage({ filterUnavailable = false }: { filterUnavailable?: boolean }) {
+export default function StatsPage({ filter }: { filter: DataQuery }) {
   const { route, setTab, setPeriod } = useStatsRoute()
   const dark = themeIsDark(useStore((s) => s.theme))
+  const openFilters = useStore((s) => s.setPanelOpenFor)
   return (
     <div className="pointer-events-auto absolute inset-0 z-10 overflow-y-auto bg-slate-100 pt-12 text-slate-900 md:pt-14 dark:bg-slate-950 dark:text-slate-100" style={chartVars(dark)}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-8">
         <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-1.5 bg-slate-100/95 px-3 py-2 backdrop-blur dark:bg-slate-950/95">
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            <h2 className="mr-1 font-semibold">Статистика</h2>
+            <h2 className="mr-1 font-semibold">Аналітика</h2>
+            <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-200 dark:border-slate-600 dark:hover:bg-slate-700" onClick={() => openFilters('analytics', true)}>Фільтри та період</button>
             <Tabs tab={route.tab} onChange={setTab} />
             <PeriodBar period={route.period} onChange={setPeriod} />
           </div>
           <LiveLine />
         </div>
-        {filterUnavailable ? <div role="alert" className="rounded-xl bg-amber-100 p-4 text-amber-950 dark:bg-amber-950 dark:text-amber-100">Обрана метрика ще не підтримує активні URL filters. Дані не завантажено, щоб не показати unfiltered chart під активними chips.</div> : <TabPanel tab={route.tab} period={route.period} />}
+        <TabPanel tab={route.tab} period={route.period} filter={filter} />
       </div>
     </div>
   )
@@ -47,13 +50,13 @@ function Tabs({ tab, onChange }: { tab: Tab; onChange: (t: Tab) => void }) {
   )
 }
 
-function TabPanel({ tab, period }: { tab: Tab; period: Period }) {
+function TabPanel({ tab, period, filter }: { tab: Tab; period: Period; filter: DataQuery }) {
   return (
     <div id="stats-panel" role="tabpanel" aria-labelledby={`stats-tab-${tab}`} className="flex flex-col gap-3">
-      {tab === 'targets' && <TargetsTab period={period} />}
-      {tab === 'alerts' && <AlertsTab period={period} />}
-      {tab === 'sources' && <SourcesTab period={period} />}
-      {tab === 'recognition' && <RecognitionTab period={period} />}
+      {tab === 'targets' && <TargetsTab period={period} filter={filter} />}
+      {tab === 'alerts' && <AlertsTab period={period} filter={filter} />}
+      {tab === 'sources' && <SourcesTab period={period} filter={filter} />}
+      {tab === 'recognition' && <RecognitionTab period={period} filter={filter} />}
     </div>
   )
 }

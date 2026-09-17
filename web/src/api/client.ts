@@ -38,11 +38,25 @@ function mapQuery(filter?: DataQuery): string {
     confidence: filter.confidence,
     location: filter.location,
     hasResults: filter.hasResults,
+    outcome: filter.outcome,
+    sort: filter.sort,
+    cursor: filter.cursor,
+    pageSize: filter.pageSize,
+    dataset: filter.dataset,
   })
 }
 
 function withQuery(path: string, query: string): string {
   return query ? `${path}${path.includes('?') ? '&' : '?'}${query}` : path
+}
+
+/**
+ * One canonical request key for every analytics metric.  Keeping the period
+ * first and reusing U03's ordered query serializer makes a copied URL and the
+ * request it produces directly comparable in tests and in the network panel.
+ */
+export function statsRequestPath(metric: 'targets' | 'alerts' | 'sources' | 'recognition', from: Date, to: Date, filter?: DataQuery): string {
+  return withQuery(`/api/stats/${metric}?${periodQuery(from, to)}`, mapQuery(filter))
 }
 
 export const api = {
@@ -68,7 +82,7 @@ export const api = {
   eventKinds: () => get<EventKindDto[]>('/api/event-kinds'),
   /** U04 catalogue: string IDs preserve bigint direct links; cursors are opaque and bound to the current filters/dataset. */
   publicEntities: (params: Record<string, string | number | boolean | undefined> = {}) => get<PublicEntityPageDto>(`/api/public/entities?${publicQuery(params)}`),
-  publicEntity: (kind: PublicEntityKind, id: string, dataset = 'live') => get<PublicEntityDetailsDto>(`/api/public/entities/${kind}/${encodeURIComponent(id)}?${publicQuery({ dataset })}`),
+  publicEntity: (kind: PublicEntityKind, id: string, dataset = 'live', signal?: AbortSignal, historyAt?: string) => get<PublicEntityDetailsDto>(`/api/public/entities/${kind}/${encodeURIComponent(id)}?${publicQuery({ dataset, ...(historyAt ? { historyBasis: 'reconstructed', at: historyAt } : {}) })}`, signal),
   publicEvidence: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEvidenceDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/evidence?${publicQuery({ cursor, dataset })}`),
   publicMessages: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/messages?${publicQuery({ cursor, dataset })}`),
   publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
@@ -85,10 +99,10 @@ export const api = {
   replay: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<ReplayDto>(withQuery(`/api/replay?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, mapQuery(filter)), signal),
   /** The statistics page, one payload per tab for one period (server-cached, the same for everyone). */
   stats: {
-    targets: (from: Date, to: Date) => get<StatsTargetsDto>(`/api/stats/targets?${periodQuery(from, to)}`),
-    alerts: (from: Date, to: Date) => get<StatsAlertsDto>(`/api/stats/alerts?${periodQuery(from, to)}`),
-    sources: (from: Date, to: Date) => get<StatsSourcesDto>(`/api/stats/sources?${periodQuery(from, to)}`),
-    recognition: (from: Date, to: Date) => get<StatsRecognitionDto>(`/api/stats/recognition?${periodQuery(from, to)}`),
+    targets: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsTargetsDto>(statsRequestPath('targets', from, to, filter), signal),
+    alerts: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsAlertsDto>(statsRequestPath('alerts', from, to, filter), signal),
+    sources: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsSourcesDto>(statsRequestPath('sources', from, to, filter), signal),
+    recognition: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsRecognitionDto>(statsRequestPath('recognition', from, to, filter), signal),
   },
   timeline: (from: Date, to: Date, bucketMinutes: number, filter?: DataQuery, signal?: AbortSignal) =>
     get<TimelineBucketDto[]>(

@@ -58,4 +58,15 @@ public class StatsFoldsTests
         Assert.Equal("вибухи", slices[1].Label);
         Assert.Equal(10, slices[0].Count);
     }
+
+    [Fact]
+    public void Folds_KeepCountsAboveInt32MaxValue()
+    {
+        const long many = 3_000_000_000;
+        var place = Place(1, "Сумська", PlaceLevel.Region);
+        var (regions, unlocated) = StatsFolds.ByRegion([(10, many)], id => id == 10 ? place : null, 15);
+        Assert.Equal(many, Assert.Single(regions).Targets);
+        Assert.Equal(0, unlocated);
+        Assert.Equal(many, StatsFolds.Slices(new List<(int Value, long Count)> { ((int)EventType.TargetObserved, many) }, StatsFolds.EventTypeLabels).Single().Count);
+    }
 }

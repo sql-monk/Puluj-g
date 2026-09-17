@@ -158,60 +158,67 @@ public sealed record IngestRequest(string SourceCode, string? Text, DateTimeOffs
 // Statistics page (GET /api/stats/{targets|alerts|sources|recognition}?from&to): one payload per tab, aggregated for
 // one period in Europe/Kyiv buckets. Same for every viewer; per-bucket arrays are aligned with Period.BucketStarts.
 public sealed record StatsPeriodDto(DateTimeOffset From, DateTimeOffset To, string Bucket, IReadOnlyList<DateTimeOffset> BucketStarts);
+/// <summary>One requested URL filter that this metric cannot apply without changing its population.</summary>
+public sealed record StatsUnavailableFilterDto(string Key, string Reason);
+/// <summary>Filter and population disclosure carried by every statistics tab.</summary>
+public sealed record StatsFilterMetaDto(IReadOnlyList<string> Applied, IReadOnlyList<StatsUnavailableFilterDto> Unavailable, string TimeBasis, string Population, string? ExclusionReason);
 public sealed record StatsCategoryDto(string Code, string Name);
-public sealed record StatsClassDto(string Code, string Name, string CategoryCode, int Targets, int Tracks, long ObjectsDeclared);
+public sealed record StatsClassDto(string Code, string Name, string CategoryCode, long Targets, long Tracks, long ObjectsDeclared);
 /// <summary>Targets located in a region (oblast, Kyiv); Id is null for the folded "other" row.</summary>
-public sealed record StatsRegionDto(int? Id, string Name, int Targets);
-public sealed record StatsRouteDto(int FromId, string FromName, int ToId, string ToName, int Count);
-public sealed record StatsSliceDto(string Key, string Label, int Count);
+public sealed record StatsRegionDto(int? Id, string Name, long Targets);
+public sealed record StatsRouteDto(int FromId, string FromName, int ToId, string ToName, long Count);
+public sealed record StatsSliceDto(string Key, string Label, long Count);
 /// <summary>"What flew": facts (targets that are not a repeat) and tracks per bucket and category, classes, regions, routes, hour x weekday.</summary>
 public sealed record StatsTargetsDto(
     StatsPeriodDto Period,
-    int Targets,
-    int Tracks,
+    StatsFilterMetaDto Filters,
+    long Targets,
+    long Tracks,
     long ObjectsDeclared,
     IReadOnlyList<StatsCategoryDto> Categories,
     // One row per bucket; inner arrays are counts per category in the order of Categories.
-    IReadOnlyList<IReadOnlyList<int>> TargetsByBucket,
-    IReadOnlyList<IReadOnlyList<int>> TracksByBucket,
+    IReadOnlyList<IReadOnlyList<long>> TargetsByBucket,
+    IReadOnlyList<IReadOnlyList<long>> TracksByBucket,
     IReadOnlyList<StatsClassDto> ByClass,
     IReadOnlyList<StatsRegionDto> ByRegion,
     // Facts whose location does not resolve to a region (none, direction only, abroad).
-    int Unlocated,
+    long Unlocated,
     IReadOnlyList<StatsRouteDto> Routes,
     // 7 rows (Monday first) x 24 hours, Europe/Kyiv.
-    IReadOnlyList<IReadOnlyList<int>> HourWeekday);
-public sealed record StatsAlertRegionDto(int Id, string Name, int Count, double Hours);
-public sealed record StatsAlertDayDto(DateOnly Day, int Count, double Hours);
+    IReadOnlyList<IReadOnlyList<long>> HourWeekday);
+public sealed record StatsAlertRegionDto(int Id, string Name, long Count, double Hours);
+public sealed record StatsAlertDayDto(DateOnly Day, long Count, double Hours);
 /// <summary>Region-level air-raid alerts: hours under alert and declarations per bucket, per region, durations, hour of day, top days.</summary>
 public sealed record StatsAlertsDto(
     StatsPeriodDto Period,
-    int Alerts,
+    StatsFilterMetaDto Filters,
+    long Alerts,
     double AlertHours,
     // Alerts still open at the end of the period.
-    int OpenAtEnd,
-    IReadOnlyList<int> DeclaredByBucket,
+    long OpenAtEnd,
+    IReadOnlyList<long> DeclaredByBucket,
     IReadOnlyList<double> HoursByBucket,
     IReadOnlyList<StatsAlertRegionDto> ByRegion,
     IReadOnlyList<StatsSliceDto> Durations,
     // 24 entries: alerts declared per hour of the day, Europe/Kyiv.
-    IReadOnlyList<int> DeclaredByHour,
+    IReadOnlyList<long> DeclaredByHour,
     IReadOnlyList<StatsAlertDayDto> TopDays);
 /// <summary>Series: messages per bucket, aligned with Period.BucketStarts.</summary>
-public sealed record StatsSourceDto(int Id, string Code, string Name, int Messages, int Processed, int WithTargets, int Targets, double? MedianLagSeconds, IReadOnlyList<int> Series);
-public sealed record StatsSourcesDto(StatsPeriodDto Period, int Messages, int Processed, int WithTargets, int Targets, IReadOnlyList<StatsSourceDto> Sources);
+public sealed record StatsSourceDto(int Id, string Code, string Name, long Messages, long Processed, long WithTargets, long Targets, double? MedianLagSeconds, IReadOnlyList<long> Series);
+public sealed record StatsSourcesDto(StatsPeriodDto Period, StatsFilterMetaDto Filters, StatsFilterMetaDto FactFilters, long Messages, long Processed, long WithTargets, long Targets, IReadOnlyList<StatsSourceDto> Sources);
 /// <summary>How the pipeline read the period: distributions of the facts and the share of processed messages without a fact per bucket.</summary>
 public sealed record StatsRecognitionDto(
     StatsPeriodDto Period,
-    int Targets,
-    int Processed,
-    int WithTargets,
+    StatsFilterMetaDto Filters,
+    long Targets,
+    long Processed,
+    long WithTargets,
     IReadOnlyList<StatsSliceDto> EventTypes,
     IReadOnlyList<StatsSliceDto> Methods,
     IReadOnlyList<StatsSliceDto> Confidence,
     IReadOnlyList<StatsSliceDto> LocationKinds,
-    IReadOnlyList<int> ProcessedByBucket,
-    IReadOnlyList<int> WithTargetsByBucket);
+    IReadOnlyList<long> ProcessedByBucket,
+    IReadOnlyList<long> WithTargetsByBucket);
 
 // ---- P11 incidents (plan §8.5–8.6, ADR-0011): additive read-side contracts ----
 

@@ -1,4 +1,4 @@
-# Puluj-G
+# Puluj-g
 
 ## Quick Start: Docker
 

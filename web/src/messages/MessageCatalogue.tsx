@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { PublicCollectionPageDto, PublicMessageDetailsDto, PublicMessageResultDto, PublicMessageRevisionDto, PublicMessageSummaryDto } from '../api/types'
 import type { DataQuery } from '../public/query'
 import { publicHash, type PublicRoute } from '../public/routes'
+import { mapHref } from '../public/mapLink'
 
 /** The public API accepts only this allow-listed projection of the shared U03 query. */
 export function messageParams(q: DataQuery) {
@@ -110,6 +111,7 @@ function MessageDetail({ route, id }: { route: PublicRoute; id: string }) {
     <p className="mt-1 text-sm">{outcomeLabel(message.outcome)}. Це статус публічного outcome, а не висновок із кількості results.</p>
     {href ? <a className="mt-2 inline-block underline" href={href} target="_blank" rel="noreferrer">Оригінальне джерело ↗</a> : message.urlText ? <p className="mt-2 break-all text-sm">Оригінальне посилання недоступне; значення: {message.urlText}</p> : null}
     <MessageText id={id} state={data.textState} initial={data.text} dataset={route.query.get('dataset') ?? 'live'} />
+    <MessageMapAction route={route} message={message} results={data.results.items} />
     <Paged title={`Результати (${data.results.totalCount})`} initial={data.results} load={(cursor) => api.publicMessageResults(id, cursor, route.query.get('dataset') ?? 'live')} keyOf={(item) => item.targetId} render={(item: PublicMessageResultDto) => <Result route={route} item={item} />} />
     <Paged title={`Інші редакції (${data.revisions.totalCount})`} initial={data.revisions} load={(cursor) => api.publicMessageRevisions(id, cursor, route.query.get('dataset') ?? 'live')} keyOf={(item) => item.id} render={(item: PublicMessageRevisionDto) => item.isCurrent ? <span>{kyiv(item.publishedAt)} · ця редакція</span> : <a className="underline" href={publicHash({ section: 'messages', detail: { id: item.id }, query: route.query })}>{kyiv(item.publishedAt)} · редакція {item.sourceRevision || 'без позначки'}</a>} />
     {data.directRelations.length > 0 && <section><h2 className="mt-4 font-semibold">Прямі зв’язки</h2><ul>{data.directRelations.map((item) => <li key={`${item.kind}:${item.id}`}><a className="underline" href={entityHref(route, item.kind, item.id)}>{item.kind}: {item.title ?? item.id}</a> · {item.relation}</li>)}</ul></section>}
@@ -132,7 +134,16 @@ function MessageText({ id, state, initial, dataset }: { id: string; state: strin
 }
 
 function Result({ route, item }: { route: PublicRoute; item: PublicMessageResultDto }) {
-  return <div className="border-b border-slate-200 py-2 text-sm dark:border-slate-700"><p><a className="underline" href={entityHref(route, 'observation', item.observationId ?? item.targetId)}>{item.catalogKind ?? 'результат'}{item.classification ? ` · ${item.classification}` : ''}</a> · {kyiv(item.at)} · confidence: {item.confidence}</p>{item.segmentText && <p className="whitespace-pre-wrap">{item.segmentText}</p>}<p>Місце: {item.map.placeName ?? 'невідоме'} · точність: {item.map.precision ?? 'невідома'} · {item.mapAvailable ? 'мапа доступна після U10' : item.map.unavailableReason ?? 'мапа недоступна'} <button disabled title={item.mapAvailable ? 'Наскрізний перехід буде додано в U10' : 'Для цього результату немає мапи'} className="ml-1 rounded bg-slate-200 px-2 py-0.5 disabled:opacity-50 dark:bg-slate-700">Показати на мапі</button></p>{item.relations.length > 0 && <p>Зв’язки: {item.relations.map((relation) => <a key={`${relation.kind}:${relation.id}`} className="mr-1 underline" href={entityHref(route, relation.kind, relation.id)}>{relation.kind} {relation.id}</a>)}</p>}</div>
+  const id = item.observationId ?? item.targetId
+  return <div className="border-b border-slate-200 py-2 text-sm dark:border-slate-700"><p><a className="underline" href={entityHref(route, 'observation', id)}>{item.catalogKind ?? 'результат'}{item.classification ? ` · ${item.classification}` : ''}</a> · {kyiv(item.at)} · confidence: {item.confidence}</p>{item.segmentText && <p className="whitespace-pre-wrap">{item.segmentText}</p>}<p>Місце: {item.map.placeName ?? 'невідоме'} · точність: {item.map.precision ?? 'невідома'} · {item.mapAvailable ? <a className="ml-1 rounded bg-slate-200 px-2 py-0.5 underline dark:bg-slate-700" href={mapHref(route, { kind: 'observation', id }, item.map)}>Показати на мапі</a> : <span> · {item.map.unavailableReason ?? 'мапа недоступна'}</span>}</p>{item.relations.length > 0 && <p>Зв’язки: {item.relations.map((relation) => <a key={`${relation.kind}:${relation.id}`} className="mr-1 underline" href={entityHref(route, relation.kind, relation.id)}>{relation.kind} {relation.id}</a>)}</p>}</div>
+}
+
+function MessageMapAction({ route, message, results }: { route: PublicRoute; message: PublicMessageSummaryDto; results: PublicMessageResultDto[] }) {
+  if (message.locatedResultCount === 0) return <p className="mt-3 text-sm">У повідомленні немає результатів із підтвердженою локацією.</p>
+  if (message.resultCount > results.length) return <p className="mt-3 text-sm">Для цього повідомлення є більше результатів, ніж безпечно відкривати одним оверлеєм. Оберіть конкретний результат нижче.</p>
+  const times = results.filter((result) => result.mapAvailable).map((result) => new Date(result.at).getTime()).filter(Number.isFinite)
+  const locator = { at: times.length ? new Date(Math.max(...times)).toISOString() : message.publishedAt }
+  return <a className="mt-3 inline-block rounded bg-slate-200 px-3 py-1 dark:bg-slate-700" href={mapHref(route, { kind: 'message', id: message.id }, locator)}>Показати всі доступні ({message.locatedResultCount})</a>
 }
 
 function Paged<T>({ title, initial, load, render, keyOf }: { title: string; initial: PublicCollectionPageDto<T>; load: (cursor: string) => Promise<PublicCollectionPageDto<T>>; render: (item: T) => ReactNode; keyOf: (item: T) => string }) {

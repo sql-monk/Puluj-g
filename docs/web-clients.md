@@ -40,4 +40,4 @@ UI показує server errors (зокрема 409/422), requires actor/reason 
 
 ## Докази поведінки
 
-Unit tests біля компонентів охоплюють routing/query/map-link, ETA, incident layer і live window. Playwright tests: `E01-precision`, `E02-provenance`, `E03-history`, `E04-parity`, `E05-filters`, `E06-mobile-a11y`, `E08-resync`, `E09-messages`, `E10-analytics`; admin: `A01-admin`, `A03-queues`, `A05-replay`, `A06-lifecycle`. Fixtures і mocked responses у `web/e2e/fixtures/` підтверджують UI contract, але не замінюють service integration test.
+Unit tests біля компонентів охоплюють routing/query/map-link, ETA, incident layer і live window. Playwright tests: `E01-precision`, `E02-provenance`, `E03-history`, `E04-parity`, `E05-filters`, `E06-mobile-a11y`, `E08-resync`, `E09-messages`, `E10-analytics`; admin: `A01-admin`, `A03-queues`, `A05-replay`, `A06-lifecycle`. Fixtures і mocked responses у `web/e2e/fixtures/` підтверджують UI contract, але не замінюють service integration test. Повний відтворюваний gate, межі доказів, compatibility та rollback описано в [public-ui-release.md](public-ui-release.md).

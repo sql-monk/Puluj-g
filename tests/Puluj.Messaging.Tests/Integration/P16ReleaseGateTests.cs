@@ -22,7 +22,7 @@ public sealed class P16ReleaseGateTests(MessagingFixture f)
 
     private static void RecordEvidence(string scenario, object values)
     {
-        var path = Path.Combine(MessagingFixture.FindRepoRoot(), "docs", "evidence", "message-platform", "P16-release-evidence.json");
+        var path = MessagingFixture.EvidencePath("P16-release-evidence.json");
         EvidenceMutex.WaitOne();
         try
         {

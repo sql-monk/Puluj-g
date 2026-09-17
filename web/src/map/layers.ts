@@ -191,6 +191,14 @@ export function addTrackSources(map: maplibregl.Map, cluster = true) {
   map.addSource('track-points', cluster ? { type: 'geojson', data: empty, cluster: true, clusterRadius: 6, clusterMaxZoom: 10 } : { type: 'geojson', data: empty })
   map.addSource('events', { type: 'geojson', data: empty })
   map.addSource('home', { type: 'geojson', data: empty })
+  // U10: selected historical evidence is separate from the live aggregate snapshot.
+  map.addSource('selected-evidence', { type: 'geojson', data: empty })
+}
+
+export function addSelectionLayers(map: maplibregl.Map, p: MapPalette) {
+  map.addLayer({ id: 'selected-evidence-fill', type: 'fill', source: 'selected-evidence', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'fill-color': p.glyphHalo, 'fill-opacity': 0.18 } })
+  map.addLayer({ id: 'selected-evidence-line', type: 'line', source: 'selected-evidence', filter: ['!=', ['geometry-type'], 'Point'], paint: { 'line-color': p.glyphEdge, 'line-width': 3 } })
+  map.addLayer({ id: 'selected-evidence-point', type: 'circle', source: 'selected-evidence', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-color': p.glyphHalo, 'circle-radius': 10, 'circle-stroke-color': p.glyphEdge, 'circle-stroke-width': 3 } })
 }
 
 /** Localized reports that are not moving targets: a halo makes them legible without borrowing target glyphs. */

@@ -10,6 +10,7 @@ using Npgsql;
 using Puluj.Analytics;
 using Puluj.Collectors;
 using Puluj.Domain.Entities;
+using Puluj.Domain.Enums;
 using Puluj.Infrastructure;
 using Puluj.Infrastructure.Ingestion;
 using Puluj.Infrastructure.Messaging;
@@ -188,6 +189,7 @@ public sealed class MessagingFixture : IAsyncLifetime
             {
                 await seeder.SeedAsync(db, CancellationToken.None);
             }
+            await EnsureDeterministicGazetteerAsync(db);
             SourceId = await db.Sources.Where(s => s.Code == SourceCode).Select(s => s.SourceId).SingleAsync();
         }
         await Indexes.RefreshAsync(CancellationToken.None);
@@ -196,10 +198,78 @@ public sealed class MessagingFixture : IAsyncLifetime
         await ResetAsync(); // P15: ResetAsync also (re)starts the lifecycle projection consumer for the whole collection
     }
 
+    /// <summary>
+    /// Geo-boundary downloads are optional in a clean clone, whereas the message-stage suite must always exercise
+    /// real PostGIS locations.  Supply a compact test-only hierarchy only when the optional import produced no
+    /// regions; production datasets are never changed by this fixture.
+    /// </summary>
+    private static async Task EnsureDeterministicGazetteerAsync(PulujDbContext db)
+    {
+        if (await db.Places.AnyAsync(p => p.Level == PlaceLevel.Region))
+        {
+            return;
+        }
+
+        Place Region(string key, string name, string[] variants, double lon, double lat, double halfWidth = 0.45, double halfHeight = 0.35) => new()
+        {
+            Name = name,
+            NameVariants = variants,
+            Level = PlaceLevel.Region,
+            CountryCode = "UA",
+            ExternalKey = $"test:{key}",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(lon - halfWidth, lat - halfHeight), new(lon + halfWidth, lat - halfHeight),
+                new(lon + halfWidth, lat + halfHeight), new(lon - halfWidth, lat + halfHeight), new(lon - halfWidth, lat - halfHeight),
+            ]),
+            Centroid = Geo.Point(lon, lat),
+            RadiusKm = 180,
+        };
+
+        var kyiv = Region("UA-32", "Київська область", ["київськ обл", "київщин", "київськ"], 30.5, 50.45);
+        var poltava = Region("UA-53", "Полтавська область", ["полтавськ обл", "полтавщин", "полтавськ"], 34.55, 49.6);
+        var sumy = Region("UA-59", "Сумська область", ["сумськ обл", "сумщин", "сумськ"], 34.8, 51.0, 1.0, 1.3);
+        var kirovohrad = Region("UA-35", "Кіровоградська область", ["кіровоградськ обл", "кіровоградщин", "кіровоградськ"], 32.25, 48.5);
+        var kharkiv = Region("UA-63", "Харківська область", ["харківськ обл", "харківщин", "харківськ"], 36.45, 49.95);
+        db.Places.AddRange(kyiv, poltava, sumy, kirovohrad, kharkiv);
+        await db.SaveChangesAsync();
+
+        var brovary = new Place
+        {
+            Name = "Броварський район",
+            NameVariants = ["броварськ район", "броварськ"],
+            Level = PlaceLevel.District,
+            ParentId = kyiv.PlaceId,
+            CountryCode = "UA",
+            ExternalKey = "test:UA-32-brovary",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(30.5, 50.35), new(30.9, 50.35), new(30.9, 50.65), new(30.5, 50.65), new(30.5, 50.35),
+            ]),
+            Centroid = Geo.Point(30.7, 50.5),
+            RadiusKm = 25,
+        };
+        db.Places.Add(brovary);
+        await db.SaveChangesAsync();
+        db.Places.Add(new Place
+        {
+            Name = "Тестова громада",
+            NameVariants = ["тестов гром"],
+            Level = PlaceLevel.Hromada,
+            ParentId = brovary.PlaceId,
+            CountryCode = "UA",
+            ExternalKey = "test:UA-32-brovary-hromada",
+            Geometry = Geo.Factory.CreatePolygon([
+                new(30.6, 50.4), new(30.8, 50.4), new(30.8, 50.55), new(30.6, 50.55), new(30.6, 50.4),
+            ]),
+            Centroid = Geo.Point(30.7, 50.475),
+            RadiusKm = 15,
+        });
+        await db.SaveChangesAsync();
+    }
+
     public async Task DisposeAsync()
     {
         await MessageAnalytics.StopAsync(CancellationToken.None);
-        Evidence.Flush(Path.Combine(FindRepoRoot(), "docs", "evidence", "message-platform", "messaging-crash-evidence.json"), BrokerVersion);
+        Evidence.Flush(EvidencePath("messaging-crash-evidence.json"), BrokerVersion);
         await Services.DisposeAsync();
         await _rabbit.DisposeAsync();
         await _postgres.DisposeAsync();
@@ -359,6 +429,16 @@ public sealed class MessagingFixture : IAsyncLifetime
             dir = dir.Parent;
         }
         return dir?.FullName ?? throw new InvalidOperationException("Repository root not found");
+    }
+
+    public static string EvidencePath(string file)
+    {
+        var directory = Environment.GetEnvironmentVariable("PULUJ_TEST_EVIDENCE_DIR");
+        directory = string.IsNullOrWhiteSpace(directory)
+            ? Path.Combine(FindRepoRoot(), "docs", "evidence", "message-platform")
+            : directory;
+        Directory.CreateDirectory(directory);
+        return Path.Combine(directory, file);
     }
 
     private sealed class TestEnvironment(string root) : IHostEnvironment

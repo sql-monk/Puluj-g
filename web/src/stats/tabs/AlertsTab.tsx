@@ -8,10 +8,12 @@ import Histogram from '../charts/Histogram'
 import { ACCENT, ACCENT_2 } from '../palette'
 import { HOURS, bucketLabel, bucketTitle, compact, dayTitle, hoursText, num, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
+import type { DataQuery } from '../../public/query'
+import FilterMeta from '../FilterMeta'
 
 /** Region-level air-raid alerts: hours under alert over time, per region, durations, hour of day, the heaviest days. */
-export default function AlertsTab({ period }: { period: Period }) {
-  const state = useSection(api.stats.alerts, period)
+export default function AlertsTab({ period, filter }: { period: Period; filter: DataQuery }) {
+  const state = useSection(api.stats.alerts, period, filter)
   return <SectionShell {...state}>{(data) => <Alerts data={data} />}</SectionShell>
 }
 
@@ -24,30 +26,31 @@ function Alerts({ data }: { data: StatsAlertsDto }) {
   const empty = data.alerts === 0
   return (
     <>
+      <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Тривог по областях" value={compact(data.alerts)} note="область або Київ; громади не рахуються" />
-        <StatTile label="Годин під тривогою" value={hoursText(data.alertHours)} note="сума по областях" />
-        <StatTile label="Областей у тривозі" value={String(data.byRegion.length)} note="хоч раз за період" />
-        <StatTile label="Тривали наприкінці періоду" value={String(data.openAtEnd)} note="не завершені на кінець періоду" />
+        <StatTile label="Тривог по областях" value={compact(data.alerts)} exactValue={data.alerts.toLocaleString('uk-UA')} note="область або Київ; громади не рахуються" />
+        <StatTile label="Область-години під тривогою" value={hoursText(data.alertHours)} exactValue={`${data.alertHours.toLocaleString('uk-UA')} область-годин`} note="сума перекритих інтервалів по областях" />
+        <StatTile label="Областей у тривозі" value={String(data.byRegion.length)} exactValue={data.byRegion.length.toLocaleString('uk-UA')} note="хоч раз за період" />
+        <StatTile label="Тривали наприкінці періоду" value={String(data.openAtEnd)} exactValue={data.openAtEnd.toLocaleString('uk-UA')} note="не завершені на кінець періоду" />
       </div>
 
       <ChartCard
         title="Під тривогою"
-        subtitle={`годин під тривогою ${perBucket(p.bucket)} (сума по областях); нижче — скільки тривог оголошено`}
+        subtitle={`область-годин ${perBucket(p.bucket)} (сума по областях); нижче — скільки тривог оголошено`}
         empty={empty}
         legend={
           <>
-            <LegendItem color={ACCENT} label="годин під тривогою" />
+            <LegendItem color={ACCENT} label="область-годин під тривогою" />
             <LegendItem color={ACCENT_2} label="оголошено тривог" line />
           </>
         }
-        table={{ head: ['Час', 'Годин', 'Оголошено'], rows: titles.map((t, i) => [t, Math.round(data.hoursByBucket[i] * 10) / 10, data.declaredByBucket[i]]) }}
+        table={{ head: ['Час', 'Область-годин', 'Оголошено'], rows: titles.map((t, i) => [t, Math.round(data.hoursByBucket[i] * 10) / 10, data.declaredByBucket[i]]) }}
       >
         <Columns
           labels={labels}
           titles={titles}
           series={[{ key: 'hours', label: 'годин під тривогою', color: ACCENT, values: data.hoursByBucket }]}
-          valueLabel="годин під тривогою"
+          valueLabel="область-годин під тривогою"
           format={hours}
           height={260}
           secondary={{ label: 'оголошено тривог', color: ACCENT_2, values: data.declaredByBucket }}
