@@ -24,6 +24,7 @@ public sealed class TelegramCollector(
     ReprocessService reprocess,
     CollectorStateStore states,
     SettingsStore settings,
+    TimeProvider clock,
     ILogger<TelegramCollector> logger) : ICollector
 {
     public const string StatusKey = "Telegram:Status";
@@ -32,15 +33,10 @@ public sealed class TelegramCollector(
 
     private readonly Dictionary<long, (Source Source, string Username)> _channels = [];
     private TelegramOptions _o = new();
+    private TelegramRequestGate? _requestGate;
+    private TelegramRpcExecutor? _rpc;
     /// <summary>True while the whole-history load runs: live posts are stored without being queued, like the history.</summary>
     private volatile bool _loadingHistory;
-
-    /// <summary>Progress of the whole-history load of one channel, kept in collector_states.cursor.</summary>
-    private sealed record HistoryCursor(
-        [property: JsonPropertyName("since")] DateTimeOffset Since,
-        [property: JsonPropertyName("lastId")] int LastId,
-        [property: JsonPropertyName("stored")] long Stored,
-        [property: JsonPropertyName("done")] bool Done);
 
     public bool Handles(Source source) => options.CurrentValue.Enabled && source.Type == SourceType.Telegram && Username(source) is not null;
 
@@ -89,6 +85,10 @@ public sealed class TelegramCollector(
     private async Task RunSessionAsync(IReadOnlyList<Source> sources, TelegramOptions o, CancellationToken ct)
     {
         using var client = new WTelegram.Client(Config);
+        // The scheduler owns flood handling. Letting WTelegram sleep/retry invisibly would bypass the global gate.
+        client.FloodRetryThreshold = 0;
+        _requestGate = new TelegramRequestGate(clock, o.HistoryRequestInterval, o.HistoryMinimumInterval, o.HistoryMaximumInterval);
+        _rpc = new TelegramRpcExecutor(_requestGate, o.RpcTimeout);
         var manager = client.WithUpdateManager(OnUpdate, o.SessionPath + ".updates");
         await settings.SetStatusAsync(StatusKey, "connecting", ct);
         TL.User user;
@@ -106,6 +106,7 @@ public sealed class TelegramCollector(
 
         // Let the update manager know about our dialogs so peers resolve; then resolve each configured channel.
         await manager.LoadDialogs(await client.Messages_GetAllDialogs());
+        var resolvedChannels = new List<(Channel Channel, Source Source, string Username)>();
         foreach (var source in sources)
         {
             var username = Username(source)!;
@@ -123,13 +124,19 @@ public sealed class TelegramCollector(
                     logger.LogInformation("Telegram: joined @{Username}", username);
                 }
                 _channels[channel.id] = (source, username);
-                await BackfillAsync(client, channel, source, username, ct);
+                resolvedChannels.Add((channel, source, username));
             }
             catch (RpcException ex)
             {
                 logger.LogWarning(ex, "Telegram: cannot set up @{Username} ({Source})", username, source.Code);
                 await states.MarkFailureAsync(source.SourceId, ex.Message, ct);
             }
+        }
+        // All configured channels are registered before history calls begin, so UpdateManager can durably ingest live
+        // posts for every resolved channel while the backfill scheduler runs.
+        foreach (var (channel, source, username) in resolvedChannels)
+        {
+            await BackfillAsync(client, channel, source, username, ct);
         }
         if (o.BackfillSince is { } since)
         {
@@ -207,7 +214,7 @@ public sealed class TelegramCollector(
     {
         var state = await states.GetAsync(source.SourceId, ct);
         var minId = int.TryParse(state.LastSourceMessageId?.Split(':')[0], out var last) ? last : 0;
-        var history = await client.Messages_GetHistory(channel, limit: Math.Clamp(_o.BackfillLimit, 1, 100), min_id: minId);
+        var history = await GetHistoryAsync(() => client.Messages_GetHistory(channel, limit: Math.Clamp(_o.BackfillLimit, 1, 100), min_id: minId), "recent backfill", ct);
         var messages = history.Messages.OfType<Message>().OrderBy(m => m.id).ToList();
         var stored = 0;
         foreach (var m in messages)
@@ -234,7 +241,7 @@ public sealed class TelegramCollector(
     /// </summary>
     private async Task LoadHistoryAsync(WTelegram.Client client, DateTimeOffset since, CancellationToken ct)
     {
-        var pending = new List<(Channel Channel, Source Source, string Username, HistoryCursor Cursor)>();
+        var pending = new List<TelegramBackfillJob>();
         foreach (var (channelId, (source, username)) in _channels)
         {
             var state = await states.GetAsync(source.SourceId, ct);
@@ -248,7 +255,15 @@ public sealed class TelegramCollector(
             {
                 continue;
             }
-            pending.Add((channel, source, username, cursor is null || cursor.Since > since ? new HistoryCursor(since, 0, 0, false) : cursor));
+            var historyState = cursor is null || cursor.Since > since ? TelegramHistoryState.Start(since) : cursor;
+            pending.Add(new TelegramBackfillJob
+            {
+                Channel = channel,
+                Source = source,
+                Username = username,
+                State = historyState.Normalize(),
+                Weight = Math.Clamp(source.Priority, 1, 10),
+            });
         }
         if (pending.Count == 0)
         {
@@ -258,11 +273,8 @@ public sealed class TelegramCollector(
         await reprocess.PauseAsync($"history load: {pending.Count} channel(s) since {since:yyyy-MM-dd}", ct);
         try
         {
-            foreach (var (channel, source, username, start) in pending)
-            {
-                await settings.SetStatusAsync(StatusKey, $"history: @{username} since {since:yyyy-MM-dd}", ct);
-                await LoadChannelHistoryAsync(client, channel, source, username, start, ct);
-            }
+            var scheduler = new TelegramBackfillScheduler(clock, _o.HistoryWorkers);
+            await scheduler.RunAsync(pending, (job, schedulerCt) => LoadHistoryPageAsync(client, job, schedulerCt), ct);
             // Everything is in: rebuild in order. Held until now so no message was processed out of sequence. Through the
             // ingress the raw rows are written by the raw-writer: wait until every published message of these channels
             // has one, otherwise the rebuild would start before the history is complete.
@@ -282,62 +294,68 @@ public sealed class TelegramCollector(
         }
     }
 
-    private async Task LoadChannelHistoryAsync(WTelegram.Client client, Channel channel, Source source, string username, HistoryCursor cursor, CancellationToken ct)
+    private async Task LoadHistoryPageAsync(WTelegram.Client client, TelegramBackfillJob job, CancellationToken ct)
     {
         const int limit = 100;
-        var lastId = cursor.LastId;
-        var stored = cursor.Stored;
-        var pages = 0;
-        while (!ct.IsCancellationRequested)
+        var state = job.State;
+        await settings.SetStatusAsync(StatusKey, $"history: @{job.Username} since {state.Since:yyyy-MM-dd}", ct);
+        Messages_MessagesBase history;
+        try
         {
-            Messages_MessagesBase history;
-            try
-            {
-                // The `limit` messages right after the last id seen; the first page starts after id 1 (the oldest the
-                // account can see). An offset_date start is not used: on one channel it returned the newest page.
-                history = await client.Messages_GetHistory(channel, offset_id: Math.Max(1, lastId), add_offset: -limit, limit: limit);
-            }
-            catch (RpcException ex) when (ex.Code == 420)
-            {
-                // FLOOD_WAIT longer than the client's own retry threshold: wait it out and go on.
-                logger.LogWarning("Telegram: @{Username} flood wait {Seconds}s", username, ex.X);
-                await Task.Delay(TimeSpan.FromSeconds(ex.X + 1), ct);
-                continue;
-            }
-            var page = history.Messages.OfType<Message>().Where(m => m.id > lastId).OrderBy(m => m.id).ToList();
-            if (page.Count == 0)
-            {
-                break;
-            }
-            // Pages before `since` are only paged past, not stored. The page cursor is committed with the last stored
-            // message of the page (or on its own when the page stored nothing), so a restart resumes from a page whose
-            // messages are all published.
-            var toStore = page.Where(m => ToUtc(m.date) >= cursor.Since).ToList();
-            var messages = page;
-            lastId = messages[^1].id;
-            pages++;
-            var pageCursor = WriteCursor(new HistoryCursor(cursor.Since, lastId, stored + toStore.Count, false));
-            for (var i = 0; i < toStore.Count; i++)
-            {
-                var last = i == toStore.Count - 1;
-                if (await StoreAsync(toStore[i], source, username, ct, enqueue: false, checkpoint: last ? new CollectorCheckpoint(null, ToUtc(messages[^1].date), pageCursor) : null))
-                {
-                    stored++;
-                }
-            }
-            if (toStore.Count == 0)
-            {
-                await states.MarkSuccessAsync(source.SourceId, null, ToUtc(messages[^1].date), pageCursor, ct);
-            }
-            if (pages % 20 == 0)
-            {
-                logger.LogInformation("Telegram: @{Username} history … id {LastId} ({Date:yyyy-MM-dd HH:mm}), {Stored} stored", username, lastId, ToUtc(messages[^1].date), stored);
-            }
-            // Telegram tolerates a steady trickle far better than bursts.
-            await Task.Delay(300, ct);
+            history = await GetHistoryAsync(() => client.Messages_GetHistory(job.Channel, offset_id: Math.Max(1, state.LastId), add_offset: -limit, limit: limit), "history", ct);
         }
-        await states.MarkSuccessAsync(source.SourceId, lastId == 0 ? null : lastId.ToString(), null, WriteCursor(new HistoryCursor(cursor.Since, lastId, stored, true)), ct);
-        logger.LogInformation("Telegram: @{Username} history done since {Since:yyyy-MM-dd}: {Stored} stored, last id {LastId}", username, cursor.Since, stored, lastId);
+        catch (RpcException ex) when (ex.Code == 420)
+        {
+            var retry = clock.GetUtcNow().AddSeconds(Math.Max(1, ex.X) + 1);
+            job.State = state with { NextAttemptAt = retry, FloodWaitCount = state.FloodWaitCount + 1, LastFailureKind = "flood_wait" };
+            await states.MarkSuccessAsync(job.Source.SourceId, null, null, WriteCursor(job.State), ct);
+            logger.LogWarning("Telegram: @{Username} flood wait {Seconds}s; global gate is cooling down", job.Username, ex.X);
+            return;
+        }
+        catch (TelegramRpcTimeoutException)
+        {
+            job.State = state with { NextAttemptAt = clock.GetUtcNow().AddMinutes(1), LastFailureKind = "timeout" };
+            await states.MarkFailureAsync(job.Source.SourceId, "Telegram history RPC timeout; restarting the MTProto session.", ct);
+            await states.MarkCursorAsync(job.Source.SourceId, WriteCursor(job.State), ct);
+            throw;
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            job.State = state with { NextAttemptAt = clock.GetUtcNow().AddMinutes(1), LastFailureKind = "rpc_error" };
+            await states.MarkFailureAsync(job.Source.SourceId, ex.Message, ct);
+            await states.MarkCursorAsync(job.Source.SourceId, WriteCursor(job.State), ct);
+            return;
+        }
+        var page = history.Messages.OfType<Message>().Where(m => m.id > state.LastId).OrderBy(m => m.id).ToList();
+        if (page.Count == 0)
+        {
+            job.State = state with { Done = true, NextAttemptAt = null, LastFailureKind = null };
+            await states.MarkSuccessAsync(job.Source.SourceId, null, null, WriteCursor(job.State), ct);
+            logger.LogInformation("Telegram: @{Username} history done since {Since:yyyy-MM-dd}: {Stored} stored, last id {LastId}", job.Username, state.Since, state.Stored, state.LastId);
+            return;
+        }
+        var toStore = page.Where(m => ToUtc(m.date) >= state.Since).ToList();
+        var lastId = page[^1].id;
+        var stored = state.Stored;
+        var next = state with { LastId = lastId, Stored = state.Stored + toStore.Count, Pages = state.Pages + 1, NextAttemptAt = null, LastFailureKind = null };
+        for (var i = 0; i < toStore.Count; i++)
+        {
+            var last = i == toStore.Count - 1;
+            var checkpoint = last ? new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)) : null;
+            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, enqueue: false, checkpoint: checkpoint))
+            {
+                stored++;
+            }
+        }
+        job.State = next;
+        if (toStore.Count == 0)
+        {
+            await states.MarkSuccessAsync(job.Source.SourceId, null, ToUtc(page[^1].date), WriteCursor(job.State), ct);
+        }
+        if (job.State.Pages % 20 == 0)
+        {
+            logger.LogInformation("Telegram: @{Username} history … id {LastId} ({Date:yyyy-MM-dd HH:mm}), {Stored} stored", job.Username, lastId, ToUtc(page[^1].date), stored);
+        }
     }
 
     private async Task<Channel?> ResolveAsync(WTelegram.Client client, string username)
@@ -353,7 +371,7 @@ public sealed class TelegramCollector(
         }
     }
 
-    private static HistoryCursor? ReadCursor(JsonDocument? cursor)
+    private static TelegramHistoryState? ReadCursor(JsonDocument? cursor)
     {
         if (cursor is null || !cursor.RootElement.TryGetProperty("history", out var h))
         {
@@ -361,7 +379,7 @@ public sealed class TelegramCollector(
         }
         try
         {
-            return h.Deserialize<HistoryCursor>();
+            return h.Deserialize<TelegramHistoryState>()?.Normalize();
         }
         catch (JsonException)
         {
@@ -369,7 +387,13 @@ public sealed class TelegramCollector(
         }
     }
 
-    private static JsonDocument WriteCursor(HistoryCursor cursor) => JsonSerializer.SerializeToDocument(new { history = cursor });
+    private static JsonDocument WriteCursor(TelegramHistoryState cursor) => JsonSerializer.SerializeToDocument(new { history = cursor });
+
+    private async Task<T> GetHistoryAsync<T>(Func<Task<T>> rpc, string operation, CancellationToken ct)
+    {
+        var executor = _rpc ?? throw new InvalidOperationException("Telegram RPC executor is not initialized.");
+        return await executor.ExecuteAsync(rpc, operation, ct);
+    }
 
     private async Task OnUpdate(Update update)
     {

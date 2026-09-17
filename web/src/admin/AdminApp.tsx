@@ -304,6 +304,11 @@ function TelegramSection({ status, draft, change, s, notify, reload }: TabProps)
           <Field label="Телефон" setting={s('Collectors:Telegram:Phone')} draft={draft} onChange={change} placeholder="+380…" />
           <Field label="Пароль 2FA" setting={s('Collectors:Telegram:Password')} draft={draft} onChange={change} type="password" hint="лише якщо увімкнено двофакторний захист" />
           <Field label="Дочитати постів при старті" setting={s('Collectors:Telegram:BackfillLimit')} draft={draft} onChange={change} type="number" />
+          <Field label="History workers" setting={s('Collectors:Telegram:HistoryWorkers')} draft={draft} onChange={change} type="number" hint="максимум 2; RPC все одно глобально послідовні" />
+          <Field label="Пауза між history RPC" setting={s('Collectors:Telegram:HistoryRequestInterval')} draft={draft} onChange={change} hint="стартово 00:00:00.500; flood автоматично сповільнює темп" />
+          <Field label="Мінімальна пауза" setting={s('Collectors:Telegram:HistoryMinimumInterval')} draft={draft} onChange={change} hint="нижня межа adaptive throttling" />
+          <Field label="Максимальна пауза" setting={s('Collectors:Telegram:HistoryMaximumInterval')} draft={draft} onChange={change} hint="верхня межа після FLOOD_WAIT" />
+          <Field label="RPC timeout" setting={s('Collectors:Telegram:RpcTimeout')} draft={draft} onChange={change} hint="після timeout сесія колектора перезапускається" />
         </div>
         <Toggle label="Підписуватись на канали автоматично" setting={s('Collectors:Telegram:AutoJoin')} draft={draft} onChange={change} hint="без підписки live-повідомлення не приходять" />
       </Section>
