@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Puluj.Processing;
 using Puluj.Processing.Projection;
 
@@ -23,5 +24,17 @@ public class ProjectionRegistrationTests
         var services = new ServiceCollection();
         services.AddPulujProjection(new HashSet<string> { "relay", "archive" }, "test");
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(ProjectionHandler));
+    }
+
+    [Fact]
+    public void Every_subscription_consumer_is_hosted()
+    {
+        var services = new ServiceCollection();
+
+        services.AddPulujMessaging(new HashSet<string> { "archive", "raw-writer" }, "test");
+
+        // archive + raw-writer + the one shared DLQ worker. This guards against
+        // AddHostedService(factory) de-duplicating the later subscription factories.
+        Assert.Equal(3, services.Count(d => d.ServiceType == typeof(IHostedService)));
     }
 }

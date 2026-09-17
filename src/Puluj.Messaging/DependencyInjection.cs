@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace Puluj.Messaging;
 
@@ -69,7 +70,12 @@ public static class DependencyInjection
             var handler = sp.GetRequiredService<THandler>();
             return ActivatorUtilities.CreateInstance<SubscriptionConsumer>(sp, (IDeliveryHandler)handler, ConsumerWorker(handler.SubscriptionId, instanceName));
         });
-        services.AddHostedService(sp => sp.GetServices<SubscriptionConsumer>().Single(c => c.Handler is THandler));
+        // AddHostedService(factory) uses TryAddEnumerable. Because every invocation here exposes the
+        // same IHostedService factory shape, DI keeps only the first one (archive in the default
+        // role set), silently leaving the remaining subscription queues without consumers.
+        // Register each already-singleton consumer directly instead; AddSingleton preserves every
+        // descriptor for IHostedService.
+        services.AddSingleton<IHostedService>(sp => sp.GetServices<SubscriptionConsumer>().Single(c => c.Handler is THandler));
         return services;
     }
 
