@@ -152,6 +152,8 @@ export function DbPanel() {
   const [tableRows, setTableRows] = useState<DbQueryResultDto | null>(null)
   const [tableError, setTableError] = useState<string | null>(null)
   const [loadingTable, setLoadingTable] = useState(false)
+  const [analyzingTable, setAnalyzingTable] = useState<string | null>(null)
+  const [analyzeMessage, setAnalyzeMessage] = useState<string | null>(null)
   const [sql, setSql] = useState('')
   const [queryResult, setQueryResult] = useState<DbQueryResultDto | null>(null)
   const [queryError, setQueryError] = useState<string | null>(null)
@@ -186,6 +188,20 @@ export function DbPanel() {
       setQueryError(e instanceof Error ? e.message : String(e))
     } finally {
       setQuerying(false)
+    }
+  }
+
+  const analyzeTable = async (name: string) => {
+    setAnalyzingTable(name)
+    setAnalyzeMessage(null)
+    try {
+      const result = await admin.ops.analyzeTable(name)
+      setAnalyzeMessage(`ANALYZE для ${result.name} виконано за ${fmtNum(result.elapsedMs)} мс.`)
+      reload()
+    } catch (e) {
+      setAnalyzeMessage(`Помилка ANALYZE: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setAnalyzingTable(null)
     }
   }
 
@@ -276,7 +292,14 @@ export function DbPanel() {
                       <div title={t.lastVacuumAt}>{t.lastVacuumAt ? `vacuum ${ago(t.lastVacuumAt)}` : 'vacuum —'}</div>
                       <div title={t.lastAnalyzeAt}>{t.lastAnalyzeAt ? `analyze ${ago(t.lastAnalyzeAt)}` : 'analyze —'}</div>
                     </td>
-                    <td className="pr-2 text-right"><button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-600" onClick={() => void openTable(t.name)}>Дані</button></td>
+                    <td className="pr-2 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] disabled:opacity-50 dark:border-slate-600" onClick={() => void analyzeTable(t.name)} disabled={analyzingTable !== null}>
+                          {analyzingTable === t.name ? 'ANALYZE…' : 'ANALYZE'}
+                        </button>
+                        <button className="rounded border border-slate-300 px-2 py-0.5 text-[11px] dark:border-slate-600" onClick={() => void openTable(t.name)}>Дані</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -285,6 +308,7 @@ export function DbPanel() {
           </>
         )}
       </Section>
+      {analyzeMessage && <div className={analyzeMessage.startsWith('Помилка') ? 'text-xs text-red-600' : 'text-xs text-emerald-700 dark:text-emerald-400'}>{analyzeMessage}</div>}
       {selectedTable && (
         <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={`${fmtNum(tableRows.rows.length)} рядків`} />}>
           <p className="text-xs text-slate-500">Перші 50 рядків. Значення секретних полів приховано.</p>

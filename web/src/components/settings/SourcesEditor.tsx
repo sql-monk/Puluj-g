@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { admin, type AdminSourceDto, type SourcePatch } from '../../api/admin'
 import { Badge, Section } from './fields'
+import { filterSources, sortSources, type SourceSortKey } from './sources'
 
 interface Props {
   sources: AdminSourceDto[]
@@ -10,12 +11,26 @@ interface Props {
 
 const statusLabel: Record<AdminSourceDto['status'], string> = { ok: 'працює', stale: 'немає даних', idle: 'очікує', disabled: 'вимкнено' }
 const typeLabel: Record<string, string> = { Telegram: 'Telegram', RestApi: 'REST API', Rss: 'RSS', Web: 'Web' }
+const columns: { key: SourceSortKey; label: string }[] = [
+  { key: 'name', label: 'Джерело' },
+  { key: 'type', label: 'Тип' },
+  { key: 'trustLevel', label: 'Довіра' },
+  { key: 'priority', label: 'Пріор.' },
+  { key: 'status', label: 'Стан' },
+  { key: 'rawMessageCount', label: 'Повід.' },
+]
 
 /** Table of sources with inline editing (name, channel, trust, priority, polling, home region), enable/disable, add and delete. */
 export default function SourcesEditor({ sources, reload, notify }: Props) {
   const [editing, setEditing] = useState<number | null>(null)
   const [form, setForm] = useState<SourcePatch>({})
   const [adding, setAdding] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<{ key: SourceSortKey; asc: boolean }>({ key: 'priority', asc: false })
+  const [selected, setSelected] = useState<Set<number>>(() => new Set())
+  const [bulkTrust, setBulkTrust] = useState('')
+  const [bulkPriority, setBulkPriority] = useState('')
+  const [bulkSaving, setBulkSaving] = useState(false)
   // Token is sent only when typed: an untouched field keeps the stored one.
   const [tokenDraft, setTokenDraft] = useState('')
   const [add, setAdd] = useState({ type: 'Telegram', channel: '', name: '', url: '', trustLevel: '0.6', priority: '50', polling: '' })
@@ -37,6 +52,45 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
   }
 
   const saveEdit = () => run(() => admin.updateSource(editing!, tokenDraft ? { ...form, token: tokenDraft } : form), 'Джерело оновлено').then(() => setEditing(null))
+
+  const rows = useMemo(() => sortSources(filterSources(sources, query), sort.key, sort.asc), [sources, query, sort])
+  const selectedIds = [...selected]
+  const allVisibleSelected = rows.length > 0 && rows.every((source) => selected.has(source.id))
+  const toggleSort = (key: SourceSortKey) => setSort((current) => (current.key === key ? { key, asc: !current.asc } : { key, asc: key === 'name' || key === 'type' || key === 'status' }))
+  const toggleSelected = (id: number) => setSelected((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+  const toggleAllVisible = () => setSelected((current) => {
+    const next = new Set(current)
+    if (allVisibleSelected) rows.forEach((source) => next.delete(source.id))
+    else rows.forEach((source) => next.add(source.id))
+    return next
+  })
+  const updateSelected = async (patch: SourcePatch, action: string) => {
+    if (selectedIds.length === 0 || bulkSaving) return
+    setBulkSaving(true)
+    const results = await Promise.allSettled(selectedIds.map((id) => admin.updateSource(id, patch)))
+    const updated = results.filter((result) => result.status === 'fulfilled').length
+    const failed = results.length - updated
+    try {
+      await reload()
+    } catch (e) {
+      notify({ ok: false, text: (e as Error).message })
+      setBulkSaving(false)
+      return
+    }
+    if (failed > 0) {
+      const error = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')?.reason as Error | undefined
+      notify({ ok: false, text: `${action}: оновлено ${updated} з ${results.length}. ${error?.message ?? ''}`.trim() })
+    } else {
+      notify({ ok: true, text: `${action}: оновлено ${updated} джерел.` })
+      setSelected(new Set())
+    }
+    setBulkSaving(false)
+  }
 
   const create = () =>
     run(
@@ -74,6 +128,38 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
         Довіра (0–1) обмежує максимальну впевненість фактів із джерела; пріоритет впливає лише на порядок. Джерело, в якого вже є збережені повідомлення, можна тільки вимкнути — воно частина ланцюжка походження.
         Усе, включно з токенами API, зберігається в базі; <code>data/sources.json</code> лише додає джерела, яких ще немає.
       </p>
+
+      <div className="flex flex-wrap items-end gap-2 text-xs">
+        <label className="min-w-52 flex-1">
+          <span className="mb-0.5 block text-slate-500">Пошук за назвою</span>
+          <input className={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Назва каналу" aria-label="Пошук джерел за назвою" />
+        </label>
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap items-end gap-2 rounded border border-slate-300 p-2 dark:border-slate-600">
+            <span className="pb-1 text-slate-500">Вибрано: {selectedIds.length}</span>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving} onClick={() => void updateSelected({ enabled: true }, 'Увімкнення')}>
+              Увімкнути
+            </button>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving} onClick={() => void updateSelected({ enabled: false }, 'Вимкнення')}>
+              Вимкнути
+            </button>
+            <label>
+              <span className="mb-0.5 block text-slate-500">Довіра 0–1</span>
+              <input className="w-20 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" type="number" min="0" max="1" step="0.05" value={bulkTrust} onChange={(e) => setBulkTrust(e.target.value)} />
+            </label>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving || bulkTrust === '' || !Number.isFinite(Number(bulkTrust))} onClick={() => void updateSelected({ trustLevel: Number(bulkTrust) }, 'Зміна довіри')}>
+              Застосувати
+            </button>
+            <label>
+              <span className="mb-0.5 block text-slate-500">Пріоритет</span>
+              <input className="w-20 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" type="number" step="1" value={bulkPriority} onChange={(e) => setBulkPriority(e.target.value)} />
+            </label>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving || bulkPriority === '' || !Number.isInteger(Number(bulkPriority))} onClick={() => void updateSelected({ priority: Number(bulkPriority) }, 'Зміна пріоритету')}>
+              Застосувати
+            </button>
+          </div>
+        )}
+      </div>
 
       {adding && (
         <div className="grid gap-2 rounded border border-dashed border-slate-300 p-3 text-xs sm:grid-cols-3 dark:border-slate-600">
@@ -124,20 +210,20 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
         <table className="w-full text-xs">
           <thead className="text-left text-slate-500">
             <tr>
-              <th className="py-1 pr-2">Джерело</th>
-              <th className="pr-2">Тип</th>
-              <th className="pr-2">Довіра</th>
-              <th className="pr-2">Пріор.</th>
-              <th className="pr-2">Стан</th>
-              <th className="pr-2">Повід.</th>
+              <th className="py-1 pr-2"><input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} aria-label="Вибрати всі видимі джерела" /></th>
+              {columns.map((column) => (
+                <th key={column.key} className="cursor-pointer select-none pr-2" onClick={() => toggleSort(column.key)}>
+                  {column.label}{sort.key === column.key ? (sort.asc ? ' ↑' : ' ↓') : ''}
+                </th>
+              ))}
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {sources.map((s) =>
+            {rows.map((s) =>
               editing === s.id ? (
                 <tr key={s.id} className="border-t border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
-                  <td colSpan={7} className="p-2">
+                  <td colSpan={8} className="p-2">
                     <div className="grid gap-2 sm:grid-cols-3">
                       <label>
                         <span className="block text-slate-500">Назва</span>
@@ -194,6 +280,7 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                 </tr>
               ) : (
                 <tr key={s.id} className={`border-t border-slate-100 dark:border-slate-800 ${s.enabled ? '' : 'opacity-60'}`}>
+                  <td className="py-1.5 pr-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} aria-label={`Вибрати ${s.name}`} /></td>
                   <td className="py-1.5 pr-2">
                     <div className="font-medium">{s.name}</div>
                     <div className="text-slate-400">

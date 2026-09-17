@@ -445,6 +445,7 @@ export const admin = {
     llmRequest: (id: number) => call<LlmRequestDetailDto>('GET', `/api/admin/ops/llm/requests/${id}`),
     db: () => call<DbReportDto>('GET', '/api/admin/ops/db'),
     dbTableRows: (name: string, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}`),
+    analyzeTable: (name: string) => call<{ name: string; elapsedMs: number }>('POST', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/analyze`, {}),
     dbQuery: (sql: string) => call<DbQueryResultDto>('POST', '/api/admin/ops/db/query', { sql }),
     reprocess: () => call<{ queued: number; analyticsReset: boolean }>('POST', '/api/admin/ops/reprocess', { confirmation: 'REPROCESS_DERIVED_DATA' }),
     clearOperationalData: () => call<{ tables: number; stoppedContainers: number }>('POST', '/api/admin/ops/db/clear', { confirmation: 'DELETE_ALL_OPERATIONAL_DATA' }),
