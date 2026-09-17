@@ -6,6 +6,15 @@
 
 ## Навігація
 
+- [Розгортання, конфігурація та експлуатація](deployment-operations.md)
+- [Доменна модель, PostgreSQL/PostGIS і довідники](domain-data-model.md)
+- [Колектори, ingestion і первинні джерела](collectors-ingestion.md)
+- [Обробка повідомлень і платформа подій](message-processing-platform.md)
+- [Кореляція, треки, інциденти та provenance](correlation-tracks-incidents.md)
+- [Публічний API, realtime та read-side](public-api-read-side.md)
+- [Адміністративний контур і операційні процедури](admin-operations.md)
+- [Аналітичний сервіс і життєвий цикл повідомлень](analytics-service.md)
+- [Web-клієнти: публічна карта і адмін-панель](web-clients.md)
 - [Правила іменування та розміщення](naming.md)
 - [Шаблон сторінки компонента](templates/component.md)
 - [Реєстр діаграм](diagrams/README.md)
