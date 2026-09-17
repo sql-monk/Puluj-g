@@ -47,6 +47,8 @@ public static partial class OpsEndpoints
         ops.MapGet("/ops/db", DbAsync);
         ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
         ops.MapPost("/ops/db/tables/{name}/analyze", AnalyzeTableAsync);
+        ops.MapPost("/ops/db/tables/{name}/vacuum", VacuumTableAsync);
+        ops.MapPost("/ops/db/tables/{name}/reindex", ReindexTableAsync);
         ops.MapPost("/ops/db/query", DbQueryAsync);
         ops.MapPost("/ops/db/clear", ClearOperationalDataAsync);
 
@@ -486,7 +488,16 @@ public static partial class OpsEndpoints
         return Results.Ok(await ReadQueryAsync(db, $"SELECT * FROM public.\"{name}\" LIMIT {take + 1}", take, redactSensitiveColumns: true, ct));
     }
 
-    private static async Task<IResult> AnalyzeTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    private static Task<IResult> AnalyzeTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+        => MaintainTableAsync(name, TableMaintenance.Analyze, factory, ct);
+
+    private static Task<IResult> VacuumTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+        => MaintainTableAsync(name, TableMaintenance.Vacuum, factory, ct);
+
+    private static Task<IResult> ReindexTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+        => MaintainTableAsync(name, TableMaintenance.Reindex, factory, ct);
+
+    private static async Task<IResult> MaintainTableAsync(string name, TableMaintenance maintenance, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
     {
         if (!TableName().IsMatch(name))
         {
@@ -506,11 +517,20 @@ public static partial class OpsEndpoints
         var stopwatch = Stopwatch.StartNew();
         await db.Database.OpenConnectionAsync(ct);
         await using var command = db.Database.GetDbConnection().CreateCommand();
-        command.CommandText = $"ANALYZE public.{QuoteIdentifier(name)}";
-        command.CommandTimeout = 60;
+        var table = $"public.{QuoteIdentifier(name)}";
+        var (operation, sql, timeoutSeconds) = maintenance switch
+        {
+            TableMaintenance.Analyze => ("ANALYZE", $"ANALYZE {table}", 60),
+            TableMaintenance.Vacuum => ("VACUUM", $"VACUUM {table}", 120),
+            // Concurrent reindexing keeps the table available for ordinary reads and writes.
+            TableMaintenance.Reindex => ("REINDEX", $"REINDEX TABLE CONCURRENTLY {table}", 300),
+            _ => throw new ArgumentOutOfRangeException(nameof(maintenance)),
+        };
+        command.CommandText = sql;
+        command.CommandTimeout = timeoutSeconds;
         await command.ExecuteNonQueryAsync(ct);
         stopwatch.Stop();
-        return Results.Ok(new DbAnalyzeResultDto(name, stopwatch.ElapsedMilliseconds));
+        return Results.Ok(new DbTableMaintenanceResultDto(name, operation, stopwatch.ElapsedMilliseconds));
     }
 
     private static async Task<IResult> DbQueryAsync(DbQueryRequest request, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
@@ -585,6 +605,8 @@ public static partial class OpsEndpoints
         || name.Contains("password", StringComparison.OrdinalIgnoreCase)
         || name.Contains("api_key", StringComparison.OrdinalIgnoreCase)
         || name.Equals("config", StringComparison.OrdinalIgnoreCase);
+
+    private enum TableMaintenance { Analyze, Vacuum, Reindex }
 
     [System.Text.RegularExpressions.GeneratedRegex("^[a-z][a-z0-9_]*$", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
     private static partial System.Text.RegularExpressions.Regex TableName();
