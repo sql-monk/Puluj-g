@@ -47,6 +47,48 @@ public class CorrelatorTests
         var score = Correlator.Score(lviv, track, Shahed, 30);
         Assert.True(score.Total < 0.6, $"score {score.Total:F2}");
         Assert.Equal(0, score.Space);
+        Assert.Equal("distance_exceeds_speed", score.Rejection);
+    }
+
+    [Fact]
+    public void Reverse_event_time_never_attaches_even_when_places_overlap()
+    {
+        var track = TrackUpdater.CreateTrack(Obs(30.45, 50.30, 10), T0);
+        var earlier = Obs(30.45, 50.30, 9);
+
+        var score = Correlator.Score(earlier, track, Shahed, 8);
+
+        Assert.True(score.Total < 0.6);
+        Assert.Equal("out_of_order_time", score.Rejection);
+    }
+
+    [Fact]
+    public void Distant_ends_of_kyiv_in_one_minute_never_attach()
+    {
+        var track = TrackUpdater.CreateTrack(Obs(30.1, 50.7, 0), T0);
+        var otherEnd = Obs(30.9, 50.2, 1);
+        track.LastLocationAccuracyKm = 3;
+        otherEnd.LocationAccuracyKm = 3;
+
+        var score = Correlator.Score(otherEnd, track, Shahed, 8);
+
+        Assert.True(score.Total < 0.6);
+        Assert.Equal("distance_exceeds_speed", score.Rejection);
+    }
+
+    [Fact]
+    public void Two_coarse_regions_do_not_become_a_track_without_a_precise_fact()
+    {
+        var first = Obs(34.8, 50.9, 0, place: 1);
+        first.LocationAccuracyKm = 150;
+        var track = TrackUpdater.CreateTrack(first, T0);
+        var second = Obs(34.55, 49.59, 10, place: 2);
+        second.LocationAccuracyKm = 135;
+
+        var score = Correlator.Score(second, track, Shahed, 8);
+
+        Assert.True(score.Total < 0.6);
+        Assert.Equal("two_coarse_locations", score.Rejection);
     }
 
     [Fact]
@@ -164,9 +206,10 @@ public class CorrelatorTests
         second.SourceId = 7;
         second.LocationAccuracyKm = 150;
         Assert.True(Correlator.Score(second, track, Shahed, 30).Total < 0.6);
-        // A different source saying the same thing is corroboration, not a split.
+        // A second broad report is still not enough to invent an exact route; it remains separate
+        // until a more precise independent fact arrives.
         second.SourceId = 8;
-        Assert.True(Correlator.Score(second, track, Shahed, 30).Total >= 0.6);
+        Assert.True(Correlator.Score(second, track, Shahed, 8).Total < 0.6);
     }
 
     [Fact]

@@ -12,7 +12,7 @@ namespace Puluj.Processing.Correlation;
 /// <param name="DistanceKm">Between the anchor centres.</param>
 /// <param name="GapKm">Between the anchor areas themselves (0 when they overlap or touch): what the object must really have covered.</param>
 /// <param name="MaxDistanceKm">How far the areas may lie apart for the object to have covered the gap: speed × time + slack.</param>
-public sealed record AssociationScore(double Total, double Time, double Space, double Direction, double Class, double DistanceKm, double GapKm, double MaxDistanceKm, double MinutesApart)
+public sealed record AssociationScore(double Total, double Time, double Space, double Direction, double Class, double DistanceKm, double GapKm, double MaxDistanceKm, double MinutesApart, string? Rejection = null)
 {
     public JsonDocument ToJson() => JsonDocument.Parse(JsonSerializer.Serialize(new
     {
@@ -25,6 +25,7 @@ public sealed record AssociationScore(double Total, double Time, double Space, d
         gapKm = Math.Round(GapKm, 1),
         maxDistanceKm = Math.Round(MaxDistanceKm, 1),
         minutesApart = Math.Round(MinutesApart, 1),
+        rejection = Rejection,
     }));
 }
 
@@ -129,13 +130,14 @@ public static class Correlator
         return new SpatialAnchor(t.LastLocation.Centroid.Coordinate, t.LastLocationAccuracyKm ?? 0, t.LastLocationPlaceId, boundary);
     }
 
-    public static AssociationScore Score(Target o, TargetTrack t, ClassProfile? profile, double slackKm) =>
-        Score(o, t, profile, slackKm, AnchorOf(o), AnchorOf(t));
+    public static AssociationScore Score(Target o, TargetTrack t, ClassProfile? profile, double slackKm, double coarseLocationAccuracyKm = 80) =>
+        Score(o, t, profile, slackKm, AnchorOf(o), AnchorOf(t), coarseLocationAccuracyKm);
 
-    public static AssociationScore Score(Target o, TargetTrack t, ClassProfile? profile, double slackKm, SpatialAnchor? oAnchor, SpatialAnchor? tAnchor)
+    public static AssociationScore Score(Target o, TargetTrack t, ClassProfile? profile, double slackKm, SpatialAnchor? oAnchor, SpatialAnchor? tAnchor, double coarseLocationAccuracyKm = 80)
     {
         var windowMin = profile?.CorrelationWindowMinutes ?? 30;
-        var minutes = Math.Abs((o.ObservedAt - t.LastSeenAt).TotalMinutes);
+        var elapsed = (o.ObservedAt - t.LastSeenAt).TotalMinutes;
+        var minutes = Math.Abs(elapsed);
         var time = Math.Clamp(1 - minutes / windowMin, 0, 1);
         var speed = profile?.SpeedKmhMax ?? DefaultSpeedKmh;
         var reach = speed * minutes / 60 + slackKm;
@@ -192,9 +194,27 @@ public static class Correlator
         }
 
         var total = 0.30 * time + 0.35 * space + 0.15 * direction + 0.20 * cls;
-        if (space == 0)
+        string? rejection = null;
+        if (elapsed < 0)
         {
-            total = Math.Min(total, Impossible); // physically impossible jump, or no location on one side: never attach
+            rejection = "out_of_order_time";
+        }
+        else if (!anchored)
+        {
+            rejection = "missing_location";
+        }
+        else if (oAnchor!.AccuracyKm >= coarseLocationAccuracyKm && tAnchor!.AccuracyKm >= coarseLocationAccuracyKm
+                 && oAnchor.PlaceId != tAnchor.PlaceId)
+        {
+            rejection = "two_coarse_locations";
+        }
+        else if (space == 0)
+        {
+            rejection = "distance_exceeds_speed";
+        }
+        if (rejection is not null)
+        {
+            total = Math.Min(total, Impossible); // insufficient or physically impossible evidence must never attach
         }
         // The same source naming two different places within a few minutes is reporting two objects, not one moving
         // faster than region-level accuracy can tell (typical "БпЛА на Сумщині / БпЛА на Чернігівщині" lists).
@@ -203,7 +223,8 @@ public static class Correlator
             && distance > 2 * speed * minutes / 60 + 20)
         {
             total = Math.Min(total, Impossible);
+            rejection = "same_source_conflicting_places";
         }
-        return new AssociationScore(total, time, space, direction, cls, distance, gap, reach, minutes);
+        return new AssociationScore(total, time, space, direction, cls, distance, gap, reach, minutes, rejection);
     }
 }

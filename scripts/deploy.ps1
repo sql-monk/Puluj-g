@@ -12,6 +12,17 @@
            Existing Docker volume that contains PostgreSQL data. Defaults to puluj-g-pgdata.
 .PARAMETER InitializeDatabase
            Create DatabaseVolume when it does not exist. Required only for a deliberately new, empty installation.
+.PARAMETER ResetDatabase
+           Destroy the whole isolated Puluj-G deployment state, recreate its PostgreSQL volume, and then run the
+           normal migration/seed/start sequence. This is destructive and requires -ConfirmReset. It also removes this
+           Compose project's non-external volumes (Telegram session, logs and RabbitMQ state); configure collector
+           secrets again afterwards. It never resets a volume outside the exact '<ComposeProject>-pgdata' target.
+.PARAMETER ConfirmReset
+           Explicit acknowledgement required together with -ResetDatabase. Without it the script stops before touching
+           Docker resources.
+.PARAMETER ComposeProject
+           Isolated Compose project name. Defaults to puluj-g. Only names beginning with puluj-g are accepted, and a
+           reset accepts only its matching '<ComposeProject>-pgdata' database volume.
 .PARAMETER Broker
            Start the `broker` profile (RabbitMQ + the `messaging` worker: relay, archive, raw-writer, normalizer, parser,
            llm-worker, finalizer) and route the collectors through the single ingress (MESSAGING_OUTBOX_ENABLED /
@@ -28,14 +39,22 @@ param(
     [string[]]$Services = @(),
     [string]$DatabaseVolume = "puluj-g-pgdata",
     [switch]$InitializeDatabase,
+    [switch]$ResetDatabase,
+    [switch]$ConfirmReset,
+    [string]$ComposeProject = "puluj-g",
     [switch]$Broker,
     [switch]$DomainWriters
 )
 if ($DomainWriters -and -not $Broker) { throw "-DomainWriters needs -Broker: the writers consume observations.recorded from RabbitMQ (ADR-0009)" }
+$expectedVolume = "$ComposeProject-pgdata"
+if ($ComposeProject -notmatch '^puluj-g(?:-[a-z0-9][a-z0-9-]*)?$') { throw "ComposeProject '$ComposeProject' is not an isolated Puluj-G project name." }
+if ($ResetDatabase -and -not $ConfirmReset) { throw "-ResetDatabase is destructive and requires -ConfirmReset. Nothing was deleted." }
+if ($ResetDatabase -and $InitializeDatabase) { throw "Use either -ResetDatabase or -InitializeDatabase, not both." }
+if ($ResetDatabase -and $DatabaseVolume.Trim() -ne $expectedVolume) { throw "Reset only accepts the exact database volume '$expectedVolume' for Compose project '$ComposeProject'; refusing '$DatabaseVolume'." }
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 $deploy = Join-Path $root "deploy"
-$composeProject = "puluj-g"
+$composeProject = $ComposeProject
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not found (Docker Desktop is not installed or not in PATH)" }
@@ -45,7 +64,24 @@ if ([string]::IsNullOrWhiteSpace($DatabaseVolume)) { throw "DatabaseVolume must 
 # or the persistent disk was not mounted.  A first install is deliberately opt-in via -InitializeDatabase.
 $volume = $DatabaseVolume.Trim()
 $volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
-if (-not $volumeExists) {
+if ($ResetDatabase) {
+    if (-not $volumeExists) { throw "PostgreSQL volume '$volume' does not exist; refusing a reset with an unverified target." }
+    Step "Resetting isolated Puluj-G target: compose '$composeProject', database volume '$volume'"
+    Push-Location $deploy
+    try {
+        # --volumes clears only non-external volumes of this exact Compose project. The external database volume is
+        # removed explicitly below, after all services that use it have stopped.
+        & docker compose -p $composeProject down --volumes --remove-orphans
+        if ($LASTEXITCODE -ne 0) { throw "could not stop isolated compose project '$composeProject'; database was not removed" }
+    } finally { Pop-Location }
+    & docker volume rm $volume | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "could not remove verified PostgreSQL volume '$volume'; reset stopped before recreation" }
+    & docker volume create $volume | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "could not recreate PostgreSQL volume '$volume'; rerun deploy with the same target after resolving Docker's error" }
+    $volumeExists = $true
+    Write-Host "Database volume recreated. The normal migrate/seed/health sequence follows; do not call reset successful until it completes." -ForegroundColor Yellow
+}
+elseif (-not $volumeExists) {
     if (-not $InitializeDatabase) {
         throw "PostgreSQL volume '$volume' does not exist. Refusing to create a new database; restore or pass -DatabaseVolume <existing-volume>. For a new installation, run again with -InitializeDatabase."
     }

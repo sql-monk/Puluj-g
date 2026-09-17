@@ -58,6 +58,43 @@ pwsh scripts/deploy.ps1
 відкат слід планувати як відновлення перевіреного тому/backup або окремо
 перевірену операцію для конкретної міграції.
 
+## Повний reset ізольованого розгортання
+
+Це руйнівна, але явна операція для тестового або ізольованого Puluj-G deployment:
+
+```powershell
+pwsh scripts/deploy.ps1 -ResetDatabase -ConfirmReset
+```
+
+Без обох switch-ів скрипт не видаляє нічого. Перед дією він перевіряє точну пару
+Compose project + database volume: за замовчуванням це тільки `puluj-g` і
+`puluj-g-pgdata`. Для окремого ізольованого стенда назва project має починатися
+з `puluj-g`, а том повинен точно збігатися з `<ComposeProject>-pgdata`, наприклад:
+
+```powershell
+pwsh scripts/deploy.ps1 -ComposeProject puluj-g-smoke -DatabaseVolume puluj-g-smoke-pgdata -ResetDatabase -ConfirmReset
+```
+
+Reset зупиняє лише цей Compose project, видаляє його non-external volumes
+(`tgsession`, `logs`, RabbitMQ state) та точно перевірений PostgreSQL volume,
+створює новий PostgreSQL volume, після чого запускає штатні EF migrations,
+seeders, topology registration і health checks. Отже видаляються raw/derived
+дані, треки, події, інциденти, alerts, replay/processing/messaging state,
+collector cursors, watermarks, aggregates і `app_settings`. Також видаляються
+DB-збережені source settings та Telegram session: після reset оператор заново
+вводить секрети через безпечний канал; їх не виводить скрипт і не слід додавати
+до звіту. Файлові/env значення лишаються fallback, але не замінюють відсутні
+секрети автоматично.
+
+Після успішного `migrate` перевірте health endpoints і зробіть один контрольний
+ingest → processing → public/API read-side. Колектори починають без cursor та
+watermark і виконують backfill за чинними налаштуваннями після повторної
+конфігурації. Telegram та інші зовнішні API можуть не віддати старі дані через
+retention, доступ, rate limits або історичні обмеження — reset цього не обходить.
+Якщо скрипт зупинився, не вважайте reset успішним: виправте Docker/seed/migration
+помилку і повторіть звичайний `pwsh scripts/deploy.ps1` для тієї самої ізольованої
+цілі; новий volume без даних є безпечним кінцевим станом до успішної міграції.
+
 ![Послідовність install і deploy](diagrams/deployment-lifecycle.png)
 
 Редагована схема: [deployment-lifecycle.drawio](diagrams/deployment-lifecycle.drawio).

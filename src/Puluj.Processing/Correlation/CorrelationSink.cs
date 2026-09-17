@@ -129,7 +129,7 @@ public sealed class CorrelationSink(
         foreach (var t in candidates.Where(t => Correlator.ClassCompatible(o, t) && !usedTracks.Contains(t.TargetTrackId)))
         {
             var profile = indexes.Taxonomy.ClassProfile(o.TargetClassId ?? t.TargetClassId);
-            var score = Correlator.Score(o, t, profile, options.CurrentValue.SlackKm, oAnchor, Correlator.AnchorOf(t, indexes.Gazetteer));
+            var score = Correlator.Score(o, t, profile, options.CurrentValue.SlackKm, oAnchor, Correlator.AnchorOf(t, indexes.Gazetteer), options.CurrentValue.CoarseLocationAccuracyKm);
             scoredCandidates.Add(new ScoredTrack(t, score));
         }
         var chosen = Correlator.SelectBestTrack(scoredCandidates, options.CurrentValue.AttachThreshold, options.CurrentValue.AmbiguityMargin);
@@ -138,6 +138,11 @@ public sealed class CorrelationSink(
 
         if (best is null)
         {
+            var rejected = scoredCandidates.Where(candidate => candidate.Score.Rejection is not null).Select(candidate => candidate.Score.Rejection).Distinct().ToArray();
+            if (rejected.Length > 0)
+            {
+                logger.LogInformation("Target {Obs} opens a new track; candidate hard rejects: {Reasons}", o.TargetId, string.Join(",", rejected));
+            }
             best = TrackUpdater.CreateTrack(o, now, destination, approach);
             best.DistinctSourceCount = 1;
             best.TrackConfidence = TrackUpdater.ComputeTrackConfidence(best, o.Confidence);

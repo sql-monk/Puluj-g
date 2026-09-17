@@ -27,7 +27,15 @@ public static class AdminEndpoints
     ];
     private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
-    private static readonly string[] OtherKeys = ["Correlation:AttachThreshold", "Correlation:CandidateWindowMinutes", "Correlation:AmbiguityMargin", "Admin:Token"];
+    private static readonly IReadOnlyDictionary<string, (double Min, double Max)> CorrelationRanges = new Dictionary<string, (double, double)>
+    {
+        ["Correlation:AttachThreshold"] = (0, 1),
+        ["Correlation:CandidateWindowMinutes"] = (1, 24 * 60),
+        ["Correlation:AmbiguityMargin"] = (0, 1),
+        ["Correlation:SlackKm"] = (0, 200),
+        ["Correlation:CoarseLocationAccuracyKm"] = (1, 500),
+    };
+    private static readonly string[] OtherKeys = ["Correlation:AttachThreshold", "Correlation:CandidateWindowMinutes", "Correlation:AmbiguityMargin", "Correlation:SlackKm", "Correlation:CoarseLocationAccuracyKm", "Admin:Token"];
 
     /// <summary>Defaults baked into the option classes, shown when neither the DB nor configuration sets the key.</summary>
     private static readonly Dictionary<string, string> Defaults = new(StringComparer.OrdinalIgnoreCase)
@@ -45,6 +53,8 @@ public static class AdminEndpoints
         ["Correlation:AttachThreshold"] = "0.6",
         ["Correlation:CandidateWindowMinutes"] = "120",
         ["Correlation:AmbiguityMargin"] = "0.05",
+        ["Correlation:SlackKm"] = "8",
+        ["Correlation:CoarseLocationAccuracyKm"] = "80",
     };
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
@@ -91,6 +101,14 @@ public static class AdminEndpoints
                 if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var price) || price < 0)
                 {
                     return Results.BadRequest(new { error = $"{key} має бути невід'ємним числом у USD за мільйон токенів." });
+                }
+            }
+            foreach (var (key, value) in req.Values.Where(x => CorrelationRanges.ContainsKey(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
+            {
+                var range = CorrelationRanges[key];
+                if (!double.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) || number < range.Min || number > range.Max)
+                {
+                    return Results.BadRequest(new { error = $"{key} має бути числом від {range.Min} до {range.Max}." });
                 }
             }
             var values = req.Values.ToDictionary(kv => kv.Key, kv => kv.Value?.Trim());

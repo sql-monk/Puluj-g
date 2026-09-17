@@ -11,8 +11,10 @@ public sealed class CorrelationOptions
     public double AttachThreshold { get; set; } = 0.6;
     /// <summary>Minimum lead over the second-best candidate required to attach to an existing track.</summary>
     public double AmbiguityMargin { get; set; } = 0.05;
-    /// <summary>Extra distance tolerance on top of speed × time and location accuracies.</summary>
-    public double SlackKm { get; set; } = 30;
+    /// <summary>Extra distance tolerance on top of the class speed × time and reported location areas.</summary>
+    public double SlackKm { get; set; } = 8;
+    /// <summary>Two reports this imprecise cannot identify one moving object without a more specific fact.</summary>
+    public double CoarseLocationAccuracyKm { get; set; } = 80;
     /// <summary>Tracks without updates for this many correlation windows are closed by the watchdog.</summary>
     public double CloseAfterWindows { get; set; } = 2;
     public TimeSpan WatchdogInterval { get; set; } = TimeSpan.FromMinutes(1);

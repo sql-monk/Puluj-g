@@ -15,13 +15,12 @@ accuracy. Центр великої області або destination approach �
 підтвердження.
 
 Спершу `Correlator` відкидає несумісні category, різні explicit class/model та
-неможливий простір. Кандидати шукаються в configurable
-`Correlation:CandidateWindowMinutes` (default 120); скоринг користується
-class-profile window/speed, `SlackKm` (default 30), часом, gap між geometry,
-direction і class. Best candidate потребує score ≥ `AttachThreshold` (0.6) і
-строгу перевагу над runner-up > `AmbiguityMargin` (0.05). Інакше створюється
-новий track; deterministic ID ordering існує для діагностики, не створює
-доказовості.
+неможливий простір. Кандидати шукаються у
+`Correlation:CandidateWindowMinutes` (типово 120) обмежує лише пошук кандидатів. Сам зв’язок дозволений, коли клас/модель сумісні, час і простір дають фізично можливий рух, а кращий кандидат випереджає наступний на `Correlation:AmbiguityMargin` (типово 0,05).
+
+Швидкість береться з профілю класу; допустима відстань — `speed × elapsed time + Correlation:SlackKm` (типово 8 км), а не від глобального радіуса області. Межа областей та accuracy використовуються для відстані між реальними area, тому система не вигадує точку в центрі області. Зворотний event-time, відсутня локація, дві різні грубі локації (за `Correlation:CoarseLocationAccuracyKm`, типово 80 км), фізично неможлива відстань і конфліктні короткі повідомлення одного джерела є hard reject: створюється окремий трек. Причина збереженого accepted зв’язку містить time/space/direction/class і відстані; для rejected кандидатів Worker пише короткий reason у службовий журнал, не у публічний UI.
+
+Значення `AttachThreshold`, `CandidateWindowMinutes`, `AmbiguityMargin`, `SlackKm` і `CoarseLocationAccuracyKm` редагуються в admin UI та зберігаються в `app_settings`; `appsettings`/environment є fallback. Інакше створюється новий track; deterministic ID ordering існує для діагностики, не створює доказовості.
 
 ![Correlation decision](diagrams/correlation-decision.png)
 

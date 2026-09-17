@@ -363,6 +363,8 @@ function SystemSection({ status, draft, change, s }: TabProps) {
         <Field label="Поріг приєднання до треку (0–1)" setting={s('Correlation:AttachThreshold')} draft={draft} onChange={change} type="number" hint="0.6 типово; вище — більше окремих треків, нижче — агресивніше злиття" />
         <Field label="Вікно пошуку кандидатів (хв)" setting={s('Correlation:CandidateWindowMinutes')} draft={draft} onChange={change} type="number" hint="120 типово; межа часу для добору активних треків, перед точним оцінюванням" />
         <Field label="Запас переваги кандидата (0–1)" setting={s('Correlation:AmbiguityMargin')} draft={draft} onChange={change} type="number" hint="0.05 типово; якщо різниця між двома найкращими балами менша, створюється окремий трек" />
+        <Field label="Просторовий запас (км)" setting={s('Correlation:SlackKm')} draft={draft} onChange={change} type="number" hint="8 типово; додається лише до швидкості класу × час, а не замінює фізичне обмеження" />
+        <Field label="Межа грубої локації (км)" setting={s('Correlation:CoarseLocationAccuracyKm')} draft={draft} onChange={change} type="number" hint="80 типово; дві локації з такою або гіршою точністю не зливаються без конкретнішого факту" />
       </Section>
     </>
   )
