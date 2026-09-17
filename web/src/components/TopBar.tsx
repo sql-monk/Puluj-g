@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { createPortal } from 'react-dom'
 import { isMapRoute, publicHash, type PublicRoute, type PublicSection } from '../public/routes'
 import { THEMES, useStore, type Theme } from '../store/useStore'
 
@@ -19,7 +20,9 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
   const setTheme = useStore((s) => s.setTheme)
   const error = useStore((s) => s.error)
   const [mapOpen, setMapOpen] = useState(false)
+  const [mapMenuPosition, setMapMenuPosition] = useState<{ left: number; top: number } | null>(null)
   const mapMenu = useRef<HTMLSpanElement>(null)
+  const mapPopup = useRef<HTMLSpanElement>(null)
   const mapButton = useRef<HTMLButtonElement>(null)
   const liveLink = useRef<HTMLAnchorElement>(null)
   const historyLink = useRef<HTMLAnchorElement>(null)
@@ -41,13 +44,33 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
   useEffect(() => {
     if (!mapOpen) return
     const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !mapMenu.current?.contains(event.target)) setMapOpen(false)
+      if (event.target instanceof Node && !mapMenu.current?.contains(event.target) && !mapPopup.current?.contains(event.target)) setMapOpen(false)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [mapOpen])
 
   useEffect(() => setMapOpen(false), [route.section, route.mapMode])
+
+  // The primary navigation scrolls horizontally on narrow screens. A descendant popup would be clipped by that
+  // scroll container, so position the mode menu in a portal over the page instead.
+  useLayoutEffect(() => {
+    if (!mapOpen) {
+      setMapMenuPosition(null)
+      return
+    }
+    const update = () => {
+      const rect = mapButton.current?.getBoundingClientRect()
+      setMapMenuPosition(rect ? { left: rect.left, top: rect.bottom + 4 } : null)
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
+  }, [mapOpen])
 
   const dot = connection === 'connected' ? 'bg-emerald-500' : connection === 'reconnecting' ? 'animate-pulse bg-amber-500' : 'bg-red-500'
   const status = connection === 'connected' ? 'онлайн' : connection === 'reconnecting' ? 'перепідключення…' : 'офлайн'
@@ -68,13 +91,13 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
       <button ref={panelButtonRef} className={`rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${panelOpen ? 'bg-slate-200 dark:bg-slate-700' : ''}`} onClick={onTogglePanel} aria-label="Панель фільтрів і налаштувань" aria-expanded={panelOpen} title={panelOpen ? 'Сховати панель' : 'Показати панель'}>☰</button>
       <span className="font-semibold tracking-wide">Puluj</span>
       <nav className="order-3 flex w-full items-center gap-1 overflow-x-auto text-xs sm:order-none sm:w-auto sm:text-sm" aria-label="Основна навігація">
-        <span ref={mapMenu} className="relative flex items-center">
+        <span ref={mapMenu} className="flex items-center">
           <a href={publicHash({ ...mapBase, mapMode: 'live' })} className={`whitespace-nowrap rounded-l px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${map ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`} aria-current={map ? 'page' : undefined} onClick={() => setMapOpen(false)}>Мапа</a>
-          <button ref={mapButton} className={`rounded-r px-1.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${map ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`} aria-label="Обрати режим мапи" aria-haspopup="menu" aria-expanded={mapOpen} onClick={() => setMapOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setMapOpen(true); focusMapItem(event.key === 'ArrowDown' ? 'live' : 'history') } }}><span aria-hidden="true">▾</span></button>
-          {mapOpen && <span className="absolute left-0 top-full z-40 mt-1 flex min-w-36 flex-col rounded-md bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700" role="menu" aria-label="Режим мапи">
+          <button ref={mapButton} type="button" className={`rounded-r px-1.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${map ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`} aria-label="Обрати режим мапи" aria-controls="map-mode-menu" aria-haspopup="menu" aria-expanded={mapOpen} onClick={() => setMapOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setMapOpen(true); focusMapItem(event.key === 'ArrowDown' ? 'live' : 'history') } }}><span aria-hidden="true">▾</span></button>
+          {mapOpen && mapMenuPosition && createPortal(<span ref={mapPopup} id="map-mode-menu" style={mapMenuPosition} className="fixed z-50 flex min-w-36 flex-col rounded-md bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700" role="menu" aria-label="Режим мапи">
             <a ref={liveLink} role="menuitem" href={publicHash({ ...mapBase, mapMode: 'live' })} className="rounded px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => setMapOpen(false)} onKeyDown={(event) => { if (event.key === 'ArrowDown') { event.preventDefault(); historyLink.current?.focus() } else if (event.key === 'ArrowUp') { event.preventDefault(); historyLink.current?.focus() } }}>Онлайн</a>
             <a ref={historyLink} role="menuitem" href={publicHash({ ...mapBase, mapMode: 'history' })} className="rounded px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-700" onClick={() => setMapOpen(false)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); liveLink.current?.focus() } }}>Історія</a>
-          </span>}
+          </span>, document.body)}
         </span>
         {nav(publicHash(routeFor('analytics')), 'Аналітика', route.section === 'analytics')}
         {nav(publicHash(routeFor('entities')), 'Цілі і події', route.section === 'entities')}

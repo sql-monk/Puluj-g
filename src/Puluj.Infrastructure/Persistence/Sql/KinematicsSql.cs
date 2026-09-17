@@ -121,15 +121,11 @@ END $$;
     /// The anchor of every located target, computed once when the target is inserted: the linker joins this table
     /// instead of rebuilding the oblast polygon of every candidate for every new target.
     /// </summary>
-    public const string Anchors = """
-CREATE TABLE IF NOT EXISTS target_anchors (
-    target_id bigint PRIMARY KEY REFERENCES targets (target_id) ON DELETE CASCADE,
-    geom geography NOT NULL,
-    centre geography NOT NULL,
-    slack_km double precision NOT NULL
-);
-CREATE INDEX IF NOT EXISTS ix_target_anchors_geom ON target_anchors USING gist (geom);
-
+    /// <summary>
+    /// Refreshes the target-insert trigger without rebuilding historical anchors. Kept separately so a migration can
+    /// repair databases that still have the retired source-statistics implementation of this function.
+    /// </summary>
+    public const string OnTargetInsert = """
 CREATE OR REPLACE FUNCTION puluj_on_target_insert() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -141,7 +137,17 @@ BEGIN
     END IF;
     RETURN NULL;
 END $$;
+""";
 
+    public const string Anchors = """
+CREATE TABLE IF NOT EXISTS target_anchors (
+    target_id bigint PRIMARY KEY REFERENCES targets (target_id) ON DELETE CASCADE,
+    geom geography NOT NULL,
+    centre geography NOT NULL,
+    slack_km double precision NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_target_anchors_geom ON target_anchors USING gist (geom);
+""" + OnTargetInsert + """
 -- Anchors of the targets already in the database (the trigger covers everything from here on).
 INSERT INTO target_anchors (target_id, geom, centre, slack_km)
 SELECT t.target_id, a.geom, ST_Centroid(a.geom), a.slack_km

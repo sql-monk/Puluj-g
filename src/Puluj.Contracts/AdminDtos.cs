@@ -67,6 +67,9 @@ public sealed record DbQueryRequest(string Sql);
 /// <summary>Explicit acknowledgement required before clearing derived pipeline data.</summary>
 public sealed record DbReprocessRequest(string Confirmation);
 
+/// <summary>Explicit acknowledgement for erasing all operational data while retaining the deployable schema and configuration.</summary>
+public sealed record DbClearRequest(string Confirmation);
+
 public sealed record LogFileDto(string Name, string Service, long Bytes, DateTimeOffset ModifiedAt);
 
 public sealed record LogTailDto(string File, IReadOnlyList<string> Lines, bool Truncated, long Bytes);

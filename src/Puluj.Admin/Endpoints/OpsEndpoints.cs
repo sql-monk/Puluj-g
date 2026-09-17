@@ -26,6 +26,13 @@ namespace Puluj.Admin;
 public static partial class OpsEndpoints
 {
     private static readonly TimeSpan WorkerStale = TimeSpan.FromSeconds(90);
+    private static readonly string[] OperationalSchemas = ["public", "analytics", "messaging", "processing"];
+    private static readonly HashSet<string> ResetExcludedTables = new(StringComparer.Ordinal)
+    {
+        "__EFMigrationsHistory", "spatial_ref_sys", "app_settings", "sources", "places",
+        "target_categories", "target_classes", "target_families", "target_models", "target_model_aliases",
+        "event_kinds", "event_kind_rulesets", "event_kind_rules", "event_kind_ruleset_audit", "event_kind_audit", "event_kind_rule_shadow",
+    };
 
     public static IEndpointRouteBuilder MapOpsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -40,6 +47,7 @@ public static partial class OpsEndpoints
         ops.MapGet("/ops/db", DbAsync);
         ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
         ops.MapPost("/ops/db/query", DbQueryAsync);
+        ops.MapPost("/ops/db/clear", ClearOperationalDataAsync);
 
         // Containers of the compose stack (docs/plan-admin-ops.md §2.3): list, restart / stop / start, scale the processors.
         ops.MapGet("/ops/containers", async (DockerService docker, CancellationToken ct) => Results.Ok(await docker.ListAsync(ct)));
@@ -124,6 +132,64 @@ public static partial class OpsEndpoints
         });
 
         return app;
+    }
+
+    private static async Task<IResult> ClearOperationalDataAsync(DbClearRequest request, HttpContext http, DockerService docker, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        if (!string.Equals(request.Confirmation, "DELETE_ALL_OPERATIONAL_DATA", StringComparison.Ordinal))
+        {
+            return Results.BadRequest(new { error = "Для цієї операції потрібне точне підтвердження." });
+        }
+
+        var paused = await docker.PauseDataWritersAsync(http.Connection.RemoteIpAddress?.ToString(), ct);
+        if (!paused.Ok)
+        {
+            return Results.Json(new { error = paused.Message }, statusCode: paused.StatusCode);
+        }
+
+        try
+        {
+            await using var db = await factory.CreateDbContextAsync(ct);
+            await db.Database.OpenConnectionAsync(ct);
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(hashtext('puluj:clear-operational-data'))", ct);
+
+            var connection = db.Database.GetDbConnection();
+            await using var discover = connection.CreateCommand();
+            discover.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
+            discover.CommandText = "SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ANY (@schemas) ORDER BY schemaname, tablename";
+            var schemas = discover.CreateParameter();
+            schemas.ParameterName = "schemas";
+            schemas.Value = OperationalSchemas;
+            discover.Parameters.Add(schemas);
+
+            var tables = new List<(string Schema, string Name)>();
+            await using (var reader = await discover.ExecuteReaderAsync(ct))
+            {
+                while (await reader.ReadAsync(ct))
+                {
+                    var schema = reader.GetString(0);
+                    var name = reader.GetString(1);
+                    if (!ResetExcludedTables.Contains(name)) tables.Add((schema, name));
+                }
+            }
+
+            if (tables.Count > 0)
+            {
+                var names = string.Join(", ", tables.Select(t => $"{QuoteIdentifier(t.Schema)}.{QuoteIdentifier(t.Name)}"));
+                await using var truncate = connection.CreateCommand();
+                truncate.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
+                truncate.CommandText = $"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE";
+                await truncate.ExecuteNonQueryAsync(ct);
+            }
+            await transaction.CommitAsync(ct);
+            return Results.Ok(new { tables = tables.Count, stoppedContainers = paused.Containers.Count });
+        }
+        catch
+        {
+            await docker.ResumeDataWritersAsync(paused.Containers, http.Connection.RemoteIpAddress?.ToString(), ct);
+            throw;
+        }
     }
 
     private static async Task<IResult> LlmAsync(int? hours, IDbContextFactory<PulujDbContext> factory, TimeProvider clock, CancellationToken ct)
@@ -481,6 +547,8 @@ public static partial class OpsEndpoints
         // Browsing a JSON payload or long message must not turn an admin request into a multi-megabyte response.
         return value.Length <= 4_000 ? value : $"{value[..4_000]}…";
     }
+
+    private static string QuoteIdentifier(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
 
     private static bool IsSensitiveColumn(string name) => name.Contains("secret", StringComparison.OrdinalIgnoreCase)
         || name.Contains("token", StringComparison.OrdinalIgnoreCase)

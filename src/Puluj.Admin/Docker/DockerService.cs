@@ -7,6 +7,7 @@ namespace Puluj.Admin.Docker;
 
 /// <summary>Outcome of a container action for the endpoint: the HTTP status to answer with and the body.</summary>
 public sealed record ActionOutcome(int StatusCode, ContainerActionResultDto Result);
+public sealed record DataWriterPauseResult(int StatusCode, bool Ok, string Message, IReadOnlyList<string> Containers);
 
 /// <summary>
 /// Runs the docker CLI against the compose stack the panel itself runs in (docs/plan-admin-ops.md §2.3). Every
@@ -16,6 +17,10 @@ public sealed record ActionOutcome(int StatusCode, ContainerActionResultDto Resu
 /// </summary>
 public sealed class DockerService(IOptions<DockerOptions> options, ILogger<DockerService> log, TimeProvider clock)
 {
+    private static readonly HashSet<string> DataWriterServices = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "collector-telegram", "collector-alerts", "processor", "analytics", "messaging",
+    };
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(60); // compose scale pulls nothing but may wait on health checks
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ProbeTtl = TimeSpan.FromMinutes(1);
@@ -116,6 +121,52 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
         var res = await RunAsync(DockerCommands.Action(container.Id, verb), ct);
         _list = null;
         return Outcome(res, $"{verb} {container.Name}");
+    }
+
+    /// <summary>Stops every service that can write application data before a destructive data reset. The admin, database and migrator are protected.</summary>
+    public async Task<DataWriterPauseResult> PauseDataWritersAsync(string? remoteIp, CancellationToken ct)
+    {
+        var list = await ListAsync(ct, fresh: true);
+        if (!list.Available)
+        {
+            return new DataWriterPauseResult(503, false, list.Unavailable ?? "docker недоступний", []);
+        }
+
+        var targets = list.Containers
+            .Where(c => c.State == "running" && c.Controllable && DataWriterServices.Contains(c.Service))
+            .ToList();
+        var stopped = new List<string>();
+        foreach (var target in targets)
+        {
+            var outcome = await ActAsync(target.Id, "stop", remoteIp, ct);
+            if (outcome.StatusCode == 200)
+            {
+                stopped.Add(target.Id);
+                continue;
+            }
+
+            // A failed reset must not leave a partially paused system. Best-effort resume is deliberately logged.
+            foreach (var id in stopped)
+            {
+                await ActAsync(id, "start", remoteIp, ct);
+            }
+            return new DataWriterPauseResult(outcome.StatusCode, false, outcome.Result.Message, []);
+        }
+
+        return new DataWriterPauseResult(200, true, "Writers зупинено", stopped);
+    }
+
+    /// <summary>Best-effort recovery when a reset fails after writers were paused.</summary>
+    public async Task ResumeDataWritersAsync(IEnumerable<string> containerIds, string? remoteIp, CancellationToken ct)
+    {
+        foreach (var id in containerIds)
+        {
+            var outcome = await ActAsync(id, "start", remoteIp, ct);
+            if (outcome.StatusCode != 200)
+            {
+                log.LogError("Docker: could not resume data writer {Container}: {Message}", id, outcome.Result.Message);
+            }
+        }
     }
 
     /// <summary>`docker compose up --scale processor=N`; 0…MaxReplicas, otherwise 400.</summary>

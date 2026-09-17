@@ -158,6 +158,8 @@ export function DbPanel() {
   const [querying, setQuerying] = useState(false)
   const [confirmation, setConfirmation] = useState('')
   const [reprocessing, setReprocessing] = useState(false)
+  const [clearConfirmation, setClearConfirmation] = useState('')
+  const [clearing, setClearing] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
   const openTable = async (name: string) => {
@@ -201,6 +203,23 @@ export function DbPanel() {
       setActionMessage(`Помилка: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setReprocessing(false)
+    }
+  }
+
+  const clearOperationalData = async () => {
+    if (clearConfirmation !== 'DELETE ALL DATA') return
+    if (!window.confirm('Зупинити writers і назавжди видалити всі робочі дані з БД? Схема, налаштування, джерела й довідники залишаться. Після цього writers лишаться зупиненими, доки ви не запустите їх вручну.')) return
+    setClearing(true)
+    setActionMessage(null)
+    try {
+      const result = await admin.ops.clearOperationalData()
+      setActionMessage(`Видалено робочі дані з ${fmtNum(result.tables)} таблиць; зупинено контейнерів: ${fmtNum(result.stoppedContainers)}.`)
+      setClearConfirmation('')
+      reload()
+    } catch (e) {
+      setActionMessage(`Помилка: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setClearing(false)
     }
   }
 
@@ -290,6 +309,16 @@ export function DbPanel() {
         </label>
         <div className="flex items-center gap-2">
           <button className="rounded border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300" disabled={confirmation !== 'REPROCESS' || reprocessing} onClick={() => void reprocess()}>{reprocessing ? 'Очищаю й ставлю в чергу…' : 'Очистити похідні дані та перепроцесити'}</button>
+          {actionMessage && <span className={`text-xs ${actionMessage.startsWith('Помилка:') ? 'text-red-600' : 'text-emerald-600'}`}>{actionMessage}</span>}
+        </div>
+      </Section>
+      <Section title="Небезпечна зона" badge={<Badge ok={false} text="безповоротно" />}>
+        <p className="text-xs text-slate-500">Зупиняє колектори, processors, messaging та analytics, а потім видаляє всі робочі дані: повідомлення, цілі, треки, тривоги, інциденти, стан обробки, черги й аналітику. Схема БД, міграції, налаштування, доступ адміна, джерела та довідники залишаються.</p>
+        <label className="mt-2 block text-xs">Введіть <code>DELETE ALL DATA</code> для розблокування дії
+          <input className="ml-2 rounded border border-red-300 px-2 py-1 font-mono dark:border-red-800 dark:bg-slate-800" value={clearConfirmation} onChange={(e) => setClearConfirmation(e.target.value)} />
+        </label>
+        <div className="mt-2 flex items-center gap-2">
+          <button className="rounded bg-red-700 px-3 py-1 text-xs text-white disabled:opacity-50 dark:bg-red-600" disabled={clearConfirmation !== 'DELETE ALL DATA' || clearing} onClick={() => void clearOperationalData()}>{clearing ? 'Зупиняю й видаляю…' : 'Видалити все з бази'}</button>
           {actionMessage && <span className={`text-xs ${actionMessage.startsWith('Помилка:') ? 'text-red-600' : 'text-emerald-600'}`}>{actionMessage}</span>}
         </div>
       </Section>
