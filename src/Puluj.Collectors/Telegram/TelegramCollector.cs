@@ -94,7 +94,7 @@ public sealed class TelegramCollector(
         TL.User user;
         try
         {
-            user = await client.LoginUserIfNeeded();
+            user = await GetTelegramRpcAsync(() => client.LoginUserIfNeeded(), "login", ct);
         }
         catch (Exception ex)
         {
@@ -105,14 +105,14 @@ public sealed class TelegramCollector(
         await settings.SetStatusAsync(StatusKey, $"logged_in: {user.first_name} {user.last_name} (@{user.username})".Trim(), ct);
 
         // Let the update manager know about our dialogs so peers resolve; then resolve each configured channel.
-        await manager.LoadDialogs(await client.Messages_GetAllDialogs());
+        await manager.LoadDialogs(await GetTelegramRpcAsync(() => client.Messages_GetAllDialogs(), "load dialogs", ct));
         var resolvedChannels = new List<(Channel Channel, Source Source, string Username)>();
         foreach (var source in sources)
         {
             var username = Username(source)!;
             try
             {
-                var resolved = await client.Contacts_ResolveUsername(username);
+                var resolved = await GetTelegramRpcAsync(() => client.Contacts_ResolveUsername(username), $"resolve @{username}", ct);
                 if (resolved.Chat is not Channel channel)
                 {
                     logger.LogWarning("Telegram: @{Username} is not a channel; skipping {Source}", username, source.Code);
@@ -120,7 +120,7 @@ public sealed class TelegramCollector(
                 }
                 if (o.AutoJoin && channel.flags.HasFlag(Channel.Flags.left))
                 {
-                    await client.Channels_JoinChannel(channel);
+                    await GetTelegramRpcAsync(() => client.Channels_JoinChannel(channel), $"join @{username}", ct);
                     logger.LogInformation("Telegram: joined @{Username}", username);
                 }
                 _channels[channel.id] = (source, username);
@@ -214,7 +214,7 @@ public sealed class TelegramCollector(
     {
         var state = await states.GetAsync(source.SourceId, ct);
         var minId = int.TryParse(state.LastSourceMessageId?.Split(':')[0], out var last) ? last : 0;
-        var history = await GetHistoryAsync(() => client.Messages_GetHistory(channel, limit: Math.Clamp(_o.BackfillLimit, 1, 100), min_id: minId), "recent backfill", ct);
+        var history = await GetTelegramRpcAsync(() => client.Messages_GetHistory(channel, limit: Math.Clamp(_o.BackfillLimit, 1, 100), min_id: minId), "recent backfill", ct);
         var messages = history.Messages.OfType<Message>().OrderBy(m => m.id).ToList();
         var stored = 0;
         foreach (var m in messages)
@@ -250,7 +250,7 @@ public sealed class TelegramCollector(
             {
                 continue;
             }
-            var channel = await ResolveAsync(client, username);
+            var channel = await ResolveAsync(client, username, ct);
             if (channel is null || channel.id != channelId)
             {
                 continue;
@@ -302,7 +302,7 @@ public sealed class TelegramCollector(
         Messages_MessagesBase history;
         try
         {
-            history = await GetHistoryAsync(() => client.Messages_GetHistory(job.Channel, offset_id: Math.Max(1, state.LastId), add_offset: -limit, limit: limit), "history", ct);
+            history = await GetTelegramRpcAsync(() => client.Messages_GetHistory(job.Channel, offset_id: Math.Max(1, state.LastId), add_offset: -limit, limit: limit), "history", ct);
         }
         catch (RpcException ex) when (ex.Code == 420)
         {
@@ -318,6 +318,14 @@ public sealed class TelegramCollector(
             await states.MarkFailureAsync(job.Source.SourceId, "Telegram history RPC timeout; restarting the MTProto session.", ct);
             await states.MarkCursorAsync(job.Source.SourceId, WriteCursor(job.State), ct);
             throw;
+        }
+        catch (RpcException ex) when (IsTerminalHistoryError(ex))
+        {
+            job.State = state with { Done = true, NextAttemptAt = null, LastFailureKind = "terminal_rpc_error" };
+            await states.MarkFailureAsync(job.Source.SourceId, ex.Message, ct);
+            await states.MarkCursorAsync(job.Source.SourceId, WriteCursor(job.State), ct);
+            logger.LogWarning(ex, "Telegram: @{Username} history stopped after terminal RPC error", job.Username);
+            return;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -358,11 +366,11 @@ public sealed class TelegramCollector(
         }
     }
 
-    private async Task<Channel?> ResolveAsync(WTelegram.Client client, string username)
+    private async Task<Channel?> ResolveAsync(WTelegram.Client client, string username, CancellationToken ct)
     {
         try
         {
-            return (await client.Contacts_ResolveUsername(username)).Chat as Channel;
+            return (await GetTelegramRpcAsync(() => client.Contacts_ResolveUsername(username), $"resolve @{username} for history", ct)).Chat as Channel;
         }
         catch (RpcException ex)
         {
@@ -389,11 +397,13 @@ public sealed class TelegramCollector(
 
     private static JsonDocument WriteCursor(TelegramHistoryState cursor) => JsonSerializer.SerializeToDocument(new { history = cursor });
 
-    private async Task<T> GetHistoryAsync<T>(Func<Task<T>> rpc, string operation, CancellationToken ct)
+    private async Task<T> GetTelegramRpcAsync<T>(Func<Task<T>> rpc, string operation, CancellationToken ct)
     {
         var executor = _rpc ?? throw new InvalidOperationException("Telegram RPC executor is not initialized.");
         return await executor.ExecuteAsync(rpc, operation, ct);
     }
+
+    private static bool IsTerminalHistoryError(RpcException ex) => ex.Code is 400 or 403 or 404;
 
     private async Task OnUpdate(Update update)
     {

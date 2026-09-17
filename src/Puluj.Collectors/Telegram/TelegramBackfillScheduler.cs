@@ -59,11 +59,13 @@ internal sealed class TelegramBackfillScheduler(TimeProvider clock, int workers)
             }
             _next = 0;
         }
-        await Task.WhenAll(Enumerable.Range(0, _workers).Select(_ => WorkerAsync(process, ct)));
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        await Task.WhenAll(Enumerable.Range(0, _workers).Select(_ => WorkerAsync(process, stop)));
     }
 
-    private async Task WorkerAsync(Func<TelegramBackfillJob, CancellationToken, Task> process, CancellationToken ct)
+    private async Task WorkerAsync(Func<TelegramBackfillJob, CancellationToken, Task> process, CancellationTokenSource stop)
     {
+        var ct = stop.Token;
         while (!ct.IsCancellationRequested)
         {
             var job = ClaimReady();
@@ -80,6 +82,13 @@ internal sealed class TelegramBackfillScheduler(TimeProvider clock, int workers)
             try
             {
                 await process(job, ct);
+            }
+            catch
+            {
+                // A timeout poisons the session. Stop sibling workers before the exception reaches the
+                // collector supervisor, otherwise they could continue to use the same WTelegram client.
+                stop.Cancel();
+                throw;
             }
             finally
             {
@@ -124,23 +133,37 @@ internal sealed class TelegramBackfillScheduler(TimeProvider clock, int workers)
 }
 
 /// <summary>Serializes history RPC issue time across workers and adapts to Telegram-wide flood pressure.</summary>
-internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialInterval, TimeSpan minimumInterval, TimeSpan maximumInterval)
+internal sealed class TelegramRequestGate
 {
+    private readonly TimeProvider _clock;
     private readonly SemaphoreSlim _mutex = new(1, 1);
-    private readonly TimeSpan _minimum = minimumInterval;
-    private readonly TimeSpan _maximum = maximumInterval;
-    private TimeSpan _interval = initialInterval;
+    private readonly TimeSpan _minimum;
+    private readonly TimeSpan _maximum;
+    private TimeSpan _interval;
     private DateTimeOffset _next = DateTimeOffset.MinValue;
     private DateTimeOffset _blockedUntil = DateTimeOffset.MinValue;
-    private DateTimeOffset _lastFlood = DateTimeOffset.MinValue;
+    private DateTimeOffset? _lastFlood;
+    private TelegramRpcTimeoutException? _poisoned;
+
+    public TelegramRequestGate(TimeProvider clock, TimeSpan initialInterval, TimeSpan minimumInterval, TimeSpan maximumInterval)
+    {
+        if (minimumInterval <= TimeSpan.Zero || maximumInterval < minimumInterval || initialInterval < minimumInterval || initialInterval > maximumInterval)
+        {
+            throw new ArgumentOutOfRangeException(nameof(initialInterval), "Telegram history intervals must be positive and satisfy minimum <= initial <= maximum.");
+        }
+        _clock = clock;
+        _minimum = minimumInterval;
+        _maximum = maximumInterval;
+        _interval = initialInterval;
+    }
 
     public async Task WaitTurnAsync(CancellationToken ct)
     {
         await _mutex.WaitAsync(ct);
         try
         {
-            var now = clock.GetUtcNow();
-            if (now - _lastFlood >= TimeSpan.FromMinutes(30) && _interval > _minimum)
+            var now = _clock.GetUtcNow();
+            if (_lastFlood is { } lastFlood && now - lastFlood >= TimeSpan.FromMinutes(30) && _interval > _minimum)
             {
                 _interval = TimeSpan.FromMilliseconds(Math.Max(_minimum.TotalMilliseconds, _interval.TotalMilliseconds * 0.75));
                 _lastFlood = now;
@@ -164,7 +187,7 @@ internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialIn
         await _mutex.WaitAsync(ct);
         try
         {
-            var now = clock.GetUtcNow();
+            var now = _clock.GetUtcNow();
             _lastFlood = now;
             _interval = TimeSpan.FromMilliseconds(Math.Min(_maximum.TotalMilliseconds, Math.Max(_interval.TotalMilliseconds * 2, _minimum.TotalMilliseconds)));
             _blockedUntil = new[] { _blockedUntil, now.AddSeconds(Math.Max(1, seconds) + 1) }.Max();
@@ -181,8 +204,12 @@ internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialIn
         await _mutex.WaitAsync(ct);
         try
         {
-            var now = clock.GetUtcNow();
-            if (now - _lastFlood >= TimeSpan.FromMinutes(30) && _interval > _minimum)
+            if (_poisoned is not null)
+            {
+                throw new TelegramSessionRestartRequiredException(operation, _poisoned);
+            }
+            var now = _clock.GetUtcNow();
+            if (_lastFlood is { } lastFlood && now - lastFlood >= TimeSpan.FromMinutes(30) && _interval > _minimum)
             {
                 _interval = TimeSpan.FromMilliseconds(Math.Max(_minimum.TotalMilliseconds, _interval.TotalMilliseconds * 0.75));
                 _lastFlood = now;
@@ -193,9 +220,11 @@ internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialIn
             {
                 await Task.Delay(at - now, ct);
             }
+            Task<T>? pending = null;
             try
             {
-                return await rpc().WaitAsync(timeout, ct);
+                pending = rpc();
+                return await pending.WaitAsync(timeout, ct);
             }
             catch (RpcException ex) when (ex.Code == 420)
             {
@@ -204,8 +233,14 @@ internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialIn
             }
             catch (TimeoutException ex) when (!ct.IsCancellationRequested)
             {
+                var timeoutException = new TelegramRpcTimeoutException(operation, ex);
+                _poisoned = timeoutException;
+                if (pending is not null)
+                {
+                    _ = ObserveLateFailureAsync(pending);
+                }
                 await ApplyFloodAsync((int)Math.Ceiling(timeout.TotalSeconds), ct);
-                throw new TelegramRpcTimeoutException(operation, ex);
+                throw timeoutException;
             }
         }
         finally
@@ -217,15 +252,28 @@ internal sealed class TelegramRequestGate(TimeProvider clock, TimeSpan initialIn
     private Task ApplyFloodAsync(int seconds, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var now = clock.GetUtcNow();
+        var now = _clock.GetUtcNow();
         _lastFlood = now;
         _interval = TimeSpan.FromMilliseconds(Math.Min(_maximum.TotalMilliseconds, Math.Max(_interval.TotalMilliseconds * 2, _minimum.TotalMilliseconds)));
         _blockedUntil = new[] { _blockedUntil, now.AddSeconds(Math.Max(1, seconds) + 1) }.Max();
         return Task.CompletedTask;
     }
+
+    private static async Task ObserveLateFailureAsync(Task task)
+    {
+        try
+        {
+            await task.ConfigureAwait(false);
+        }
+        catch
+        {
+            // The timed-out session will be disposed; observe the abandoned RPC so it cannot become unobserved.
+        }
+    }
 }
 
 internal sealed class TelegramRpcTimeoutException(string operation, Exception inner) : TimeoutException($"Telegram {operation} exceeded the configured RPC timeout.", inner);
+internal sealed class TelegramSessionRestartRequiredException(string operation, Exception inner) : InvalidOperationException($"Telegram {operation} cannot start because the MTProto session is restarting.", inner);
 
 /// <summary>Small testable boundary around a non-cancellable MTProto RPC. Its timeout causes the outer session to restart.</summary>
 internal sealed class TelegramRpcExecutor(TelegramRequestGate gate, TimeSpan timeout)
