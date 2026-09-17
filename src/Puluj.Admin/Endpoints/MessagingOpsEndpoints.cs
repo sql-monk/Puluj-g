@@ -127,8 +127,14 @@ public static class MessagingOpsEndpoints
         });
 
         // Message explorer.
-        g.MapGet("/messages", async (string? q, int? sourceId, int? hours, int? limit, MessageExplorer explorer, CancellationToken ct) =>
-            Results.Ok(await explorer.SearchAsync(q, sourceId, hours, limit, ct)));
+        g.MapGet("/messages", async (string? q, int? sourceId, int? hours, int? limit, string? view, MessageExplorer explorer, CancellationToken ct) =>
+        {
+            if (!MessageExplorer.IsValidView(view))
+            {
+                return Results.BadRequest(new { error = $"view має бути одним із: {string.Join(", ", MessageExplorer.Views)}" });
+            }
+            return Results.Ok(await explorer.SearchAsync(q, sourceId, hours, limit, view, ct));
+        });
         g.MapGet("/messages/{rawId:long}/lifecycle", async (long rawId, MessageExplorer explorer, CancellationToken ct) =>
             await explorer.LifecycleAsync(rawId, ct) is { } card ? Results.Ok(card) : Results.NotFound());
 

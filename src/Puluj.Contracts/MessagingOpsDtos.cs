@@ -122,7 +122,12 @@ public sealed record ControlAuditDto(long AuditId, string Action, string? Subscr
 
 // ---- Message explorer (§8.7): one card with the whole lifecycle of a raw message.
 
-public sealed record MessageSearchRowDto(long RawMessageId, int SourceId, string SourceCode, string SourceMessageId, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string Status, int Extractions, int Observations, string? LastOutcome, string TextPreview);
+/// <summary>
+/// One row in the operator's message list.  Counts are durable evidence, not guesses: a target is a legacy target
+/// projection, an observation is a catalog event fact, and an LLM call is an immutable provider audit row.
+/// </summary>
+public sealed record MessageSearchRowDto(long RawMessageId, int SourceId, string SourceCode, string SourceMessageId, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string Status,
+    int Extractions, int Observations, int Targets, int LlmCalls, string? AnalysisOutcome, string? Method, string? LastOutcome, string TextPreview);
 
 public sealed record LifecycleAttemptDto(long AttemptId, string Worker, string State, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string? Error, long? RetryOfAttemptId, string? RetryReason);
 
@@ -133,6 +138,13 @@ public sealed record LifecycleEventDto(Guid EventId, string EventType, string La
 public sealed record LifecycleExtractionDto(Guid ExtractionId, Guid RunId, int Version, string Method, string Outcome, string? Versions, string FinalizedBy, DateTimeOffset CreatedAt, int Observations, string? Error);
 
 public sealed record LifecycleObservationDto(Guid ObservationId, Guid ExtractionId, string Kind, string Category, DateTimeOffset EffectiveAt, string PayloadPreview, long? LegacyTargetId);
+
+/// <summary>The direct legacy projection of this raw message.  It is listed even when it has not joined a track yet.</summary>
+public sealed record LifecycleTargetDto(long TargetId, int SegmentIndex, string EventType, string? EventKind, DateTimeOffset ObservedAt, int? ObjectCount, string? Classification, string? Location, double? LocationAccuracyKm, long? DuplicateOfTargetId);
+
+/// <summary>Compact, per-message LLM audit.  Prompt and response bodies remain behind the existing on-demand audit endpoint.</summary>
+public sealed record LifecycleLlmRequestDto(long LlmRequestId, DateTimeOffset OccurredAt, string Model, string PromptVersion, string Outcome, int? StatusCode, int DurationMs,
+    long? InputTokens, long? CacheWriteTokens, long? CacheReadTokens, long? OutputTokens, decimal? EstimatedCostUsd, int FactsCount, string? Error);
 
 public sealed record LifecycleQuarantineDto(long QuarantineId, string SubscriptionId, string Lane, string Reason, string? Error, DateTimeOffset QuarantinedAt, DateTimeOffset? ResolvedAt, string? Resolution, string EnvelopePreview, bool EnvelopeTruncated);
 
@@ -146,6 +158,8 @@ public sealed record MessageLifecycleDto(
     IReadOnlyList<LifecycleEventDto> Events, bool EventsTruncated,
     IReadOnlyList<LifecycleExtractionDto> Extractions,
     IReadOnlyList<LifecycleObservationDto> Observations,
+    IReadOnlyList<LifecycleTargetDto> Targets,
+    IReadOnlyList<LifecycleLlmRequestDto> LlmRequests,
     IReadOnlyList<LifecycleRefDto> Derived,
     IReadOnlyList<LifecycleQuarantineDto> Quarantine,
     LifecycleSummaryDto Summary);

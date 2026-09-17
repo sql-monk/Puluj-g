@@ -131,6 +131,10 @@ export interface MessageSearchRowDto {
   status: string
   extractions: number
   observations: number
+  targets: number
+  llmCalls: number
+  analysisOutcome?: string | null
+  method?: string | null
   lastOutcome?: string | null
   textPreview: string
 }
@@ -184,10 +188,44 @@ export interface MessageLifecycleDto {
   eventsTruncated: boolean
   extractions: { extractionId: string; runId: string; version: number; method: string; outcome: string; versions?: string | null; finalizedBy: string; createdAt: string; observations: number; error?: string | null }[]
   observations: { observationId: string; extractionId: string; kind: string; category: string; effectiveAt: string; payloadPreview: string; legacyTargetId?: number | null }[]
+  targets: LifecycleTargetDto[]
+  llmRequests: LifecycleLlmRequestDto[]
   derived: { kind: string; id: number; label: string }[]
   quarantine: { quarantineId: number; subscriptionId: string; lane: string; reason: string; error?: string | null; quarantinedAt: string; resolvedAt?: string | null; resolution?: string | null; envelopePreview: string; envelopeTruncated: boolean }[]
   summary: { completion: string; waiting: string[]; completed: string[]; failed: string[] }
 }
+
+export interface LifecycleTargetDto {
+  targetId: number
+  segmentIndex: number
+  eventType: string
+  eventKind?: string | null
+  observedAt: string
+  objectCount?: number | null
+  classification?: string | null
+  location?: string | null
+  locationAccuracyKm?: number | null
+  duplicateOfTargetId?: number | null
+}
+
+export interface LifecycleLlmRequestDto {
+  llmRequestId: number
+  occurredAt: string
+  model: string
+  promptVersion: string
+  outcome: string
+  statusCode?: number | null
+  durationMs: number
+  inputTokens?: number | null
+  cacheWriteTokens?: number | null
+  cacheReadTokens?: number | null
+  outputTokens?: number | null
+  estimatedCostUsd?: number | null
+  factsCount: number
+  error?: string | null
+}
+
+export type MessageView = 'all' | 'ignored' | 'llm' | 'targets' | 'events' | 'failed'
 
 export const adminOps = {
   messaging: (fresh = false) => adminCall<MessagingOpsDto>('GET', `/api/admin/ops/messaging${fresh ? '?fresh=true' : ''}`),
@@ -200,7 +238,7 @@ export const adminOps = {
   waive: (quarantineId: number, actor: string, reason: string) => adminCall<{ ok: boolean; waived: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/waive`, { actor, reason }),
   scale: (service: 'processor' | 'messaging', replicas: number, actor: string, reason: string) =>
     adminCall<{ ok: boolean; message: string; output: string }>('POST', '/api/admin/ops/messaging/scale', { service, replicas, actor, reason }),
-  search: (q: string, hours: number, sourceId?: number, limit = 50) =>
-    adminCall<MessageSearchRowDto[]>('GET', `/api/admin/messages?q=${encodeURIComponent(q)}&hours=${hours}&limit=${limit}${sourceId ? `&sourceId=${sourceId}` : ''}`),
+  search: (q: string, hours: number, view: MessageView = 'all', sourceId?: number, limit = 50) =>
+    adminCall<MessageSearchRowDto[]>('GET', `/api/admin/messages?q=${encodeURIComponent(q)}&hours=${hours}&view=${view}&limit=${limit}${sourceId ? `&sourceId=${sourceId}` : ''}`),
   lifecycle: (rawId: number) => adminCall<MessageLifecycleDto>('GET', `/api/admin/messages/${rawId}/lifecycle`),
 }

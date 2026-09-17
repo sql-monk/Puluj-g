@@ -32,6 +32,17 @@ stage results, attempts/deliveries, extractions та observations). Аналіт
 `analytics.message_lifecycle`. Її поля з невідомим старим таймінгом лишають
 `timings_available = false`, а не заповнюються вигаданими значеннями.
 
+## Діаграма класів
+
+Ця UML-діаграма показує скорочений зріз реалізованих класів домену: первинне
+повідомлення, його канонічний результат аналізу, похідні факти, агрегати та
+історичні snapshots. Вона не дублює повну ER-схему нижче: cardinality на
+стрілках пояснює саме навігаційні/FK-зв'язки, важливі для provenance.
+
+![Діаграма класів домену](diagrams/domain-class-model.png)
+
+Редагована схема: [domain-class-model.drawio](diagrams/domain-class-model.drawio).
+
 ![ER та ownership модель](diagrams/database-ownership.png)
 
 Редагована схема: [database-ownership.drawio](diagrams/database-ownership.drawio).

@@ -13,6 +13,7 @@ PNG. Попередній набір збережено в [архіві](../../
 | Життєвий цикл колектора | startup, retry, backoff і recovery | [D04](../collectors-ingestion.md) | [Draw.io](collector-lifecycle.drawio) | [PNG](collector-lifecycle.png) |
 | Рішення кореляції | кандидати, scoring і неоднозначність | [D06](../correlation-tracks-incidents.md) | [Draw.io](correlation-decision.drawio) | [PNG](correlation-decision.png) |
 | Власність схем БД | основна й analytics schema | [D03](../domain-data-model.md) | [Draw.io](database-ownership.drawio) | [PNG](database-ownership.png) |
+| Діаграма класів домену | ключові агрегати, класи й provenance-зв'язки | [D03](../domain-data-model.md) | [Draw.io](domain-class-model.drawio) | [PNG](domain-class-model.png) |
 | Install і deploy | перший install та оновлення | [D02](../deployment-operations.md) | [Draw.io](deployment-lifecycle.drawio) | [PNG](deployment-lifecycle.png) |
 | Docker topology | мережі, томи й межі доступу | [D02](../deployment-operations.md) | [Draw.io](deployment-topology.drawio) | [PNG](deployment-topology.png) |
 | Durable event | outbox, broker, inbox і commit | [D05](../message-processing-platform.md) | [Draw.io](durable-event-lifecycle.drawio) | [PNG](durable-event-lifecycle.png) |
@@ -22,6 +23,7 @@ PNG. Попередній набір збережено в [архіві](../../
 | Live update і history | realtime та historical replay | [D07](../public-api-read-side.md) | [Draw.io](live-update-history-replay.drawio) | [PNG](live-update-history-replay.png) |
 | Message lifecycle | projection, backfill і reconciliation | [D09](../analytics-service.md) | [Draw.io](message-lifecycle-projection-reconciliation.drawio) | [PNG](message-lifecycle-projection-reconciliation.png) |
 | Message processing pipeline | stages, транзакції та межі | [D05](../message-processing-platform.md) | [Draw.io](message-processing-pipeline.drawio) | [PNG](message-processing-pipeline.png) |
+| Діаграма взаємодії обробки | sequence durable-доставки, commit і ACK | [D05](../message-processing-platform.md) | [Draw.io](message-processing-interaction.drawio) | [PNG](message-processing-interaction.png) |
 | Privacy boundary | user location і client ETA | [D10](../web-clients.md) | [Draw.io](privacy-boundary-user-location-eta.drawio) | [PNG](privacy-boundary-user-location-eta.png) |
 | Provenance chain | публічний об'єкт до першоджерела | [D03](../domain-data-model.md) | [Draw.io](provenance-chain.drawio) | [PNG](provenance-chain.png) |
 | Read-side provenance | raw message до публічного record | [D06](../correlation-tracks-incidents.md) | [Draw.io](provenance-read-side.drawio) | [PNG](provenance-read-side.png) |

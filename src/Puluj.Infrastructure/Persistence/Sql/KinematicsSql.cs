@@ -139,6 +139,28 @@ BEGIN
 END $$;
 """;
 
+    /// <summary>
+    /// Refreshes the duplicate-link trigger after the retired source-copy statistics tables have been removed.
+    /// Kept separately so upgrades replace a function body installed by an earlier migration.
+    /// </summary>
+    public const string OnTargetDuplicate = """
+CREATE OR REPLACE FUNCTION puluj_on_target_duplicate() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE o targets;
+BEGIN
+    IF NEW.duplicate_of_target_id IS NULL OR OLD.duplicate_of_target_id IS NOT DISTINCT FROM NEW.duplicate_of_target_id THEN
+        RETURN NULL;
+    END IF;
+    DELETE FROM target_links WHERE (to_target_id = NEW.target_id OR from_target_id = NEW.target_id) AND kind = 0;
+    SELECT * INTO o FROM targets WHERE target_id = NEW.duplicate_of_target_id;
+    IF o.target_id IS NULL THEN RETURN NULL; END IF;
+    INSERT INTO target_links (from_target_id, to_target_id, kind, probability, created_at)
+    VALUES (o.target_id, NEW.target_id, 4, 1, now())
+    ON CONFLICT (from_target_id, to_target_id) DO UPDATE SET kind = 4, probability = 1;
+    RETURN NULL;
+END $$;
+""";
+
     public const string Anchors = """
 CREATE TABLE IF NOT EXISTS target_anchors (
     target_id bigint PRIMARY KEY REFERENCES targets (target_id) ON DELETE CASCADE,
@@ -222,21 +244,7 @@ $$;
 -- ---------------------------------------------------------------------------------------------------------------
 -- Duplicate targets remain linked for map/history traversal, without attributing one source to another.
 -- ---------------------------------------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION puluj_on_target_duplicate() RETURNS trigger
-LANGUAGE plpgsql AS $$
-DECLARE o targets;
-BEGIN
-    IF NEW.duplicate_of_target_id IS NULL OR OLD.duplicate_of_target_id IS NOT DISTINCT FROM NEW.duplicate_of_target_id THEN
-        RETURN NULL;
-    END IF;
-    DELETE FROM target_links WHERE (to_target_id = NEW.target_id OR from_target_id = NEW.target_id) AND kind = 0;
-    SELECT * INTO o FROM targets WHERE target_id = NEW.duplicate_of_target_id;
-    IF o.target_id IS NULL THEN RETURN NULL; END IF;
-    INSERT INTO target_links (from_target_id, to_target_id, kind, probability, created_at)
-    VALUES (o.target_id, NEW.target_id, 4, 1, now())
-    ON CONFLICT (from_target_id, to_target_id) DO UPDATE SET kind = 4, probability = 1;
-    RETURN NULL;
-END $$;
+""" + OnTargetDuplicate + """
 
 DROP TRIGGER IF EXISTS trg_targets_insert_kinematics ON targets;
 CREATE TRIGGER trg_targets_insert_kinematics AFTER INSERT ON targets

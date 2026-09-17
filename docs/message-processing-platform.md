@@ -14,6 +14,17 @@ settings мають пріоритет над файлом конфігурац�
 наступний етап/доменний запис, або контрольована quarantine/retry-процедура.
 Не запускайте legacy `processing` разом із domain writer-ролями для однієї БД.
 
+## Діаграма взаємодії
+
+Sequence-діаграма нижче фіксує часовий порядок успішної durable-доставки.
+Вона показує критичну межу: consumer робить ACK тільки після коміту inbox,
+ефекту та наступних outbox-подій. Повторна доставка до цього моменту є
+нормальною властивістю at-least-once transport, а не окремим помилковим шляхом.
+
+![Діаграма взаємодії обробки повідомлення](diagrams/message-processing-interaction.png)
+
+Редагована схема: [message-processing-interaction.drawio](diagrams/message-processing-interaction.drawio).
+
 ## Основний потік і межі транзакцій
 
 Колектор фіксує `ingress.received` і checkpoint в одній БД-транзакції. Роль

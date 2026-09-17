@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { adminOps, type LifecycleEventDto, type MessageLifecycleDto, type MessageSearchRowDto } from '../api/adminOps'
+import { admin, type LlmRequestDetailDto } from '../api/admin'
+import { adminOps, type LifecycleEventDto, type LifecycleLlmRequestDto, type MessageLifecycleDto, type MessageSearchRowDto, type MessageView } from '../api/adminOps'
 import { Badge, Section } from '../components/settings/fields'
 import { fmtTime } from './shared'
 
@@ -10,6 +11,14 @@ const COMPLETION: Record<string, { text: string; ok: boolean | null }> = {
   needs_attention: { text: 'ПОТРЕБУЄ УВАГИ', ok: false },
   pending: { text: 'подій ще немає', ok: null },
 }
+const VIEWS: { id: MessageView; label: string }[] = [
+  { id: 'all', label: 'Усі' },
+  { id: 'ignored', label: 'Проігноровані' },
+  { id: 'llm', label: 'LLM' },
+  { id: 'targets', label: 'Цілі' },
+  { id: 'events', label: 'Події' },
+  { id: 'failed', label: 'Помилки' },
+]
 
 function safeHref(url?: string | null): boolean {
   return typeof url === 'string' && /^https?:\/\//i.test(url)
@@ -28,6 +37,7 @@ function rawFromHash(): number | null {
 export function MessagesPanel() {
   const [q, setQ] = useState('')
   const [hours, setHours] = useState<24 | 168 | 720>(24)
+  const [view, setView] = useState<MessageView>('all')
   const [rows, setRows] = useState<MessageSearchRowDto[] | null>(null)
   const [card, setCard] = useState<MessageLifecycleDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -47,7 +57,7 @@ export function MessagesPanel() {
   const search = async () => {
     setBusy(true)
     try {
-      setRows(await adminOps.search(q.trim(), hours))
+      setRows(await adminOps.search(q.trim(), hours, view))
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -90,6 +100,12 @@ export function MessagesPanel() {
               <option value={720}>30 д (текст — до 7 д)</option>
             </select>
           </label>
+          <label>
+            Результат
+            <select className="ml-1 rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" value={view} onChange={(e) => setView(e.target.value as MessageView)} aria-label="результат обробки">
+              {VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
+          </label>
           <button type="submit" className="rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900" disabled={busy}>
             Шукати
           </button>
@@ -112,7 +128,7 @@ export function MessagesPanel() {
                     <th className="pr-2">Ключ</th>
                     <th className="pr-2">Опубліковано</th>
                     <th className="pr-2">Статус</th>
-                    <th className="pr-2">Витяги/факти</th>
+                    <th className="pr-2">Результат</th>
                     <th className="pr-2">Остання квитанція</th>
                     <th>Текст</th>
                   </tr>
@@ -129,9 +145,7 @@ export function MessagesPanel() {
                       <td className="pr-2 font-mono">{r.sourceMessageId}</td>
                       <td className="pr-2">{fmtTime(r.publishedAt)}</td>
                       <td className="pr-2">{r.status}</td>
-                      <td className="pr-2 font-mono">
-                        {r.extractions}/{r.observations}
-                      </td>
+                      <td className="pr-2"><SearchOutcome row={r} /></td>
                       <td className="pr-2">{r.lastOutcome ? OUTCOME[r.lastOutcome] ?? r.lastOutcome : 'очікує'}</td>
                       <td className="max-w-md truncate">{r.textPreview}</td>
                     </tr>
@@ -254,6 +268,21 @@ function LifecycleCard({ card }: { card: MessageLifecycleDto }) {
             )}
           </div>
         </div>
+        <div className="grid gap-3 text-xs sm:grid-cols-2">
+          <div>
+            <h4 className="font-semibold uppercase text-slate-500">Цілі ({card.targets.length})</h4>
+            {card.targets.length === 0 ? <p className="text-slate-500">Ціль не створювалася.</p> : (
+              <ul className="space-y-1 font-mono">
+                {card.targets.map((t) => <li key={t.targetId} className="rounded bg-slate-100 px-1.5 py-1 dark:bg-slate-800">
+                  target #{t.targetId} · {t.eventKind ?? t.eventType} · сегмент {t.segmentIndex + 1}{t.objectCount != null ? ` · ${t.objectCount} шт.` : ''}
+                  {t.classification ? ` · ${t.classification}` : ''}{t.location ? ` · ${t.location}${t.locationAccuracyKm != null ? ` ±${t.locationAccuracyKm} км` : ''}` : ''}
+                  {t.duplicateOfTargetId ? ` · дублікат #${t.duplicateOfTargetId}` : ''}
+                </li>)}
+              </ul>
+            )}
+          </div>
+          <LlmRequests key={card.rawMessageId} requests={card.llmRequests} />
+        </div>
         <div className="text-xs">
           <h4 className="font-semibold uppercase text-slate-500">Похідне</h4>
           {card.derived.length === 0 ? (
@@ -271,6 +300,46 @@ function LifecycleCard({ card }: { card: MessageLifecycleDto }) {
       </div>
     </Section>
   )
+}
+
+function SearchOutcome({ row }: { row: MessageSearchRowDto }) {
+  const ignored = row.status === 'skipped' || row.analysisOutcome === 'no_facts' || row.analysisOutcome === 'unsupported'
+  return <div className="font-mono text-[11px]" title={`витяги: ${row.extractions}; події: ${row.observations}; цілі: ${row.targets}; LLM: ${row.llmCalls}`}>
+    {ignored ? <span className="text-slate-500">проігноровано{row.analysisOutcome ? ` (${row.analysisOutcome})` : ''}</span> : <>
+      <span>події {row.observations} · цілі {row.targets}</span>{row.llmCalls > 0 && <span className="block text-violet-700 dark:text-violet-300">LLM {row.llmCalls}{row.method ? ` · ${row.method}` : ''}</span>}
+    </>}
+  </div>
+}
+
+function LlmRequests({ requests }: { requests: LifecycleLlmRequestDto[] }) {
+  const [detail, setDetail] = useState<LlmRequestDetailDto | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const open = async (id: number) => {
+    setError(null)
+    try {
+      setDetail(await admin.ops.llmRequest(id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return <div>
+    <h4 className="font-semibold uppercase text-slate-500">LLM ({requests.length})</h4>
+    {requests.length === 0 ? <p className="text-slate-500">До LLM не надсилалося.</p> : <ul className="space-y-1">
+      {requests.map((r) => <li key={r.llmRequestId} className="rounded bg-violet-50 px-1.5 py-1 font-mono dark:bg-violet-950/30">
+        #{r.llmRequestId} · {r.outcome}{r.factsCount ? ` · фактів ${r.factsCount}` : ''} · {r.model} · {r.durationMs} мс
+        <button className="ml-2 underline" onClick={() => void open(r.llmRequestId)}>prompt/відповідь</button>
+        {r.error && <div className="whitespace-pre-wrap break-words text-red-700 dark:text-red-300">{r.error}</div>}
+      </li>)}
+    </ul>}
+    {error && <p className="text-red-600">{error}</p>}
+    {detail && <details open className="mt-2 rounded border border-violet-200 p-2 dark:border-violet-900"><summary className="cursor-pointer font-mono">LLM #{detail.request.id} · закрити/відкрити</summary>
+      <AuditText title="Надісланий текст" value={detail.requestText} /><AuditText title="System prompt" value={detail.systemPrompt} /><AuditText title="Відповідь" value={detail.responseText ?? detail.request.error ?? '—'} />
+    </details>}
+  </div>
+}
+
+function AuditText({ title, value }: { title: string; value: string }) {
+  return <details className="mt-1"><summary className="cursor-pointer text-slate-600 dark:text-slate-300">{title}</summary><pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-white p-1 text-[11px] dark:bg-slate-900">{value}</pre></details>
 }
 
 function SummaryList({ label, items, tone }: { label: string; items: string[]; tone: string }) {

@@ -16,12 +16,24 @@ namespace Puluj.Infrastructure.Messaging.Ops;
 public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
 {
     public const int MaxLimit = 100, MaxEvents = 200, MaxAttempts = 20, MaxTextHours = 168, MaxHours = 720, EnvelopePreview = 2000;
+    public static readonly string[] Views = ["all", "ignored", "llm", "targets", "events", "failed"];
 
-    public async Task<IReadOnlyList<MessageSearchRowDto>> SearchAsync(string? q, int? sourceId, int? hours, int? limit, CancellationToken ct)
+    public static bool IsValidView(string? view) => string.IsNullOrWhiteSpace(view) || Views.Contains(view, StringComparer.Ordinal);
+
+    /// <summary>Compatibility overload for existing operator tools: an unqualified search means every outcome.</summary>
+    public Task<IReadOnlyList<MessageSearchRowDto>> SearchAsync(string? q, int? sourceId, int? hours, int? limit, CancellationToken ct) =>
+        SearchAsync(q, sourceId, hours, limit, "all", ct);
+
+    public async Task<IReadOnlyList<MessageSearchRowDto>> SearchAsync(string? q, int? sourceId, int? hours, int? limit, string? view, CancellationToken ct)
     {
         var take = Math.Clamp(limit ?? 50, 1, MaxLimit);
         var span = Math.Clamp(hours ?? 24, 1, MaxHours);
         q = q?.Trim();
+        view = string.IsNullOrWhiteSpace(view) ? "all" : view;
+        if (!IsValidView(view))
+        {
+            throw new ArgumentException($"unknown message view '{view}'", nameof(view));
+        }
         if (q is { Length: > 200 })
         {
             q = q[..200];
@@ -43,12 +55,17 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
             SELECT r.raw_message_id, r.source_id, s.code, r.source_message_id, r.published_at, r.received_at, r.processing_status,
                    (SELECT count(*)::int FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id),
                    (SELECT count(*)::int FROM processing.observations o WHERE o.raw_message_id = r.raw_message_id),
+                   (SELECT count(*)::int FROM targets t WHERE t.raw_message_id = r.raw_message_id),
+                   (SELECT count(*)::int FROM llm_requests l WHERE l.raw_message_id = r.raw_message_id),
+                   (SELECT x.outcome FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id ORDER BY x.created_at DESC LIMIT 1),
+                   (SELECT x.method FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id ORDER BY x.created_at DESC LIMIT 1),
                    (SELECT d.outcome FROM messaging.events e JOIN processing.deliveries d ON d.event_id = e.event_id WHERE e.raw_message_id = r.raw_message_id ORDER BY d.completed_at DESC NULLS FIRST LIMIT 1),
                    left(coalesce(r.raw_text, ''), 160)
             FROM raw_messages r JOIN sources s ON s.source_id = r.source_id
             WHERE r.received_at >= now() - make_interval(hours => @hours)
               {(sourceId is null ? "" : "AND r.source_id = @source")}
               {(string.IsNullOrEmpty(q) ? "" : byId ? "AND (r.raw_message_id = @id OR r.source_message_id = @q)" : "AND (r.source_message_id = @q OR r.source_message_key = @q OR r.raw_text ILIKE @like)")}
+              {ViewSql(view)}
             ORDER BY r.received_at DESC
             LIMIT @take
             """, conn, tx);
@@ -75,7 +92,8 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
         while (await reader.ReadAsync(ct))
         {
             rows.Add(new MessageSearchRowDto(reader.GetInt64(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4), reader.GetFieldValue<DateTimeOffset>(5),
-                StatusName(reader.GetInt32(6)), reader.GetInt32(7), reader.GetInt32(8), reader.IsDBNull(9) ? null : reader.GetString(9), reader.GetString(10)));
+                StatusName(reader.GetInt32(6)), reader.GetInt32(7), reader.GetInt32(8), reader.GetInt32(9), reader.GetInt32(10), reader.IsDBNull(11) ? null : reader.GetString(11), reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.IsDBNull(13) ? null : reader.GetString(13), reader.GetString(14)));
         }
         return rows;
     }
@@ -205,6 +223,42 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
             }
         }
 
+        var targets = new List<LifecycleTargetDto>();
+        await using (var cmd = new NpgsqlCommand(
+            """
+            SELECT t.target_id, t.segment_index, t.event_type::text, k.code, t.observed_at, t.object_count,
+                   coalesce(tm.code, tf.code, tc.code), p.name, t.location_accuracy_km, t.duplicate_of_target_id
+            FROM targets t
+            LEFT JOIN event_kinds k ON k.event_kind_id = t.event_kind_id
+            LEFT JOIN target_models tm ON tm.target_model_id = t.target_model_id
+            LEFT JOIN target_families tf ON tf.target_family_id = t.target_family_id
+            LEFT JOIN target_classes tc ON tc.target_class_id = t.target_class_id
+            LEFT JOIN places p ON p.place_id = t.location_place_id
+            WHERE t.raw_message_id = @id ORDER BY t.segment_index, t.target_id
+            """, conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", rawMessageId);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                targets.Add(new LifecycleTargetDto(reader.GetInt64(0), reader.GetInt32(1), reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3), reader.GetFieldValue<DateTimeOffset>(4),
+                    reader.IsDBNull(5) ? null : reader.GetInt32(5), reader.IsDBNull(6) ? null : reader.GetString(6), reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetDouble(8), reader.IsDBNull(9) ? null : reader.GetInt64(9)));
+            }
+        }
+
+        var llmRequests = new List<LifecycleLlmRequestDto>();
+        await using (var cmd = new NpgsqlCommand(
+            "SELECT llm_request_id, occurred_at, model, prompt_version, outcome, status_code, duration_ms, input_tokens, cache_creation_input_tokens, cache_read_input_tokens, output_tokens, estimated_cost_usd, facts_count, error FROM llm_requests WHERE raw_message_id = @id ORDER BY occurred_at, llm_request_id", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("id", rawMessageId);
+            await using var reader = await cmd.ExecuteReaderAsync(ct);
+            while (await reader.ReadAsync(ct))
+            {
+                llmRequests.Add(new LifecycleLlmRequestDto(reader.GetInt64(0), reader.GetFieldValue<DateTimeOffset>(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.IsDBNull(5) ? null : reader.GetInt32(5), reader.GetInt32(6),
+                    reader.IsDBNull(7) ? null : reader.GetInt64(7), reader.IsDBNull(8) ? null : reader.GetInt64(8), reader.IsDBNull(9) ? null : reader.GetInt64(9), reader.IsDBNull(10) ? null : reader.GetInt64(10), reader.IsDBNull(11) ? null : reader.GetDecimal(11), reader.GetInt32(12), reader.IsDBNull(13) ? null : Truncate(reader.GetString(13), 1000)));
+            }
+        }
+
         var derived = new List<LifecycleRefDto>();
         await using (var cmd = new NpgsqlCommand(
             """
@@ -242,7 +296,7 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
         await tx.RollbackAsync(ct);
 
         return new MessageLifecycleDto(rawMessageId, sourceId, sourceCode, sourceMessageId, publishedAt, receivedAt, status, text, url,
-            eventDtos, truncated, extractions, observations, derived, quarantine, Summarize(eventDtos));
+            eventDtos, truncated, extractions, observations, targets, llmRequests, derived, quarantine, Summarize(eventDtos));
     }
 
     /// <summary>
@@ -274,6 +328,18 @@ public sealed class MessageExplorer(IDbContextFactory<PulujDbContext> factory)
     }
 
     private static string StatusName(int status) => status switch { 0 => "pending", 1 => "processed", 2 => "failed", 3 => "skipped", 4 => "in_progress", _ => status.ToString() };
+
+    private static string ViewSql(string view) => view switch
+    {
+        "all" => "",
+        // These are explicit terminal outcomes, rather than a guess from an empty result set.
+        "ignored" => "AND (r.processing_status = 3 OR EXISTS (SELECT 1 FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id AND x.outcome IN ('no_facts', 'unsupported')))",
+        "llm" => "AND EXISTS (SELECT 1 FROM llm_requests l WHERE l.raw_message_id = r.raw_message_id)",
+        "targets" => "AND EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = r.raw_message_id)",
+        "events" => "AND EXISTS (SELECT 1 FROM processing.observations o WHERE o.raw_message_id = r.raw_message_id)",
+        "failed" => "AND (r.processing_status = 2 OR EXISTS (SELECT 1 FROM processing.extractions x WHERE x.raw_message_id = r.raw_message_id AND x.outcome = 'failed'))",
+        _ => throw new ArgumentOutOfRangeException(nameof(view)),
+    };
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max] + "…";
 
