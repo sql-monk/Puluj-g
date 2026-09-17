@@ -24,10 +24,11 @@ public class TelegramBackfillSchedulerTests
             replies = new MessageReplies { replies = 3, channel_id = 9876543211 },
         };
 
-        var payload = TelegramMessagePayload.From(message, "example_channel", subscriberCount: 42_000);
+        var payload = TelegramMessagePayload.From(message, "example_channel", subscriberCount: 42_000, channelTitle: "Приклад каналу");
         using var json = payload.ToDocument();
 
         Assert.Equal(42_000, payload.SubscriberCount);
+        Assert.Equal("Приклад каналу", payload.ChannelTitle);
         var reaction = Assert.Single(payload.Reactions);
         Assert.Equal("emoji", reaction.Kind);
         Assert.Equal("👍", reaction.Value);

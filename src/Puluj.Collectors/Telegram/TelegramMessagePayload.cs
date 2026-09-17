@@ -10,6 +10,7 @@ public sealed record TelegramMessagePayload
     [JsonPropertyName("kind")] public string Kind { get; init; } = "telegram.message";
     [JsonPropertyName("channelId")] public long ChannelId { get; init; }
     [JsonPropertyName("channel")] public string? Channel { get; init; }
+    [JsonPropertyName("channelTitle")] public string? ChannelTitle { get; init; }
     [JsonPropertyName("messageId")] public int MessageId { get; init; }
     [JsonPropertyName("date")] public DateTimeOffset Date { get; init; }
     [JsonPropertyName("editDate")] public DateTimeOffset? EditDate { get; init; }
@@ -32,7 +33,7 @@ public sealed record TelegramMessagePayload
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public static TelegramMessagePayload From(Message m, string? channelUsername, int? subscriberCount = null)
+    public static TelegramMessagePayload From(Message m, string? channelUsername, int? subscriberCount = null, string? channelTitle = null)
     {
         var urls = new List<string>();
         foreach (var e in m.entities ?? [])
@@ -52,6 +53,7 @@ public sealed record TelegramMessagePayload
         {
             ChannelId = m.peer_id is PeerChannel pc ? pc.channel_id : 0,
             Channel = channelUsername,
+            ChannelTitle = channelTitle,
             MessageId = m.id,
             Date = new DateTimeOffset(DateTime.SpecifyKind(m.date, DateTimeKind.Utc)),
             EditDate = m.edit_date == default ? null : new DateTimeOffset(DateTime.SpecifyKind(m.edit_date, DateTimeKind.Utc)),

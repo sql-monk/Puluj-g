@@ -31,7 +31,7 @@ public sealed class TelegramCollector(
 
     public string Name => "telegram";
 
-    private readonly Dictionary<long, (Source Source, string Username, int? SubscriberCount)> _channels = [];
+    private readonly Dictionary<long, (Source Source, string Username, string? Title, int? SubscriberCount)> _channels = [];
     private TelegramOptions _o = new();
     private TelegramRequestGate? _requestGate;
     private TelegramRpcExecutor? _rpc;
@@ -123,7 +123,7 @@ public sealed class TelegramCollector(
                     await GetTelegramRpcAsync(() => client.Channels_JoinChannel(channel), $"join @{username}", ct);
                     logger.LogInformation("Telegram: joined @{Username}", username);
                 }
-                _channels[channel.id] = (source, username, SubscriberCount(channel));
+                _channels[channel.id] = (source, username, channel.title, SubscriberCount(channel));
                 resolvedChannels.Add((channel, source, username));
             }
             catch (RpcException ex)
@@ -221,7 +221,7 @@ public sealed class TelegramCollector(
         {
             // The checkpoint travels with the message (ids are monotonic within a channel): a crash between them cannot
             // move the cursor past an unpublished post.
-            if (await StoreAsync(m, source, username, ct, SubscriberCount(channel), checkpoint: new CollectorCheckpoint(m.id.ToString(), ToUtc(m.date))))
+            if (await StoreAsync(m, source, username, ct, SubscriberCount(channel), channel.title, checkpoint: new CollectorCheckpoint(m.id.ToString(), ToUtc(m.date))))
             {
                 stored++;
             }
@@ -242,7 +242,7 @@ public sealed class TelegramCollector(
     private async Task LoadHistoryAsync(WTelegram.Client client, DateTimeOffset since, CancellationToken ct)
     {
         var pending = new List<TelegramBackfillJob>();
-        foreach (var (channelId, (source, username, _)) in _channels)
+        foreach (var (channelId, (source, username, _, _)) in _channels)
         {
             var state = await states.GetAsync(source.SourceId, ct);
             var cursor = ReadCursor(state.Cursor);
@@ -350,7 +350,7 @@ public sealed class TelegramCollector(
         {
             var last = i == toStore.Count - 1;
             var checkpoint = last ? new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)) : null;
-            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, SubscriberCount(job.Channel), enqueue: false, checkpoint: checkpoint))
+            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, SubscriberCount(job.Channel), job.Channel.title, enqueue: false, checkpoint: checkpoint))
             {
                 stored++;
             }
@@ -431,14 +431,14 @@ public sealed class TelegramCollector(
         {
             return;
         }
-        var (source, username, subscriberCount) = entry;
+        var (source, username, title, subscriberCount) = entry;
         // An edit does not move the id checkpoint (it belongs to an old post); the date still counts as activity.
-        await StoreAsync(m, source, username, CancellationToken.None, subscriberCount, enqueue: !_loadingHistory,
+        await StoreAsync(m, source, username, CancellationToken.None, subscriberCount, title, enqueue: !_loadingHistory,
             checkpoint: new CollectorCheckpoint(isEdit ? null : m.id.ToString(), ToUtc(m.date)));
     }
 
     /// <summary>Publishes one post (or edit); returns whether it was stored/accepted (false for service messages and known duplicates).</summary>
-    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, int? subscriberCount = null, bool enqueue = true, CollectorCheckpoint? checkpoint = null)
+    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, int? subscriberCount = null, string? channelTitle = null, bool enqueue = true, CollectorCheckpoint? checkpoint = null)
     {
         if (string.IsNullOrWhiteSpace(m.message) && m.media is null)
         {
@@ -448,7 +448,7 @@ public sealed class TelegramCollector(
             }
             return false; // service messages still move the cursor
         }
-        var payload = TelegramMessagePayload.From(m, username, subscriberCount);
+        var payload = TelegramMessagePayload.From(m, username, subscriberCount, channelTitle);
         var revision = payload.EditDate is null ? "0" : $"e{payload.EditDate.Value.ToUnixTimeSeconds()}";
         var result = await ingress.PublishAsync(new IncomingMessage
         {
