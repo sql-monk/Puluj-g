@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.Json;
 using Puluj.Collectors.Telegram;
 using Puluj.Domain.Entities;
 using TL;
@@ -16,6 +18,21 @@ public class TelegramBackfillSchedulerTests
         Assert.Equal(1, current.Version);
         Assert.Equal(42, current.LastId);
         Assert.Equal(99, current.Stored);
+    }
+
+    [Fact]
+    public void Legacy_cursor_json_is_deserialized_and_upgraded_without_losing_progress()
+    {
+        const string cursor = """
+            {"since":"2022-02-24T00:00:00+00:00","lastId":42,"stored":99,"pages":0,"done":false}
+            """;
+
+        var current = JsonSerializer.Deserialize<TelegramHistoryState>(cursor)!.Normalize();
+
+        Assert.Equal(1, current.Version);
+        Assert.Equal(42, current.LastId);
+        Assert.Equal(99, current.Stored);
+        Assert.False(current.Done);
     }
 
     [Fact]
@@ -114,6 +131,19 @@ public class TelegramBackfillSchedulerTests
             executor.ExecuteAsync(RpcAsync, "two", CancellationToken.None));
 
         Assert.Equal(1, maximum);
+    }
+
+    [Fact]
+    public async Task Flood_cooldown_blocks_the_next_history_rpc()
+    {
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+        var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(5));
+        await gate.FloodAsync(1, CancellationToken.None);
+        var elapsed = Stopwatch.StartNew();
+
+        await executor.ExecuteAsync(() => Task.FromResult(1), "after-flood", CancellationToken.None);
+
+        Assert.True(elapsed.Elapsed >= TimeSpan.FromMilliseconds(1500), $"Cooldown was only {elapsed.Elapsed}.");
     }
 
     private static TelegramBackfillJob Job(int sourceId, int weight) => new()
