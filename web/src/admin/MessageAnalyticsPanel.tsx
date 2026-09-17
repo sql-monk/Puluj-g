@@ -17,6 +17,27 @@ export function share(part: number, whole: number): string {
   return whole === 0 ? '—' : `${((100 * part) / whole).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} % з ${fmtNum(whole)}`
 }
 
+/** Average flow over the selected calendar window, retained as decimal instead of rounding low-volume sources to zero. */
+function throughput(value: number, hours: number): string {
+  const n = (value / hours).toLocaleString('uk-UA', { maximumFractionDigits: 1 })
+  const d = ((24 * value) / hours).toLocaleString('uk-UA', { maximumFractionDigits: 1 })
+  return `${n}/год · ${d}/добу`
+}
+
+function percent(part: number, whole: number): string {
+  return whole === 0 ? '—' : `${((100 * part) / whole).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} %`
+}
+
+/** A source-level conversion: numerator and denominator are both messages, never generated object counts. */
+function Conversion({ value, total }: { value: number; total: number }) {
+  return (
+    <div className="font-mono" title={`${fmtNum(value)} з ${fmtNum(total)} повідомлень`}>
+      <div>{fmtNum(value)}</div>
+      <div className="text-[10px] text-slate-400">{percent(value, total)}</div>
+    </div>
+  )
+}
+
 function Dict({ values, label, map }: { values: Record<string, number>; label?: (k: string) => string; map?: Record<string, string> }) {
   const entries = Object.entries(values).sort((a, b) => b[1] - a[1])
   if (entries.length === 0) return <p className="text-xs text-slate-500">—</p>
@@ -76,75 +97,68 @@ export function MessageAnalyticsPanel() {
 
       <StatusRow status={status.data} />
 
-      <Section title="Проходження конвеєра" badge={<Badge ok={data.funnel.stuckAnalysis + data.funnel.stuckDomain === 0} text={data.funnel.stuckAnalysis + data.funnel.stuckDomain === 0 ? 'без зависань' : `зависли: розбір ${fmtNum(data.funnel.stuckAnalysis)}, домен ${fmtNum(data.funnel.stuckDomain)}`} />}>
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6" data-testid="funnel">
-          <Stat label="Отримано (raw)" value={fmtNum(data.funnel.raw)} hint={`постів ${fmtNum(data.funnel.posts)} (редакції окремо)`} />
-          <Stat label="Збережено" value={fmtNum(data.funnel.stored)} hint={share(data.funnel.stored, data.funnel.raw)} />
+      <Section title="Повідомлення та результат" badge={<Badge ok={data.funnel.stuckAnalysis + data.funnel.stuckDomain === 0} text={data.funnel.stuckAnalysis + data.funnel.stuckDomain === 0 ? 'без зависань' : `зависли: розбір ${fmtNum(data.funnel.stuckAnalysis)}, домен ${fmtNum(data.funnel.stuckDomain)}`} />}>
+        <div className="grid gap-2 sm:grid-cols-4 xl:grid-cols-8" data-testid="funnel">
+          <Stat label="Отримано" value={fmtNum(data.funnel.raw)} hint={`${throughput(data.funnel.raw, data.hours)} · постів ${fmtNum(data.funnel.posts)}`} />
           <Stat label="Розібрано" value={fmtNum(data.funnel.analyzed)} hint={share(data.funnel.analyzed, data.funnel.raw)} />
-          <Stat label="З фактами" value={fmtNum(data.funnel.withFacts)} hint={share(data.funnel.withFacts, data.funnel.analyzed) + ' розібраних'} />
-          <Stat label="Доменно оброблено" value={fmtNum(data.funnel.domainCompleted)} hint={share(data.funnel.domainCompleted, data.funnel.analyzed) + unavailable(data.funnel.unavailableCompletion, data.funnel.raw)} tone={data.funnel.unavailableCompletion > 0 ? 'warn' : undefined} />
-          <Stat label="Видимі (incidents)" value={fmtNum(data.funnel.visible)} hint="incidents active generation" />
+          <Stat label="З фактами" value={fmtNum(data.funnel.withFacts)} hint={share(data.funnel.withFacts, data.funnel.raw)} />
+          <Stat label="З цілями" value={fmtNum(data.funnel.withTargets)} hint={share(data.funnel.withTargets, data.funnel.raw)} />
+          <Stat label="З подіями" value={fmtNum(data.funnel.withEvents)} hint={share(data.funnel.withEvents, data.funnel.raw)} />
+          <Stat label="З інцидентами" value={fmtNum(data.funnel.withIncidents)} hint={share(data.funnel.withIncidents, data.funnel.raw)} />
+          <Stat label="З треками" value={fmtNum(data.funnel.withTracks)} hint={share(data.funnel.withTracks, data.funnel.raw)} />
+          <Stat label="З тривогами" value={fmtNum(data.funnel.withAlerts)} hint={share(data.funnel.withAlerts, data.funnel.raw)} />
         </div>
-        <p className="text-xs" data-testid="transitions">
-          Час збережено → розібрано: p50 {fmtAge(data.funnel.storedToAnalyzedP50Seconds)}, p95 {fmtAge(data.funnel.storedToAnalyzedP95Seconds)}; розібрано → домен: p50 {fmtAge(data.funnel.analyzedToDomainP50Seconds)}, p95 {fmtAge(data.funnel.analyzedToDomainP95Seconds)}
-          {data.funnel.unavailableTimings > 0 && <span className="ml-1 text-amber-700 dark:text-amber-300">— timings unavailable для {fmtNum(data.funnel.unavailableTimings)} повідомлень (оброблені до появи стадій; не вигадуємо)</span>}
-        </p>
-        <div className="flex flex-wrap gap-4 text-xs">
-          <div>
-            <div className="text-[10px] uppercase text-slate-500">отримано</div>
-            <Bars values={data.timeline.map((b) => b.raw)} title={(i, v) => `${fmtTime(data.timeline[i].at)}: ${v}`} />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-slate-500">з фактами</div>
-            <Bars values={data.timeline.map((b) => b.withFacts)} color="bg-emerald-500" title={(i, v) => `${fmtTime(data.timeline[i].at)}: ${v}`} />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-slate-500">помилки</div>
-            <Bars values={data.timeline.map((b) => b.failed)} color="bg-red-500" title={(i, v) => `${fmtTime(data.timeline[i].at)}: ${v}`} />
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-slate-500">без тексту</div>
-            <Bars values={data.timeline.map((b) => b.noText)} color="bg-slate-400" title={(i, v) => `${fmtTime(data.timeline[i].at)}: ${v}`} />
-          </div>
+        <details className="text-xs text-slate-600 dark:text-slate-300" data-testid="transitions">
+          <summary className="cursor-pointer">Швидкість конвеєра: p50 — половина повідомлень вклалася в цей час; p95 — 95 % вклалися</summary>
+          <p className="mt-1">
+            Збережено → розібрано: p50 {fmtAge(data.funnel.storedToAnalyzedP50Seconds)}, p95 {fmtAge(data.funnel.storedToAnalyzedP95Seconds)}; розібрано → домен: p50 {fmtAge(data.funnel.analyzedToDomainP50Seconds)}, p95 {fmtAge(data.funnel.analyzedToDomainP95Seconds)}. Виміряно для {fmtNum(Math.max(0, data.funnel.raw - data.funnel.unavailableTimings))} з {fmtNum(data.funnel.raw)} повідомлень.
+            {data.funnel.unavailableTimings > 0 && <span className="text-amber-700 dark:text-amber-300"> Для {fmtNum(data.funnel.unavailableTimings)} старих повідомлень етапи не записувалися, тому час відсутній.</span>}
+          </p>
+        </details>
+      </Section>
+
+      <Section title="Надходження й конверсія в часі" badge={<Badge ok={null} text={`у середньому ${throughput(data.funnel.raw, data.hours)}`} />}>
+        <p className="mb-2 text-xs text-slate-500">Кожна смуга — {data.bucket === 'hour' ? 'година' : 'доба'}; усі значення — кількість повідомлень у відповідному стані.</p>
+        <div className="flex flex-wrap gap-x-5 gap-y-3 text-xs" data-testid="timeline">
+          <TimelineBars label="отримано" values={data.timeline.map((b) => b.raw)} timeline={data.timeline} />
+          <TimelineBars label="розібрано" values={data.timeline.map((b) => b.analyzed)} color="bg-blue-500" timeline={data.timeline} />
+          <TimelineBars label="з фактами" values={data.timeline.map((b) => b.withFacts)} color="bg-emerald-500" timeline={data.timeline} />
+          <TimelineBars label="з цілями" values={data.timeline.map((b) => b.withTargets)} color="bg-violet-500" timeline={data.timeline} />
+          <TimelineBars label="з подіями" values={data.timeline.map((b) => b.withEvents)} color="bg-amber-500" timeline={data.timeline} />
+          <TimelineBars label="з інцидентами" values={data.timeline.map((b) => b.withIncidents)} color="bg-rose-500" timeline={data.timeline} />
         </div>
       </Section>
 
-      <Section title="Джерела та надходження">
+      <Section title="Конверсія за джерелами" badge={<Badge ok={null} text="у клітинці: повідомлення та частка від отриманих" />}>
         <div className="overflow-x-auto">
           <table className="w-full text-xs" data-testid="sources">
             <thead className="text-left text-[10px] uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-1 pr-2">Джерело</th>
-                <th className="pr-2 text-right">raw</th>
-                <th className="pr-2 text-right">пости</th>
-                <th className="pr-2 text-right">редакції</th>
-                <th className="pr-2 text-right">без тексту</th>
-                <th className="pr-2 text-right">payload</th>
-                <th className="pr-2 text-right">факти</th>
-                <th className="pr-2 text-right">довжина p50</th>
-                <th className="pr-2 text-right">затримка збору p50/p95</th>
-                <th className="pr-2 text-right">live/history</th>
-                <th className="pr-2 text-right">макс. перерва</th>
+                <th className="pr-2 text-right">отримано</th>
+                <th className="pr-2 text-right">розібрано</th>
+                <th className="pr-2 text-right">з фактами</th>
+                <th className="pr-2 text-right">з цілями</th>
+                <th className="pr-2 text-right">з подіями</th>
+                <th className="pr-2 text-right">з інцидентами</th>
+                <th className="pr-2 text-right">з треками</th>
+                <th className="pr-2 text-right">з тривогами</th>
+                <th className="pr-2 text-right">фактів</th>
               </tr>
             </thead>
             <tbody>
               {data.sources.map((s) => (
                 <tr key={s.sourceId} className="border-t border-slate-100 dark:border-slate-800" data-testid={`source-${s.code}`}>
                   <td className="py-1 pr-2 font-mono">{s.code}</td>
-                  <td className="pr-2 text-right font-mono">{fmtNum(s.raw)}</td>
-                  <td className="pr-2 text-right font-mono">{fmtNum(s.posts)}</td>
-                  <td className="pr-2 text-right font-mono">{fmtNum(s.edits)}</td>
-                  <td className="pr-2 text-right font-mono">{fmtNum(s.noText)}</td>
-                  <td className="pr-2 text-right font-mono">{fmtNum(s.withPayload)}</td>
+                  <td className="pr-2 text-right"><Conversion value={s.raw} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.analyzed} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withFacts} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withTargets} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withEvents} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withIncidents} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withTracks} total={s.raw} /></td>
+                  <td className="pr-2 text-right"><Conversion value={s.withAlerts} total={s.raw} /></td>
                   <td className="pr-2 text-right font-mono">{fmtNum(s.facts)}</td>
-                  <td className="pr-2 text-right font-mono">{s.textLengthP50 == null ? '—' : fmtNum(Math.round(s.textLengthP50))}</td>
-                  <td className="pr-2 text-right font-mono">
-                    {fmtAge(s.collectDelayP50Seconds)} / {fmtAge(s.collectDelayP95Seconds)}
-                  </td>
-                  <td className="pr-2 text-right font-mono">
-                    {fmtNum(s.live)}/{fmtNum(s.history)}
-                  </td>
-                  <td className="pr-2 text-right font-mono">{fmtAge(s.maxGapSeconds)}</td>
                 </tr>
               ))}
             </tbody>
@@ -318,12 +332,26 @@ export function MessageAnalyticsPanel() {
   )
 }
 
+function TimelineBars({ label, values, timeline, color }: { label: string; values: number[]; timeline: { at: string }[]; color?: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase text-slate-500">{label}</div>
+      <Bars values={values} color={color} title={(i, value) => `${fmtTime(timeline[i].at)}: ${fmtNum(value)} повідомлень`} />
+    </div>
+  )
+}
+
 function StatusRow({ status }: { status: LifecycleStatusDto | null }) {
   if (!status) return null
   const r = status.reconciliation
   return (
     <div className="grid gap-3 sm:grid-cols-3" data-testid="lifecycle-status">
-      <Stat label="Backfill" value={status.backfill.caughtUp ? 'наздогнав' : `${fmtNum(status.backfill.cursor)} / ${fmtNum(status.backfill.maxRawMessageId)}`} hint={status.backfill.at ? `оновлено ${fmtTime(status.backfill.at)}` : 'ще не запускався'} tone={status.backfill.caughtUp ? 'ok' : 'warn'} />
+      <Stat
+        label="Backfill"
+        value={`${fmtNum(status.backfill.projectedRows)} / ${fmtNum(status.backfill.rawRows)}`}
+        hint={`проєкційовано / усі повідомлення · ${status.backfill.caughtUp ? 'наздогнав' : 'ще триває'}${status.backfill.at ? ` · оновлено ${fmtTime(status.backfill.at)}` : ' · ще не запускався'}`}
+        tone={status.backfill.caughtUp ? 'ok' : 'warn'}
+      />
       <Stat
         label={`Звірка (${r ? `${r.windowHours} год` : '—'})`}
         value={r ? (r.missingRoots === 0 ? 'лічильники збігаються' : `бракує ${fmtNum(r.missingRoots)}`) : 'звіту ще немає'}

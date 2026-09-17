@@ -179,7 +179,9 @@ public static partial class OpsEndpoints
                 var names = string.Join(", ", tables.Select(t => $"{QuoteIdentifier(t.Schema)}.{QuoteIdentifier(t.Name)}"));
                 await using var truncate = connection.CreateCommand();
                 truncate.Transaction = db.Database.CurrentTransaction!.GetDbTransaction();
-                truncate.CommandText = $"TRUNCATE TABLE {names} RESTART IDENTITY CASCADE";
+                // `RESTART IDENTITY` requires ownership of every affected sequence. The admin service is intentionally
+                // a non-owner role, so preserve monotonic IDs while clearing the data it is authorized to reset.
+                truncate.CommandText = $"TRUNCATE TABLE {names} CASCADE";
                 await truncate.ExecuteNonQueryAsync(ct);
             }
             await transaction.CommitAsync(ct);

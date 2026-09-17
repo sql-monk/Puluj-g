@@ -1,6 +1,6 @@
 {
   "task": "P02",
-  "recorded_at": "2026-09-15T14:23:07.2942422Z",
+  "recorded_at": "2026-09-17T15:45:51.0715728Z",
   "environment": {
     "os": "Microsoft Windows NT 10.0.26200.0",
     "cpu_count": 12,
@@ -19,15 +19,15 @@
     "publisher_confirms": "per message, sequential"
   },
   "results": {
-    "enqueue_ms": 153,
-    "publish_confirm_ms": 36220,
-    "publish_confirm_rate_per_s": 138,
+    "enqueue_ms": 108,
+    "publish_confirm_ms": 36129,
+    "publish_confirm_rate_per_s": 138.4,
     "deliveries_acked": 10000,
     "effects": 10000,
     "duplicates_suppressed": 0,
     "redelivered": 0,
-    "consumer_drain_seconds_first_to_last_completion": 36.186,
-    "consumer_rate_per_s": 276.4,
+    "consumer_drain_seconds_first_to_last_completion": 36.109,
+    "consumer_rate_per_s": 276.9,
     "per_consumer_acked": [
       2500,
       2500,

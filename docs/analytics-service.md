@@ -38,7 +38,7 @@ watermark, тому не гарантують повноту або актуал
 
 Редагована схема: [message-lifecycle-projection-reconciliation.drawio](diagrams/message-lifecycle-projection-reconciliation.drawio).
 
-Worker у кожному циклі виконує bounded backfill за cursor, потім sweep reconciliation у recent window. Reconciliation лічить raw/posts/edits проти projection, backfill-ить не більш як 2000 missing roots за раз і заповнює late analysis/domain completion лише за наявними durable records. Вона не доводить повноту джерела і може відобразити затримку delivery/event.
+Worker у кожному циклі виконує bounded backfill за cursor, потім sweep reconciliation у recent window. Cursor — це технічний `raw_message_id` для keyset-обходу з можливими пропусками, а не кількість повідомлень: у статусі прогрес показано як точне `проєкційовано / усі повідомлення`. Reconciliation лічить raw/posts/edits проти projection, backfill-ить не більш як 2000 missing roots за раз і заповнює late analysis/domain completion лише за наявними durable records. Вона не доводить повноту джерела і може відобразити затримку delivery/event.
 
 `POST /api/admin/analytics/lifecycle/backfill` і `/reconcile` потребують actor/reason та записують `ControlAudit`; `backfill?reset=true` скидає cursor, але не видаляє rows. Це write-операції з можливими DB load, зміною derived view та конкуренцією з worker. Спершу оцінюють status/progress, після — reconciliation report; відповідь API не означає завершення всієї історії.
 

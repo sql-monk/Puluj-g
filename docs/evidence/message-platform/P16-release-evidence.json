@@ -6,7 +6,7 @@
     "legacy_processor_after_canary": "0 effects for every root",
     "pending_non_analytics_deliveries": 0,
     "unconfirmed_outbox": 0,
-    "recorded_at": "2026-09-16T21:12:05.7360409\u002B00:00"
+    "recorded_at": "2026-09-17T15:50:57.5076655\u002B00:00"
   },
   "P16-L01": {
     "workload": "archive-only independent durable branch; real RabbitMQ \u002B PostGIS; no LLM provider",
@@ -15,12 +15,12 @@
         "replicas": 1,
         "roots": 96,
         "committed_outcomes": 96,
-        "drain_ms": 2340,
-        "committed_per_second": 41.02,
+        "drain_ms": 2166,
+        "committed_per_second": 44.31,
         "commit_latency_ms": {
-          "p50": 835.741,
-          "p95": 1334.01,
-          "p99": 1491.669
+          "p50": 900.266,
+          "p95": 1102.849,
+          "p99": 1208.658
         },
         "per_consumer_deliveries": [
           96
@@ -30,12 +30,12 @@
         "replicas": 2,
         "roots": 96,
         "committed_outcomes": 96,
-        "drain_ms": 1936,
-        "committed_per_second": 49.57,
+        "drain_ms": 1404,
+        "committed_per_second": 68.35,
         "commit_latency_ms": {
-          "p50": 639.356,
-          "p95": 915.615,
-          "p99": 1040.247
+          "p50": 482.826,
+          "p95": 718.425,
+          "p99": 735.271
         },
         "per_consumer_deliveries": [
           48,
@@ -46,12 +46,12 @@
         "replicas": 4,
         "roots": 96,
         "committed_outcomes": 96,
-        "drain_ms": 1253,
-        "committed_per_second": 76.58,
+        "drain_ms": 1151,
+        "committed_per_second": 83.34,
         "commit_latency_ms": {
-          "p50": 274.646,
-          "p95": 833.626,
-          "p99": 912.993
+          "p50": 244.28,
+          "p95": 539.183,
+          "p99": 569.748
         },
         "per_consumer_deliveries": [
           24,
@@ -64,12 +64,12 @@
         "replicas": 8,
         "roots": 96,
         "committed_outcomes": 96,
-        "drain_ms": 1262,
-        "committed_per_second": 76.06,
+        "drain_ms": 1259,
+        "committed_per_second": 76.22,
         "commit_latency_ms": {
-          "p50": 133.278,
-          "p95": 693.855,
-          "p99": 789.565
+          "p50": 275.051,
+          "p95": 679.48,
+          "p99": 714.067
         },
         "per_consumer_deliveries": [
           12,
@@ -84,6 +84,6 @@
       }
     ],
     "interpretation": "compare this curve with the release environment baseline; it is not an absolute SLO",
-    "recorded_at": "2026-09-16T21:12:16.8101966+00:00"
+    "recorded_at": "2026-09-17T15:51:07.5515179+00:00"
   }
 }

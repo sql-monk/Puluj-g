@@ -52,16 +52,23 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
         var available = (await db.Database.SqlQueryRaw<bool>("SELECT to_regclass('analytics.message_lifecycle') IS NOT NULL AND to_regclass('analytics.state') IS NOT NULL AS \"Value\"").ToListAsync(ct)).First();
         if (!available)
         {
-            return new LifecycleStatusDto(false, new LifecycleBackfillDto(0, 0, false, null), null);
+            return new LifecycleStatusDto(false, new LifecycleBackfillDto(0, 0, 0, 0, false, null), null);
         }
         var cursor = await LifecycleBackfill.CursorAsync(conn, ct);
-        long max;
-        await using (var m = new NpgsqlCommand("SELECT coalesce(max(raw_message_id), 0) FROM raw_messages", conn))
+        long max, rawRows, projectedRows;
+        await using (var m = new NpgsqlCommand("SELECT coalesce(max(raw_message_id), 0), count(*) FROM raw_messages", conn))
         {
-            max = (long)(await m.ExecuteScalarAsync(ct))!;
+            await using var reader = await m.ExecuteReaderAsync(ct);
+            await reader.ReadAsync(ct);
+            max = reader.GetInt64(0);
+            rawRows = reader.GetInt64(1);
+        }
+        await using (var m = new NpgsqlCommand("SELECT count(DISTINCT raw_message_id) FROM analytics.message_lifecycle", conn))
+        {
+            projectedRows = (long)(await m.ExecuteScalarAsync(ct))!;
         }
         var at = await db.State.AsNoTracking().Where(s => s.Key == LifecycleBackfill.CursorKey).Select(s => (DateTimeOffset?)s.UpdatedAt).FirstOrDefaultAsync(ct);
-        return new LifecycleStatusDto(true, new LifecycleBackfillDto(cursor, max, cursor >= max, at), await LifecycleReconciliation.LastReportAsync(db, ct));
+        return new LifecycleStatusDto(true, new LifecycleBackfillDto(cursor, max, rawRows, projectedRows, cursor >= max, at), await LifecycleReconciliation.LastReportAsync(db, ct));
     }
 
     private async Task<LifecycleReportDto> ComputeAsync(int hours, DateTimeOffset now, CancellationToken ct)
@@ -81,7 +88,10 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
         await using (var cmd = new NpgsqlCommand(
             $"""
             SELECT count(DISTINCT ml.raw_message_id), count(DISTINCT (ml.source_id, ml.source_message_key)),
-                   count(*) FILTER (WHERE ml.stored_at IS NOT NULL), count(*) FILTER (WHERE ml.analyzed_at IS NOT NULL), count(*) FILTER (WHERE ml.fact_count > 0),
+                    count(*) FILTER (WHERE ml.stored_at IS NOT NULL), count(*) FILTER (WHERE ml.analyzed_at IS NOT NULL), count(*) FILTER (WHERE ml.fact_count > 0),
+                    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = ml.raw_message_id)),
+                    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM processing.observations o WHERE o.raw_message_id = ml.raw_message_id AND o.run_id = ml.run_id)),
+                    count(*) FILTER (WHERE cardinality(ml.incident_ids) > 0), count(*) FILTER (WHERE cardinality(ml.track_ids) > 0), count(*) FILTER (WHERE cardinality(ml.alert_ids) > 0),
                    count(*) FILTER (WHERE ml.domain_completed_at IS NOT NULL),
                    count(*) FILTER (WHERE EXISTS (SELECT 1 FROM incidents i JOIN processing.generations g ON g.generation_id = i.generation_id WHERE g.is_active AND i.incident_id = ANY(ml.incident_ids))),
                    count(*) FILTER (WHERE ml.analyzed_at IS NULL AND ml.received_at < @stale AND ml.analysis_outcome IS NULL),
@@ -98,13 +108,16 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
             cmd.Parameters.AddWithValue("stale", now - TimeSpan.FromMinutes(options.Value.LifecycleStaleMinutes));
             await using var r = await cmd.ExecuteReaderAsync(ct);
             await r.ReadAsync(ct);
-            funnel = new LifecycleFunnelDto(r.GetInt64(0), r.GetInt64(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), r.GetInt64(8), r.GetInt64(9), r.GetInt64(10), Nullable(r, 11), Nullable(r, 12), Nullable(r, 13), Nullable(r, 14));
+            funnel = new LifecycleFunnelDto(r.GetInt64(0), r.GetInt64(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), r.GetInt64(8), r.GetInt64(9), r.GetInt64(10), r.GetInt64(11), r.GetInt64(12), r.GetInt64(13), r.GetInt64(14), r.GetInt64(15), Nullable(r, 16), Nullable(r, 17), Nullable(r, 18), Nullable(r, 19));
         }
 
         var timeline = new List<LifecycleBucketDto>();
         await using (var cmd = new NpgsqlCommand(
             $"""
-            SELECT b, count(DISTINCT ml.raw_message_id), count(*) FILTER (WHERE ml.analyzed_at IS NOT NULL), count(*) FILTER (WHERE ml.fact_count > 0), count(*) FILTER (WHERE ml.domain_completed_at IS NOT NULL),
+            SELECT b, count(DISTINCT ml.raw_message_id), count(*) FILTER (WHERE ml.analyzed_at IS NOT NULL), count(*) FILTER (WHERE ml.fact_count > 0),
+                   count(*) FILTER (WHERE EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = ml.raw_message_id)),
+                   count(*) FILTER (WHERE EXISTS (SELECT 1 FROM processing.observations o WHERE o.raw_message_id = ml.raw_message_id AND o.run_id = ml.run_id)),
+                   count(*) FILTER (WHERE cardinality(ml.incident_ids) > 0), count(*) FILTER (WHERE ml.domain_completed_at IS NOT NULL),
                    count(*) FILTER (WHERE ml.analysis_outcome = 'failed'), count(*) FILTER (WHERE NOT ml.has_text)
             FROM analytics.message_lifecycle ml
             CROSS JOIN LATERAL (SELECT CASE WHEN @bucket = 'hour' THEN date_trunc('hour', ml.received_at) ELSE (date_trunc('day', ml.received_at AT TIME ZONE 'Europe/Kyiv') AT TIME ZONE 'Europe/Kyiv') END AS b) x
@@ -116,7 +129,7 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
             {
-                timeline.Add(new LifecycleBucketDto(r.GetFieldValue<DateTimeOffset>(0), r.GetInt64(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6)));
+                timeline.Add(new LifecycleBucketDto(r.GetFieldValue<DateTimeOffset>(0), r.GetInt64(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), r.GetInt64(8), r.GetInt64(9)));
             }
         }
 
@@ -124,8 +137,12 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
         await using (var cmd = new NpgsqlCommand(
             $"""
             SELECT ml.source_id, s.code, count(DISTINCT ml.raw_message_id), count(DISTINCT ml.source_message_key), count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.is_edit),
-                   count(DISTINCT ml.raw_message_id) FILTER (WHERE NOT ml.has_text), count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.has_payload), coalesce(sum(ml.fact_count), 0),
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY ml.text_length::float8) FILTER (WHERE ml.has_text),
+                   count(DISTINCT ml.raw_message_id) FILTER (WHERE NOT ml.has_text), count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.has_payload),
+                   count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.analyzed_at IS NOT NULL), count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.fact_count > 0),
+                   count(DISTINCT ml.raw_message_id) FILTER (WHERE EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = ml.raw_message_id)),
+                   count(DISTINCT ml.raw_message_id) FILTER (WHERE EXISTS (SELECT 1 FROM processing.observations o WHERE o.raw_message_id = ml.raw_message_id AND o.run_id = ml.run_id)),
+                   count(DISTINCT ml.raw_message_id) FILTER (WHERE cardinality(ml.incident_ids) > 0), count(DISTINCT ml.raw_message_id) FILTER (WHERE cardinality(ml.track_ids) > 0), count(DISTINCT ml.raw_message_id) FILTER (WHERE cardinality(ml.alert_ids) > 0),
+                   coalesce(sum(ml.fact_count), 0), percentile_cont(0.5) WITHIN GROUP (ORDER BY ml.text_length::float8) FILTER (WHERE ml.has_text),
                    percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM ml.received_at - ml.published_at)::float8),
                    percentile_cont(0.95) WITHIN GROUP (ORDER BY extract(epoch FROM ml.received_at - ml.published_at)::float8),
                    count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.lane = 'live'), count(DISTINCT ml.raw_message_id) FILTER (WHERE ml.lane = 'history'),
@@ -138,7 +155,7 @@ public sealed class LifecycleReportService(IDbContextFactory<AnalyticsDbContext>
             await using var r = await cmd.ExecuteReaderAsync(ct);
             while (await r.ReadAsync(ct))
             {
-                sources.Add(new LifecycleSourceDto(r.GetInt32(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), Nullable(r, 8), Nullable(r, 9), Nullable(r, 10), r.GetInt64(11), r.GetInt64(12), Nullable(r, 13)));
+                sources.Add(new LifecycleSourceDto(r.GetInt32(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetInt64(4), r.GetInt64(5), r.GetInt64(6), r.GetInt64(7), r.GetInt64(8), r.GetInt64(9), r.GetInt64(10), r.GetInt64(11), r.GetInt64(12), r.GetInt64(13), r.GetInt64(14), Nullable(r, 15), Nullable(r, 16), Nullable(r, 17), r.GetInt64(18), r.GetInt64(19), Nullable(r, 20)));
             }
         }
 

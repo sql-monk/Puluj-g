@@ -245,7 +245,7 @@ export function DbPanel() {
               <Stat label="Таблиць" value={fmtNum(d.tables.length)} />
               <Stat label="Оновлення" value="15 с" hint="автоматично" />
             </div>
-            <p className="text-[11px] text-slate-500">Лічильники записів і транзакцій — накопичувальні з моменту останнього скидання статистики PostgreSQL. Три риски в «Активності» — insert / update / delete.</p>
+            <p className="text-[11px] text-slate-500">Кількість рядків — приблизна оцінка PostgreSQL (`n_live_tup`), вона оновлюється після ANALYZE і може відставати від точного COUNT. Лічильники активності й транзакцій — накопичувальні з моменту останнього скидання статистики PostgreSQL. Три риски в «Активності» — insert / update / delete.</p>
             <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead className="text-left text-slate-500">
@@ -262,7 +262,7 @@ export function DbPanel() {
                   <tr key={t.name} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="py-1 pr-2 font-mono">{t.name}</td>
                     <td className="min-w-32 pr-2 font-mono">
-                      <div>{fmtNum(t.rows)} рядків</div>
+                      <div title="Оцінка PostgreSQL n_live_tup; це не точний COUNT">≈ {fmtNum(t.rows)} рядків</div>
                       <InlineMeter value={t.bytes} max={Math.max(...d.tables.map((x) => x.bytes), 1)} label={fmtBytes(t.bytes)} />
                     </td>
                     <td className="min-w-28 pr-2">

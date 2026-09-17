@@ -21,7 +21,7 @@ export interface LifecycleReconciliationDto {
 
 export interface LifecycleStatusDto {
   available: boolean
-  backfill: { cursor: number; maxRawMessageId: number; caughtUp: boolean; at?: string | null }
+  backfill: { cursor: number; maxRawMessageId: number; rawRows: number; projectedRows: number; caughtUp: boolean; at?: string | null }
   reconciliation?: LifecycleReconciliationDto | null
 }
 
@@ -30,6 +30,9 @@ export interface LifecycleBucketDto {
   raw: number
   analyzed: number
   withFacts: number
+  withTargets: number
+  withEvents: number
+  withIncidents: number
   domainCompleted: number
   failed: number
   noText: number
@@ -43,6 +46,13 @@ export interface LifecycleSourceDto {
   edits: number
   noText: number
   withPayload: number
+  analyzed: number
+  withFacts: number
+  withTargets: number
+  withEvents: number
+  withIncidents: number
+  withTracks: number
+  withAlerts: number
   facts: number
   textLengthP50?: number | null
   collectDelayP50Seconds?: number | null
@@ -58,6 +68,11 @@ export interface LifecycleFunnelDto {
   stored: number
   analyzed: number
   withFacts: number
+  withTargets: number
+  withEvents: number
+  withIncidents: number
+  withTracks: number
+  withAlerts: number
   domainCompleted: number
   visible: number
   stuckAnalysis: number

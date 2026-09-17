@@ -10,7 +10,7 @@
     "effects_per_subscription": 1,
     "duplicates": 0,
     "parser_live_total": 0,
-    "recorded_at": "2026-09-15T14:22:30.8291358\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:13.990746\u002B00:00"
   },
   "C02_crash_after_commit_before_ack": {
     "window": "W5",
@@ -18,7 +18,7 @@
     "ready_after_crash": 1,
     "effect_final": 1,
     "duplicates_suppressed": 1,
-    "recorded_at": "2026-09-15T14:22:40.6863633\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:24.1485008\u002B00:00"
   },
   "G02_competing_consumers": {
     "window": "gate: \u0440\u0435\u043F\u043B\u0456\u043A\u0438 \u0434\u0456\u043B\u044F\u0442\u044C jobs",
@@ -28,7 +28,7 @@
     "effects": 200,
     "duplicates": 0,
     "archive_backlog_without_consumer": 200,
-    "recorded_at": "2026-09-15T14:22:46.1173828\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:29.4040926\u002B00:00"
   },
   "G04b_crash_loop_delivery_limit": {
     "window": "W4 loop \u2192 x-delivery-limit",
@@ -37,24 +37,24 @@
     "max_x_delivery_count": 4,
     "dlq_ready": 1,
     "effects": 0,
-    "recorded_at": "2026-09-15T14:22:51.2970567\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:34.5711635\u002B00:00"
   },
   "G00_topology": {
     "window": "readiness/declare",
     "server": "4.3.5",
     "image": "rabbitmq:4.3-management",
-    "queues": 32,
-    "dlqs": 32,
-    "topology_version": 1,
+    "queues": 30,
+    "dlqs": 30,
+    "topology_version": 10,
     "redeclare_idempotent": true,
-    "recorded_at": "2026-09-15T14:22:52.5252604\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:35.9269991\u002B00:00"
   },
   "G03_lanes": {
     "window": "lanes: history \u043D\u0435 \u043F\u043E\u0442\u0440\u0430\u043F\u043B\u044F\u0454 \u0432 live; projection \u0431\u0435\u0437 replay",
     "parser_history_delta": 1,
     "parser_live_delta": 0,
     "analytics_replay_delta": 1,
-    "recorded_at": "2026-09-15T14:23:01.3457019\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:49.349681\u002B00:00"
   },
   "C05_broker_restart_while_unacked": {
     "window": "W7c",
@@ -62,7 +62,7 @@
     "ready_after_restart": 1,
     "redelivered_seen": 1,
     "effect": 1,
-    "recorded_at": "2026-09-15T14:23:06.3211996\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:49.8386193\u002B00:00"
   },
   "G04_business_failures_quarantine": {
     "window": "W6a-2",
@@ -74,7 +74,7 @@
     "dlq_after_transfer": 0,
     "x_delivery_count_seen": 0,
     "observation": "RabbitMQ 4.3: nack(requeue=true) \u0437 consumer \u043D\u0435 \u0456\u043D\u043A\u0440\u0435\u043C\u0435\u043D\u0442\u0443\u0454 x-delivery-count (\u043B\u0438\u0448\u0435 x-acquired-count); business retries \u2014 \u0443 \u0411\u0414",
-    "recorded_at": "2026-09-15T14:23:11.1274305\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:59.2334572\u002B00:00"
   },
   "C08_unroutable_missing_queue_unbind_drift": {
     "window": "W11",
@@ -89,7 +89,7 @@
     "publish_after_unbind_confirmed_not_returned": true,
     "archive_history_copy_lost_until_reconciliation": true,
     "bindings_restored_by_declare": true,
-    "recorded_at": "2026-09-15T14:23:15.285519\u002B00:00"
+    "recorded_at": "2026-09-17T15:45:58.6063039\u002B00:00"
   },
   "C07_one_subscription_offline": {
     "window": "W10b",
@@ -98,7 +98,7 @@
     "archive_backlog_ready": 40,
     "archive_consumers_while_offline": 0,
     "archive_effects_after_start": 40,
-    "recorded_at": "2026-09-15T14:23:24.7470329\u002B00:00"
+    "recorded_at": "2026-09-17T15:46:17.7729013\u002B00:00"
   },
   "C09_memory_alarm_blocked_publisher": {
     "window": "W13",
@@ -108,18 +108,18 @@
     "confirmed_after_clear": 1,
     "effect": 1,
     "duplicates_suppressed": 1,
-    "recorded_at": "2026-09-15T14:24:35.6074824\u002B00:00"
+    "recorded_at": "2026-09-17T15:47:28.619658\u002B00:00"
   },
   "C03_broker_restart_during_publish": {
     "window": "W7a/W2/W3",
     "messages": 300,
     "first_pass_confirmed": -1,
-    "unconfirmed_after_restart": 275,
-    "republished": 275,
+    "unconfirmed_after_restart": 265,
+    "republished": 265,
     "effects": 300,
     "duplicates_suppressed": 0,
     "lost": 0,
-    "recorded_at": "2026-09-15T14:25:12.1449231\u002B00:00"
+    "recorded_at": "2026-09-17T15:47:59.3462334\u002B00:00"
   },
   "C04_delayed_confirm": {
     "window": "W7b (client-simulated timeout)",
@@ -127,7 +127,7 @@
     "deliveries": 2,
     "effect": 1,
     "duplicates_suppressed": 1,
-    "recorded_at": "2026-09-15T14:25:12.3132729\u002B00:00"
+    "recorded_at": "2026-09-17T15:47:59.4719108\u002B00:00"
   },
   "C01_crash_before_commit": {
     "window": "W4",
@@ -136,7 +136,7 @@
     "redelivered_seen": 1,
     "effect_final": 1,
     "duplicates": 0,
-    "recorded_at": "2026-09-15T14:25:32.0143171\u002B00:00"
+    "recorded_at": "2026-09-17T15:48:14.5763779\u002B00:00"
   },
   "C06_publish_before_consumer": {
     "window": "W10a",
@@ -144,6 +144,6 @@
     "ready_before_consumer": 50,
     "effects": 50,
     "duplicates": 0,
-    "recorded_at": "2026-09-15T14:25:42.6541528+00:00"
+    "recorded_at": "2026-09-17T15:48:25.1047665+00:00"
   }
 }

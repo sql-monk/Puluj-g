@@ -31,15 +31,26 @@ public sealed record LifecycleReconciliationDto(
     long PendingAnalysis, long PendingDomain,
     long UnavailableTimings, long UnavailableCompletion);
 
-public sealed record LifecycleBackfillDto(long Cursor, long MaxRawMessageId, bool CaughtUp, DateTimeOffset? At);
+/// <summary>
+/// Backfill status. Cursor and MaxRawMessageId are internal keyset positions, not message counts;
+/// the UI should present ProjectedRows / RawRows as the human-facing progress.
+/// </summary>
+public sealed record LifecycleBackfillDto(long Cursor, long MaxRawMessageId, long RawRows, long ProjectedRows, bool CaughtUp, DateTimeOffset? At);
 
 public sealed record LifecycleStatusDto(bool Available, LifecycleBackfillDto Backfill, LifecycleReconciliationDto? Reconciliation);
 
-public sealed record LifecycleBucketDto(DateTimeOffset At, long Raw, long Analyzed, long WithFacts, long DomainCompleted, long Failed, long NoText);
+/// <summary>One time bucket. Conversion fields count raw messages, not the number of objects they produced.</summary>
+public sealed record LifecycleBucketDto(DateTimeOffset At, long Raw, long Analyzed, long WithFacts, long WithTargets, long WithEvents, long WithIncidents, long DomainCompleted, long Failed, long NoText);
 
-public sealed record LifecycleSourceDto(int SourceId, string Code, long Raw, long Posts, long Edits, long NoText, long WithPayload, long Facts, double? TextLengthP50, double? CollectDelayP50Seconds, double? CollectDelayP95Seconds, long Live, long History, double? MaxGapSeconds);
+/// <summary>
+/// Source conversion counts. Every <c>With*</c> field counts messages that produced at least one result of that kind, so it remains
+/// comparable with <see cref="Raw"/> even when one message creates several facts or domain objects.
+/// </summary>
+public sealed record LifecycleSourceDto(int SourceId, string Code, long Raw, long Posts, long Edits, long NoText, long WithPayload,
+    long Analyzed, long WithFacts, long WithTargets, long WithEvents, long WithIncidents, long WithTracks, long WithAlerts, long Facts,
+    double? TextLengthP50, double? CollectDelayP50Seconds, double? CollectDelayP95Seconds, long Live, long History, double? MaxGapSeconds);
 
-public sealed record LifecycleFunnelDto(long Raw, long Posts, long Stored, long Analyzed, long WithFacts, long DomainCompleted, long Visible, long StuckAnalysis, long StuckDomain, long UnavailableTimings, long UnavailableCompletion,
+public sealed record LifecycleFunnelDto(long Raw, long Posts, long Stored, long Analyzed, long WithFacts, long WithTargets, long WithEvents, long WithIncidents, long WithTracks, long WithAlerts, long DomainCompleted, long Visible, long StuckAnalysis, long StuckDomain, long UnavailableTimings, long UnavailableCompletion,
     double? StoredToAnalyzedP50Seconds, double? StoredToAnalyzedP95Seconds, double? AnalyzedToDomainP50Seconds, double? AnalyzedToDomainP95Seconds);
 
 public sealed record LifecycleParseDto(IReadOnlyDictionary<string, long> Outcomes, IReadOnlyDictionary<string, long> Methods, long MultiFact, long Unlocated, long TotalFacts, IReadOnlyDictionary<string, long> RuleVersions, IReadOnlyDictionary<string, long> ModelVersions);

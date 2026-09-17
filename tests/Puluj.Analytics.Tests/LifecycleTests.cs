@@ -398,6 +398,11 @@ public sealed class LifecycleTests : IAsyncLifetime
         await RawAsync("d-4", "0", kyivMidnight.AddMinutes(55), "Старе повідомлення.", 1); // legacy processed: timings unavailable
         await Backfill.RunAsync(100, 10, CancellationToken.None);
 
+        var status = await Reports.StatusAsync(CancellationToken.None);
+        Assert.Equal(5, status.Backfill.RawRows);
+        Assert.Equal(5, status.Backfill.ProjectedRows);
+        Assert.True(status.Backfill.CaughtUp);
+
         var report = await Reports.ReportAsync(168, CancellationToken.None);
         Assert.NotNull(report);
         Assert.Equal("day", report.Bucket);
@@ -405,6 +410,9 @@ public sealed class LifecycleTests : IAsyncLifetime
         Assert.Equal(4, report.Funnel.Posts); // the edit is the same post
         Assert.Equal(4, report.Funnel.Analyzed); // 2 stage analyses + 2 legacy outcomes (unsupported, legacy); the edit has none
         Assert.Equal(2, report.Funnel.WithFacts);
+        Assert.Equal(0, report.Funnel.WithTargets); // no target rows were materialized by this fixture
+        Assert.Equal(2, report.Funnel.WithEvents); // both platform-path messages have observations
+        Assert.Equal(0, report.Funnel.WithIncidents);
         Assert.Equal(3, report.Funnel.UnavailableTimings); // the two legacy rows and the edit without an analysis (no stage rows)
         Assert.Equal(5, report.Funnel.UnavailableCompletion); // no archived events in the synthetic run
         Assert.Equal(1, report.Funnel.StuckAnalysis); // the edit: no analysis, older than the (zero) stale window
@@ -413,6 +421,11 @@ public sealed class LifecycleTests : IAsyncLifetime
         Assert.Equal(4, source.Posts);
         Assert.Equal(1, source.Edits);
         Assert.Equal(1, source.NoText);
+        Assert.Equal(4, source.Analyzed);
+        Assert.Equal(2, source.WithFacts);
+        Assert.Equal(0, source.WithTargets);
+        Assert.Equal(2, source.WithEvents);
+        Assert.Equal(0, source.WithIncidents);
         Assert.Equal(3, source.Facts);
         Assert.Equal(30d, source.CollectDelayP50Seconds);
         Assert.Equal(2, report.Parse.Outcomes["completed"]);
