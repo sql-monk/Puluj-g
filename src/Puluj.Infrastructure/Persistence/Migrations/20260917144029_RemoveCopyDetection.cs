@@ -11,6 +11,10 @@ namespace Puluj.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Older databases have this legacy view from the former copy-detection schema.
+            // PostgreSQL will not drop its source table while the view still depends on it.
+            migrationBuilder.Sql("DROP VIEW IF EXISTS source_rating_daily;");
+
             migrationBuilder.DropTable(
                 name: "source_copies");
 

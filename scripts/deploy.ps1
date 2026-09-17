@@ -66,6 +66,8 @@ $volume = $DatabaseVolume.Trim()
 $volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
 $env:PULUJ_PGDATA_VOLUME = $volume
 
+function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
+
 function Assert-ResetTarget {
     # A name alone is not ownership. Refuse a reset unless the exact existing postgis container of this Compose
     # project is labelled as such and mounts this exact volume at PostgreSQL's data directory. This check happens
@@ -114,7 +116,6 @@ elseif (-not $volumeExists) {
 else {
     Write-Host "Using existing PostgreSQL volume '$volume'; migrations will update it in place." -ForegroundColor Green
 }
-function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
 
 # Platform path (P03–P09): which roles the `messaging` worker runs and how many legacy processors stay. Compose reads
 # these through ${…} substitution, so they are set here per run — the plain run always restores the legacy layout.
