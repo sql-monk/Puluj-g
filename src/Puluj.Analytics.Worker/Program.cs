@@ -15,8 +15,7 @@ if (args.Contains("--healthcheck"))
     return await Healthcheck.RunAsync();
 }
 
-// The source analytics service: indexes raw_messages into the analytics schema (who copies whom, forwards, activity,
-// who reports tracks first) and serves its own status. The admin panel reads the same schema directly.
+// The analytics service indexes raw messages for the independent track-first projection and serves its own status.
 var builder = WebApplication.CreateBuilder(args);
 var appName = $"puluj-{builder.Configuration[$"{AnalyticsOptions.Section}:Name"] ?? "analytics"}";
 
@@ -54,22 +53,6 @@ app.MapGet("/health", (AnalysisLoop loop) =>
     return healthy ? Results.Ok(body) : Results.Json(body, statusCode: StatusCodes.Status503ServiceUnavailable);
 });
 app.MapGet("/api/analytics/status", (AnalyticsReportService reports, CancellationToken ct) => reports.StatusAsync(ct));
-app.MapGet("/api/analytics/report", async (int? days, AnalyticsReportService reports, CancellationToken ct) =>
-    await reports.ReportAsync(days ?? 14, ct) is { } report ? Results.Ok(report) : Results.NotFound(new { error = "analytics schema is not initialized" }));
-// kind: near | verbatim | forward; primaryOnly: only the earliest original of every copy (same contract as the admin panel).
-app.MapGet("/api/analytics/recent", async (int? limit, int? sourceId, string? kind, bool? primaryOnly, AnalyticsReportService reports, CancellationToken ct) =>
-{
-    CopyKind? copyKind = null;
-    if (!string.IsNullOrEmpty(kind))
-    {
-        if (!Enum.TryParse<CopyKind>(kind, ignoreCase: true, out var parsed) || !Enum.IsDefined(parsed))
-        {
-            return Results.BadRequest(new { error = "kind: near, verbatim or forward" });
-        }
-        copyKind = parsed;
-    }
-    return Results.Ok(await reports.RecentAsync(limit ?? 30, sourceId, copyKind, primaryOnly ?? false, ct));
-});
 
 app.Services.GetRequiredService<ILogger<Program>>().LogInformation("{App} starting", appName);
 await app.RunAsync();

@@ -131,12 +131,6 @@ public sealed record PredecessorsDto(long TrackId, long HeadTargetId, IReadOnlyL
 
 public sealed record TargetLinkDto(long TargetId, string Kind, double Probability, string Direction, double? DistanceKm, double? MinutesApart, double? HeadingDiffDeg, double? RequiredMinutes);
 
-/// <summary>Source rating over time: per-day counters and the earned rating (0..1), plus who copies whom and the groups that follow.</summary>
-public sealed record SourceRatingDayDto(DateOnly Day, int Targets, int Copies, int CopiedBy, double? AvgLeadSeconds, double? Rating);
-public sealed record SourceRatingDto(int Id, string Name, double TrustLevel, double? Rating, int? Group, IReadOnlyList<SourceRatingDayDto> Days);
-public sealed record SourceCopyDto(int CopierId, int OriginalId, int Count, double AvgDelaySeconds);
-public sealed record SourceRatingReportDto(IReadOnlyList<DateOnly> Days, IReadOnlyList<SourceRatingDto> Sources, IReadOnlyList<SourceCopyDto> Copies, IReadOnlyList<IReadOnlyList<int>> Groups);
-
 public sealed record TrackDetailsDto(TrackDto Track, IReadOnlyList<TargetDto> Targets);
 
 public sealed record PlaceDto(int Id, string Name, string Level, int? ParentId, string? ParentName, double Lon, double Lat, double RadiusKm, int Population);

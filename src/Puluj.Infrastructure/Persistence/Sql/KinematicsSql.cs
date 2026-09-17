@@ -134,9 +134,6 @@ CREATE OR REPLACE FUNCTION puluj_on_target_insert() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF NEW.event_type = 1 THEN
-        INSERT INTO source_daily_stats (source_id, day, targets, copies, copied_by, lead_seconds_sum)
-        VALUES (NEW.source_id, puluj_day(NEW.observed_at), 1, 0, 0, 0)
-        ON CONFLICT (source_id, day) DO UPDATE SET targets = source_daily_stats.targets + 1;
         INSERT INTO target_anchors (target_id, geom, centre, slack_km)
         SELECT NEW.target_id, a.geom, ST_Centroid(a.geom), a.slack_km FROM puluj_target_anchor(NEW) a WHERE a.geom IS NOT NULL
         ON CONFLICT (target_id) DO NOTHING;
@@ -193,10 +190,6 @@ LANGUAGE sql STABLE AS $$
     FROM target_classes c WHERE c.target_class_id = class_id
 $$;
 
--- Day boundaries are Kyiv local time (used by the trigger below and the statistics further down).
-CREATE OR REPLACE FUNCTION puluj_day(ts timestamptz) RETURNS date
-LANGUAGE sql IMMUTABLE AS $$ SELECT (ts AT TIME ZONE 'Europe/Kyiv')::date $$;
-
 """ + Anchors + LinkTarget + """
 -- ---------------------------------------------------------------------------------------------------------------
 -- Predecessor chain of a target: at every step the most probable predecessor. Feeds the crumbs on the map and the
@@ -221,13 +214,11 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- ---------------------------------------------------------------------------------------------------------------
--- Source statistics.
+-- Duplicate targets remain linked for map/history traversal, without attributing one source to another.
 -- ---------------------------------------------------------------------------------------------------------------
--- A fact marked as a duplicate stops being a node of the kinematic graph and becomes a copy: who copied whom, how
--- much later. Same-source repeats (a channel re-posting its own list) are not copies.
 CREATE OR REPLACE FUNCTION puluj_on_target_duplicate() RETURNS trigger
 LANGUAGE plpgsql AS $$
-DECLARE o targets; delay double precision;
+DECLARE o targets;
 BEGIN
     IF NEW.duplicate_of_target_id IS NULL OR OLD.duplicate_of_target_id IS NOT DISTINCT FROM NEW.duplicate_of_target_id THEN
         RETURN NULL;
@@ -238,18 +229,6 @@ BEGIN
     INSERT INTO target_links (from_target_id, to_target_id, kind, probability, created_at)
     VALUES (o.target_id, NEW.target_id, 4, 1, now())
     ON CONFLICT (from_target_id, to_target_id) DO UPDATE SET kind = 4, probability = 1;
-    IF o.source_id <> NEW.source_id THEN
-        delay := GREATEST(0, EXTRACT(EPOCH FROM (NEW.observed_at - o.observed_at)));
-        INSERT INTO source_daily_stats (source_id, day, targets, copies, copied_by, lead_seconds_sum)
-        VALUES (NEW.source_id, puluj_day(NEW.observed_at), 0, 1, 0, 0)
-        ON CONFLICT (source_id, day) DO UPDATE SET copies = source_daily_stats.copies + 1;
-        INSERT INTO source_daily_stats (source_id, day, targets, copies, copied_by, lead_seconds_sum)
-        VALUES (o.source_id, puluj_day(o.observed_at), 0, 0, 1, delay)
-        ON CONFLICT (source_id, day) DO UPDATE SET copied_by = source_daily_stats.copied_by + 1, lead_seconds_sum = source_daily_stats.lead_seconds_sum + EXCLUDED.lead_seconds_sum;
-        INSERT INTO source_copies (copier_source_id, original_source_id, day, count, delay_seconds_sum)
-        VALUES (NEW.source_id, o.source_id, puluj_day(NEW.observed_at), 1, delay)
-        ON CONFLICT (copier_source_id, original_source_id, day) DO UPDATE SET count = source_copies.count + 1, delay_seconds_sum = source_copies.delay_seconds_sum + EXCLUDED.delay_seconds_sum;
-    END IF;
     RETURN NULL;
 END $$;
 
@@ -260,36 +239,7 @@ DROP TRIGGER IF EXISTS trg_targets_duplicate ON targets;
 CREATE TRIGGER trg_targets_duplicate AFTER UPDATE OF duplicate_of_target_id ON targets
     FOR EACH ROW EXECUTE FUNCTION puluj_on_target_duplicate();
 
--- Rating per source per day: 0.7 * originality (share of facts that were not copies) + 0.3 * influence (share of
--- facts other sources repeated, capped at 1). Not the operator's trust level: this one is earned.
-CREATE OR REPLACE VIEW source_rating_daily AS
-SELECT s.source_id, s.day, s.targets, s.copies, s.copied_by,
-       CASE WHEN s.copied_by > 0 THEN s.lead_seconds_sum / s.copied_by END AS avg_lead_seconds,
-       CASE WHEN s.targets > 0 THEN 1 - s.copies::float / s.targets ELSE NULL END AS originality,
-       CASE WHEN s.targets > 0 THEN LEAST(1, s.copied_by::float / s.targets) ELSE NULL END AS influence,
-       CASE WHEN s.targets > 0 THEN ROUND((0.7 * (1 - s.copies::float / s.targets) + 0.3 * LEAST(1, s.copied_by::float / s.targets))::numeric, 3) END AS rating
-FROM source_daily_stats s;
-
--- Backfill from what is already in the database: statistics from existing facts and duplicates, links for every
--- fact of the last day (older ones are off the map anyway; the trigger covers everything from here on).
-TRUNCATE source_daily_stats, source_copies;
-INSERT INTO source_daily_stats (source_id, day, targets, copies, copied_by, lead_seconds_sum)
-SELECT t.source_id, puluj_day(t.observed_at), COUNT(*),
-       COUNT(*) FILTER (WHERE t.duplicate_of_target_id IS NOT NULL AND o.source_id <> t.source_id), 0, 0
-FROM targets t LEFT JOIN targets o ON o.target_id = t.duplicate_of_target_id
-WHERE t.event_type = 1 GROUP BY 1, 2;
-WITH copied AS (
-    SELECT o.source_id, puluj_day(o.observed_at) AS day, COUNT(*) AS n, SUM(GREATEST(0, EXTRACT(EPOCH FROM (t.observed_at - o.observed_at)))) AS lead
-    FROM targets t JOIN targets o ON o.target_id = t.duplicate_of_target_id
-    WHERE t.event_type = 1 AND o.source_id <> t.source_id GROUP BY 1, 2
-)
-INSERT INTO source_daily_stats (source_id, day, targets, copies, copied_by, lead_seconds_sum)
-SELECT source_id, day, 0, 0, n, lead FROM copied
-ON CONFLICT (source_id, day) DO UPDATE SET copied_by = EXCLUDED.copied_by, lead_seconds_sum = EXCLUDED.lead_seconds_sum;
-INSERT INTO source_copies (copier_source_id, original_source_id, day, count, delay_seconds_sum)
-SELECT t.source_id, o.source_id, puluj_day(t.observed_at), COUNT(*), SUM(GREATEST(0, EXTRACT(EPOCH FROM (t.observed_at - o.observed_at))))
-FROM targets t JOIN targets o ON o.target_id = t.duplicate_of_target_id
-WHERE t.event_type = 1 AND o.source_id <> t.source_id GROUP BY 1, 2, 3;
+-- Backfill map links for existing duplicate facts and recent moving targets.
 DELETE FROM target_links WHERE kind IN (0, 1, 2, 3);
 INSERT INTO target_links (from_target_id, to_target_id, kind, probability, created_at)
 SELECT t.duplicate_of_target_id, t.target_id, 4, 1, now() FROM targets t WHERE t.duplicate_of_target_id IS NOT NULL
@@ -301,10 +251,8 @@ SELECT COUNT(puluj_link_target(target_id)) FROM (SELECT target_id FROM targets W
 DROP TABLE IF EXISTS target_anchors;
 DROP TRIGGER IF EXISTS trg_targets_insert_kinematics ON targets;
 DROP TRIGGER IF EXISTS trg_targets_duplicate ON targets;
-DROP VIEW IF EXISTS source_rating_daily;
 DROP FUNCTION IF EXISTS puluj_on_target_duplicate();
 DROP FUNCTION IF EXISTS puluj_on_target_insert();
-DROP FUNCTION IF EXISTS puluj_day(timestamptz);
 DROP FUNCTION IF EXISTS puluj_target_chain(bigint, integer);
 DROP FUNCTION IF EXISTS puluj_link_target(bigint);
 DROP FUNCTION IF EXISTS puluj_class_params(integer);

@@ -22,7 +22,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
     public async Task InitializeAsync()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts, source_daily_stats, source_copies RESTART IDENTITY CASCADE");
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts RESTART IDENTITY CASCADE");
     }
     public Task DisposeAsync() => InitializeAsync(); // Do not leak this class's synthetic data into legacy tests.
 
@@ -69,7 +69,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
     }
 
     [Fact]
-    public async Task Concurrent_observations_create_one_track_with_all_evidence_and_sql_stats()
+    public async Task Concurrent_observations_create_one_track_with_all_evidence()
     {
         var ids = new List<long>();
         for (var i = 0; i < 12; i++) ids.Add(await Text($"same-{i}", "Шахеди на Сумщині курсом на Полтавщину.", At, i % 2 == 0 ? "tg_kpszsu" : "tg_monitoringwar"));
@@ -81,7 +81,6 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
         Assert.Equal(ids.Count, await db.TrackTargets.CountAsync());
         Assert.Equal(ids.Count, await db.TargetTrackRevisions.CountAsync());
         Assert.Equal(ids.Count - 1, await db.Targets.CountAsync(t => t.DuplicateOfTargetId != null));
-        Assert.Equal(ids.Count, await db.Database.SqlQueryRaw<long>("SELECT coalesce(sum(targets), 0)::bigint AS \"Value\" FROM source_daily_stats").SingleAsync());
         await AssertCommitted(db, ids);
     }
 

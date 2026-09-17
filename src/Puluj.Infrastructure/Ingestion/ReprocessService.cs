@@ -7,7 +7,7 @@ namespace Puluj.Infrastructure.Ingestion;
 
 /// <summary>
 /// Rebuilds everything derived from the raw messages: drops targets, tracks, revisions, links, alerts, processing
-/// errors and source statistics, and puts every raw message back to Pending. The processors then re-run the
+/// errors, and puts every raw message back to Pending. The processors then re-run the
 /// pipeline over all of them in publication order (see ProcessingLoop), so the result is what live processing would
 /// have produced had the messages arrived in that order. The raw messages themselves are never touched.
 /// Plain DELETEs (not TRUNCATE) so the admin role, which has no TRUNCATE privilege, can run it too.
@@ -30,8 +30,6 @@ public sealed class ReprocessService(IDbContextFactory<PulujDbContext> factory, 
         ("targets", "DELETE FROM targets"),
         ("air_alerts", "DELETE FROM air_alerts"),
         ("processing_errors", "DELETE FROM processing_errors"),
-        ("source_daily_stats", "DELETE FROM source_daily_stats"),
-        ("source_copies", "DELETE FROM source_copies"),
     ];
 
     public async Task<int> ResetAsync(CancellationToken ct)

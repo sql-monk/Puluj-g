@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { admin, AdminError, getAdminToken, setAdminToken, type AdminSourceDto, type AdminStatusDto, type SettingDto } from '../api/admin'
 import { Badge, Field, findSetting, Section, Toggle, type Draft } from '../components/settings/fields'
-import SourceRatingPanel from '../components/settings/SourceRatingPanel'
-import AnalyticsPanel from '../components/analytics/AnalyticsPanel'
 import LlmUsagePanel from './LlmUsagePanel'
 import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
@@ -21,7 +19,7 @@ import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'replay' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'analytics' | 'analytics-service' | 'catalog' | 'incidents' | 'sources' | 'rating' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'replay' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'catalog' | 'incidents' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
@@ -34,13 +32,9 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
   { id: 'logs', label: 'Логи', group: 'Моніторинг' },
   { id: 'lifecycle', label: 'Аналітика повідомлень', group: 'Аналітика' },
-  { id: 'analytics', label: 'Хто кого копіює', group: 'Аналітика' },
-  // Same component as `analytics`: it reads the hash itself and opens its "Сервіс" tab on #/analytics-service.
-  { id: 'analytics-service', label: 'Стан сервісу', group: 'Аналітика' },
   { id: 'catalog', label: 'Каталог подій', group: 'Дані' },
   { id: 'incidents', label: 'Інциденти', group: 'Дані' },
   { id: 'sources', label: 'Джерела', group: 'Налаштування' },
-  { id: 'rating', label: 'Рейтинг джерел', group: 'Налаштування' },
   { id: 'alerts', label: 'alerts.in.ua', group: 'Налаштування' },
   { id: 'telegram', label: 'Telegram', group: 'Налаштування' },
   { id: 'llm', label: 'LLM', group: 'Налаштування' },
@@ -176,11 +170,9 @@ export default function AdminApp() {
                 {section === 'db' && <DbPanel />}
                 {section === 'logs' && <LogsPanel />}
                 {section === 'lifecycle' && <MessageAnalyticsPanel />}
-                {(section === 'analytics' || section === 'analytics-service') && <AnalyticsPanel />}
                 {section === 'catalog' && <CatalogPanel />}
                 {section === 'incidents' && <IncidentsPanel />}
                 {section === 'sources' && <SourcesEditor sources={sources} reload={load} notify={setMessage} />}
-                {section === 'rating' && <SourceRatingPanel />}
                 {section === 'alerts' && <AlertsSection {...props} />}
                 {section === 'telegram' && <TelegramSection {...props} />}
                 {section === 'llm' && <LlmSection {...props} />}

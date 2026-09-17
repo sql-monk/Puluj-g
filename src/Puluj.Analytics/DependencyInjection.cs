@@ -12,12 +12,11 @@ public static class DependencyInjection
 {
     public const string ConnectionStringName = "Puluj";
 
-    /// <summary>Everything the analytics service runs: the index, the detector and the runner (owner connection: it migrates its own schema).</summary>
+    /// <summary>Everything the analytics service runs: the independent index and runner (owner connection: it migrates its own schema).</summary>
     public static IServiceCollection AddPulujAnalytics(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddPulujAnalyticsReporting(configuration);
         services.AddSingleton<AnalyticsMetrics>();
-        services.AddSingleton<CopyDetector>();
         services.AddSingleton<AnalysisRunner>();
         return services;
     }

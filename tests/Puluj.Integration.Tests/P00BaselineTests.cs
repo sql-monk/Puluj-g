@@ -69,7 +69,7 @@ public sealed class P00BaselineTests(PipelineFixture fixture)
     private async Task<object> Run(string profile, int workers, int repeat)
     {
         await using (var db = await Factory.CreateDbContextAsync())
-            await db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts, source_daily_stats, source_copies RESTART IDENTITY CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts RESTART IDENTITY CASCADE");
         var ingestor = Services.GetRequiredService<RawMessageIngestor>();
         await using var setup = await Factory.CreateDbContextAsync();
         var sources = await setup.Sources.ToDictionaryAsync(s => s.Code, s => s.SourceId);

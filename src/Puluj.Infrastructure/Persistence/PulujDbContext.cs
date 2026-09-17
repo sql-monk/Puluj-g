@@ -29,8 +29,6 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<TargetTrack> TargetTracks => Set<TargetTrack>();
     public DbSet<TrackTarget> TrackTargets => Set<TrackTarget>();
     public DbSet<TargetLink> TargetLinks => Set<TargetLink>();
-    public DbSet<SourceCopy> SourceCopies => Set<SourceCopy>();
-    public DbSet<SourceDailyStat> SourceDailyStats => Set<SourceDailyStat>();
     public DbSet<TargetTrackRevision> TargetTrackRevisions => Set<TargetTrackRevision>();
 
     public DbSet<AirAlert> AirAlerts => Set<AirAlert>();

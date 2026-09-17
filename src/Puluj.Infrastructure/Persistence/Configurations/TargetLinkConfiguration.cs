@@ -15,21 +15,3 @@ public class TargetLinkConfiguration : IEntityTypeConfiguration<TargetLink>
         b.HasOne(x => x.To).WithMany().HasForeignKey(x => x.ToTargetId).OnDelete(DeleteBehavior.Cascade);
     }
 }
-
-public class SourceCopyConfiguration : IEntityTypeConfiguration<SourceCopy>
-{
-    public void Configure(EntityTypeBuilder<SourceCopy> b)
-    {
-        b.HasKey(x => new { x.CopierSourceId, x.OriginalSourceId, x.Day });
-        b.HasIndex(x => x.Day);
-    }
-}
-
-public class SourceDailyStatConfiguration : IEntityTypeConfiguration<SourceDailyStat>
-{
-    public void Configure(EntityTypeBuilder<SourceDailyStat> b)
-    {
-        b.HasKey(x => new { x.SourceId, x.Day });
-        b.HasIndex(x => x.Day);
-    }
-}

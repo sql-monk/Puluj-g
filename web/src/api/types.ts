@@ -253,36 +253,6 @@ export interface TargetLinkDto {
   requiredMinutes?: number
 }
 
-/** Source rating report: per-day counters and the earned rating, who copies whom, and the groups that follow. */
-export interface SourceRatingDayDto {
-  day: string
-  targets: number
-  copies: number
-  copiedBy: number
-  avgLeadSeconds?: number
-  rating?: number
-}
-export interface SourceRatingDto {
-  id: number
-  name: string
-  trustLevel: number
-  rating?: number
-  group?: number
-  days: SourceRatingDayDto[]
-}
-export interface SourceCopyDto {
-  copierId: number
-  originalId: number
-  count: number
-  avgDelaySeconds: number
-}
-export interface SourceRatingReportDto {
-  days: string[]
-  sources: SourceRatingDto[]
-  copies: SourceCopyDto[]
-  groups: number[][]
-}
-
 export interface TargetDto {
   id: MapId
   observedAt: string

@@ -1,6 +1,5 @@
 // Admin panel client (served by Puluj.Admin, same origin). The admin token (if the server has one) is kept in
 // localStorage and sent as X-Admin-Token.
-import type { SourceRatingReportDto } from './types'
 
 export interface SettingDto {
   key: string
@@ -434,8 +433,6 @@ export const admin = {
   deleteSource: (id: number) => call<void>('DELETE', `/api/admin/sources/${id}`),
   telegramCode: (code: string) => call<void>('POST', '/api/admin/telegram/code', { code }),
   testAlerts: (token?: string) => call<TestResultDto>('POST', '/api/admin/test/alerts', {}, token ? { 'X-Test-Token': token } : undefined),
-  /** Earned source rating with per-day history, copy pairs and groups. */
-  sourceRating: (days = 14) => call<SourceRatingReportDto>('GET', `/api/admin/sources/rating?days=${days}`),
   ops: {
     overview: () => call<OpsOverviewDto>('GET', '/api/admin/ops/overview'),
     collectors: () => call<CollectorStatusDto[]>('GET', '/api/admin/ops/collectors'),

@@ -15,7 +15,7 @@ UPDATE raw_messages
 SET processing_status = 0, attempts = 0, processed_at = NULL, claimed_by = NULL, claimed_at = NULL
 WHERE processing_status <> 0; -- Failed ones too: a parser fix is one of the reasons to be here
 SELECT pg_advisory_xact_lock(88327283100161); -- 0x50554C554A01
-TRUNCATE track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, source_daily_stats, source_copies
+TRUNCATE track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors
     RESTART IDENTITY CASCADE;
 COMMIT;
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;

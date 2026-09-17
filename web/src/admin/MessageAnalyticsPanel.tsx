@@ -35,7 +35,7 @@ function Dict({ values, label, map }: { values: Record<string, number>; label?: 
 /**
  * Сторінка «Аналітика повідомлень» (P15, §10, ADR-0013): життєвий цикл кожного повідомлення з відомими знаменниками — джерела й
  * надходження, проходження конвеєра (funnel і час на переходах), розбори, якість, вартість, результати, історія змін; no-text і failed видимі,
- * невідомі timings/completion позначені «unavailable». Copy-аналітика («Хто кого копіює») лишається окремою сторінкою — допоміжний розділ.
+ * невідомі timings/completion позначені «unavailable».
  */
 export function MessageAnalyticsPanel() {
   const [hours, setHours] = useState<24 | 168 | 720>(24)
@@ -72,9 +72,6 @@ export function MessageAnalyticsPanel() {
         <span className="text-slate-500">
           {fmtTime(data.from)} → {fmtTime(data.to)} · bucket {data.bucket === 'hour' ? 'година (UTC)' : 'доба (Europe/Kyiv)'} · час у сховищі UTC
         </span>
-        <a className="ml-auto underline" href="#/analytics">
-          Схожість повідомлень (хто кого копіює) →
-        </a>
       </div>
 
       <StatusRow status={status.data} />

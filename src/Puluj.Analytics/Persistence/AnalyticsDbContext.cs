@@ -15,7 +15,6 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
     public DbSet<AnalyticsState> State => Set<AnalyticsState>();
     public DbSet<AnalysisRun> Runs => Set<AnalysisRun>();
     public DbSet<MessageFingerprint> Messages => Set<MessageFingerprint>();
-    public DbSet<MessageCopy> Copies => Set<MessageCopy>();
     public DbSet<TrackFirst> TrackFirsts => Set<TrackFirst>();
     /// <summary>P15: the lifecycle projection (per raw message per run) — DDL owned by the pipeline's `PulujDbContext` migrations (schema `analytics`), mapped here read/write without migrations.</summary>
     public DbSet<Puluj.Domain.Entities.Analytics.MessageLifecycle> Lifecycle => Set<Puluj.Domain.Entities.Analytics.MessageLifecycle>();
@@ -45,23 +44,8 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
             e.HasKey(x => x.RawMessageId);
             e.Property(x => x.RawMessageId).ValueGeneratedNever();
             e.Property(x => x.PostKey).HasMaxLength(256);
-            e.Property(x => x.ForwardedFrom).HasMaxLength(128);
             e.HasIndex(x => x.PublishedAt);
             e.HasIndex(x => new { x.SourceId, x.PublishedAt });
-            e.HasIndex(x => new { x.SourceId, x.ChannelId });
-            // Kept for compatibility with already migrated analytics databases; semantic matching does not query it.
-            e.HasIndex(x => x.Bands).HasMethod("gin").HasFilter("bands IS NOT NULL");
-        });
-
-        b.Entity<MessageCopy>(e =>
-        {
-            e.ToTable("copies");
-            e.HasKey(x => new { x.CopySourceId, x.CopyPostKey, x.OriginalSourceId, x.OriginalPostKey });
-            e.Property(x => x.CopyPostKey).HasMaxLength(256);
-            e.Property(x => x.OriginalPostKey).HasMaxLength(256);
-            e.HasIndex(x => x.CopyPublishedAt);
-            e.HasIndex(x => new { x.CopySourceId, x.OriginalSourceId, x.CopyPublishedAt });
-            e.HasIndex(x => x.OriginalRawMessageId);
         });
 
         b.Entity<TrackFirst>(e =>

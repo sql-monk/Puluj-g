@@ -55,10 +55,6 @@ public static partial class OpsEndpoints
             return Results.Json(new { result = outcome.Result, containers }, statusCode: outcome.StatusCode);
         });
 
-        // Earned rating of the sources (originality, who copies whom, groups) with per-day history.
-        ops.MapGet("/sources/rating", async (int? days, SnapshotService snapshots, CancellationToken ct) =>
-            await snapshots.SourceRatingAsync(days ?? 14, ct));
-
         ops.MapGet("/logs/files", (LogReader logs) => Results.Ok(logs.Files()));
         ops.MapGet("/logs", (string file, int? lines, string? filter, string? level, LogReader logs) =>
         {

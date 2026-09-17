@@ -170,8 +170,6 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
         var started = targets.Single(t => t.RawMessageId == structured.RawMessageId);
         Assert.Equal(EventType.AirRaidAlert, started.EventType);
         Assert.Equal("alert.air_raid.started", started.EventKind!.Code);
-        // The SQL functions still see the legacy enum: the insert trigger counted the observed target in the daily stats.
-        Assert.Equal(1, await db.SourceDailyStats.CountAsync(s => s.SourceId == telegram));
         await Truncate(db);
     }
 
@@ -271,7 +269,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
     }
 
     private static Task Truncate(PulujDbContext db) =>
-        db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts, source_daily_stats, source_copies, processing_errors RESTART IDENTITY CASCADE");
+        db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts, processing_errors RESTART IDENTITY CASCADE");
 
     private static async Task<string> Explain(PulujDbContext db, string sql)
     {
