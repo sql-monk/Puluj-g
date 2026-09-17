@@ -128,12 +128,9 @@ export function QueuesPanel() {
                 <th className="pr-2 text-right">Retry/год</th>
                 <th className="pr-2 text-right">DLQ</th>
                 <th className="pr-2 text-right">Найстаріша</th>
-                <th className="pr-2 text-right">Лаг</th>
-                <th className="pr-2 text-right">Wait p50/p95/p99</th>
-                <th className="pr-2 text-right">Обробка p50/p95/p99</th>
+
                 <th className="pr-2 text-right">Завершено/год</th>
-                <th className="pr-2 text-right">Консюмери</th>
-                <th className="pr-2 text-right">Брокер</th>
+
                 <th>Дії</th>
               </tr>
             </thead>
@@ -332,17 +329,49 @@ function AlarmRow({ alarm }: { alarm: AlarmDto }) {
   )
 }
 
+const SUBSCRIPTION_HELP: Record<string, string> = {
+  'raw-writer': 'Надійно зберігає вхідні повідомлення як raw-дані та публікує подію raw.stored для наступних етапів.',
+  normalizer: 'Нормалізує збережене повідомлення: готує текст і метадані для розпізнавання.',
+  parser: 'Розпізнає нормалізований текст за правилами та, коли потрібно, створює запит до LLM.',
+  'llm-worker': 'Виконує запити до LLM для складного розпізнавання й повертає результат або фінальну помилку.',
+  finalizer: 'Збирає результат розпізнавання, записує observations і завершує аналіз повідомлення.',
+  'track-worker': 'Оновлює агрегати рухомих цілей і обробляє запити на закриття застарілих треків.',
+  'alert-worker': 'Оновлює стани тривог та обробляє запити watchdog на завершення інтервалів.',
+  'incident-worker': 'Створює й оновлює інциденти на основі зафіксованих observations.',
+  projection: 'Передає зміни треків, тривог та інцидентів у проєкції й realtime-оновлення для клієнтів.',
+  'message-analytics': 'Будує життєвий цикл повідомлення для аналітики: етапи, очікувані гілки та завершення.',
+  archive: 'Зберігає незмінний архів транспортних подій; це обов’язкова гілка для відтворення та аудиту.',
+}
+
+function subscriptionHelp(subscription: string): string {
+  return SUBSCRIPTION_HELP[subscription] ?? `Обробник підписки «${subscription}»: отримує події своєї черги для цього lane.`
+}
 function LaneRow({ row, slo, ready, busy, onLane }: { row: SubscriptionLaneOpsDto; slo: MessagingOpsDto['slo']; ready: boolean; busy: boolean; onLane: (row: SubscriptionLaneOpsDto, state: 'active' | 'paused' | 'draining') => Promise<void> }) {
+  const [helpOpen, setHelpOpen] = useState(false)
   const state = row.laneState.state
   const over = (row.oldestPendingAgeSeconds ?? 0) > (slo.oldestAgeSeconds[row.lane] ?? 300)
   const stateText = `${LANE_STATE[state] ?? state}${state !== 'active' ? ` (${row.laneState.actor ?? '?'}: ${row.laneState.reason ?? '—'})` : ''}`
   const notEmpty = row.pending > 0 || row.inFlight > 0
   return (
     <tr className="border-t border-slate-100 dark:border-slate-800" data-testid={`lane-${row.subscription}-${row.lane}`} data-state={state}>
-      <td className="py-1 pr-2 font-mono">
-        {row.subscription}
+      <td className="relative py-1 pr-2 font-mono">
+        <span>{row.subscription}</span>
         {row.required ? '' : ' (opt)'}
         {row.registryStatus !== 'active' ? ` [${row.registryStatus}]` : ''}
+        <button
+          type="button"
+          className="ml-1 inline-flex size-4 items-center justify-center rounded-full border border-slate-400 font-sans text-[10px] font-bold text-slate-600 hover:border-slate-600 hover:text-slate-900 dark:border-slate-500 dark:text-slate-300 dark:hover:border-slate-300 dark:hover:text-white"
+          aria-label={`Призначення черги ${row.subscription}/${row.lane}`}
+          aria-expanded={helpOpen}
+          onClick={() => setHelpOpen((open) => !open)}
+        >
+          ?
+        </button>
+        {helpOpen && (
+          <div className="absolute left-0 top-full z-20 mt-1 w-72 rounded border border-slate-300 bg-white p-2 font-sans text-[11px] leading-snug text-slate-700 shadow-lg dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" role="tooltip">
+            <span className="font-semibold">{row.subscription}/{row.lane}</span>: {subscriptionHelp(row.subscription)}
+          </div>
+        )}
       </td>
       <td className="pr-2 font-mono">{row.lane}</td>
       <td className={`pr-2 ${state !== 'active' ? 'text-amber-700 dark:text-amber-300' : ''}`} title={row.laneState.changedAt ? fmtTime(row.laneState.changedAt) : ''}>
@@ -357,20 +386,11 @@ function LaneRow({ row, slo, ready, busy, onLane }: { row: SubscriptionLaneOpsDt
       </td>
       <td className={`pr-2 text-right font-mono ${row.quarantined > 0 ? 'text-red-600' : ''}`}>{fmtNum(row.quarantined)}</td>
       <td className={`pr-2 text-right ${over ? 'text-red-600' : ''}`}>{notEmpty ? fmtAge(row.oldestPendingAgeSeconds) : 'порожня'}</td>
-      <td className="pr-2 text-right">{fmtAge(row.eventTimeLagSeconds)}</td>
-      <td className="pr-2 text-right font-mono">
-        {fmtMs(row.waitP50Ms)}/{fmtMs(row.waitP95Ms)}/{fmtMs(row.waitP99Ms)}
-      </td>
-      <td className="pr-2 text-right font-mono">
-        {fmtMs(row.processingP50Ms)}/{fmtMs(row.processingP95Ms)}/{fmtMs(row.processingP99Ms)}
-      </td>
+
       <td className="pr-2 text-right font-mono" title={`noop ${fmtNum(row.noopHour)}, quarantined ${fmtNum(row.failedHour)}, очікувалось ${fmtNum(row.expectedHour)}`}>
         {fmtNum(row.completedHour)}
       </td>
-      <td className={`pr-2 text-right font-mono ${row.consumers === 0 && row.required && state === 'active' && row.pending > 0 ? 'text-red-600' : ''}`}>{row.consumers}</td>
-      <td className="pr-2 text-right font-mono text-[11px]" title={row.source === 'management' ? 'management API' : 'лише БД'}>
-        {row.source === 'management' ? `${fmtNum(row.ready)} / ${fmtNum(row.unacked)} / ${row.brokerConsumers ?? 0}` : '—'}
-      </td>
+
       <td className="space-x-1 whitespace-nowrap">
         {state !== 'paused' && (
           <button className="rounded border border-slate-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={!ready || busy} onClick={() => void onLane(row, 'paused')}>

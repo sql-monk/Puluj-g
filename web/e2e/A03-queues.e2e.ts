@@ -116,6 +116,12 @@ test.describe('admin ops', () => {
     const history = page.getByTestId('lane-parser-history')
     await expect(history).toContainText('пауза (ops: backfill window)')
     await expect(history).toHaveAttribute('data-state', 'paused')
+    await expect(page.getByTestId('lanes-table').locator('thead')).toContainText('ПідпискаLaneСтанPendingIn-flightRetry/годDLQНайстарішаЗавершено/годДії')
+    await expect(page.getByTestId('lanes-table').locator('thead')).not.toContainText('Wait p50/p95/p99')
+    const help = parserLive.getByRole('button', { name: 'Призначення черги parser/live' })
+    await help.click()
+    await expect(parserLive.getByRole('tooltip')).toContainText('parser/live: Розпізнає нормалізований текст')
+    await expect(help).toHaveAttribute('aria-expanded', 'true')
     // Controls are disabled until actor + reason are given.
     const resume = history.getByRole('button', { name: 'відновити' })
     await expect(resume).toBeDisabled()
