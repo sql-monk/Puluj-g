@@ -123,6 +123,13 @@ public sealed class AlarmRulesTests
     }
 
     [Fact]
+    public void Queue_commands_use_explicit_audit_defaults_when_the_single_operator_omits_metadata()
+    {
+        Assert.Equal(("local-admin", "manual action from admin UI"), Puluj.Admin.Endpoints.MessagingOpsEndpoints.Audit(null, null));
+        Assert.Equal(("ops", "backfill window"), Puluj.Admin.Endpoints.MessagingOpsEndpoints.Audit(" ops ", " backfill window "));
+    }
+
+    [Fact]
     public void Explorer_summary_classifies_branches_and_completion()
     {
         static LifecycleDeliveryDto D(string s, string? outcome) => new(s, "live", Now, outcome, null, null, null, [], false);

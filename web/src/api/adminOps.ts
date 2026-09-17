@@ -240,12 +240,12 @@ export const adminOps = {
   quarantine: (subscription?: string, open = true, limit = 100) =>
     adminCall<QuarantineRowDto[]>('GET', `/api/admin/ops/messaging/quarantine?open=${open}&limit=${limit}${subscription ? `&subscription=${encodeURIComponent(subscription)}` : ''}`),
   audit: (limit = 100) => adminCall<ControlAuditDto[]>('GET', `/api/admin/ops/messaging/audit?limit=${limit}`),
-  setLane: (subscription: string, lane: string, state: 'active' | 'paused' | 'draining', actor: string, reason: string) =>
-    adminCall<{ ok: boolean; scope: string; state: string; lane?: SubscriptionLaneOpsDto | null }>('POST', `/api/admin/ops/messaging/lanes/${encodeURIComponent(subscription)}/${encodeURIComponent(lane)}`, { state, actor, reason }),
-  retry: (quarantineId: number, actor: string, reason: string) => adminCall<{ ok: boolean; outboxId: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/retry`, { actor, reason }),
-  waive: (quarantineId: number, actor: string, reason: string) => adminCall<{ ok: boolean; waived: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/waive`, { actor, reason }),
-  scale: (service: 'processor' | 'messaging', replicas: number, actor: string, reason: string) =>
-    adminCall<{ ok: boolean; message: string; output: string }>('POST', '/api/admin/ops/messaging/scale', { service, replicas, actor, reason }),
+  setLane: (subscription: string, lane: string, state: 'active' | 'paused' | 'draining') =>
+    adminCall<{ ok: boolean; scope: string; state: string; lane?: SubscriptionLaneOpsDto | null }>('POST', `/api/admin/ops/messaging/lanes/${encodeURIComponent(subscription)}/${encodeURIComponent(lane)}`, { state }),
+  retry: (quarantineId: number) => adminCall<{ ok: boolean; outboxId: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/retry`, {}),
+  waive: (quarantineId: number) => adminCall<{ ok: boolean; waived: number }>('POST', `/api/admin/ops/messaging/quarantine/${quarantineId}/waive`, {}),
+  scale: (service: 'processor' | 'messaging', replicas: number) =>
+    adminCall<{ ok: boolean; message: string; output: string }>('POST', '/api/admin/ops/messaging/scale', { service, replicas }),
   search: (q: string, hours: number, view: MessageView = 'all', sourceIds: number[] = [], page = 1, sort = 'receivedAt', direction: 'asc' | 'desc' = 'desc', limit = 100) => {
     const sources = sourceIds.map((id) => `sourceIds=${encodeURIComponent(id)}`).join('&')
     return adminCall<MessageSearchPageDto>('GET', `/api/admin/messages?q=${encodeURIComponent(q)}&hours=${hours}&view=${view}&limit=${limit}&page=${page}&sort=${encodeURIComponent(sort)}&direction=${direction}${sources ? `&${sources}` : ''}`)

@@ -13,7 +13,8 @@ namespace Puluj.Admin.Endpoints;
 /// P13 (ADR-0012, plan §9/§8.7): the message-platform operations view and its controls. Reads are the snapshot
 /// (<see cref="OpsSnapshotService"/>), the quarantine list, the control audit and the message explorer; writes are the
 /// operator commands — pause/resume/drain one lane of one subscription, retry/waive one quarantined delivery, scale a
-/// compose service — each with a mandatory actor and reason and an audit row. RBAC is the admin token; roles are P16.
+/// compose service — each leaves an audit row. The single-operator UI uses explicit local-admin defaults, while API
+/// clients may still attach an actor and reason. RBAC is the admin token; roles are P16.
 /// </summary>
 public static class MessagingOpsEndpoints
 {
@@ -57,17 +58,14 @@ public static class MessagingOpsEndpoints
         // Lane control: the consumers react on their next control poll (≤ Messaging:Consumer:ControlPoll + in-flight).
         g.MapPost("/ops/messaging/lanes/{subscription}/{lane}", async (string subscription, string lane, LaneControlRequest req, SubscriptionAdmin admin, OpsSnapshotService snapshots, CancellationToken ct) =>
         {
-            if (Missing(req.Actor, req.Reason) is { } error)
-            {
-                return Results.BadRequest(new { error });
-            }
             if (req.State is not (SubscriptionLane.Active or SubscriptionLane.Paused or SubscriptionLane.Draining))
             {
                 return Results.BadRequest(new { error = "state має бути active, paused або draining" });
             }
+            var audit = Audit(req.Actor, req.Reason);
             try
             {
-                await admin.SetLaneStateAsync(subscription, lane, req.State, req.Actor.Trim(), req.Reason.Trim(), ct);
+                await admin.SetLaneStateAsync(subscription, lane, req.State, audit.Actor, audit.Reason, ct);
             }
             catch (ArgumentException e)
             {
@@ -79,13 +77,10 @@ public static class MessagingOpsEndpoints
 
         g.MapPost("/ops/messaging/quarantine/{id:long}/retry", async (long id, QuarantineActionRequest req, SubscriptionAdmin admin, CancellationToken ct) =>
         {
-            if (Missing(req.Actor, req.Reason) is { } error)
-            {
-                return Results.BadRequest(new { error });
-            }
+            var audit = Audit(req.Actor, req.Reason);
             try
             {
-                var outboxId = await admin.RetryAsync(id, req.Actor.Trim(), req.Reason.Trim(), ct);
+                var outboxId = await admin.RetryAsync(id, audit.Actor, audit.Reason, ct);
                 return Results.Ok(new { ok = true, outboxId });
             }
             catch (InvalidOperationException e)
@@ -96,32 +91,26 @@ public static class MessagingOpsEndpoints
 
         g.MapPost("/ops/messaging/quarantine/{id:long}/waive", async (long id, QuarantineActionRequest req, SubscriptionAdmin admin, IDbContextFactory<PulujDbContext> factory, CancellationToken ct) =>
         {
-            if (Missing(req.Actor, req.Reason) is { } error)
-            {
-                return Results.BadRequest(new { error });
-            }
+            var audit = Audit(req.Actor, req.Reason);
             await using var db = await factory.CreateDbContextAsync(ct);
             var row = await db.Quarantine.AsNoTracking().FirstOrDefaultAsync(q => q.QuarantineId == id && q.ResolvedAt == null, ct);
             if (row is null)
             {
                 return Results.Conflict(new { error = $"карантин {id} не знайдено або вже вирішено" });
             }
-            var waived = await admin.WaiveAsync(row.SubscriptionId, req.Reason.Trim(), req.Actor.Trim(), [row.EventId], ct);
+            var waived = await admin.WaiveAsync(row.SubscriptionId, audit.Reason, audit.Actor, [row.EventId], ct);
             return Results.Ok(new { ok = true, waived });
         });
 
-        // Scale a compose service (processor | messaging); refused outside Docker (no simulation), audited with actor/reason.
+        // Scale a compose service (processor | messaging); refused outside Docker (no simulation), always audited.
         g.MapPost("/ops/messaging/scale", async (MessagingScaleRequest req, HttpContext http, DockerService docker, SubscriptionAdmin admin, CancellationToken ct) =>
         {
-            if (Missing(req.Actor, req.Reason) is { } error)
-            {
-                return Results.BadRequest(new { error });
-            }
+            var audit = Audit(req.Actor, req.Reason);
             // The allow-list is Docker:ScalableServices (DockerService answers 400 for anything else); a refused request is not audited.
             var outcome = await docker.ScaleAsync(req.Service ?? "", req.Replicas, http.Connection.RemoteIpAddress?.ToString(), ct);
             if (outcome.StatusCode != 400)
             {
-                await admin.AuditAsync("scale", null, null, req.Actor.Trim(), req.Reason.Trim(), new { req.Service, req.Replicas, ok = outcome.Result.Ok, outcome.Result.Message }, ct);
+                await admin.AuditAsync("scale", null, null, audit.Actor, audit.Reason, new { req.Service, req.Replicas, ok = outcome.Result.Ok, outcome.Result.Message }, ct);
             }
             return Results.Json(outcome.Result, statusCode: outcome.StatusCode == 503 ? 409 : outcome.StatusCode);
         });
@@ -158,4 +147,15 @@ public static class MessagingOpsEndpoints
         : actor.Trim().Length > SubscriptionAdmin.MaxActor ? $"actor ≤ {SubscriptionAdmin.MaxActor} символів"
         : reason.Trim().Length > SubscriptionAdmin.MaxReason ? $"reason ≤ {SubscriptionAdmin.MaxReason} символів"
         : null;
+
+    /// <summary>Audit provenance for the single-user panel. Explicit API values stay available for automation.</summary>
+    public static (string Actor, string Reason) Audit(string? actor, string? reason)
+    {
+        const string defaultActor = "local-admin";
+        const string defaultReason = "manual action from admin UI";
+        var normalizedActor = string.IsNullOrWhiteSpace(actor) ? defaultActor : actor.Trim();
+        var normalizedReason = string.IsNullOrWhiteSpace(reason) ? defaultReason : reason.Trim();
+        return (normalizedActor.Length <= SubscriptionAdmin.MaxActor ? normalizedActor : defaultActor,
+            normalizedReason.Length <= SubscriptionAdmin.MaxReason ? normalizedReason : defaultReason);
+    }
 }

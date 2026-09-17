@@ -112,9 +112,11 @@ public sealed record OpsSloDto(
     int InflightStuckSeconds,
     int RequiredConsumerMissingSeconds);
 
-public sealed record LaneControlRequest(string State, string Actor, string Reason);
-public sealed record QuarantineActionRequest(string Actor, string Reason);
-public sealed record MessagingScaleRequest(string Service, int Replicas, string Actor, string Reason);
+// The single-operator admin UI omits audit metadata. API clients may still supply it when they have a real identity
+// or a useful reason; the messaging endpoints otherwise record their explicit local-admin defaults.
+public sealed record LaneControlRequest(string State, string? Actor = null, string? Reason = null);
+public sealed record QuarantineActionRequest(string? Actor = null, string? Reason = null);
+public sealed record MessagingScaleRequest(string Service, int Replicas, string? Actor = null, string? Reason = null);
 
 public sealed record QuarantineRowDto(long QuarantineId, string SubscriptionId, Guid EventId, string Lane, string Reason, string? Error, DateTimeOffset QuarantinedAt, DateTimeOffset? ResolvedAt, string? ResolvedBy, string? Resolution, string? EventType, long? RawMessageId);
 

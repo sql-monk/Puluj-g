@@ -29,14 +29,13 @@ export function laneScope(subscription: string, lane: string, state: 'active' | 
 }
 
 /**
- * Панель «Черги» (P13, §9, ADR-0012): підписка × lane з backlog/in-flight/retry/quarantine/віком/лагом/перцентилями і живими
+ * Панель «Черги» (P13, §9, ADR-0012): підписка × lane з backlog/in-flight/retry/quarantine/віком/завершеннями і живими
  * консюмерами, alarms зверху (severity словом), broker/outbox/inbox/reconciliation, воркери з їхніми lane-консюмерами (stale/stuck словом),
- * дії pause/resume/drain per lane, retry/waive карантину, scale — кожна з actor + reason і точним scope у підтвердженні.
+ * дії pause/resume/drain per lane, retry/waive карантину, scale — з точним scope у підтвердженні та автоматичним
+ * аудитом local-admin, без зайвих полів для одноосібного оператора.
  */
 export function QueuesPanel() {
   const { data, error, reload } = usePolled(() => adminOps.messaging(), 10_000)
-  const [actor, setActor] = useState('')
-  const [reason, setReason] = useState('')
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [quarantine, setQuarantine] = useState<QuarantineRowDto[] | null>(null)
@@ -45,13 +44,12 @@ export function QueuesPanel() {
   const [replicas, setReplicas] = useState(1)
   const [showAll, setShowAll] = useState(false)
 
-  const ready = actor.trim().length > 0 && reason.trim().length > 0
   const run = async (what: string, action: () => Promise<unknown>) => {
     setBusy(true)
     setMessage(null)
     try {
       await action()
-      setMessage({ ok: true, text: `${what}: виконано (${actor.trim()})` })
+      setMessage({ ok: true, text: `${what}: виконано` })
       reload()
       if (quarantine) setQuarantine(await adminOps.quarantine())
       if (audit) setAudit(await adminOps.audit())
@@ -63,7 +61,7 @@ export function QueuesPanel() {
   }
   const lane = async (row: SubscriptionLaneOpsDto, state: 'active' | 'paused' | 'draining') => {
     if (!window.confirm(laneScope(row.subscription, row.lane, state, row))) return
-    await run(`${LANE_VERB[state]} ${row.subscription}/${row.lane}`, () => adminOps.setLane(row.subscription, row.lane, state, actor.trim(), reason.trim()))
+    await run(`${LANE_VERB[state]} ${row.subscription}/${row.lane}`, () => adminOps.setLane(row.subscription, row.lane, state))
   }
 
   if (!data) return <Loading error={error} empty />
@@ -89,24 +87,11 @@ export function QueuesPanel() {
         )}
       </Section>
 
-      <Section title="Дія оператора">
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="text-xs">
-            Хто (actor)
-            <input className="mt-1 w-full rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" value={actor} onChange={(e) => setActor(e.target.value)} placeholder="ім’я або служба" aria-label="actor" />
-          </label>
-          <label className="text-xs">
-            Чому (reason)
-            <input className="mt-1 w-full rounded border border-slate-300 px-2 py-1 dark:border-slate-600 dark:bg-slate-800" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="причина — потрапляє в аудит" aria-label="reason" />
-          </label>
-        </div>
-        <p className="text-[11px] text-slate-500">Кожна дія потребує actor і reason, показує точний scope у підтвердженні і лишає рядок у control_audit. Реакція консюмерів ≈ 5 с (poll) плюс in-flight.</p>
-        {message && (
-          <p className={`text-xs ${message.ok ? 'text-emerald-600' : 'text-red-600'}`} role="status">
-            {message.text}
-          </p>
-        )}
-      </Section>
+      {message && (
+        <p className={`text-xs ${message.ok ? 'text-emerald-600' : 'text-red-600'}`} role="status">
+          {message.text}
+        </p>
+      )}
 
       <Section
         title="Підписки × lanes"
@@ -128,15 +113,13 @@ export function QueuesPanel() {
                 <th className="pr-2 text-right">Retry/год</th>
                 <th className="pr-2 text-right">DLQ</th>
                 <th className="pr-2 text-right">Найстаріша</th>
-
                 <th className="pr-2 text-right">Завершено/год</th>
-
                 <th>Дії</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((s) => (
-                <LaneRow key={`${s.subscription}/${s.lane}`} row={s} slo={data.slo} ready={ready} busy={busy} onLane={lane} />
+                <LaneRow key={`${s.subscription}/${s.lane}`} row={s} slo={data.slo} busy={busy} onLane={lane} />
               ))}
             </tbody>
           </table>
@@ -219,20 +202,20 @@ export function QueuesPanel() {
                       <td className="space-x-1 whitespace-nowrap">
                         <button
                           className="rounded border border-slate-300 px-2 py-0.5 disabled:opacity-50 dark:border-slate-600"
-                          disabled={!ready || busy}
+                          disabled={busy}
                           onClick={() => {
                             if (!window.confirm(`Повторити доставку #${q.quarantineId} (${q.subscriptionId}/${q.lane}, подія ${q.eventType ?? '?'}) — лише ця доставка, лише ця підписка. Attempts починаються заново, envelope береться з карантину.`)) return
-                            void run(`retry #${q.quarantineId}`, () => adminOps.retry(q.quarantineId, actor.trim(), reason.trim()))
+                            void run(`retry #${q.quarantineId}`, () => adminOps.retry(q.quarantineId))
                           }}
                         >
                           retry
                         </button>
                         <button
                           className="rounded border border-red-300 px-2 py-0.5 text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300"
-                          disabled={!ready || busy}
+                          disabled={busy}
                           onClick={() => {
                             if (!window.confirm(`Списати (waive) доставку #${q.quarantineId}: підписка ${q.subscriptionId} отримає термінальну квитанцію «waived» лише для цієї події. Дію видно в аудиті.`)) return
-                            void run(`waive #${q.quarantineId}`, () => adminOps.waive(q.quarantineId, actor.trim(), reason.trim()))
+                            void run(`waive #${q.quarantineId}`, () => adminOps.waive(q.quarantineId))
                           }}
                         >
                           waive
@@ -262,10 +245,10 @@ export function QueuesPanel() {
           </label>
           <button
             className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50 dark:border-slate-600"
-            disabled={!ready || busy}
+            disabled={busy}
             onClick={() => {
               if (!window.confirm(`docker compose up --scale ${scaleService}=${replicas}: змінюється лише сервіс «${scaleService}». Поза Docker дія відхиляється (нічого не імітується).`)) return
-              void run(`scale ${scaleService}=${replicas}`, () => adminOps.scale(scaleService, replicas, actor.trim(), reason.trim()))
+              void run(`scale ${scaleService}=${replicas}`, () => adminOps.scale(scaleService, replicas))
             }}
           >
             Застосувати
@@ -346,7 +329,8 @@ const SUBSCRIPTION_HELP: Record<string, string> = {
 function subscriptionHelp(subscription: string): string {
   return SUBSCRIPTION_HELP[subscription] ?? `Обробник підписки «${subscription}»: отримує події своєї черги для цього lane.`
 }
-function LaneRow({ row, slo, ready, busy, onLane }: { row: SubscriptionLaneOpsDto; slo: MessagingOpsDto['slo']; ready: boolean; busy: boolean; onLane: (row: SubscriptionLaneOpsDto, state: 'active' | 'paused' | 'draining') => Promise<void> }) {
+
+function LaneRow({ row, slo, busy, onLane }: { row: SubscriptionLaneOpsDto; slo: MessagingOpsDto['slo']; busy: boolean; onLane: (row: SubscriptionLaneOpsDto, state: 'active' | 'paused' | 'draining') => Promise<void> }) {
   const [helpOpen, setHelpOpen] = useState(false)
   const state = row.laneState.state
   const over = (row.oldestPendingAgeSeconds ?? 0) > (slo.oldestAgeSeconds[row.lane] ?? 300)
@@ -386,24 +370,22 @@ function LaneRow({ row, slo, ready, busy, onLane }: { row: SubscriptionLaneOpsDt
       </td>
       <td className={`pr-2 text-right font-mono ${row.quarantined > 0 ? 'text-red-600' : ''}`}>{fmtNum(row.quarantined)}</td>
       <td className={`pr-2 text-right ${over ? 'text-red-600' : ''}`}>{notEmpty ? fmtAge(row.oldestPendingAgeSeconds) : 'порожня'}</td>
-
       <td className="pr-2 text-right font-mono" title={`noop ${fmtNum(row.noopHour)}, quarantined ${fmtNum(row.failedHour)}, очікувалось ${fmtNum(row.expectedHour)}`}>
         {fmtNum(row.completedHour)}
       </td>
-
       <td className="space-x-1 whitespace-nowrap">
         {state !== 'paused' && (
-          <button className="rounded border border-slate-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={!ready || busy} onClick={() => void onLane(row, 'paused')}>
+          <button className="rounded border border-slate-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={busy} onClick={() => void onLane(row, 'paused')}>
             пауза
           </button>
         )}
         {state === 'active' && (
-          <button className="rounded border border-slate-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={!ready || busy} onClick={() => void onLane(row, 'draining')}>
+          <button className="rounded border border-slate-300 px-1.5 py-0.5 disabled:opacity-50 dark:border-slate-600" disabled={busy} onClick={() => void onLane(row, 'draining')}>
             злити
           </button>
         )}
         {state !== 'active' && (
-          <button className="rounded border border-emerald-300 px-1.5 py-0.5 text-emerald-700 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300" disabled={!ready || busy} onClick={() => void onLane(row, 'active')}>
+          <button className="rounded border border-emerald-300 px-1.5 py-0.5 text-emerald-700 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-300" disabled={busy} onClick={() => void onLane(row, 'active')}>
             відновити
           </button>
         )}

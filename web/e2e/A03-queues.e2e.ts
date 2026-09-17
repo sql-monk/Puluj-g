@@ -2,7 +2,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
 
 /**
  * A03/A04 (§9, §8.7, P13): the queues panel and the message explorer over a mocked /api/admin/* — alarms are visible with their
- * severity as words, a stuck worker is marked, every control needs actor + reason and its confirmation names the exact scope
+ * severity as words, a stuck worker is marked, every control is ready immediately and its confirmation names the exact scope
  * ("history lane of parser"), a queue with in-flight work is never called empty; the lifecycle card shows a delivery error in full
  * and renders source text as text.
  */
@@ -89,7 +89,7 @@ async function mockAdmin(page: Page, posts: { url: string; body: unknown }[]) {
 }
 
 test.describe('admin ops', () => {
-  test('A03 queues: alarms with severity words, stuck worker marked, scope in the confirmation, controls disabled without actor/reason, in-flight never "empty"', async ({ page }) => {
+  test('A03 queues: alarms with severity words, stuck worker marked, scope in the confirmation, controls are immediate, in-flight never "empty"', async ({ page }) => {
     const posts: { url: string; body: unknown }[] = []
     await mockAdmin(page, posts)
     const dialogs: string[] = []
@@ -122,11 +122,8 @@ test.describe('admin ops', () => {
     await help.click()
     await expect(parserLive.getByRole('tooltip')).toContainText('parser/live: Розпізнає нормалізований текст')
     await expect(help).toHaveAttribute('aria-expanded', 'true')
-    // Controls are disabled until actor + reason are given.
+    // Single-operator controls do not ask for repetitive actor/reason fields.
     const resume = history.getByRole('button', { name: 'відновити' })
-    await expect(resume).toBeDisabled()
-    await page.getByLabel('actor').fill('ops')
-    await page.getByLabel('reason').fill('backfill done')
     await expect(resume).toBeEnabled()
     await resume.click()
     expect(dialogs).toHaveLength(1)
@@ -134,18 +131,23 @@ test.describe('admin ops', () => {
     expect(dialogs[0]).toContain('Інші lanes цієї підписки та інші підписки не змінюються')
     expect(dialogs[0]).toMatch(/pending 1[\s  ]234/) // uk-UA grouping uses a narrow no-break space
     await expect(page.getByRole('status')).toContainText('відновити parser/history: виконано')
-    expect(posts).toEqual([{ url: '/api/admin/ops/messaging/lanes/parser/history', body: { state: 'active', actor: 'ops', reason: 'backfill done' } }])
+    expect(posts).toEqual([{ url: '/api/admin/ops/messaging/lanes/parser/history', body: { state: 'active' } }])
     // Pausing the live lane of the parser names that lane, not the subscription.
     await parserLive.getByRole('button', { name: 'пауза' }).click()
     expect(dialogs[1]).toContain('Призупинити: lane «live» підписки «parser», pending 1, in-flight 1')
-    expect(posts[1]).toEqual({ url: '/api/admin/ops/messaging/lanes/parser/live', body: { state: 'paused', actor: 'ops', reason: 'backfill done' } })
-    // Quarantine: retry sends actor/reason for exactly one row.
+    expect(posts[1]).toEqual({ url: '/api/admin/ops/messaging/lanes/parser/live', body: { state: 'paused' } })
+    // Quarantine: retry names exactly one row without repetitive metadata fields.
     await page.getByRole('button', { name: 'показати' }).first().click()
     const q = page.getByTestId('quarantine-table')
     await expect(q).toContainText('NullReferenceException: boom')
     await q.getByRole('button', { name: 'retry' }).click()
     expect(dialogs[2]).toContain('лише ця доставка')
-    expect(posts[2]).toEqual({ url: '/api/admin/ops/messaging/quarantine/5/retry', body: { actor: 'ops', reason: 'backfill done' } })
+    expect(posts[2]).toEqual({ url: '/api/admin/ops/messaging/quarantine/5/retry', body: {} })
+    // Scaling is just the replica number and the apply button.
+    await page.getByLabel('replicas').fill('2')
+    await page.getByRole('button', { name: 'Застосувати' }).click()
+    expect(dialogs[3]).toContain('messaging=2')
+    expect(posts[3]).toEqual({ url: '/api/admin/ops/messaging/scale', body: { service: 'messaging', replicas: 2 } })
   })
 
   test('A04 message explorer: search → card, delivery error in full, source text as text, no javascript: link, who waits/completed/failed', async ({ page }) => {
