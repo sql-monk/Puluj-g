@@ -63,6 +63,10 @@ Telegram recent backfill використовує останній source messag
 спочатку. Кожен RPC має 30-секундний timeout; оскільки WTelegram RPC не
 скасовується токеном, timeout припиняє scheduler і передає session supervisor-у
 контрольований restart, а cursor залишається на попередній безпечній сторінці.
+Після timeout request gate позначає session poisoned і не запускає жодного
+наступного RPC, доки supervisor не створить новий client. Permanent history RPC
+errors (400/403/404, зокрема private або revoked канал) завершують лише це
+джерело з помилкою в `collector_states`; вони не залишають processing на паузі.
 
 `UpdateManager` стартує до scheduler-а: live posts та edits негайно durable
 ingest-яться з тією самою raw identity, навіть коли history триває. Existing

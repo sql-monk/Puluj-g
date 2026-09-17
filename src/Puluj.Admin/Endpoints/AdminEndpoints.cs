@@ -27,6 +27,7 @@ public static class AdminEndpoints
         "Collectors:Telegram:HistoryWorkers", "Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval",
     ];
     private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
+    private static readonly string[] TelegramIntervalKeys = ["Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval"];
     private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly IReadOnlyDictionary<string, (double Min, double Max)> CorrelationRanges = new Dictionary<string, (double, double)>
     {
@@ -87,7 +88,7 @@ public static class AdminEndpoints
             }).ToList();
         });
 
-        admin.MapPut("/settings", async (SettingsUpdateRequest req, SettingsStore store, CancellationToken ct) =>
+        admin.MapPut("/settings", async (SettingsUpdateRequest req, IConfiguration config, SettingsStore store, CancellationToken ct) =>
         {
             var unknown = req.Values.Keys.Where(k => !SettingsStore.EditableKeys.Contains(k)).ToList();
             if (unknown.Count > 0)
@@ -106,13 +107,24 @@ public static class AdminEndpoints
             {
                 return Results.BadRequest(new { error = "History workers має бути числом від 1 до 2." });
             }
-            foreach (var (key, value) in req.Values.Where(x => x.Key is "Collectors:Telegram:RpcTimeout" or "Collectors:Telegram:HistoryRequestInterval" or "Collectors:Telegram:HistoryMinimumInterval" or "Collectors:Telegram:HistoryMaximumInterval")
-                         .Where(x => !string.IsNullOrWhiteSpace(x.Value)))
+            var telegramIntervals = new Dictionary<string, TimeSpan>(StringComparer.OrdinalIgnoreCase);
+            foreach (var key in TelegramIntervalKeys)
             {
+                var value = req.Values.TryGetValue(key, out var requested) && !string.IsNullOrWhiteSpace(requested)
+                    ? requested
+                    : config[key] ?? Defaults[key];
                 if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var interval) || interval <= TimeSpan.Zero)
                 {
                     return Results.BadRequest(new { error = $"{key} має бути додатнім TimeSpan, наприклад 00:00:30." });
                 }
+                telegramIntervals[key] = interval;
+            }
+            var minimum = telegramIntervals["Collectors:Telegram:HistoryMinimumInterval"];
+            var initial = telegramIntervals["Collectors:Telegram:HistoryRequestInterval"];
+            var maximum = telegramIntervals["Collectors:Telegram:HistoryMaximumInterval"];
+            if (minimum > maximum || initial < minimum || initial > maximum)
+            {
+                return Results.BadRequest(new { error = "Telegram history intervals мають відповідати правилу: minimum ≤ request ≤ maximum." });
             }
             foreach (var (key, value) in req.Values.Where(x => LlmPriceKeys.Contains(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
             {

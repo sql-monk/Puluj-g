@@ -100,7 +100,7 @@ public class TelegramBackfillSchedulerTests
     [Fact]
     public async Task Rpc_timeout_is_reported_before_a_new_session_can_continue()
     {
-        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(1));
         var executor = new TelegramRpcExecutor(gate, TimeSpan.FromMilliseconds(10));
 
         await Assert.ThrowsAsync<TelegramRpcTimeoutException>(() => executor.ExecuteAsync(async () =>
@@ -113,7 +113,7 @@ public class TelegramBackfillSchedulerTests
     [Fact]
     public async Task Request_gate_never_starts_two_history_rpcs_together()
     {
-        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(1));
         var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(1));
         var active = 0;
         var maximum = 0;
@@ -136,7 +136,7 @@ public class TelegramBackfillSchedulerTests
     [Fact]
     public async Task Flood_cooldown_blocks_the_next_history_rpc()
     {
-        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.Zero, TimeSpan.Zero, TimeSpan.FromSeconds(2));
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(2));
         var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(5));
         await gate.FloodAsync(1, CancellationToken.None);
         var elapsed = Stopwatch.StartNew();
@@ -144,6 +144,62 @@ public class TelegramBackfillSchedulerTests
         await executor.ExecuteAsync(() => Task.FromResult(1), "after-flood", CancellationToken.None);
 
         Assert.True(elapsed.Elapsed >= TimeSpan.FromMilliseconds(1500), $"Cooldown was only {elapsed.Elapsed}.");
+    }
+
+    [Fact]
+    public async Task Scheduler_cancels_a_sibling_worker_when_one_job_faults()
+    {
+        var scheduler = new TelegramBackfillScheduler(TimeProvider.System, 2);
+        var siblingStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var siblingCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var jobs = new[] { Job(1, 1), Job(2, 1) };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => scheduler.RunAsync(jobs, async (job, ct) =>
+        {
+            if (job.Source.SourceId == 1)
+            {
+                await siblingStarted.Task.WaitAsync(ct);
+                throw new InvalidOperationException("session must restart");
+            }
+            siblingStarted.SetResult();
+            try
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                siblingCancelled.SetResult();
+                throw;
+            }
+        }, CancellationToken.None));
+
+        await siblingCancelled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task Timed_out_rpc_poisons_the_gate_before_any_new_rpc_can_start()
+    {
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(2));
+        var executor = new TelegramRpcExecutor(gate, TimeSpan.FromMilliseconds(10));
+        var lateRpc = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invokedAfterTimeout = false;
+
+        await Assert.ThrowsAsync<TelegramRpcTimeoutException>(() => executor.ExecuteAsync(() => lateRpc.Task, "first", CancellationToken.None));
+        await Assert.ThrowsAsync<TelegramSessionRestartRequiredException>(() => executor.ExecuteAsync(() =>
+        {
+            invokedAfterTimeout = true;
+            return Task.FromResult(1);
+        }, "second", CancellationToken.None));
+
+        lateRpc.SetResult(1);
+        Assert.False(invokedAfterTimeout);
+    }
+
+    [Fact]
+    public void Request_gate_rejects_an_invalid_interval_range()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new TelegramRequestGate(TimeProvider.System, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3)));
     }
 
     private static TelegramBackfillJob Job(int sourceId, int weight) => new()
