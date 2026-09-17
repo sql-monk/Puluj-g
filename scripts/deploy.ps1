@@ -64,8 +64,30 @@ if ([string]::IsNullOrWhiteSpace($DatabaseVolume)) { throw "DatabaseVolume must 
 # or the persistent disk was not mounted.  A first install is deliberately opt-in via -InitializeDatabase.
 $volume = $DatabaseVolume.Trim()
 $volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
+$env:PULUJ_PGDATA_VOLUME = $volume
+
+function Assert-ResetTarget {
+    # A name alone is not ownership. Refuse a reset unless the exact existing postgis container of this Compose
+    # project is labelled as such and mounts this exact volume at PostgreSQL's data directory. This check happens
+    # before `down`, while the evidence still exists.
+    Push-Location $deploy
+    try {
+        $ids = @(& docker compose -p $composeProject ps -aq postgis | Where-Object { $_ })
+    } finally { Pop-Location }
+    if ($ids.Count -ne 1) { throw "Reset requires exactly one existing postgis container for compose project '$composeProject'; found $($ids.Count). Refusing an unverified target." }
+    $details = @(& docker inspect $ids[0] | ConvertFrom-Json)
+    if ($LASTEXITCODE -ne 0 -or $details.Count -ne 1) { throw "Could not inspect postgis container '$($ids[0])'; database was not removed." }
+    $labels = $details[0].Config.Labels
+    if ($labels.'com.docker.compose.project' -ne $composeProject -or $labels.'com.docker.compose.service' -ne 'postgis') {
+        throw "Container '$($ids[0])' is not the postgis service of compose project '$composeProject'; database was not removed."
+    }
+    $mounts = @($details[0].Mounts | Where-Object { $_.Type -eq 'volume' -and $_.Name -eq $volume -and $_.Destination -eq '/var/lib/postgresql/data' })
+    if ($mounts.Count -ne 1) { throw "Postgis container '$($ids[0])' does not mount verified volume '$volume' at /var/lib/postgresql/data; database was not removed." }
+}
+
 if ($ResetDatabase) {
     if (-not $volumeExists) { throw "PostgreSQL volume '$volume' does not exist; refusing a reset with an unverified target." }
+    Assert-ResetTarget
     Step "Resetting isolated Puluj-G target: compose '$composeProject', database volume '$volume'"
     Push-Location $deploy
     try {
@@ -92,8 +114,6 @@ elseif (-not $volumeExists) {
 else {
     Write-Host "Using existing PostgreSQL volume '$volume'; migrations will update it in place." -ForegroundColor Green
 }
-$env:PULUJ_PGDATA_VOLUME = $volume
-
 function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
 
 # Platform path (P03–P09): which roles the `messaging` worker runs and how many legacy processors stay. Compose reads

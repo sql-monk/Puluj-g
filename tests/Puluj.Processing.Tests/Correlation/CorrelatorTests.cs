@@ -63,6 +63,17 @@ public class CorrelatorTests
     }
 
     [Fact]
+    public void Hard_reject_is_not_selectable_when_an_operator_sets_threshold_to_zero()
+    {
+        var track = TrackUpdater.CreateTrack(Obs(30.45, 50.30, 10), T0);
+        var earlier = Obs(30.45, 50.30, 9);
+        var rejected = Correlator.Score(earlier, track, Shahed, 8);
+
+        Assert.NotNull(rejected.Rejection);
+        Assert.Null(Correlator.SelectBestTrack([new ScoredTrack(track, rejected)], 0, 0));
+    }
+
+    [Fact]
     public void Distant_ends_of_kyiv_in_one_minute_never_attach()
     {
         var track = TrackUpdater.CreateTrack(Obs(30.1, 50.7, 0), T0);

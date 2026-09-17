@@ -90,6 +90,9 @@ public static class Correlator
     public static ScoredTrack? SelectBestTrack(IEnumerable<ScoredTrack> candidates, double attachThreshold, double ambiguityMargin)
     {
         var ranked = candidates
+            // A hard reject is a policy boundary, not merely a low score. In particular an operator lowering the
+            // attach threshold must not turn impossible movement or insufficient facts into an association.
+            .Where(candidate => candidate.Score.Rejection is null)
             .OrderByDescending(candidate => candidate.Score.Total)
             .ThenBy(candidate => candidate.Track.TargetTrackId)
             .ToList();
