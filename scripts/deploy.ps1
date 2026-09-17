@@ -1,8 +1,7 @@
 <#
-.SYNOPSIS  Rebuilds and restarts the Docker stack (deploy/docker-compose.yml, project "puluj-g") from the working tree,
-           waits for the one-shot migrate service, runs the one-off SQL fixes and then checks that the stack is healthy.
-           Everything here needs Docker on the host, which the Claude Code session is not allowed to drive — run it
-           yourself from the repo root:  .\scripts\deploy.ps1
+.SYNOPSIS  Interactive deployment wizard and non-interactive Docker deployment command for the Puluj-G Compose stack.
+           With no parameters it lets an operator choose services, image rebuild, database handling, optional broker
+           mode, and runtime credentials. Existing command-line parameters remain available for CI and runbooks.
            The steps are idempotent: a second run rebuilds what changed and applies outstanding migrations to the
            existing database; it never replaces its data or settings.
 .PARAMETER NoBuild   Restart with the existing images (no `--build`).
@@ -32,6 +31,10 @@
            gets the track-worker, alert-worker, watchdog and incident-worker roles — never two owners of tracks/alerts over one database.
            Requires -Broker. Rollback: run again without -DomainWriters (processor back to 2 replicas, writers roles off;
            the guards in both directions keep the rows consistent).
+.PARAMETER Wizard
+           Force the interactive wizard even when other command-line parameters were supplied.
+.PARAMETER NonInteractive
+           Do not prompt. Intended for CI/runbooks; use the remaining parameters exactly as before.
 #>
 param(
     [switch]$NoBuild,
@@ -43,18 +46,173 @@ param(
     [switch]$ConfirmReset,
     [string]$ComposeProject = "puluj-g",
     [switch]$Broker,
-    [switch]$DomainWriters
+    [switch]$DomainWriters,
+    [switch]$Wizard,
+    [switch]$NonInteractive
 )
+$ErrorActionPreference = "Stop"
+$root = Resolve-Path "$PSScriptRoot\.."
+$deploy = Join-Path $root "deploy"
+$composeProject = $ComposeProject
+$envFile = Join-Path $deploy ".env"
+$wizardSettings = [ordered]@{}
+$applyWizardSettingsToDatabase = $false
+$selectedServicesOnly = $false
+
+function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
+
+function Read-Choice([string]$Prompt, [string[]]$Allowed) {
+    do { $answer = (Read-Host $Prompt).Trim() } while ($answer -notin $Allowed)
+    return $answer
+}
+
+function Read-YesNo([string]$Prompt, [bool]$Default = $true) {
+    $suffix = if ($Default) { "[Y/n]" } else { "[y/N]" }
+    $answer = (Read-Host "$Prompt $suffix").Trim()
+    if ([string]::IsNullOrEmpty($answer)) { return $Default }
+    if ($answer -match '^(y|yes|т|так)$') { return $true }
+    if ($answer -match '^(n|no|н|ні)$') { return $false }
+    Write-Warning "Введіть Y або N."
+    return Read-YesNo $Prompt $Default
+}
+
+function Get-DotEnvValues {
+    $values = @{}
+    if (-not (Test-Path -LiteralPath $envFile)) { return $values }
+    foreach ($line in Get-Content -LiteralPath $envFile) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$') {
+            $value = $Matches[2].Trim()
+            if ($value.Length -ge 2 -and (($value.StartsWith("'") -and $value.EndsWith("'")) -or ($value.StartsWith('"') -and $value.EndsWith('"')))) {
+                $value = $value.Substring(1, $value.Length - 2)
+            }
+            $values[$Matches[1]] = $value
+        }
+    }
+    return $values
+}
+
+function Read-Setting([hashtable]$Current, [string]$Key, [string]$Label, [bool]$Secret = $false) {
+    $state = if ($Current.ContainsKey($Key) -and -not [string]::IsNullOrWhiteSpace($Current[$Key])) { if ($Secret) { "задано" } else { "поточне: $($Current[$Key])" } } else { "не задано" }
+    $value = if ($Secret) {
+        $secure = Read-Host "$Label ($state; Enter — не змінювати, '-' — очистити)" -AsSecureString
+        $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+        try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) }
+    } else {
+        Read-Host "$Label ($state; Enter — не змінювати, '-' — очистити)"
+    }
+    if ([string]::IsNullOrEmpty($value)) { return }
+    $wizardSettings[$Key] = if ($value -eq '-') { '' } else { $value.Trim() }
+}
+
+function Update-DotEnv([System.Collections.IDictionary]$Values) {
+    $lines = if (Test-Path -LiteralPath $envFile) { [System.Collections.Generic.List[string]]@(Get-Content -LiteralPath $envFile) } else { [System.Collections.Generic.List[string]]::new() }
+    foreach ($entry in $Values.GetEnumerator()) {
+        $key = $entry.Key
+        # Single quotes keep $, # and whitespace literal for Docker Compose. A literal quote is escaped in dotenv syntax.
+        $escaped = ([string]$entry.Value).Replace("'", "\'")
+        $replacement = "$key='$escaped'"
+        $index = -1
+        for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match "^\s*$([regex]::Escape($key))\s*=") { $index = $i; break } }
+        if ($index -ge 0) { $lines[$index] = $replacement } else { $lines.Add($replacement) }
+    }
+    Set-Content -LiteralPath $envFile -Value $lines -Encoding utf8NoBOM
+    Write-Host "Оновлено deploy/.env; значення секретів не показані." -ForegroundColor Green
+}
+
+function Select-Services {
+    $available = @('postgis', 'migrate', 'collector-telegram', 'collector-alerts', 'processor', 'api', 'admin', 'analytics', 'messaging')
+    Write-Host "`nЩо публікувати:"
+    Write-Host "  0. Увесь стек"
+    for ($i = 0; $i -lt $available.Count; $i++) { Write-Host ("  {0}. {1}" -f ($i + 1), $available[$i]) }
+    do {
+        $answer = (Read-Host "Номери через кому").Trim()
+        if ($answer -eq '0') { return @() }
+        $numbers = @($answer -split '\s*,\s*' | Where-Object { $_ })
+        $valid = $numbers.Count -gt 0 -and @($numbers | Where-Object { $_ -notmatch '^\d+$' -or [int]$_ -lt 1 -or [int]$_ -gt $available.Count }).Count -eq 0
+        if (-not $valid) { Write-Warning "Вкажіть 0 або номери від 1 до $($available.Count) через кому."; continue }
+        return @($numbers | ForEach-Object { $available[[int]$_ - 1] } | Select-Object -Unique)
+    } while ($true)
+}
+
+function Invoke-DeploymentWizard {
+    Step "Майстер розгортання Puluj-G"
+    Write-Host "Значення з app_settings мають пріоритет над .env для runtime-параметрів. Майстер може застосувати введені значення і туди."
+    # Preserve an empty selection as a real empty string array: it means the whole stack.
+    $script:Services = @((Select-Services) | Where-Object { $_ })
+    $script:selectedServicesOnly = $Services.Count -gt 0
+    $script:NoBuild = -not (Read-YesNo "Перебудувати вибрані Docker-образи?" $true)
+
+    Write-Host "`nБаза даних:"
+    Write-Host "  1. Залишити наявну БД без очищення"
+    Write-Host "  2. Створити новий порожній Docker volume, якщо його ще немає"
+    Write-Host "  3. Повністю очистити ізольоване розгортання і БД"
+    $databaseChoice = Read-Choice "Оберіть 1, 2 або 3" @('1', '2', '3')
+    $defaultVolume = $script:DatabaseVolume
+    $volumeAnswer = (Read-Host "Назва PostgreSQL volume (Enter — $defaultVolume)").Trim()
+    if ($volumeAnswer) { $script:DatabaseVolume = $volumeAnswer }
+    switch ($databaseChoice) {
+        '1' { }
+        '2' { $script:InitializeDatabase = $true }
+        '3' {
+            Write-Host "УВАГА: буде видалено дані БД, Telegram session, логи й RabbitMQ state лише для '$($script:ComposeProject)'." -ForegroundColor Yellow
+            $confirmation = Read-Host "Для підтвердження введіть DELETE $($script:ComposeProject)"
+            if ($confirmation -ne "DELETE $($script:ComposeProject)") { throw "Очищення скасовано: фраза підтвердження не збігається." }
+            $script:ResetDatabase = $true
+            $script:ConfirmReset = $true
+        }
+    }
+
+    $script:Broker = Read-YesNo "Увімкнути broker profile (RabbitMQ + messaging)?" ([bool]$script:Broker)
+    if ($script:Broker) { $script:DomainWriters = Read-YesNo "Передати domain writers у messaging (зупиняє legacy processor)?" ([bool]$script:DomainWriters) }
+    else { $script:DomainWriters = $false }
+
+    if (Read-YesNo "Ввести або змінити токени й параметри колекторів/LLM зараз?" $false) {
+        $current = Get-DotEnvValues
+        Step "Конфігурація (Enter зберігає поточне значення)"
+        Read-Setting $current 'ADMIN_TOKEN' 'Токен доступу до Admin' $true
+        Read-Setting $current 'Collectors__AlertsInUa__Enabled' 'Увімкнути alerts.in.ua (true/false)'
+        Read-Setting $current 'Collectors__AlertsInUa__Token' 'Токен alerts.in.ua' $true
+        Read-Setting $current 'Collectors__Telegram__Enabled' 'Увімкнути Telegram (true/false)'
+        Read-Setting $current 'Collectors__Telegram__ApiId' 'Telegram API ID'
+        Read-Setting $current 'Collectors__Telegram__ApiHash' 'Telegram API hash' $true
+        Read-Setting $current 'Collectors__Telegram__Phone' 'Номер Telegram у міжнародному форматі'
+        Read-Setting $current 'Collectors__Telegram__Password' 'Пароль двофакторного захисту Telegram' $true
+        Read-Setting $current 'Collectors__Telegram__SessionPath' 'Шлях до Telegram session у контейнері'
+        Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
+        Read-Setting $current 'Llm__Model' 'Модель LLM'
+        Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
+        Read-Setting $current 'OTEL_EXPORTER_OTLP_ENDPOINT' 'OTLP endpoint'
+        if ($wizardSettings.Count -gt 0) {
+            Update-DotEnv $wizardSettings
+            $script:applyWizardSettingsToDatabase = Read-YesNo "Також застосувати runtime-настройки до app_settings цієї БД?" $true
+        }
+    }
+}
+
+$runWizard = $Wizard -or (-not $NonInteractive -and $PSBoundParameters.Count -eq 0)
+if ($runWizard) { Invoke-DeploymentWizard }
+
 if ($DomainWriters -and -not $Broker) { throw "-DomainWriters needs -Broker: the writers consume observations.recorded from RabbitMQ (ADR-0009)" }
 $expectedVolume = "$ComposeProject-pgdata"
 if ($ComposeProject -notmatch '^puluj-g(?:-[a-z0-9][a-z0-9-]*)?$') { throw "ComposeProject '$ComposeProject' is not an isolated Puluj-G project name." }
 if ($ResetDatabase -and -not $ConfirmReset) { throw "-ResetDatabase is destructive and requires -ConfirmReset. Nothing was deleted." }
 if ($ResetDatabase -and $InitializeDatabase) { throw "Use either -ResetDatabase or -InitializeDatabase, not both." }
 if ($ResetDatabase -and $DatabaseVolume.Trim() -ne $expectedVolume) { throw "Reset only accepts the exact database volume '$expectedVolume' for Compose project '$ComposeProject'; refusing '$DatabaseVolume'." }
-$ErrorActionPreference = "Stop"
-$root = Resolve-Path "$PSScriptRoot\.."
-$deploy = Join-Path $root "deploy"
-$composeProject = $ComposeProject
+if ($Services -contains 'messaging' -and -not $Broker) { throw "The 'messaging' service belongs to the broker profile; enable -Broker or select it in the wizard." }
+if (($ResetDatabase -or $InitializeDatabase) -and $Services.Count -gt 0 -and $Services -notcontains 'migrate') {
+    # A new database must receive schema and seed data even when the operator publishes only one service.
+    $Services += 'migrate'
+    Write-Host "Додано migrate: порожня або очищена БД спершу має отримати схему й seed-дані." -ForegroundColor Yellow
+}
+if ($Broker -and $Services.Count -gt 0 -and @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts') }).Count -gt 0 -and $Services -notcontains 'messaging') {
+    $Services += 'messaging'
+    Write-Host "Додано messaging: колектори у broker-режимі мають передавати дані до єдиного ingress." -ForegroundColor Yellow
+}
+if ($DomainWriters -and $Services.Count -gt 0 -and $Services -notcontains 'messaging') {
+    $Services += 'messaging'
+    Write-Host "Додано messaging: він виконує обрані domain writer ролі." -ForegroundColor Yellow
+}
+$requiresMigrate = $Services.Count -eq 0 -or $Services -contains 'migrate' -or @($Services | Where-Object { $_ -ne 'postgis' }).Count -gt 0
 $dockerBin = "C:\Program Files\Docker\Docker\resources\bin"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue) -and (Test-Path "$dockerBin\docker.exe")) { $env:PATH = "$env:PATH;$dockerBin" }
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw "docker not found (Docker Desktop is not installed or not in PATH)" }
@@ -65,8 +223,6 @@ if ([string]::IsNullOrWhiteSpace($DatabaseVolume)) { throw "DatabaseVolume must 
 $volume = $DatabaseVolume.Trim()
 $volumeExists = (& docker volume inspect $volume 2>$null) -and $LASTEXITCODE -eq 0
 $env:PULUJ_PGDATA_VOLUME = $volume
-
-function Step([string]$title) { Write-Host "`n=== $title ===" -ForegroundColor Cyan }
 
 function Assert-ResetTarget {
     # A name alone is not ownership. Refuse a reset unless the exact existing postgis container of this Compose
@@ -139,18 +295,57 @@ function Sql([string]$file) {
     if ($LASTEXITCODE -ne 0) { throw "psql failed for $file" }
 }
 
+function Apply-WizardSettingsToDatabase {
+    if (-not $applyWizardSettingsToDatabase -or $wizardSettings.Count -eq 0) { return }
+    $keyMap = [ordered]@{
+        'ADMIN_TOKEN' = 'Admin:Token'
+        'Collectors__AlertsInUa__Enabled' = 'Collectors:AlertsInUa:Enabled'
+        'Collectors__AlertsInUa__Token' = 'Collectors:AlertsInUa:Token'
+        'Collectors__Telegram__Enabled' = 'Collectors:Telegram:Enabled'
+        'Collectors__Telegram__ApiId' = 'Collectors:Telegram:ApiId'
+        'Collectors__Telegram__ApiHash' = 'Collectors:Telegram:ApiHash'
+        'Collectors__Telegram__Phone' = 'Collectors:Telegram:Phone'
+        'Collectors__Telegram__Password' = 'Collectors:Telegram:Password'
+        'Llm__Enabled' = 'Llm:Enabled'
+        'Llm__Model' = 'Llm:Model'
+        'ANTHROPIC_API_KEY' = 'Llm:ApiKey'
+    }
+    $secretKeys = @('Admin:Token', 'Collectors:AlertsInUa:Token', 'Collectors:Telegram:ApiHash', 'Collectors:Telegram:Password', 'Llm:ApiKey')
+    $statements = [System.Collections.Generic.List[string]]::new()
+    foreach ($entry in $keyMap.GetEnumerator()) {
+        if (-not $wizardSettings.Contains($entry.Key)) { continue }
+        $key = $entry.Value
+        $value = [string]$wizardSettings[$entry.Key]
+        if ([string]::IsNullOrEmpty($value)) {
+            $statements.Add("DELETE FROM app_settings WHERE key = '$key';")
+            continue
+        }
+        $base64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($value))
+        $isSecret = if ($key -in $secretKeys) { 'true' } else { 'false' }
+        $statements.Add("INSERT INTO app_settings (key, value, is_secret, updated_at) VALUES ('$key', convert_from(decode('$base64', 'base64'), 'UTF8'), $isSecret, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, is_secret = EXCLUDED.is_secret, updated_at = EXCLUDED.updated_at;")
+    }
+    if ($statements.Count -eq 0) { return }
+    Step "Applying runtime configuration to app_settings"
+    $statements | docker exec -i $postgisContainer psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f - | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not apply wizard runtime settings to app_settings." }
+    Write-Host "Runtime-настройки застосовано до app_settings; секрети не показані." -ForegroundColor Green
+}
+
 function ComposeContainerId([string]$service) {
     $ids = @(& docker compose -p $composeProject ps -aq $service | Where-Object { $_ })
     if ($ids.Count -ne 1) { throw "Expected exactly one $service container in compose project '$composeProject', found $($ids.Count)." }
     return $ids[0].Trim()
 }
 
-# A local dev-run Worker next to the Docker processors means two processor versions over one database (the deadlocks
-# of 15.09) and two Telegram clients on one session: stop it first.
-$local = Get-Process -Name "Puluj.Worker", "Puluj.Api", "Puluj.Admin", "Puluj.Analytics.Worker" -ErrorAction SilentlyContinue
-if ($local) {
-    Step "Stopping local dev-run processes ($($local.Name -join ', '))"
-    $local | Stop-Process -Force
+# A local dev-run Worker next to Docker processors means two processor versions over one database and two Telegram
+# clients on one session. A database-only/migrate-only selection does not touch unrelated local development processes.
+$startsApplication = $Services.Count -eq 0 -or @($Services | Where-Object { $_ -notin @('postgis', 'migrate') }).Count -gt 0
+if ($startsApplication) {
+    $local = Get-Process -Name "Puluj.Worker", "Puluj.Api", "Puluj.Admin", "Puluj.Analytics.Worker" -ErrorAction SilentlyContinue
+    if ($local) {
+        Step "Stopping local dev-run processes ($($local.Name -join ', '))"
+        $local | Stop-Process -Force
+    }
 }
 
 if ($DomainWriters) {
@@ -174,17 +369,20 @@ try {
     & docker @composeArgs
     if ($LASTEXITCODE -ne 0) { throw "docker compose up failed" }
 
-    Step "Waiting for the migrate service (migrations + seed)"
-    $deadline = (Get-Date).AddMinutes(30)
-    do {
-        $migrateContainer = ComposeContainerId "migrate"
-        $state = docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' $migrateContainer 2>$null
-        if ($state -like "exited 0*") { break }
-        if ($state -like "exited *") { docker logs --tail 50 $migrateContainer; throw "migrate exited with $state" }
-        Start-Sleep 5
-    } while ((Get-Date) -lt $deadline)
-    Write-Host "migrate: $state"
-    docker logs $migrateContainer 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
+    if ($requiresMigrate) {
+        Step "Waiting for the migrate service (migrations + seed)"
+        $deadline = (Get-Date).AddMinutes(30)
+        do {
+            $migrateContainer = ComposeContainerId "migrate"
+            $state = docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' $migrateContainer 2>$null
+            if ($state -like "exited 0*") { break }
+            if ($state -like "exited *") { docker logs --tail 50 $migrateContainer; throw "migrate exited with $state" }
+            Start-Sleep 5
+        } while ((Get-Date) -lt $deadline)
+        if ($state -notlike "exited 0*") { throw "Timed out waiting for migrate (last state: $state)." }
+        Write-Host "migrate: $state"
+        docker logs $migrateContainer 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
+    }
 
     Step "Containers"
     docker compose -p $composeProject @profileArgs ps --format "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}"
@@ -194,15 +392,17 @@ try {
     $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
 } finally { Pop-Location }
 
-if (-not $SkipSql) {
+if ($requiresMigrate) { Apply-WizardSettingsToDatabase }
+
+if (-not $SkipSql -and $requiresMigrate) {
     Step "One-off SQL: Failed raw messages back to Pending (deadlock victims of 15.09)"
     Sql (Join-Path $root "scripts\requeue-failed.sql")
     Step "One-off SQL: text alerts closed by an out-of-order 'відбій' (ended_at < started_at) reopened for the watchdog"
     Sql (Join-Path $root "scripts\fix-text-alert-ends.sql")
-}
+} elseif (-not $SkipSql) { Write-Host "Пропущено SQL-корекції: обрано лише postgis, без migrate/schema check." -ForegroundColor Yellow }
 
 Step "Checks"
-Start-Sleep 20  # let the processors claim a few messages so the new log lines exist
+if ($processorContainers.Count -gt 0 -or $messagingContainers.Count -gt 0) { Start-Sleep 20 }  # let active workers claim messages
 $since = (Get-Date).AddMinutes(-2).ToUniversalTime().ToString("o")
 $deadlocks = (docker logs --since $since $postgisContainer 2>&1 | Select-String "deadlock detected").Count
 Write-Host ("PostgreSQL deadlocks since restart: {0}" -f $deadlocks) -ForegroundColor ($(if ($deadlocks -eq 0) { "Green" } else { "Red" }))
@@ -219,10 +419,14 @@ foreach ($c in $messagingContainers) {
     $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
     if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
 }
-foreach ($u in @("http://localhost:8090/api/health", "http://localhost:8091/api/health")) {
+foreach ($u in @(
+    if ($Services.Count -eq 0 -or $Services -contains 'api') { 'http://localhost:8090/api/health' }
+    if ($Services.Count -eq 0 -or $Services -contains 'admin') { 'http://localhost:8091/api/health' }
+)) {
     try { $r = Invoke-WebRequest -UseBasicParsing -TimeoutSec 10 $u; Write-Host ("{0} -> {1}" -f $u, $r.StatusCode) }
     catch { Write-Warning "$u -> $($_.Exception.Message)" }
 }
+if ($requiresMigrate) {
 Step "Queue"
 @"
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;
@@ -236,4 +440,5 @@ SELECT subscription_id, outcome, count(*) FROM processing.deliveries GROUP BY 1,
 SELECT count(*) AS outbox_unconfirmed FROM messaging.outbox WHERE confirmed_at IS NULL;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
 }
-Write-Host "`nDone. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green
+}
+Write-Host "`nГотово. Map: http://localhost:8090  Admin: http://localhost:8091" -ForegroundColor Green

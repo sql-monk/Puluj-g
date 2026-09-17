@@ -29,18 +29,41 @@ root-еквівалентний доступ до хоста через сам s
 
 ## Перший install і оновлення
 
-З кореня репозиторію штатна команда — `pwsh scripts/deploy.ps1`. Скрипт
-відмовляється непомітно створювати порожній PostgreSQL-том. Для навмисно
-нової інсталяції потрібно явно вказати `-InitializeDatabase`; для наявних
-даних лишають `-DatabaseVolume <наявний-том>` (за замовчуванням
-`puluj-g-pgdata`).
+З кореня репозиторію штатна команда — `pwsh scripts/deploy.ps1`. Вона відкриває
+інтерактивний майстер: вибір сервісів, перебудови образів, режиму broker,
+дій з БД і введення конфігурації. Скрипт відмовляється непомітно створювати
+порожній PostgreSQL-том. Для навмисно нової інсталяції в майстрі потрібно
+вибрати відповідний пункт; для наявних даних — лишити наявний том або вказати
+`-DatabaseVolume <наявний-том>` (за замовчуванням `puluj-g-pgdata`).
+
+```powershell
+# майстер: оберіть повний стек / потрібні сервіси, rebuild та дію з БД
+pwsh scripts/deploy.ps1
+```
+
+У майстрі перелічені `postgis`, `migrate`, `collector-telegram`,
+`collector-alerts`, `processor`, `api`, `admin`, `analytics` і `messaging`.
+Для нової або очищеної БД він автоматично додає `migrate`; у broker-режимі
+автоматично додає `messaging`, якщо обрано колектор або domain writers. Повне
+очищення вимагає ввести буквально `DELETE <ComposeProject>` і зберігає
+попередні перевірки володіння томом.
+
+Майстер може оновити `deploy/.env` для admin token, alerts.in.ua, Telegram
+(enabled, API ID, API hash, номер, 2FA password, session path) та LLM. Значення
+секретів приховані під час вводу й виводу. Для існуючої БД він пропонує
+застосувати функціональні параметри також до `app_settings`; це важливо,
+оскільки DB-конфігурація має вищий пріоритет за `.env`. Одноразовий Telegram
+verification code у `.env` не зберігається: його введіть в Admin або подайте
+тимчасовим `<SessionPath>.code`.
+
+Для CI та runbook-ів збережено неінтерактивний режим:
 
 ```powershell
 # лише перший, навмисно порожній install
-pwsh scripts/deploy.ps1 -InitializeDatabase
+pwsh scripts/deploy.ps1 -InitializeDatabase -NonInteractive
 
 # оновлення наявної БД
-pwsh scripts/deploy.ps1
+pwsh scripts/deploy.ps1 -NonInteractive
 ```
 
 `migrate` — одноразова роль: бере advisory lock, застосовує очікувані EF
