@@ -16,4 +16,9 @@ describe('message catalogue query and cursor pages', () => {
     const query = { eventKinds: ['Explosion'], entityKinds: [], eventCategories: [], categoryIds: [4], classIds: [], familyIds: [], modelIds: [], sourceIds: [], regionId: 3, confidence: 'high', location: 'located', hasResults: false }
     expect(messageParams(query)).toMatchObject({ hasResults: false, eventKinds: undefined, categoryIds: undefined, regionId: undefined, confidence: undefined, location: undefined })
   })
+
+  it('keeps the requested dataset and accepts the legacy status spelling', () => {
+    const query = { eventKinds: [], entityKinds: [], eventCategories: [], categoryIds: [], classIds: [], familyIds: [], modelIds: [], sourceIds: [], status: 'completed', dataset: 'recorded' }
+    expect(messageParams(query)).toMatchObject({ outcome: 'completed', dataset: 'recorded' })
+  })
 })

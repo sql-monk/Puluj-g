@@ -12,11 +12,11 @@ export function messageParams(q: DataQuery) {
   const noResults = q.hasResults === false
   return {
     sourceIds: q.sourceIds.join(',') || undefined, from: q.from?.toISOString(), to: q.to?.toISOString(), q: q.q,
-    hasResults: q.hasResults, outcome: q.outcome, eventKinds: noResults ? undefined : q.eventKinds.join(',') || undefined,
+    hasResults: q.hasResults, outcome: q.outcome ?? q.status, eventKinds: noResults ? undefined : q.eventKinds.join(',') || undefined,
     categoryIds: noResults ? undefined : q.categoryIds.join(',') || undefined, classIds: noResults ? undefined : q.classIds.join(',') || undefined,
     familyIds: noResults ? undefined : q.familyIds.join(',') || undefined, modelIds: noResults ? undefined : q.modelIds.join(',') || undefined,
     regionId: noResults ? undefined : q.regionId, location: noResults ? undefined : q.location, confidence: noResults ? undefined : q.confidence, cursor: q.cursor,
-    pageSize: q.pageSize, dataset: 'live',
+    pageSize: q.pageSize, dataset: q.dataset,
   }
 }
 

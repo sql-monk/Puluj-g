@@ -23,6 +23,8 @@ import { replay } from '../replay/engine'
 import { buildAlertLayer, buildEventLayer, buildReplayLayers, buildTrackLayers, emptyCollection, visibleTracks } from './geojson'
 import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addSelectionLayers, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
 import { useRegionCamera } from './useRegionCamera'
+import { regionFromHits, selectedRegionFromHit } from './regionSelection'
+import { hoverLabel } from './hover'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -95,6 +97,10 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
   }, [ensurePlaceGeometry, focus])
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
+  const tracksRef = useRef(tracks)
+  tracksRef.current = tracks
+  const eventsRef = useRef(events)
+  eventsRef.current = events
   // The alert fill (one feature per alerted place, nested polygons cut out) is rebuilt only when alerts change:
   // the apply effect below runs on every clock tick and track update.
   const alertList = useMemo(() => (filters.alerts ? Object.values(alerts) : []), [alerts, filters.alerts])
@@ -102,6 +108,11 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
   // P11: incidents (the catalog-driven layer); the legacy event markers of incident kinds are hidden while it is on (one marker per explosion).
   const incidents = useIncidentLayer({ map: mapInstance, palette, clock, regionsById, placeGeometries, ensurePlaceGeometry })
   const incidentCatalog = useIncidentStore((s) => s.catalog)
+  const incidentById = useIncidentStore((s) => s.byId)
+  const incidentByIdRef = useRef(incidentById)
+  incidentByIdRef.current = incidentById
+  const incidentCatalogRef = useRef(incidentCatalog)
+  incidentCatalogRef.current = incidentCatalog
   const legacyEvents = useMemo(() => withoutIncidentEvents(Object.values(events), incidentCatalog, filters.events), [events, incidentCatalog, filters.events])
   // The click handler is registered once; the incident selection goes through a ref so it sees the current hook.
   const incidentSelect = useRef<(id: number | null, at?: [number, number]) => void>(() => {})
@@ -165,11 +176,10 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
         setEventClickAt([e.lngLat.lng, e.lngLat.lat])
         return
       }
-      // No marker under the cursor: (de)select the oblast for the feed filter and outline highlight.
-      // Raion first (the level alerts are published at), the oblast where no raion polygon is drawn.
-      const ob = map.queryRenderedFeatures(e.point, { layers: ['alerts-fill', 'raions-fill', 'oblasts-fill'] })[0]
-      const regionId = ob?.layer.id === 'alerts-fill' ? ob.properties?.placeId : ob?.properties?.id
-      selectRegion(regionId === undefined ? null : Number(regionId))
+      // A district click first establishes its parent oblast; only a second
+      // click within that selected oblast can enter the district.
+      const region = regionFromHits(map.queryRenderedFeatures(e.point, { layers: ['alerts-fill', 'raions-fill', 'oblasts-fill'] }), regionsRef.current)
+      selectRegion(selectedRegionFromHit(region, useStore.getState().selectedRegionId, regionsRef.current))
     })
     const regionLayers = ['raions-fill', 'oblasts-fill', 'alerts-fill']
     pointerCursor(map, [...regionLayers, 'event-points', ...INCIDENT_HIT_LAYERS])
@@ -179,14 +189,22 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
     // Hover: the raion under the cursor with its oblast; the oblast alone where no raion polygon is drawn. An alerted
     // oblast is only hit through its alert fill (placeId = the oblast), which sits above the raion fill, so the raion
     // is looked for among every hit before an oblast is accepted. No region tip while a target is hovered.
-    const stopHover = regionHover(map, tip.current!, regionLayers, (hits) => {
-      if (hover.current() !== null) return null
+    const stopHover = regionHover(map, tip.current!, regionLayers, (hits, e) => {
+      const trackId = hover.current()
+      const track = trackId === null ? undefined : tracksRef.current[trackId]
+      const eventFeature = map.queryRenderedFeatures(e.point, { layers: ['event-points'] })[0]
+      const event = eventFeature?.properties?.id === undefined ? undefined : eventsRef.current[String(eventFeature.properties.id)]
+      // Unlike incidentHitAt this never zooms a cluster: hovering must be read-only.
+      const incidentFeature = map.queryRenderedFeatures(e.point, { layers: INCIDENT_HIT_LAYERS.filter((layer) => map.getLayer(layer)) })
+        .find((feature) => feature.properties?.point_count === undefined && feature.properties?.id !== undefined)
+      const incident = incidentFeature?.properties?.id === undefined ? undefined : incidentByIdRef.current[Number(incidentFeature.properties.id)]
       const byId = regionsRef.current
-      const regionsHit = hits.map((hit) => byId.get(Number(hit.layer.id === 'alerts-fill' ? hit.properties?.placeId : hit.properties?.id))).filter((r): r is RegionDto => !!r)
-      const region = regionsHit.find((r) => r.level === 'District') ?? regionsHit.find((r) => r.level === 'Region' || r.level === 'City')
-      if (!region) return null
-      const parent = region.parentId !== undefined ? byId.get(region.parentId) : undefined
-      return { id: region.id, geometry: region.geometry, label: parent ? `${region.name} · ${parent.name}` : region.name }
+      const region = regionFromHits(hits, byId)
+      const parent = region?.parentId !== undefined ? byId.get(region.parentId) : undefined
+      const eventLabel = event?.type?.label ?? (event?.eventType === 'ExplosionReport' ? 'Повідомлення про вибух' : event?.eventType === 'AirDefenseActivity' ? 'Повідомлення про роботу ППО' : event ? 'Повідомлення про подію' : undefined)
+      const label = hoverLabel({ target: track?.type.label, event: eventLabel, incident: incident ? incidentCatalogRef.current.kindOf(incident.kind).name : undefined, region: region ? (parent ? `${region.name} · ${parent.name}` : region.name) : undefined })
+      if (!label) return null
+      return { id: track?.id ?? event?.id ?? incident?.id ?? region!.id, geometry: track || event || incident ? undefined : region?.geometry, label }
     })
     map.on('error', (e) => console.error('[map]', e.error?.message ?? e))
     if (import.meta.env.DEV) Object.assign(window, { __map: map, __maplibre: maplibregl })
@@ -301,7 +319,7 @@ function addLayers(map: maplibregl.Map, p: MapPalette) {
     firstSymbol,
   )
   map.addLayer(
-    { id: 'oblasts-line', type: 'line', source: 'oblasts', paint: { 'line-color': p.oblastLine, 'line-width': 0.9, 'line-opacity': 0.6 } },
+    { id: 'oblasts-line', type: 'line', source: 'oblasts', paint: { 'line-color': p.oblastLine, 'line-width': 1.2, 'line-opacity': 0.76 } },
     firstSymbol,
   )
   // Raions: an invisible fill for hit-testing and a hairline outline that gets a little firmer when zoomed in.

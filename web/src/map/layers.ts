@@ -636,8 +636,9 @@ export function pointerCursor(map: maplibregl.Map, layers: string[]) {
 
 /** A polygon region the cursor can rest on: what to outline and what to say in the tooltip. */
 export interface HoverRegion {
-  id: number
-  geometry: Geometry
+  id: string | number
+  /** Marker tips have no polygon to outline. */
+  geometry?: Geometry
   label: string
 }
 
@@ -646,8 +647,8 @@ export interface HoverRegion {
  * `resolve` maps the rendered features under the cursor (queried on `hitLayers`, top-most first) to a region, or null.
  * Returns the teardown.
  */
-export function regionHover(map: maplibregl.Map, tip: HTMLElement, hitLayers: string[], resolve: (hits: maplibregl.MapGeoJSONFeature[]) => HoverRegion | null): () => void {
-  let current: number | null = null
+export function regionHover(map: maplibregl.Map, tip: HTMLElement, hitLayers: string[], resolve: (hits: maplibregl.MapGeoJSONFeature[], event: MapLayerMouseEvent) => HoverRegion | null): () => void {
+  let current: string | number | null = null
   const clear = () => {
     tip.hidden = true
     if (current === null) return
@@ -657,12 +658,12 @@ export function regionHover(map: maplibregl.Map, tip: HTMLElement, hitLayers: st
   const move = (e: MapLayerMouseEvent) => {
     // Layers are missing while a new style loads; the tooltip must not linger with a stale name then.
     if (!map.getSource('hover-region') || hitLayers.some((l) => !map.getLayer(l))) return clear()
-    const region = resolve(map.queryRenderedFeatures(e.point, { layers: hitLayers }))
+    const region = resolve(map.queryRenderedFeatures(e.point, { layers: hitLayers }), e)
     if (!region) return clear()
     if (region.id !== current) {
       current = region.id
       tip.textContent = region.label
-      setData(map, 'hover-region', { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: region.geometry, properties: {} }] })
+      setData(map, 'hover-region', { type: 'FeatureCollection', features: region.geometry ? [{ type: 'Feature', geometry: region.geometry, properties: {} }] : [] })
     }
     // Next to the pointer, flipped to the other side near the right / bottom edge of the map.
     const box = map.getContainer()

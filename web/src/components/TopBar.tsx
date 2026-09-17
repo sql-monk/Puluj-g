@@ -19,6 +19,7 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
   const setTheme = useStore((s) => s.setTheme)
   const error = useStore((s) => s.error)
   const [mapOpen, setMapOpen] = useState(false)
+  const mapMenu = useRef<HTMLSpanElement>(null)
   const mapButton = useRef<HTMLButtonElement>(null)
   const liveLink = useRef<HTMLAnchorElement>(null)
   const historyLink = useRef<HTMLAnchorElement>(null)
@@ -34,6 +35,19 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [mapOpen])
+
+  // A menu left open over the compact navigation makes the controls beneath it
+  // unreachable on a phone. Pointer events cover mouse, pen and touch.
+  useEffect(() => {
+    if (!mapOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !mapMenu.current?.contains(event.target)) setMapOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [mapOpen])
+
+  useEffect(() => setMapOpen(false), [route.section, route.mapMode])
 
   const dot = connection === 'connected' ? 'bg-emerald-500' : connection === 'reconnecting' ? 'animate-pulse bg-amber-500' : 'bg-red-500'
   const status = connection === 'connected' ? 'онлайн' : connection === 'reconnecting' ? 'перепідключення…' : 'офлайн'
@@ -54,7 +68,7 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
       <button ref={panelButtonRef} className={`rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${panelOpen ? 'bg-slate-200 dark:bg-slate-700' : ''}`} onClick={onTogglePanel} aria-label="Панель фільтрів і налаштувань" aria-expanded={panelOpen} title={panelOpen ? 'Сховати панель' : 'Показати панель'}>☰</button>
       <span className="font-semibold tracking-wide">Puluj</span>
       <nav className="order-3 flex w-full items-center gap-1 overflow-x-auto text-xs sm:order-none sm:w-auto sm:text-sm" aria-label="Основна навігація">
-        <span className="relative flex items-center">
+        <span ref={mapMenu} className="relative flex items-center">
           <a href={publicHash({ ...mapBase, mapMode: 'live' })} className={`whitespace-nowrap rounded-l px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${map ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`} aria-current={map ? 'page' : undefined} onClick={() => setMapOpen(false)}>Мапа</a>
           <button ref={mapButton} className={`rounded-r px-1.5 py-1 hover:bg-slate-200 dark:hover:bg-slate-700 ${map ? 'bg-blue-600 text-white hover:bg-blue-700' : ''}`} aria-label="Обрати режим мапи" aria-haspopup="menu" aria-expanded={mapOpen} onClick={() => setMapOpen((open) => !open)} onKeyDown={(event) => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setMapOpen(true); focusMapItem(event.key === 'ArrowDown' ? 'live' : 'history') } }}><span aria-hidden="true">▾</span></button>
           {mapOpen && <span className="absolute left-0 top-full z-40 mt-1 flex min-w-36 flex-col rounded-md bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700" role="menu" aria-label="Режим мапи">
