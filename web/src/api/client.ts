@@ -50,6 +50,15 @@ function withQuery(path: string, query: string): string {
   return query ? `${path}${path.includes('?') ? '&' : '?'}${query}` : path
 }
 
+/**
+ * One canonical request key for every analytics metric.  Keeping the period
+ * first and reusing U03's ordered query serializer makes a copied URL and the
+ * request it produces directly comparable in tests and in the network panel.
+ */
+export function statsRequestPath(metric: 'targets' | 'alerts' | 'sources' | 'recognition', from: Date, to: Date, filter?: DataQuery): string {
+  return withQuery(`/api/stats/${metric}?${periodQuery(from, to)}`, mapQuery(filter))
+}
+
 export const api = {
   /** The live windows (lifetime choices, feed depth) the server applies; the client prunes with the same numbers. */
   mapConfig: () => get<MapConfigDto>('/api/map/config'),
@@ -90,10 +99,10 @@ export const api = {
   replay: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<ReplayDto>(withQuery(`/api/replay?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, mapQuery(filter)), signal),
   /** The statistics page, one payload per tab for one period (server-cached, the same for everyone). */
   stats: {
-    targets: (from: Date, to: Date, filter?: DataQuery) => get<StatsTargetsDto>(withQuery(`/api/stats/targets?${periodQuery(from, to)}`, mapQuery(filter))),
-    alerts: (from: Date, to: Date, filter?: DataQuery) => get<StatsAlertsDto>(withQuery(`/api/stats/alerts?${periodQuery(from, to)}`, mapQuery(filter))),
-    sources: (from: Date, to: Date, filter?: DataQuery) => get<StatsSourcesDto>(withQuery(`/api/stats/sources?${periodQuery(from, to)}`, mapQuery(filter))),
-    recognition: (from: Date, to: Date, filter?: DataQuery) => get<StatsRecognitionDto>(withQuery(`/api/stats/recognition?${periodQuery(from, to)}`, mapQuery(filter))),
+    targets: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsTargetsDto>(statsRequestPath('targets', from, to, filter), signal),
+    alerts: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsAlertsDto>(statsRequestPath('alerts', from, to, filter), signal),
+    sources: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsSourcesDto>(statsRequestPath('sources', from, to, filter), signal),
+    recognition: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => get<StatsRecognitionDto>(statsRequestPath('recognition', from, to, filter), signal),
   },
   timeline: (from: Date, to: Date, bucketMinutes: number, filter?: DataQuery, signal?: AbortSignal) =>
     get<TimelineBucketDto[]>(

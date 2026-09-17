@@ -5,7 +5,7 @@ export type Tab = 'targets' | 'alerts' | 'sources' | 'recognition'
 
 /** The four tabs, each answering one question. */
 export const TABS: { id: Tab; label: string; question: string }[] = [
-  { id: 'targets', label: 'Цілі', question: 'що летіло' },
+  { id: 'targets', label: 'Цілі / події', question: 'що летіло та які події зафіксовано' },
   { id: 'alerts', label: 'Тривоги', question: 'скільки сиділи в тривозі' },
   { id: 'sources', label: 'Джерела', question: 'хто повідомляв' },
   { id: 'recognition', label: 'Розпізнавання', question: 'як прочитано' },

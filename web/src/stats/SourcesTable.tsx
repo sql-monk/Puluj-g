@@ -1,10 +1,13 @@
-import type { StatsSourceDto } from '../api/types'
+import type { StatsFilterMetaDto, StatsPeriodDto, StatsSourceDto } from '../api/types'
+import type { DataQuery } from '../public/query'
+import { canSourceMessagesDrillDown, sourceMessagesHref } from './drilldown'
 import Sparkline from './charts/Sparkline'
 import { MUTED } from './palette'
 import { lagText, num, pct } from './period'
 
 /** The sources of the period, busiest first: volume, the trend, how much was processed and how much of that carried a fact, the lag. */
-export default function SourcesTable({ sources }: { sources: StatsSourceDto[] }) {
+export default function SourcesTable({ sources, period, filter, filters }: { sources: StatsSourceDto[]; period: StatsPeriodDto; filter: DataQuery; filters: StatsFilterMetaDto }) {
+  const drillDown = canSourceMessagesDrillDown(filters)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs tabular-nums">
@@ -25,7 +28,7 @@ export default function SourcesTable({ sources }: { sources: StatsSourceDto[] })
           {sources.map((s) => (
             <tr key={s.id} className="border-t border-slate-100 dark:border-slate-800">
               <td className="py-1 pr-2">
-                <span className="font-medium">{s.name}</span> <span className="text-slate-400">{s.code}</span>
+                {drillDown ? <a className="font-medium text-blue-700 hover:underline dark:text-blue-300" href={sourceMessagesHref(s.id, period, filter)} title="Відкрити рівно ці збережені ревізії повідомлень за періодом">{s.name}</a> : <span className="font-medium">{s.name}</span>} <span className="text-slate-400">{s.code}</span>
               </td>
               <td className="py-1 pr-2 text-right">{num(s.messages)}</td>
               <td className="py-1 pr-2">
@@ -43,6 +46,7 @@ export default function SourcesTable({ sources }: { sources: StatsSourceDto[] })
           ))}
         </tbody>
       </table>
+      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{drillDown ? 'Назва джерела відкриває каталог з тим самим джерелом і UTC-інтервалом за часом публікації.' : 'За поточного фільтра немає точного каталожного еквівалента, тому джерела лишаються у таблиці.'} Для фактів, треків і тривог точного каталожного еквівалента також немає — їхні повні значення доступні у таблицях.</p>
     </div>
   )
 }

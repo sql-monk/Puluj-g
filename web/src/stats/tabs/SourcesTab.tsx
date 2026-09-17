@@ -14,10 +14,10 @@ import FilterMeta from '../FilterMeta'
 /** Who reported: the table of sources and their messages over time. */
 export default function SourcesTab({ period, filter }: { period: Period; filter: DataQuery }) {
   const state = useSection(api.stats.sources, period, filter)
-  return <SectionShell {...state}>{(data) => <Sources data={data} />}</SectionShell>
+  return <SectionShell {...state}>{(data) => <Sources data={data} filter={filter} />}</SectionShell>
 }
 
-function Sources({ data }: { data: StatsSourcesDto }) {
+function Sources({ data, filter }: { data: StatsSourcesDto; filter: DataQuery }) {
   const p = data.period
   const labels = useMemo(() => p.bucketStarts.map((b) => bucketLabel(b, p.bucket)), [p])
   const titles = useMemo(() => p.bucketStarts.map((b) => bucketTitle(b, p.bucket)), [p])
@@ -43,7 +43,7 @@ function Sources({ data }: { data: StatsSourcesDto }) {
       </div>
 
       <ChartCard title="Джерела" subtitle="обсяг, динаміка, корисність, затримка" empty={empty}>
-        <SourcesTable sources={data.sources} />
+        <SourcesTable sources={data.sources} period={data.period} filter={filter} filters={data.filters} />
       </ChartCard>
 
       <ChartCard
