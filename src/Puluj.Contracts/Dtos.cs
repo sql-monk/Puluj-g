@@ -205,7 +205,7 @@ public sealed record StatsAlertsDto(
     IReadOnlyList<StatsAlertDayDto> TopDays);
 /// <summary>Series: messages per bucket, aligned with Period.BucketStarts.</summary>
 public sealed record StatsSourceDto(int Id, string Code, string Name, long Messages, long Processed, long WithTargets, long Targets, double? MedianLagSeconds, IReadOnlyList<long> Series);
-public sealed record StatsSourcesDto(StatsPeriodDto Period, StatsFilterMetaDto Filters, long Messages, long Processed, long WithTargets, long Targets, IReadOnlyList<StatsSourceDto> Sources);
+public sealed record StatsSourcesDto(StatsPeriodDto Period, StatsFilterMetaDto Filters, StatsFilterMetaDto FactFilters, long Messages, long Processed, long WithTargets, long Targets, IReadOnlyList<StatsSourceDto> Sources);
 /// <summary>How the pipeline read the period: distributions of the facts and the share of processed messages without a fact per bucket.</summary>
 public sealed record StatsRecognitionDto(
     StatsPeriodDto Period,

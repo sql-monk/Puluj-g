@@ -29,10 +29,10 @@ function Recognition({ data }: { data: StatsRecognitionDto }) {
     <>
       <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Фактів про цілі" value={compact(data.targets)} note="без повторів між джерелами" />
-        <StatTile label="Оброблено повідомлень" value={compact(data.processed)} note="за часом публікації" />
-        <StatTile label="З фактами" value={pct(data.withTargets, data.processed)} note={`${compact(data.withTargets)} повідомлень`} />
-        <StatTile label="Без фактів" value={pct(totalWithout, data.processed)} note={`${compact(totalWithout)} повідомлень`} />
+        <StatTile label="Фактів про цілі" value={compact(data.targets)} exactValue={data.targets.toLocaleString('uk-UA')} note="без повторів між джерелами" />
+        <StatTile label="Оброблено повідомлень" value={compact(data.processed)} exactValue={data.processed.toLocaleString('uk-UA')} note="за часом публікації" />
+        <StatTile label="З фактами" value={pct(data.withTargets, data.processed)} exactValue={`${data.withTargets.toLocaleString('uk-UA')} з ${data.processed.toLocaleString('uk-UA')}`} note={`${compact(data.withTargets)} повідомлень`} />
+        <StatTile label="Без фактів" value={pct(totalWithout, data.processed)} exactValue={`${totalWithout.toLocaleString('uk-UA')} з ${data.processed.toLocaleString('uk-UA')}`} note={`${compact(totalWithout)} повідомлень`} />
       </div>
 
       <ChartCard

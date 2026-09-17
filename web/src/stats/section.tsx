@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { DataQuery } from '../public/query'
+import { serializeDataQuery, type DataQuery } from '../public/query'
 import type { Period } from './period'
 
 /**
- * One tab's payload for the period. While a new period loads the previous payload stays on screen (the tab dims it);
- * a response that arrives after a newer request was sent is dropped. `load` must be a stable reference (api.stats.x).
+ * One tab's payload for one exact period/filter key. A response that arrives
+ * after a newer request was sent is dropped, and an old payload is never
+ * rendered under the new URL header. `load` must be stable (api.stats.x).
  */
 export function useSection<T>(load: (from: Date, to: Date, filter?: DataQuery, signal?: AbortSignal) => Promise<T>, period: Period, filter?: DataQuery) {
   const [data, setData] = useState<T | null>(null)
@@ -14,6 +15,10 @@ export function useSection<T>(load: (from: Date, to: Date, filter?: DataQuery, s
   const seq = useRef(0)
   const fromMs = period.from.getTime()
   const toMs = period.to.getTime()
+  const filterKey = filter ? serializeDataQuery(new URLSearchParams(), filter).toString() : ''
+  const requestKey = `${fromMs}|${toMs}|${filterKey}`
+  const [dataKey, setDataKey] = useState<string | null>(null)
+  const [errorKey, setErrorKey] = useState<string | null>(null)
   useEffect(() => {
     const id = ++seq.current
     const controller = new AbortController()
@@ -22,22 +27,27 @@ export function useSection<T>(load: (from: Date, to: Date, filter?: DataQuery, s
       .then((d) => {
         if (id !== seq.current) return
         setData(d)
+        setDataKey(requestKey)
         setError(null)
+        setErrorKey(null)
       })
       .catch((e: Error) => {
         if (e.name === 'AbortError') return
-        if (id === seq.current) setError(e.message)
+        if (id === seq.current) {
+          setError(e.message)
+          setErrorKey(requestKey)
+        }
       })
       .finally(() => {
         if (id === seq.current) setLoading(false)
       })
     return () => controller.abort()
-  }, [attempt, load, fromMs, toMs, filter])
+  }, [attempt, load, requestKey, fromMs, toMs, filter])
   const retry = () => setAttempt((value) => value + 1)
-  return { data, loading, error, retry }
+  return { data: dataKey === requestKey ? data : null, loading, error: errorKey === requestKey ? error : null, retry }
 }
 
-/** The frame every tab shares: the error line, the first-load placeholder, the dimmed previous payload while reloading. */
+/** The frame every tab shares: an exact-request skeleton, error and retry state. */
 export function SectionShell<T>({ data, loading, error, retry, children }: { data: T | null; loading: boolean; error: string | null; retry: () => void; children: (data: T) => ReactNode }) {
   return (
     <>

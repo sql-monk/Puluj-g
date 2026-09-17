@@ -125,12 +125,21 @@ public sealed class StatsService(IDbContextFactory<PulujDbContext> factory, Refe
         var targets = await Rows<SourceTargetsRow>(db, $"SELECT t.source_id AS source_id, count(*) AS n FROM targets t WHERE {facts} GROUP BY 1", ct);
         var series = buckets.GroupBy(x => x.SourceId).ToDictionary(g => g.Key, g => p.Series(g, x => x.BucketAt, x => x.N));
         var targetBySource = targets.ToDictionary(x => x.SourceId, x => x.N);
-        var sources = sourceRows.Select(row =>
+        // Raw-message rows are ordered by PublishedAt.  Facts use ObservedAt
+        // and must not disappear simply because the source had no raw revision
+        // in this publication window, so retain their source rows with zeroed
+        // raw counters when necessary.
+        var sourceIds = sourceRows.Select(x => x.SourceId).Concat(targetBySource.Keys).Distinct();
+        var rawBySource = sourceRows.ToDictionary(x => x.SourceId);
+        var sources = sourceIds.Select(sourceId =>
         {
-            var source = refs.Sources.GetValueOrDefault(row.SourceId);
-            return new StatsSourceDto(row.SourceId, source?.Code ?? $"#{row.SourceId}", source?.Name ?? $"#{row.SourceId}", row.Messages, row.Processed, row.WithTargets, targetBySource.GetValueOrDefault(row.SourceId), row.MedianLag is { } lag ? Math.Round(lag) : null, series.GetValueOrDefault(row.SourceId) ?? new long[p.Starts.Count]);
-        }).OrderByDescending(x => x.Messages).ToList();
-        return new StatsSourcesDto(p.Dto, f.Meta("sources"), sources.Sum(x => x.Messages), sources.Sum(x => x.Processed), sources.Sum(x => x.WithTargets), sources.Sum(x => x.Targets), sources);
+            rawBySource.TryGetValue(sourceId, out var row);
+            var source = refs.Sources.GetValueOrDefault(sourceId);
+            return new StatsSourceDto(sourceId, source?.Code ?? $"#{sourceId}", source?.Name ?? $"#{sourceId}", row?.Messages ?? 0, row?.Processed ?? 0, row?.WithTargets ?? 0, targetBySource.GetValueOrDefault(sourceId), row?.MedianLag is { } lag ? Math.Round(lag) : null, series.GetValueOrDefault(sourceId) ?? new long[p.Starts.Count]);
+        }).OrderByDescending(x => x.Messages).ThenByDescending(x => x.Targets).ToList();
+        // This total is deliberately sourced from the observedAt aggregate,
+        // not from the PublishedAt source rows above.
+        return new StatsSourcesDto(p.Dto, f.Meta("sources"), f.Meta("targets"), sources.Sum(x => x.Messages), sources.Sum(x => x.Processed), sources.Sum(x => x.WithTargets), targets.Sum(x => x.N), sources);
     }
 
     private async Task<StatsRecognitionDto> ComputeRecognitionAsync(Period p, StatsFilter f, CancellationToken ct)

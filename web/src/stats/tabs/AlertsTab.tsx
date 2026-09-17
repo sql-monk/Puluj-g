@@ -28,10 +28,10 @@ function Alerts({ data }: { data: StatsAlertsDto }) {
     <>
       <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Тривог по областях" value={compact(data.alerts)} note="область або Київ; громади не рахуються" />
-        <StatTile label="Область-години під тривогою" value={hoursText(data.alertHours)} note="сума перекритих інтервалів по областях" />
-        <StatTile label="Областей у тривозі" value={String(data.byRegion.length)} note="хоч раз за період" />
-        <StatTile label="Тривали наприкінці періоду" value={String(data.openAtEnd)} note="не завершені на кінець періоду" />
+        <StatTile label="Тривог по областях" value={compact(data.alerts)} exactValue={data.alerts.toLocaleString('uk-UA')} note="область або Київ; громади не рахуються" />
+        <StatTile label="Область-години під тривогою" value={hoursText(data.alertHours)} exactValue={`${data.alertHours.toLocaleString('uk-UA')} область-годин`} note="сума перекритих інтервалів по областях" />
+        <StatTile label="Областей у тривозі" value={String(data.byRegion.length)} exactValue={data.byRegion.length.toLocaleString('uk-UA')} note="хоч раз за період" />
+        <StatTile label="Тривали наприкінці періоду" value={String(data.openAtEnd)} exactValue={data.openAtEnd.toLocaleString('uk-UA')} note="не завершені на кінець періоду" />
       </div>
 
       <ChartCard

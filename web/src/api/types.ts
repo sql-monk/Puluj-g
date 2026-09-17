@@ -561,6 +561,7 @@ export interface StatsSourceDto {
 export interface StatsSourcesDto {
   period: StatsPeriodDto
   filters: StatsFilterMetaDto
+  factFilters: StatsFilterMetaDto
   messages: number
   processed: number
   withTargets: number

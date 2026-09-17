@@ -25,6 +25,6 @@ export default defineConfig({
   ],
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /E0[169].*\.e2e\.ts/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /E(?:0[169]|10).*\.e2e\.ts/ },
   ],
 })

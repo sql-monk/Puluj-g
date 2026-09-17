@@ -36,13 +36,13 @@ function Sources({ data, filter }: { data: StatsSourcesDto; filter: DataQuery })
     <>
       <FilterMeta meta={data.filters} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatTile label="Повідомлень" value={compact(data.messages)} note={`з ${data.sources.length} джерел`} />
-        <StatTile label="Оброблено" value={pct(data.processed, data.messages)} note={`${compact(data.processed)} повідомлень`} />
-        <StatTile label="З розпізнаними фактами" value={pct(data.withTargets, data.processed)} note={`${compact(data.withTargets)} з оброблених`} />
-        <StatTile label="Фактів про цілі" value={compact(data.targets)} note="без повторів між джерелами" />
+        <StatTile label="Повідомлень" value={compact(data.messages)} exactValue={`${data.messages.toLocaleString('uk-UA')} ревізій за publishedAt`} note={`з ${data.sources.length} джерел`} />
+        <StatTile label="Оброблено" value={pct(data.processed, data.messages)} exactValue={`${data.processed.toLocaleString('uk-UA')} з ${data.messages.toLocaleString('uk-UA')} ревізій за publishedAt`} note={`${compact(data.processed)} повідомлень`} />
+        <StatTile label="З розпізнаними фактами" value={pct(data.withTargets, data.processed)} exactValue={`${data.withTargets.toLocaleString('uk-UA')} з ${data.processed.toLocaleString('uk-UA')} ревізій за publishedAt`} note={`${compact(data.withTargets)} з оброблених`} />
+        <StatTile label="Фактів про цілі" value={compact(data.targets)} exactValue={`${data.targets.toLocaleString('uk-UA')} канонічних фактів за ${data.factFilters.timeBasis}`} note={`без повторів; популяція: ${data.factFilters.population}`} />
       </div>
 
-      <ChartCard title="Джерела" subtitle="обсяг, динаміка, корисність, затримка" empty={empty}>
+      <ChartCard title="Джерела" subtitle="raw-ревізії за publishedAt; факти в окремій observedAt-колонці" empty={empty}>
         <SourcesTable sources={data.sources} period={data.period} filter={filter} filters={data.filters} />
       </ChartCard>
 

@@ -122,9 +122,9 @@ export function Tooltip({ tip, width }: { tip: TipState | null; width: number })
 }
 
 /** A headline figure: label above, the number, a note below. */
-export function StatTile({ label, value, note }: { label: string; value: string; note?: string }) {
+export function StatTile({ label, value, exactValue, note }: { label: string; value: string; exactValue?: string; note?: string }) {
   return (
-    <div className="rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-900">
+    <div className="rounded-xl bg-white px-3 py-2 shadow-sm dark:bg-slate-900" aria-label={exactValue ? `${label}: ${exactValue}` : undefined}>
       <div className="text-[11px] text-slate-500 dark:text-slate-400">{label}</div>
       <div className="text-xl font-semibold tabular-nums">{value}</div>
       {note && <div className="text-[11px] text-slate-500 dark:text-slate-400">{note}</div>}
