@@ -46,6 +46,7 @@ public static partial class OpsEndpoints
         ops.MapGet("/ops/llm/requests/{id:long}", LlmRequestAsync);
         ops.MapGet("/ops/db", DbAsync);
         ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
+        ops.MapPost("/ops/db/tables/{name}/analyze", AnalyzeTableAsync);
         ops.MapPost("/ops/db/query", DbQueryAsync);
         ops.MapPost("/ops/db/clear", ClearOperationalDataAsync);
 
@@ -483,6 +484,33 @@ public static partial class OpsEndpoints
             return Results.NotFound(new { error = "Таблицю не знайдено." });
         }
         return Results.Ok(await ReadQueryAsync(db, $"SELECT * FROM public.\"{name}\" LIMIT {take + 1}", take, redactSensitiveColumns: true, ct));
+    }
+
+    private static async Task<IResult> AnalyzeTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        if (!TableName().IsMatch(name))
+        {
+            return Results.BadRequest(new { error = "Некоректна назва таблиці." });
+        }
+
+        await using var db = await factory.CreateDbContextAsync(ct);
+        var exists = await db.Database.SqlQueryRaw<string>("""
+            SELECT relname AS "Value" FROM pg_stat_user_tables
+            WHERE schemaname = 'public' AND relname = {0}
+            """, name).AnyAsync(ct);
+        if (!exists)
+        {
+            return Results.NotFound(new { error = "Таблицю не знайдено." });
+        }
+
+        var stopwatch = Stopwatch.StartNew();
+        await db.Database.OpenConnectionAsync(ct);
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"ANALYZE public.{QuoteIdentifier(name)}";
+        command.CommandTimeout = 60;
+        await command.ExecuteNonQueryAsync(ct);
+        stopwatch.Stop();
+        return Results.Ok(new DbAnalyzeResultDto(name, stopwatch.ElapsedMilliseconds));
     }
 
     private static async Task<IResult> DbQueryAsync(DbQueryRequest request, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
