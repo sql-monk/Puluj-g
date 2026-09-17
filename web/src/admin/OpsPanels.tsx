@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { admin, type CollectorStatusDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
+import { sortCollectors, type CollectorSortKey } from './collectors'
 import { Bars, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 
 const SERVICE_LABEL: Record<string, string> = {
@@ -18,6 +19,17 @@ const SERVICE_LABEL: Record<string, string> = {
 }
 
 type TableMaintenance = 'ANALYZE' | 'VACUUM' | 'REINDEX'
+
+const COLLECTOR_COLUMNS: { key: CollectorSortKey; label: string }[] = [
+  { key: 'name', label: 'Джерело' },
+  { key: 'type', label: 'Тип' },
+  { key: 'status', label: 'Стан' },
+  { key: 'lastPolledAt', label: 'Опитано' },
+  { key: 'lastSuccessAt', label: 'Успіх' },
+  { key: 'lastMessageAt', label: 'Повідомлення' },
+  { key: 'messages24h', label: 'За 24 год' },
+  { key: 'lastError', label: 'Помилка' },
+]
 
 /** Scaled processor replicas are `worker:processor-<container id>`: labelled by the prefix, the id kept as detail. */
 function serviceLabel(name: string): string {
@@ -98,6 +110,12 @@ function plural(n: number, one: string, few: string, many: string): string {
 export function CollectorsPanel() {
   const { data, error } = usePolled(() => admin.ops.collectors(), 15_000)
   const list: CollectorStatusDto[] = data ?? []
+  const [sort, setSort] = useState<{ key: CollectorSortKey; asc: boolean } | null>(null)
+  const rows = useMemo(() => sort ? sortCollectors(list, sort.key, sort.asc) : list, [list, sort])
+  const toggleSort = (key: CollectorSortKey) => setSort((current) => {
+    if (current?.key === key) return { key, asc: !current.asc }
+    return { key, asc: key === 'name' || key === 'type' || key === 'status' || key === 'lastError' }
+  })
   return (
     <Section title="Колектори" badge={<Badge ok={list.length ? list.filter((c) => c.enabled).every((c) => c.consecutiveFailures === 0) : null} text={`${list.filter((c) => c.enabled).length} увімкнених`} />}>
       <p className="text-xs text-slate-500">Кожне джерело окремо: коли опитано, коли останній успіх і повідомлення, помилки поспіль, і скільки повідомлень прийшло за кожну з останніх 24 годин.</p>
@@ -106,19 +124,18 @@ export function CollectorsPanel() {
         <table className="w-full text-xs">
           <thead className="text-left text-slate-500">
             <tr>
-              <th className="py-1 pr-2">Джерело</th>
-              <th className="pr-2">Тип</th>
-              <th className="pr-2">Стан</th>
-              <th className="pr-2">Опитано</th>
-              <th className="pr-2">Успіх</th>
-              <th className="pr-2">Повідомлення</th>
-              <th className="pr-2">За 24 год</th>
-              <th className="pr-2">Помилка</th>
+              {COLLECTOR_COLUMNS.map((column, index) => (
+                <th key={column.key} className={`${index === 0 ? 'py-1 ' : ''}pr-2`} aria-sort={sort?.key === column.key ? (sort.asc ? 'ascending' : 'descending') : 'none'}>
+                  <button className="cursor-pointer select-none hover:text-slate-900 dark:hover:text-white" onClick={() => toggleSort(column.key)} title={`Сортувати за колонкою «${column.label}»`}>
+                    {column.label}{sort?.key === column.key ? (sort.asc ? ' ↑' : ' ↓') : ''}
+                  </button>
+                </th>
+              ))}
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {list.map((c) => (
+            {rows.map((c) => (
               <tr key={c.sourceId} className={`border-t border-slate-100 dark:border-slate-800 ${c.enabled ? '' : 'opacity-50'}`}>
                 <td className="py-1.5 pr-2">
                   <div>{c.name} <span className="text-slate-400">{c.code}</span></div>
