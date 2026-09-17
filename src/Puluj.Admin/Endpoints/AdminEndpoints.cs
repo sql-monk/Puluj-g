@@ -23,7 +23,8 @@ public static class AdminEndpoints
     private static readonly string[] TelegramKeys =
     [
         "Collectors:Telegram:Enabled", "Collectors:Telegram:ApiId", "Collectors:Telegram:ApiHash", "Collectors:Telegram:Phone",
-        "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit",
+        "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit", "Collectors:Telegram:BackfillSince",
+        "Collectors:Telegram:HistoryWorkers", "Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval",
     ];
     private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
@@ -44,6 +45,11 @@ public static class AdminEndpoints
         ["Collectors:Telegram:Enabled"] = "false",
         ["Collectors:Telegram:AutoJoin"] = "true",
         ["Collectors:Telegram:BackfillLimit"] = "30",
+        ["Collectors:Telegram:HistoryWorkers"] = "2",
+        ["Collectors:Telegram:RpcTimeout"] = "00:00:30",
+        ["Collectors:Telegram:HistoryRequestInterval"] = "00:00:00.500",
+        ["Collectors:Telegram:HistoryMinimumInterval"] = "00:00:00.500",
+        ["Collectors:Telegram:HistoryMaximumInterval"] = "00:00:08",
         ["Llm:Enabled"] = "false",
         ["Llm:Model"] = "claude-opus-5",
         ["Llm:InputUsdPerMillionTokens"] = "5",
@@ -95,6 +101,18 @@ public static class AdminEndpoints
             if (req.Values.TryGetValue("Collectors:Telegram:ApiId", out var apiId) && !string.IsNullOrEmpty(apiId) && !int.TryParse(apiId.Trim(), out _))
             {
                 return Results.BadRequest(new { error = "api_id має бути числом" });
+            }
+            if (req.Values.TryGetValue("Collectors:Telegram:HistoryWorkers", out var workers) && !string.IsNullOrWhiteSpace(workers) && (!int.TryParse(workers, out var parsedWorkers) || parsedWorkers is < 1 or > 2))
+            {
+                return Results.BadRequest(new { error = "History workers має бути числом від 1 до 2." });
+            }
+            foreach (var (key, value) in req.Values.Where(x => x.Key is "Collectors:Telegram:RpcTimeout" or "Collectors:Telegram:HistoryRequestInterval" or "Collectors:Telegram:HistoryMinimumInterval" or "Collectors:Telegram:HistoryMaximumInterval")
+                         .Where(x => !string.IsNullOrWhiteSpace(x.Value)))
+            {
+                if (!TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var interval) || interval <= TimeSpan.Zero)
+                {
+                    return Results.BadRequest(new { error = $"{key} має бути додатнім TimeSpan, наприклад 00:00:30." });
+                }
             }
             foreach (var (key, value) in req.Values.Where(x => LlmPriceKeys.Contains(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
             {

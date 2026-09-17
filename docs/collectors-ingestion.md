@@ -49,12 +49,28 @@ error (до 2000 символів) і послідовні помилки. Це 
 заміна raw provenance.
 
 Telegram recent backfill використовує останній source message id. Якщо задано
-`BackfillSince`, повна історія з цієї дати читається сторінками, а cursor
-лежить у `collector_states`, тож перезапуск продовжує роботу. Під час такого
-завантаження processing ставиться на паузу через runtime status; після
-завершення сировина може бути заново поставлена у Pending для відтворення
-похідних даних у publication order. Flood-wait від Telegram обробляється
-очікуванням, якщо API повертає відповідну помилку.
+`BackfillSince`, керований scheduler читає повну історію сторінками по 100:
+кожен прохід бере лише одну сторінку і повертає source у weighted round-robin
+кільце. Вага — `clamp(sources.priority, 1..10)`, тому важливий канал отримує
+більше слотів, але не може витіснити інші. Є не більш як два workers і один
+глобальний request gate: стартово один history RPC кожні 500 ms; `FLOOD_WAIT`
+ставить cooldown для всіх каналів, подвоює інтервал до максимуму та після 30
+хвилин без flood поступово зменшує його.
+
+Стан `history` у `collector_states.cursor` versioned і містить `since`,
+`lastId`, `stored`, `pages`, `done`, `nextAttemptAt`, flood/error metadata.
+Старий cursor без `version` читається як v1, тому restart не починає import
+спочатку. Кожен RPC має 30-секундний timeout; оскільки WTelegram RPC не
+скасовується токеном, timeout припиняє scheduler і передає session supervisor-у
+контрольований restart, а cursor залишається на попередній безпечній сторінці.
+
+`UpdateManager` стартує до scheduler-а: live posts та edits негайно durable
+ingest-яться з тією самою raw identity, навіть коли history триває. Existing
+safe ordering semantics лишають derived processing на паузі до history drain і
+rebuild у publication order; це не означає втрати live даних. Binary media не
+завантажуються під час history: зберігається лише metadata в raw payload.
+Takeout не є автоматичним fallback: його можна додавати лише окремим explicit
+initial-import режимом із власним session lifecycle та операційним canary.
 
 ![Життєвий цикл колектора](diagrams/collector-lifecycle.png)
 

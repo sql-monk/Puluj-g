@@ -23,4 +23,10 @@ public sealed class TelegramOptions
     /// rebuilt from the raw messages in publication order (ReprocessService). Null = only the recent backfill.
     /// </summary>
     public DateTimeOffset? BackfillSince { get; set; }
+    /// <summary>Maximum concurrent scheduler workers; history RPC itself remains globally paced.</summary>
+    public int HistoryWorkers { get; set; } = 2;
+    public TimeSpan RpcTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan HistoryRequestInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+    public TimeSpan HistoryMinimumInterval { get; set; } = TimeSpan.FromMilliseconds(500);
+    public TimeSpan HistoryMaximumInterval { get; set; } = TimeSpan.FromSeconds(8);
 }

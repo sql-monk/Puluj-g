@@ -48,6 +48,14 @@ public sealed class CollectorStateStore(IDbContextFactory<PulujDbContext> factor
             s.ConsecutiveFailures++;
         }, ct);
 
+    /// <summary>Persists scheduler metadata without clearing a failure that was recorded immediately before it.</summary>
+    public Task MarkCursorAsync(int sourceId, JsonDocument cursor, CancellationToken ct) =>
+        UpdateAsync(sourceId, s =>
+        {
+            s.LastPolledAt = clock.GetUtcNow();
+            s.Cursor = cursor;
+        }, ct);
+
     private async Task UpdateAsync(int sourceId, Action<CollectorState> mutate, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
