@@ -3,9 +3,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Puluj.Collectors;
 using Puluj.Infrastructure;
-using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Settings;
-using Puluj.Messaging;
 using Puluj.Processing;
 using Puluj.Worker.Hosting;
 using Serilog;
@@ -30,7 +28,7 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(m => m.AddHttpClientInstrumentation().AddRuntimeInstrumentation().AddMeter(PulujMetrics.MeterName).AddOtlpExporter());
 
 builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection(WorkerOptions.Section));
-builder.Services.AddPulujInfrastructure(builder.Configuration, worker.InstanceName);
+builder.Services.AddPulujInfrastructure(builder.Configuration);
 if (roles.Contains(WorkerOptions.Migrate))
 {
     builder.Services.AddHostedService<DatabaseInitializer>(); // first: the others need the schema and the seed data
@@ -43,27 +41,6 @@ if (!worker.MigrateOnly)
 if (roles.Contains(WorkerOptions.Processing))
 {
     builder.Services.AddPulujProcessing(builder.Configuration, worker.InstanceName);
-}
-// Broker roles are the default durable path. They are skipped only when an operator explicitly disables Messaging.
-var messaging = builder.Configuration.GetSection(MessagingOptions.Section).Get<MessagingOptions>() ?? new MessagingOptions();
-var brokerRoles = roles.Intersect(WorkerOptions.BrokerRoles).ToHashSet();
-if (brokerRoles.Count > 0 && messaging.Enabled)
-{
-    builder.Services.AddPulujMessaging(brokerRoles, worker.InstanceName);
-    if (brokerRoles.Overlaps([WorkerOptions.Normalizer, WorkerOptions.Parser, WorkerOptions.LlmWorker, WorkerOptions.Finalizer]))
-    {
-        builder.Services.AddPulujStages(builder.Configuration, brokerRoles, worker.InstanceName); // P05/P06 stage workers (no legacy loop)
-    }
-    if (brokerRoles.Overlaps([WorkerOptions.TrackWorker, WorkerOptions.AlertWorker, WorkerOptions.Watchdog, WorkerOptions.IncidentWorker]))
-    {
-        if (roles.Contains(WorkerOptions.Processing))
-        {
-            throw new InvalidOperationException("Worker roles: the legacy `processing` role and the P09 domain writers (track-worker/alert-worker/watchdog) must not run in one process — two owners of the same rows (ADR-0009 cutover)");
-        }
-        builder.Services.AddPulujDomainWriters(builder.Configuration, brokerRoles, worker.InstanceName); // P09 track/alert owners + watchdog
-    }
-    builder.Services.AddPulujProjection(brokerRoles, worker.InstanceName); // P11 map push adapter (default messaging roles include it)
-    builder.Services.AddPulujMessageAnalytics(brokerRoles, worker.InstanceName); // P15 lifecycle projection (analytics.message_lifecycle)
 }
 var collectors = new List<string>();
 if (roles.Contains(WorkerOptions.Telegram))
@@ -80,23 +57,5 @@ if (collectors.Count > 0)
 }
 
 var host = builder.Build();
-var startupLog = host.Services.GetRequiredService<ILogger<Program>>();
-startupLog.LogInformation("{App} starting with roles: {Roles}", appName, string.Join(", ", roles.Order()));
-if (brokerRoles.Count > 0 && !messaging.Enabled && !string.IsNullOrEmpty(worker.Roles))
-{
-    startupLog.LogWarning("Roles {Roles} need Messaging:Enabled=true and a broker; skipped", string.Join(", ", brokerRoles.Order()));
-}
-if (messaging.Outbox.Enabled)
-{
-    startupLog.LogInformation("Outbox bridge enabled: raw.stored is committed to messaging.outbox; a `relay` role must run somewhere or the outbox only grows");
-}
-if (messaging.Ingress.Enabled)
-{
-    // The collectors of this process publish ingress.received; nothing reaches raw_messages until `relay` and `raw-writer`
-    // roles run (here or elsewhere). Reconciliation alarms on outbox age / overdue deliveries if they do not.
-    var hasRawWriter = roles.Contains(WorkerOptions.RawWriter) && roles.Contains(WorkerOptions.Relay) && messaging.Enabled;
-    startupLog.Log(hasRawWriter ? LogLevel.Information : LogLevel.Warning,
-        "Ingress enabled: collectors commit ingress.received + checkpoint to messaging.outbox; raw rows are written by the raw-writer subscription{Where}",
-        hasRawWriter ? " (running in this process)" : " — make sure `relay` and `raw-writer` roles run with Messaging:Enabled in another process");
-}
+host.Services.GetRequiredService<ILogger<Program>>().LogInformation("{App} starting with roles: {Roles}", appName, string.Join(", ", roles.Order()));
 await host.RunAsync();

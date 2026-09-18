@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { admin, AdminError, type ContainerActionResultDto, type ContainerDto, type ContainersDto, type WorkerInstanceDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { ConfirmButton, Loading, Stat, ago, fmtBytes, fmtDuration, fmtMs, fmtNum, fmtPercent, fmtTime, secondsSince, usePolled } from './shared'
@@ -54,7 +54,6 @@ export function WorkersPanel() {
     </>
   )
 }
-
 function containerOf(w: WorkerInstanceDto, containers: ContainersDto | null): ContainerDto | undefined {
   if (!w.containerId || !containers) return undefined
   return containers.containers.find((c) => c.id === w.containerId)
@@ -82,69 +81,19 @@ function ActionResult({ result, onClose }: { result: ContainerActionResultDto; o
   )
 }
 
-/** "Now N replicas × M workers", the replica count field and Apply; the compose output stays under the field. */
-function ProcessorsBlock({ workers, containers, onDone }: { workers: WorkerInstanceDto[]; containers: ContainersDto | null; onDone: () => void }) {
+/** The single processor container and its bounded internal workers. */
+function ProcessorsBlock({ workers, containers }: { workers: WorkerInstanceDto[]; containers: ContainersDto | null; onDone: () => void }) {
   const summary = processorSummary(workers)
-  const current = containers?.available ? containers.processorReplicas : summary.alive
-  const [replicas, setReplicas] = useState<number>(current)
-  const [touched, setTouched] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState<ContainerActionResultDto | null>(null)
-  useEffect(() => {
-    if (!touched) setReplicas(current)
-  }, [current, touched])
   const available = containers?.available ?? false
-  const apply = async () => {
-    const text = replicas === 0 ? 'Кількість реплік 0: обробка повідомлень повністю зупиниться, черга накопичуватиметься, поки процесори не буде піднято знову. Продовжити?' : replicas < current ? `Зменшити до ${replicas}: compose зупинить і видалить ${current - replicas} зайвих реплік (зі старшими номерами); їхні незавершені claim-и повернуться в чергу за 5 хв. Продовжити?` : `Підняти до ${replicas} реплік: compose створить ${replicas - current} нових контейнерів з наявного образу puluj-worker (без перебудови). Продовжити?`
-    if (!window.confirm(text)) return
-    setBusy(true)
-    setResult(null)
-    try {
-      const r = await admin.ops.scale(replicas)
-      setResult(r.result)
-    } catch (e) {
-      setResult(errorResult(e))
-    } finally {
-      setBusy(false)
-      setTouched(false)
-      onDone()
-    }
-  }
   return (
-    <Section title="Процесори повідомлень" badge={<Badge ok={summary.alive === 0 ? false : summary.alive === summary.replicas ? true : null} text={`${summary.alive} ${plural(summary.alive, 'репліка', 'репліки', 'реплік')}${summary.concurrency ? ` × ${summary.concurrency} ${plural(summary.concurrency, 'воркер', 'воркери', 'воркерів')}` : ''}`} />}>
+    <Section title="Процесор повідомлень" badge={<Badge ok={summary.alive === 1} text={summary.alive === 1 ? 'працює' : 'не працює'} />}>
       <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        <Stat label="Реплік (живих)" value={`${summary.alive}${summary.replicas !== summary.alive ? ` з ${summary.replicas}` : ''}`} />
-        <Stat label="Воркерів на репліку" value={summary.concurrency ? String(summary.concurrency) : '—'} hint="Processing:Concurrency" />
-        <Stat label="Повідомлень/хв" value={fmtNum(Math.round(summary.perMinute * 10) / 10)} hint="сума за 5 хв по всіх репліках" />
+        <Stat label="Живий" value={summary.alive === 1 ? 'так' : 'ні'} />
+        <Stat label="Внутрішніх workers" value={summary.concurrency ? String(summary.concurrency) : '—'} hint="Processing:Concurrency" />
+        <Stat label="Повідомлень/хв" value={fmtNum(Math.round(summary.perMinute * 10) / 10)} hint="за останні 5 хв" />
         <Stat label="Контейнерів processor" value={available ? String(containers!.processorReplicas) : '—'} hint={available ? 'запущених у compose' : 'Docker недоступний'} />
       </div>
-      {available ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-2">
-            Кількість реплік
-            <input
-              type="number"
-              min={0}
-              max={8}
-              className="w-16 rounded border border-slate-300 px-2 py-1 font-mono dark:border-slate-600 dark:bg-slate-800"
-              value={replicas}
-              onChange={(e) => {
-                setTouched(true)
-                setReplicas(Math.max(0, Math.min(8, Number(e.target.value) || 0)))
-              }}
-            />
-          </label>
-          <button className="rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900" onClick={() => void apply()} disabled={busy || replicas === current}>
-            {busy ? 'Застосовую…' : 'Застосувати'}
-          </button>
-          <span className="text-slate-500">
-            docker compose up --scale processor={replicas} (0…8){replicas === 0 && <span className="ml-1 text-amber-700 dark:text-amber-300">— нічого не оброблятиметься</span>}
-          </span>
-        </div>
-      ) : (
-        <div className="text-xs text-slate-500">{containers?.unavailable ?? 'Керування контейнерами недоступне.'}</div>
-      )}
-      {result && <ActionResult result={result} onClose={() => setResult(null)} />}
+      {!available && <div className="text-xs text-slate-500">{containers?.unavailable ?? 'Керування контейнерами недоступне.'}</div>}
     </Section>
   )
 }
@@ -366,10 +315,3 @@ function ContainersBlock({ data, error, onAct }: { data: ContainersDto | null; e
   )
 }
 
-function plural(n: number, one: string, few: string, many: string): string {
-  const m10 = n % 10
-  const m100 = n % 100
-  if (m10 === 1 && m100 !== 11) return one
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
-  return many
-}

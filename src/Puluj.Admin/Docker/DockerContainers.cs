@@ -28,10 +28,10 @@ public static class DockerContainers
         .ToList();
     }
 
-    /// <summary>processor | messaging | collector-telegram | collector-alerts | analytics | worker | migrate | other — from the instance name.</summary>
+    /// <summary>processor | collector-telegram | collector-alerts | analytics | worker | migrate | other — from the instance name.</summary>
     public static string KindOf(string instanceName)
     {
-        foreach (var kind in new[] { "collector-telegram", "collector-alerts", "processor", "messaging", "analytics", "migrate", "worker" })
+        foreach (var kind in new[] { "collector-telegram", "collector-alerts", "processor", "analytics", "migrate", "worker" })
         {
             if (instanceName.Equals(kind, StringComparison.OrdinalIgnoreCase) || instanceName.StartsWith(kind + "-", StringComparison.OrdinalIgnoreCase))
             {
@@ -42,9 +42,8 @@ public static class DockerContainers
     }
 
     /// <summary>
-    /// The container of an instance. A scaled replica is named `processor-&lt;hostname&gt;`, and in Docker the host name is
-    /// the first 12 hex digits of the container id, so the suffix is matched against the ids first; a single-container
-    /// service (collector-*, analytics, migrate) is matched by its compose service name.
+    /// The container of an instance. A host-name suffix is matched against container ids first; every deployed worker
+    /// service, including processor, otherwise has exactly one container and is matched by its compose service name.
     /// </summary>
     public static ContainerDto? Match(string instanceName, string kind, IReadOnlyList<ContainerDto> containers)
     {
@@ -61,9 +60,9 @@ public static class DockerContainers
                 }
             }
         }
-        if (kind is "processor" or "messaging" or "other" or "worker")
+        if (kind is "other" or "worker")
         {
-            return null; // several replicas share the service name: without the id suffix there is nothing to pin
+            return null;
         }
         return containers.Where(c => c.Service.Equals(kind, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(c => c.State == "running").FirstOrDefault();

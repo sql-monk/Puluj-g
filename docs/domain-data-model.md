@@ -3,7 +3,7 @@
 ## Призначення
 
 Puluj-G зберігає незмінний вхід (`raw_messages`) окремо від похідних фактів,
-агрегатів і delivery-відомостей. Нижче описано реалізовані сутності та схеми;
+агрегатів. Нижче описано реалізовані сутності та схеми;
 це не каталог запланованих таблиць.
 
 Це довідник для розробника, який шукає власника даних або безпечний шлях до
@@ -21,12 +21,11 @@ Puluj-G зберігає незмінний вхід (`raw_messages`) окрем
 `incident_observations` та append-only `incident_revisions`.
 
 Поруч з ними `collector_states` тримає cursor і health колектора,
-`processing_errors` — помилки legacy-обробки, `llm_requests` — аудит LLM, а
+`processing_errors` — помилки обробки, `llm_requests` — аудит LLM, а
 `app_settings` — runtime settings.
 
-Платформа повідомлень має `messaging` (`outbox`, `inbox`, архів, registry
-підписок, керування lanes), а pipeline — `processing` (runs/generations,
-stage results, attempts/deliveries, extractions та observations). Аналітика
+Обробка спирається на `raw_messages.processing_status`; processor напряму створює
+похідні доменні записи. Аналітика
 власноруч мігрує схему `analytics`: `messages`, `track_firsts`, `runs`,
 `state`; lifecycle-проєкція також зберігається як
 `analytics.message_lifecycle`. Її поля з невідомим старим таймінгом лишають
@@ -39,13 +38,6 @@ stage results, attempts/deliveries, extractions та observations). Аналіт
 історичні snapshots. Вона не дублює повну ER-схему нижче: cardinality на
 стрілках пояснює саме навігаційні/FK-зв'язки, важливі для provenance.
 
-![Діаграма класів домену](diagrams/domain-class-model.png)
-
-Редагована схема: [domain-class-model.drawio](diagrams/domain-class-model.drawio).
-
-![ER та ownership модель](diagrams/database-ownership.png)
-
-Редагована схема: [database-ownership.drawio](diagrams/database-ownership.drawio).
 
 ## Provenance, історичність та ідемпотентність
 
@@ -56,19 +48,13 @@ processing-поля. Ідентичність рядка — унікальна 
 не заборона ще одного повідомлення. Повторна доставка повертає наявний raw ID
 і не породжує нову подію у прямому ingestion-шляху.
 
-Витяг (`processing.extractions`) канонічний і незмінний для пари raw/run;
-повторний аналіз робиться новим run. `observations` — контрактні факти для
-доменних writer-ів. Legacy `targets` у перехідний період може бути їхньою
-проєкцією. Track і incident revisions зберігають історію після кожної зміни;
+Повторний аналіз оновлює похідний результат, не змінюючи оригінал у
+`raw_messages`. Track і incident revisions зберігають історію після кожної зміни;
 інцидентний зв'язок пояснює, чому observation належить агрегату.
 
-Outbox комітиться разом із діловим результатом, а inbox дедуплікує за
-`(subscription, event)`. Це забезпечує ідемпотентність бізнес-ефекту при
-повторній доставці, але не обіцяє «рівно одного» фізичного publish.
-
-![Від публічного об'єкта до джерела](diagrams/provenance-chain.png)
-
-Редагована схема: [provenance-chain.drawio](diagrams/provenance-chain.drawio).
+Processor комітить діловий результат і завершує raw row в одній транзакції.
+Повторний collector-ingest повертає наявний raw ID, а другий processor не може
+одночасно отримати singleton-lock цієї бази.
 
 ## Географія та числові ідентифікатори
 

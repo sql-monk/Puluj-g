@@ -53,7 +53,7 @@ export function instanceHealth(w: WorkerInstanceDto, now: number = Date.now()): 
   return { ok: true, text: 'працює' }
 }
 
-/** Replica count × workers per replica for the header of the processors block. */
+/** Live processor count and bounded internal workers for the header. */
 export function processorSummary(workers: WorkerInstanceDto[]): { replicas: number; alive: number; concurrency: number | null; perMinute: number } {
   const processors = workers.filter((w) => w.kind === 'processor')
   const alive = processors.filter((w) => w.alive)

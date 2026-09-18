@@ -52,20 +52,13 @@ public static partial class OpsEndpoints
         ops.MapPost("/ops/db/query", DbQueryAsync);
         ops.MapPost("/ops/db/clear", ClearOperationalDataAsync);
 
-        // Containers of the compose stack (docs/plan-admin-ops.md §2.3): list, restart / stop / start, scale the processors.
+        // Containers of the compose stack: list, restart / stop / start. Processor count is intentionally fixed at one.
         ops.MapGet("/ops/containers", async (DockerService docker, CancellationToken ct) => Results.Ok(await docker.ListAsync(ct)));
         ops.MapPost("/ops/containers/{id}/{action:regex(^(restart|stop|start)$)}", async (string id, string action, HttpContext http, DockerService docker, CancellationToken ct) =>
         {
             var outcome = await docker.ActAsync(id, action, http.Connection.RemoteIpAddress?.ToString(), ct);
             return Results.Json(outcome.Result, statusCode: outcome.StatusCode);
         });
-        ops.MapPost("/ops/processors/scale", async (ScaleRequest req, HttpContext http, DockerService docker, CancellationToken ct) =>
-        {
-            var outcome = await docker.ScaleAsync(req.Replicas, http.Connection.RemoteIpAddress?.ToString(), ct);
-            var containers = outcome.StatusCode is 200 or 502 ? await docker.ListAsync(ct, fresh: true) : null;
-            return Results.Json(new { result = outcome.Result, containers }, statusCode: outcome.StatusCode);
-        });
-
         ops.MapGet("/logs/files", (LogReader logs) => Results.Ok(logs.Files()));
         ops.MapGet("/logs", (string file, int? lines, string? filter, string? level, LogReader logs) =>
         {

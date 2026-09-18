@@ -8,9 +8,6 @@ import { WorkersPanel } from './WorkersPanel'
 import { PipelinePanel } from './PipelinePanel'
 import { CatalogPanel } from './CatalogPanel'
 import { IncidentsPanel } from './IncidentsPanel'
-import { QueuesPanel } from './QueuesPanel'
-import { MessagesPanel } from './MessagesPanel'
-import { ReplayPanel } from './ReplayPanel'
 import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
@@ -19,14 +16,11 @@ import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'queues' | 'messages' | 'replay' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'catalog' | 'incidents' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'catalog' | 'incidents' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
   { id: 'workers', label: 'Воркери', group: 'Моніторинг' },
-  { id: 'queues', label: 'Черги', group: 'Моніторинг' },
-  { id: 'messages', label: 'Повідомлення', group: 'Моніторинг' },
-  { id: 'replay', label: 'Replay', group: 'Моніторинг' },
   { id: 'collectors', label: 'Колектори', group: 'Моніторинг' },
   { id: 'pipeline', label: 'Конвеєр', group: 'Моніторинг' },
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
@@ -162,9 +156,6 @@ export default function AdminApp() {
               <div className="mx-auto max-w-5xl space-y-4">
                 {section === 'overview' && <OverviewPanel />}
                 {section === 'workers' && <WorkersPanel />}
-                {section === 'queues' && <QueuesPanel />}
-                {section === 'messages' && <MessagesPanel sources={sources} />}
-                {section === 'replay' && <ReplayPanel />}
                 {section === 'collectors' && <CollectorsPanel />}
                 {section === 'pipeline' && <PipelinePanel />}
                 {section === 'db' && <DbPanel />}

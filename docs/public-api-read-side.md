@@ -54,10 +54,9 @@ Clients connect to `/hubs/map`; they invoke no hub methods. Server messages are
 `TrackUpserted`, `TrackClosed`, `AlertChanged`, `TargetCreated`,
 `IncidentUpserted`, `IncidentRevised`, and `Resync(at)`. The bridge reads only
 current rows inside configured map/feed/incident windows. For incident changes a
-durable `projection` subscription commits its receipt then emits PostgreSQL
-notification containing ID/revision; each API replica turns it into a SignalR
-push to its own clients. Track/alert notifications are emitted by their writers
-after commit.
+processor emits a PostgreSQL notification containing ID/revision only after its
+database commit; each API replica turns it into a SignalR push to its own clients.
+Track/alert notifications follow the same after-commit rule.
 
 `LISTEN/NOTIFY` and SignalR are best-effort notification paths. On listener
 reconnect the bridge sends `Resync`; a client reloads REST state and keeps the

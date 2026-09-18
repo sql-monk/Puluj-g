@@ -9,10 +9,10 @@ using Puluj.Processing.Indexes;
 namespace Puluj.Processing.Pipeline;
 
 /// <summary>
-/// One processor instance: <see cref="ProcessingOptions.Concurrency"/> workers that claim raw messages from the database
-/// (<see cref="RawMessageClaims"/>) and process them, plus a housekeeping task. Any number of instances may run against
-/// the same database — a claim is an atomic status change on the row, so a message is processed exactly once wherever
-/// the instances live. A worker first takes an id announced over NOTIFY (RawMessageStored from any collector or the
+/// The single processor instance: <see cref="ProcessingOptions.Concurrency"/> internal workers that claim raw messages
+/// from the database (<see cref="RawMessageClaims"/>) and process them, plus a housekeeping task. A PostgreSQL advisory
+/// lock prevents a second processor process from running against the same database. A worker first takes an id announced
+/// over NOTIFY (RawMessageStored from any collector or the
 /// admin panel: a live message goes ahead of a backlog), otherwise the oldest-published Pending row (restart, crash,
 /// retry, a reprocess, a history load, a lost notification), so a rebuild replays the situation as it unfolded; with
 /// several workers the order holds up to a window of that many messages. While a history load is running
@@ -24,6 +24,7 @@ public sealed class ProcessingLoop(
     PgNotifyListener notifications,
     RawMessageProcessor processor,
     RawMessageClaims claims,
+    ProcessorSingletonLock singletonLock,
     ProcessorIdentity identity,
     IndexProvider indexes,
     ReprocessService reprocess,
@@ -36,13 +37,26 @@ public sealed class ProcessingLoop(
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        await indexes.Ready.WaitAsync(ct);
-        _paused = await reprocess.PausedAsync(ct);
-        var concurrency = Math.Max(1, options.Value.Concurrency);
-        logger.LogInformation("Processing loop started: instance {Instance}, {Workers} worker(s), lease {Lease}", identity.Name, concurrency, options.Value.ClaimLease);
-        var tasks = new List<Task> { ListenAsync(ct), HousekeepAsync(ct) };
-        tasks.AddRange(Enumerable.Range(1, concurrency).Select(i => WorkAsync(i, ct)));
-        await Task.WhenAll(tasks);
+        await using var lease = await singletonLock.AcquireAsync(identity.Name, ct);
+        using var run = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.Lost);
+        try
+        {
+            await indexes.Ready.WaitAsync(run.Token);
+            _paused = await reprocess.PausedAsync(run.Token);
+            var concurrency = Math.Max(1, options.Value.Concurrency);
+            logger.LogInformation("Processing loop started: instance {Instance}, {Workers} internal worker(s), lease {Lease}", identity.Name, concurrency, options.Value.ClaimLease);
+            var tasks = new List<Task> { ListenAsync(run.Token), HousekeepAsync(run.Token) };
+            tasks.AddRange(Enumerable.Range(1, concurrency).Select(i => WorkAsync(i, run.Token)));
+            await Task.WhenAll(tasks);
+            if (lease.Lost.IsCancellationRequested && !ct.IsCancellationRequested)
+            {
+                throw new InvalidOperationException("The processor singleton database lock was lost; stopping this instance.");
+            }
+        }
+        catch (OperationCanceledException) when (lease.Lost.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new InvalidOperationException("The processor singleton database lock was lost; stopping this instance.");
+        }
     }
 
     /// <summary>Queues every raw message announced over NOTIFY. A claim decides who processes it; a duplicate id is harmless.</summary>

@@ -206,10 +206,6 @@ export interface ContainerActionResultDto {
   message: string
   output: string
 }
-export interface ScaleResultDto {
-  result: ContainerActionResultDto
-  containers?: ContainersDto
-}
 export interface PipelineTotalsDto {
   received: number
   processed: number
@@ -445,7 +441,6 @@ export const admin = {
     workers: () => call<WorkerInstanceDto[]>('GET', '/api/admin/ops/workers'),
     containers: () => call<ContainersDto>('GET', '/api/admin/ops/containers'),
     containerAction: (id: string, verb: 'restart' | 'stop' | 'start') => call<ContainerActionResultDto>('POST', `/api/admin/ops/containers/${encodeURIComponent(id)}/${verb}`, {}),
-    scale: (replicas: number) => call<ScaleResultDto>('POST', '/api/admin/ops/processors/scale', { replicas }),
     pipeline: (hours: 24 | 168 | 720) => call<PipelineReportDto>('GET', `/api/admin/ops/pipeline?hours=${hours}`),
     llm: (hours: 24 | 168 | 720 = 168) => call<LlmUsageReportDto>('GET', `/api/admin/ops/llm?hours=${hours}`),
     llmRequest: (id: number) => call<LlmRequestDetailDto>('GET', `/api/admin/ops/llm/requests/${id}`),

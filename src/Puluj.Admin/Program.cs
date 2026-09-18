@@ -50,7 +50,7 @@ builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetEvaluator>();
 builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetPreview>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.AdminIndexes>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.KindCorpus>();
-// P10 incident commands: the same state writer as the incident-worker (locks, revisions, incident.changed via the outbox).
+// Incident administration keeps the same state writer as the processing code.
 builder.Services.AddSingleton<Puluj.Processing.Incidents.IncidentStateWriter>();
 // Container management through the docker CLI and the mounted socket; off unless Docker__Enabled (the compose stack sets it).
 builder.Services.AddOptions<DockerOptions>().Bind(builder.Configuration.GetSection(DockerOptions.Section));
@@ -76,8 +76,6 @@ app.MapOpsEndpoints();
 Puluj.Admin.Endpoints.RulesetEndpoints.MapRulesetEndpoints(app);
 Puluj.Admin.Endpoints.IncidentEndpoints.MapIncidentEndpoints(app);
 Puluj.Admin.Endpoints.CatalogEndpoints.MapCatalogEndpoints(app); // P12 catalog editor
-Puluj.Admin.Endpoints.MessagingOpsEndpoints.MapMessagingOpsEndpoints(app); // P13 ops metrics, controls, message explorer
-Puluj.Admin.Endpoints.RunEndpoints.MapRunEndpoints(app); // P14 replay runs / generations
 app.MapAnalyticsEndpoints();
 
 // The admin SPA is built as admin.html (second Vite entry of the shared web/ code base).

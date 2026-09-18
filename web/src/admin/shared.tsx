@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export { ago, bucketLabel, fmtBytes, fmtDuration, fmtMs, fmtNum, fmtPercent, fmtTime, fmtUsd, secondsSince } from './format'
+export { ago, bucketLabel, fmtAge, fmtBytes, fmtDuration, fmtMs, fmtNum, fmtPercent, fmtTime, fmtUsd, secondsSince } from './format'
 
 /** Poll a loader every `intervalMs`; the error is shown instead of stale data. */
 export function usePolled<T>(load: () => Promise<T>, intervalMs: number, deps: unknown[] = []) {

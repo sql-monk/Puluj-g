@@ -84,7 +84,7 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
                 DockerJson.ParseLines(ps.Stdout, DockerJson.ParsePs),
                 stats.Ok ? DockerJson.ParseLines(stats.Stdout, DockerJson.ParseStats) : [],
                 Protected);
-            var replicas = containers.Count(c => c.Service == Options.ScalableService && c.State == "running");
+            var replicas = containers.Count(c => c.Service == "processor" && c.State == "running");
             var list = new ContainersDto(true, null, Options.Project, containers, replicas);
             _list = (now, list);
             return list;
@@ -169,13 +169,10 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
         }
     }
 
-    /// <summary>`docker compose up --scale processor=N`; 0…MaxReplicas, otherwise 400.</summary>
-    public Task<ActionOutcome> ScaleAsync(int replicas, string? remoteIp, CancellationToken ct) => ScaleAsync(Options.ScalableService, replicas, remoteIp, ct);
-
-    /// <summary>`docker compose up --scale &lt;service&gt;=N` for one of <see cref="DockerOptions.ScalableServices"/> (P13: processor | messaging); 0…MaxReplicas, otherwise 400.</summary>
+    /// <summary>Scaling is refused unless a service is explicitly allow-listed. The current configuration lists none.</summary>
     public async Task<ActionOutcome> ScaleAsync(string service, int replicas, string? remoteIp, CancellationToken ct)
     {
-        if (!Options.ScalableServices.Contains(service, StringComparer.Ordinal) && !string.Equals(service, Options.ScalableService, StringComparison.Ordinal))
+        if (!Options.ScalableServices.Contains(service, StringComparer.Ordinal))
         {
             return new ActionOutcome(400, new ContainerActionResultDto(false, $"сервіс '{service}' не масштабується з панелі", ""));
         }

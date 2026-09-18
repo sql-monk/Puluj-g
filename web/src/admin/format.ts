@@ -26,6 +26,15 @@ export function fmtMs(ms: number | null | undefined): string {
   return `${(ms / 1000).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} с`
 }
 
+/** Seconds as a compact Ukrainian age/duration. */
+export function fmtAge(seconds?: number | null): string {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return '—'
+  if (seconds < 90) return `${Math.round(seconds)} с`
+  if (seconds < 5400) return `${Math.round(seconds / 60)} хв`
+  if (seconds < 172800) return `${(seconds / 3600).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} год`
+  return `${(seconds / 86400).toLocaleString('uk-UA', { maximumFractionDigits: 1 })} д`
+}
+
 export function fmtPercent(value: number | null | undefined, digits = 1): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'
   return `${value.toLocaleString('uk-UA', { maximumFractionDigits: digits })} %`

@@ -29,15 +29,8 @@ revision, тому оригінал не втрачається. alerts.in.ua п
 text/payload і URL, рахує latency та будить processor через PostgreSQL `NOTIFY`;
 poll Pending рядків покриває втрату notification.
 
-За звичайного шляху `RawMessageIngestor` пише прямо у `raw_messages`. Коли
-увімкнено Messaging ingress, collector комітить `ingress.received` та
-checkpoint в outbox, після чого `relay` і `raw-writer` мають доставити подію
-до raw table. Якщо цих ролей немає, Worker лише попереджає: повідомлення ще
-не потрапляють у `raw_messages`.
-
-![Зовнішнє джерело до БД і події](diagrams/ingestion-flow.png)
-
-Редагована схема: [ingestion-flow.drawio](diagrams/ingestion-flow.drawio).
+`RawMessageIngestor` завжди пише оригінал прямо у `raw_messages`. Успішний commit є межею
+доставки: після нього processor побачить Pending рядок через `NOTIFY` або наступне опитування.
 
 ## Стан, retry та відновлення
 

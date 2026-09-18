@@ -28,7 +28,9 @@ public static class AnalyticsEndpoints
         group.MapGet("/lifecycle/status", (Puluj.Analytics.Lifecycle.LifecycleReportService lifecycle, CancellationToken ct) => lifecycle.StatusAsync(ct));
         group.MapPost("/lifecycle/backfill", async (Puluj.Contracts.QuarantineActionRequest req, bool? reset, Puluj.Analytics.Lifecycle.LifecycleBackfill backfill, IOptions<Puluj.Analytics.AnalyticsOptions> options, Puluj.Infrastructure.Messaging.SubscriptionAdmin admin, CancellationToken ct) =>
         {
-            if (Puluj.Admin.Endpoints.MessagingOpsEndpoints.Missing(req.Actor, req.Reason) is { } error)
+            var actor = req.Actor ?? string.Empty;
+            var reason = req.Reason ?? string.Empty;
+            if (Puluj.Admin.Endpoints.MessagingOpsEndpoints.Missing(actor, reason) is { } error)
             {
                 return Results.BadRequest(new { error });
             }
@@ -37,17 +39,19 @@ public static class AnalyticsEndpoints
                 await backfill.ResetCursorAsync(ct);
             }
             var progress = await backfill.RunAsync(options.Value.LifecycleBackfillBatch, options.Value.LifecycleBackfillBatchesPerPass, ct);
-            await admin.AuditAsync("analytics:backfill", null, null, req.Actor.Trim(), req.Reason.Trim(), new { reset = reset == true, progress.Cursor, progress.MaxRawMessageId, progress.Processed, progress.LegacyRows }, ct);
+            await admin.AuditAsync("analytics:backfill", null, null, actor.Trim(), reason.Trim(), new { reset = reset == true, progress.Cursor, progress.MaxRawMessageId, progress.Processed, progress.LegacyRows }, ct);
             return Results.Ok(progress);
         });
         group.MapPost("/lifecycle/reconcile", async (Puluj.Contracts.QuarantineActionRequest req, int? hours, Puluj.Analytics.Lifecycle.LifecycleReconciliation reconciliation, IOptions<Puluj.Analytics.AnalyticsOptions> options, Puluj.Infrastructure.Messaging.SubscriptionAdmin admin, CancellationToken ct) =>
         {
-            if (Puluj.Admin.Endpoints.MessagingOpsEndpoints.Missing(req.Actor, req.Reason) is { } error)
+            var actor = req.Actor ?? string.Empty;
+            var reason = req.Reason ?? string.Empty;
+            if (Puluj.Admin.Endpoints.MessagingOpsEndpoints.Missing(actor, reason) is { } error)
             {
                 return Results.BadRequest(new { error });
             }
             var report = await reconciliation.RunAsync(TimeSpan.FromHours(Math.Clamp(hours ?? 48, 1, 24 * 30)), options.Value.LifecycleReconcileGrace, ct);
-            await admin.AuditAsync("analytics:reconcile", null, null, req.Actor.Trim(), req.Reason.Trim(), report, ct);
+            await admin.AuditAsync("analytics:reconcile", null, null, actor.Trim(), reason.Trim(), report, ct);
             return Results.Ok(report);
         });
         return app;

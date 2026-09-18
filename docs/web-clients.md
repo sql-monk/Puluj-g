@@ -37,9 +37,9 @@ MapLibre відображає точки лише за DTO/catalog location. Inc
 
 ## Admin UI та його API
 
-`AdminApp` має panels settings/sources, workers/containers, pipeline, queues, messages, incidents, catalog, LLM usage, analytics і replay. `api/admin*.ts` додає `X-Admin-Token` з localStorage лише до admin requests; публічна карта цим клієнтом не користується. Admin API dependency — `/api/admin/*` на Admin service; access усе одно перевіряє сервер.
+`AdminApp` має panels settings/sources, workers/containers, pipeline, incidents, catalog, LLM usage та analytics. `api/admin.ts` додає `X-Admin-Token` з localStorage лише до admin requests; публічна карта цим клієнтом не користується. Admin API dependency — `/api/admin/*` на Admin service; access усе одно перевіряє сервер.
 
-UI показує server errors (зокрема 409/422), requires actor/reason у flows, де цього вимагає контракт, і має confirm copy для destructive run/queue actions. Це не додає відсутнього server audit: container actions і analytics reset мають межі, описані в [admin-operations.md](admin-operations.md).
+UI показує server errors (зокрема 409/422), вимагає actor/reason там, де цього вимагає контракт, і підтвердження для destructive actions. Container actions і analytics reset мають межі, описані в [admin-operations.md](admin-operations.md).
 
 ![Потік даних Admin UI та API](diagrams/admin-ui-api-data-flow.png)
 
@@ -47,4 +47,4 @@ UI показує server errors (зокрема 409/422), requires actor/reason 
 
 ## Докази поведінки
 
-Unit tests біля компонентів охоплюють routing/query/map-link, ETA, incident layer і live window. Playwright tests: `E01-precision`, `E02-provenance`, `E03-history`, `E04-parity`, `E05-filters`, `E06-mobile-a11y`, `E08-resync`, `E09-messages`, `E10-analytics`; admin: `A01-admin`, `A03-queues`, `A05-replay`, `A06-lifecycle`. Fixtures і mocked responses у `web/e2e/fixtures/` підтверджують UI contract, але не замінюють service integration test. Повний відтворюваний gate, межі доказів, compatibility та rollback описано в [public-ui-release.md](public-ui-release.md).
+Unit tests біля компонентів охоплюють routing/query/map-link, ETA, incident layer і live window. Playwright tests перевіряють public UI та основні admin flows. Fixtures і mocked responses у `web/e2e/fixtures/` підтверджують UI contract, але не замінюють service integration test.

@@ -1,55 +1,38 @@
-# Адміністративний контур і операційні процедури
+# Адміністративний контур
 
-## Призначення
+Admin працює на окремому порті `8091` і має доступ на запис. Не відкривайте
+його у публічний інтернет. Задайте `Admin__Token`; UI зберігає його лише в
+localStorage браузера і передає в `X-Admin-Token`.
 
-`Puluj.Admin` — окремий операторський HTTP-сервіс і SPA для налаштування та спостереження. Він має read-write роль до основної БД; публічна `Puluj.Api` є окремою службою з read-only роллю. Адмін-клієнт збирається зі спільного `web/` у `src/Puluj.Admin/wwwroot` і працює з `/api/admin/*`.
+## Моніторинг
 
-Користуйтеся ним, щоб подивитися стан, змінити дозволене runtime-налаштування
-або виконати контрольовану операцію. Спершу перевірте доступ і поточний стан,
-потім виконайте одну дію та перевірте її наслідок у health, логах або даних.
-HTTP-відповідь про прийняття команди не означає, що її похідна робота вже
-закінчилася.
+Панель показує один processor, колектори, pipeline, PostgreSQL, логи та
+контейнери. Processor має фіксовану кількість контейнерів — один;
+Admin не має endpoint або UI для його масштабування. Дозволені дії над
+контейнерами — restart, stop і start; `admin`, `postgis` та `migrate` захищені.
 
-## Доступ, межі та налаштування
+SQL console (`POST /api/admin/ops/db/query`) приймає один `SELECT` або `WITH … SELECT`:
+без `;`, коментарів, `app_settings`, секретних назв і `pg_*`. Запит виконується
+у read-only транзакції з timeout 10 с і лімітом 200 рядків.
 
-Усі групи `/api/admin` проходять `AuthorizeAsync`. Якщо `Admin:Token` заданий, запит має містити `X-Admin-Token`; якщо ні — сервіс приймає лише loopback-запити для початкового налаштування. Це один токен, а не RBAC.
+## Керовані зміни
 
-`GET/PUT /api/admin/settings` показує effective source (`db`, `config`, `default`, `none`) і редагує тільки allow-list `SettingsStore`. Секретні значення не повертаються. Зміна пишеться в `app_settings`, але не є гарантією миттєвого reload усіма процесами. Файли/environment — fallback для інфраструктури й секретів.
+Ruleset API реалізує draft → replace rules → validate → preview/corpus → shadow →
+publish, а також stop shadow і rollback. Мутації вимагають `actor` і `reason`.
+Incident commands (resolve/retract/confirm/suppress/unsuppress/merge/split) проходять
+через locked `IncidentStateWriter` і пишуть revision з actor/reason.
 
-Джерела доступні через `/api/admin/sources`. Джерело зі збереженими raw повідомленнями не видаляється: його треба вимкнути, щоб не розірвати provenance. Поле токена лише приймається на запис; DTO повертає тільки `hasToken`.
+`POST /api/admin/ops/reprocess` вимагає точного `REPROCESS_DERIVED_DATA`, відмовляє при
+paused processing і скидає похідні дані для повторної побудови. Оригінали в
+`raw_messages` не видаляються, але результат на карті змінюється; перед дією
+потрібні scope, backup і план перевірки.
 
-![Межі повноважень адмін-контуру](diagrams/admin-authority-boundaries.png)
+## Перевірка
 
-Редагована схема: [admin-authority-boundaries.drawio](diagrams/admin-authority-boundaries.drawio).
+Після зміни конфігурації або стану перевірте:
 
-## Операторські екрани й guardrails
-
-Панель показує status, workers, collectors, pipeline, LLM usage, DB, логи та контейнери. SQL console (`POST /api/admin/ops/db/query`) приймає один `SELECT`/`WITH … SELECT`: без `;`, коментарів, `app_settings`, секретних назв і `pg_*`; виконання додатково відбувається в read-only транзакції з 10-секундним timeout і лімітом 200 рядків. У browser таблиць чутливі колонки маскуються.
-
-Керування Docker доступне лише коли `Docker:Enabled=true`; сервіс перевіряє compose-проєкт, відмовляє protected services, обмежує scale allow-list і `MaxReplicas`, має timeout 60 с. Restart/stop/start/scale змінюють виконання сервісів; їхній запис — application log з IP, а не `ControlAudit`. Перед дією перевіряють доступність і стан, після — health/list/logs. HTTP 200 не є доказом завершення downstream-роботи.
-
-`POST /api/admin/ops/reprocess` вимагає точного `REPROCESS_DERIVED_DATA`, відмовляє при paused processing і скидає похідні дані/індекс аналітики для повторної побудови. Це не скасовує raw-повідомлення, але змінює derived result: перед ним потрібні scope, backup та перевірка pipeline.
-
-## Правила, черги, інциденти й replay
-
-Ruleset API реалізує draft → replace rules → validate → preview/corpus → shadow → publish, а також stop shadow і rollback. Усі мутації потребують `actor` і `reason`; `RulesetService` аудіює їх. Preview/corpus не публікують версію; порожній corpus є помилкою. Publish може повернути 422, а неправильний стан/гонка — 409; rollback робить версію active, тож потрібна перевірка active version і worker reload.
-
-![Життєвий цикл ruleset](diagrams/ruleset-change-lifecycle.png)
-
-Редагована схема: [ruleset-change-lifecycle.drawio](diagrams/ruleset-change-lifecycle.drawio).
-
-Replay runs (`/api/admin/ops/runs`) мають state machine create/start/pause/resume/cancel/catchup/verify/promote/rollback. Кожна команда вимагає actor/reason та аудіюється; state/gate conflict — 409. Replay має ізольовану generation. `verify` не перемикає generation; `promote` змінює active generation, `rollback` повертає попередню. UI попереджає: force-promote може приховати позасcope active incidents до наступного replay.
-
-![Життєвий цикл run і replay](diagrams/run-replay-lifecycle.png)
-
-Редагована схема: [run-replay-lifecycle.drawio](diagrams/run-replay-lifecycle.drawio).
-
-Messaging lanes переводяться між `active`, `paused`, `draining`; retry і waive карантину також вимагають actor/reason та створюють `ControlAudit`. Retry публікує роботу через outbox, waive завершує конкретну нерозв'язану карантинну подію. Incident commands (resolve/retract/confirm/suppress/unsuppress/merge/split) проходять locked `IncidentStateWriter`, пишуть revision з actor/reason і відмовляються без outbox. Merge preview — read-only plan; команда може бути відхилена за stale revision або state rules.
-
-![Рішення оператора для quarantine та incident](diagrams/quarantine-incident-operator-flow.png)
-
-Редагована схема: [quarantine-incident-operator-flow.drawio](diagrams/quarantine-incident-operator-flow.drawio).
-
-## Перевірка і межі
-
-Контракти та відмови перевіряють `tests/Puluj.Admin.Tests` (rulesets, incidents, workers, Docker і `DatabaseQueryGuard`), UI-потоки — `web/e2e/A01-admin.e2e.ts`, `A03-queues.e2e.ts`, `A05-replay.e2e.ts`, `A06-lifecycle.e2e.ts`. Токени й секрети не наведено. Settings, sources, reprocess і Docker не мають persistований actor/reason audit у коді; це обмеження реалізації, а не обіцянка документації.
+- `/api/health`;
+- один живий processor heartbeat;
+- зменшення Pending у `raw_messages`;
+- відсутність нових Error у processor/PostgreSQL logs;
+- контрольний об'єкт через API й публічну карту.

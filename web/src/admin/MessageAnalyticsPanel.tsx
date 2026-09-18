@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { adminLifecycle, type LifecycleStatusDto } from '../api/adminLifecycle'
 import { Badge, Section } from '../components/settings/fields'
 import { Bars, fmtMs, fmtNum, fmtTime, Loading, Stat, usePolled } from './shared'
-import { fmtAge } from './QueuesPanel'
+import { fmtAge } from './shared'
 
 const OUTCOME: Record<string, string> = { completed: 'з фактами / без', no_facts: 'без фактів', unsupported: 'не підтримується', needs_review: 'на ревʼю', failed: 'ПОМИЛКА', legacy: 'legacy (стара обробка)', pending: 'ще без розбору' }
 const METHOD: Record<string, string> = { rules: 'правила', llm: 'LLM', legacy: 'legacy', pending: '—' }

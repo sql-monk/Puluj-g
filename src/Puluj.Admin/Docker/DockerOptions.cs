@@ -22,13 +22,10 @@ public sealed class DockerOptions
     /// <summary>Compose files relative to ComposeDir; empty = docker-compose.yml plus docker-compose.override.yml if it exists.</summary>
     public List<string> ComposeFiles { get; set; } = [];
 
-    /// <summary>The compose service that is scaled from the panel.</summary>
-    public string ScalableService { get; set; } = "processor";
+    /// <summary>Scaling is disabled; the stack has exactly one processor container.</summary>
+    public List<string> ScalableServices { get; set; } = [];
 
-    /// <summary>Services the P13 messaging panel may scale (`--scale &lt;service&gt;=N`); messaging is the standard Compose pipeline.</summary>
-    public List<string> ScalableServices { get; set; } = ["processor", "messaging"];
-
-    public int MaxReplicas { get; set; } = 8;
+    public int MaxReplicas { get; set; } = 1;
 
     /// <summary>Services the panel never restarts or stops (view only): the database, the panel itself, the one-shot migrator.</summary>
     public List<string> ProtectedServices { get; set; } = ["admin", "postgis", "migrate"];

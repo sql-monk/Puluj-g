@@ -1,16 +1,15 @@
 namespace Puluj.Infrastructure.Messaging;
 
 /// <summary>
-/// `Messaging` configuration section. The deployed and base Worker configuration use the durable messaging path by
-/// default. A host that constructs options without configuration gets the same safe defaults; legacy processing is
-/// an explicit role choice rather than a fallback.
+/// Legacy message-platform configuration retained only for compatibility with existing database/admin code. The
+/// broker, outbox bridge and alternate collector ingress are disabled unless explicitly enabled.
 /// </summary>
 public sealed class MessagingOptions
 {
     public const string Section = "Messaging";
 
     /// <summary>Master switch for the broker roles (`relay`, `archive`): without it they are skipped with a warning.</summary>
-    public bool Enabled { get; set; } = true;
+    public bool Enabled { get; set; }
 
     public OutboxOptions Outbox { get; set; } = new();
     public IngressOptions Ingress { get; set; } = new();
@@ -26,7 +25,7 @@ public sealed class MessagingOptions
         /// DB-first bridge (plan §11): <c>RawMessageIngestor</c> commits `raw.stored` into `messaging.outbox` together with the
         /// raw row. Needs a `relay` role somewhere, otherwise the outbox only grows (reconciliation alarms on its age).
         /// </summary>
-        public bool Enabled { get; set; } = true;
+        public bool Enabled { get; set; }
 
         /// <summary>`pipeline_version` written into every envelope; defaults to the informational assembly version.</summary>
         public string? PipelineVersion { get; set; }
@@ -39,7 +38,7 @@ public sealed class MessagingOptions
         /// and the `raw-writer` subscription stores the raw row. Needs `relay` and `raw-writer` roles running somewhere;
         /// without them nothing reaches raw_messages (reconciliation alarms on outbox age / overdue deliveries).
         /// </summary>
-        public bool Enabled { get; set; } = true;
+        public bool Enabled { get; set; }
 
         /// <summary>How long a history load waits for the raw-writer to store everything it published before the rebuild.</summary>
         public TimeSpan DrainTimeout { get; set; } = TimeSpan.FromMinutes(10);

@@ -2,7 +2,7 @@
 
 ## Призначення і межа схеми
 
-`Puluj.Analytics.Worker` мігрує й обслуговує схему `analytics`; її history — `analytics.__EFMigrationsHistory`. `Puluj.Analytics` читає `raw_messages`, `sources`, `targets` та processing/messaging дані через SQL, не мапуючи їх як власні EF-сутності. Виняток — `analytics.message_lifecycle`: DDL належить migration основного `PulujDbContext`, а analytics worker її читає/оновлює.
+`Puluj.Analytics.Worker` мігрє й обслуговує схему `analytics`; її history — `analytics.__EFMigrationsHistory`. `Puluj.Analytics` читає `raw_messages`, `sources`, `targets` та processing-дані через SQL, не мапуючи їх як власні EF-сутності. Виняток — `analytics.message_lifecycle`: DDL належить migration основного `PulujDbContext`, а analytics worker її читає/оновлює.
 
 Відкривайте цю сторінку, коли потрібно пояснити цифру у звіті або безпечно
 запустити backfill/reconciliation. На виході аналітика дає похідний звіт із

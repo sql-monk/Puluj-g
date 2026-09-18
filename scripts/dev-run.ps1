@@ -16,7 +16,7 @@ $ownProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
 $ownProcesses | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 if ($Stop) { return }
 
-# The compose stack (deploy/) exposes its database on :5442. A local Worker next to its processor replicas is only safe
+# The compose stack (deploy/) exposes its database on :5442. A local Worker next to its processor is only safe
 # when both are the same build (the store lock exists since AddRawMessageClaims; an older processor deadlocks the newer
 # one), and next to its Telegram collector it is never safe (one Telegram session). -Force skips the question.
 $docker = Get-Command docker -ErrorAction SilentlyContinue

@@ -1,7 +1,6 @@
 <#
 .SYNOPSIS  Interactive deployment wizard and non-interactive Docker deployment command for the Puluj-G Compose stack.
-           Messaging (RabbitMQ, durable stages and domain writers) is the default. The obsolete legacy processor is
-           opt-in and is never allowed to write tracks, alerts or incidents at the same time as messaging.
+           Collectors write directly to PostgreSQL raw_messages and one processor claims and processes those rows.
            The steps are idempotent: a second run rebuilds what changed and applies outstanding migrations to the
            existing database; it never replaces its data or settings.
 .PARAMETER NoBuild   Restart with the existing images (no `--build`).
@@ -14,7 +13,7 @@
 .PARAMETER ResetDatabase
            Destroy the whole isolated Puluj-G deployment state, recreate its PostgreSQL volume, and then run the
            normal migration/seed/start sequence. This is destructive and requires -ConfirmReset. It also removes this
-           Compose project's non-external volumes (Telegram session, logs and RabbitMQ state); configure collector
+           Compose project's non-external volumes (Telegram session and logs); configure collector
            secrets again afterwards. It never resets a volume outside the exact '<ComposeProject>-pgdata' target.
 .PARAMETER ConfirmReset
            Explicit acknowledgement required together with -ResetDatabase. Without it the script stops before touching
@@ -22,16 +21,6 @@
 .PARAMETER ComposeProject
            Isolated Compose project name. Defaults to puluj-g. Only names beginning with puluj-g are accepted, and a
            reset accepts only its matching '<ComposeProject>-pgdata' database volume.
-.PARAMETER Broker
-           Deprecated compatibility switch. RabbitMQ and `messaging` are now started by default.
-.PARAMETER DomainWriters
-           Deprecated compatibility switch. Messaging domain writers are now the default.
-.PARAMETER LegacyProcessor
-           Explicitly enable the obsolete monolithic `processor` service. This switches messaging into stage-only mode
-           and stops messaging before the processor starts, so there is only one domain writer owner.
-.PARAMETER ProcessorReplicas
-           Number of obsolete legacy `processor` replicas (0–32). Defaults to 0; a positive explicit value also enables
-           LegacyProcessor for compatibility. LegacyProcessor itself requires at least one replica.
 .PARAMETER Wizard
            Force the interactive wizard even when other command-line parameters were supplied.
 .PARAMETER NonInteractive
@@ -46,12 +35,6 @@ param(
     [switch]$ResetDatabase,
     [switch]$ConfirmReset,
     [string]$ComposeProject = "puluj-g",
-    [switch]$Broker,
-    [switch]$DomainWriters,
-    [Alias('Processor')]
-    [switch]$LegacyProcessor,
-    [ValidateRange(0, 32)]
-    [int]$ProcessorReplicas = 0,
     [switch]$Wizard,
     [switch]$NonInteractive
 )
@@ -79,16 +62,6 @@ function Read-YesNo([string]$Prompt, [bool]$Default = $true) {
     if ($answer -match '^(n|no|н|ні)$') { return $false }
     Write-Warning "Введіть Y або N."
     return Read-YesNo $Prompt $Default
-}
-
-function Read-ProcessorReplicaCount([int]$Default) {
-    do {
-        $answer = (Read-Host "Кількість ЗАСТАРІЛИХ processor-реплік 1–32 (Enter — $Default)").Trim()
-        if ([string]::IsNullOrEmpty($answer)) { return $Default }
-        $parsed = 0
-        if ([int]::TryParse($answer, [ref]$parsed) -and $parsed -ge 1 -and $parsed -le 32) { return $parsed }
-        Write-Warning "Введіть ціле число від 1 до 32. За замовчуванням legacy processor вимкнений."
-    } while ($true)
 }
 
 function Get-DotEnvValues {
@@ -136,16 +109,14 @@ function Update-DotEnv([System.Collections.IDictionary]$Values) {
 
 function Select-Services {
     $services = [ordered]@{
-        'postgis' = 'PostgreSQL/PostGIS: постійні дані, геометрія та черги'
+        'postgis' = 'PostgreSQL/PostGIS: постійні дані та геометрія'
         'migrate' = 'одноразово застосовує EF-міграції й seed-дані'
         'collector-telegram' = 'зчитує повідомлення з Telegram-каналів'
         'collector-alerts' = 'отримує повітряні тривоги з alerts.in.ua'
-        'processor' = 'ЗАСТАРІЛИЙ monolith для raw/треки/alerts/incidents; вимкнений стандартно'
+        'processor' = 'обробляє raw_messages, треки, alerts та incidents'
         'api' = 'публічна карта й read-only HTTP API на порту 8090'
         'admin' = 'приватна панель керування й діагностики на порту 8091'
         'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
-        'messaging' = 'СТАНДАРТНИЙ RabbitMQ pipeline: relay, parsing, LLM та domain writers'
-        'rabbitmq' = 'черга durable messaging pipeline; оберіть разом із messaging, якщо її ще не запущено'
     }
     $available = @($services.Keys)
     Write-Host "`nЩо публікувати:"
@@ -169,8 +140,6 @@ function Invoke-DeploymentWizard {
     $script:selectedServicesOnly = $Services.Count -gt 0
     $script:NoBuild = -not (Read-YesNo "Перебудувати вибрані Docker-образи?" $true)
     $managesDatabase = -not $selectedServicesOnly -or $Services -contains 'postgis' -or $Services -contains 'migrate'
-    $configuresMessaging = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('rabbitmq', 'messaging', 'collector-telegram', 'collector-alerts') }).Count -gt 0
-    $configuresProcessor = -not $selectedServicesOnly -or $Services -contains 'processor'
 
     if ($managesDatabase) {
         Write-Host "`nБаза даних:"
@@ -185,7 +154,7 @@ function Invoke-DeploymentWizard {
             '1' { }
             '2' { $script:InitializeDatabase = $true }
             '3' {
-                Write-Host "УВАГА: буде видалено дані БД, Telegram session, логи й RabbitMQ state лише для '$($script:ComposeProject)'." -ForegroundColor Yellow
+                Write-Host "УВАГА: буде видалено дані БД, Telegram session і логи лише для '$($script:ComposeProject)'." -ForegroundColor Yellow
                 $confirmation = Read-Host "Для підтвердження введіть DELETE $($script:ComposeProject)"
                 if ($confirmation -ne "DELETE $($script:ComposeProject)") { throw "Очищення скасовано: фраза підтвердження не збігається." }
                 $script:ResetDatabase = $true
@@ -196,21 +165,7 @@ function Invoke-DeploymentWizard {
         Write-Host "Часткова публікація: БД, міграції та її volume не змінюються." -ForegroundColor DarkGray
     }
 
-    if ($configuresProcessor) {
-        Write-Host "Messaging (RabbitMQ + durable domain writers) буде увімкнений за замовчуванням." -ForegroundColor Green
-        $legacyDefault = $script:LegacyProcessor -or $Services -contains 'processor'
-        $script:LegacyProcessor = Read-YesNo "Увімкнути ЗАСТАРІЛИЙ processor замість messaging domain writers?" $legacyDefault
-        if ($script:LegacyProcessor) {
-            $defaultReplicas = if ($script:ProcessorReplicas -gt 0) { $script:ProcessorReplicas } else { 2 }
-            $script:ProcessorReplicas = Read-ProcessorReplicaCount $defaultReplicas
-        } else {
-            $script:ProcessorReplicas = 0
-        }
-    } elseif ($configuresMessaging) {
-        Write-Host "Messaging (RabbitMQ + durable domain writers) лишається стандартним шляхом." -ForegroundColor Green
-    }
-
-    $canConfigure = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('admin', 'collector-alerts', 'collector-telegram', 'messaging', 'processor') }).Count -gt 0
+    $canConfigure = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('admin', 'collector-alerts', 'collector-telegram', 'processor') }).Count -gt 0
     if ($canConfigure -and (Read-YesNo "Ввести або змінити параметри вибраних компонентів зараз?" $false)) {
         $current = Get-DotEnvValues
         Step "Конфігурація (Enter зберігає поточне значення)"
@@ -227,7 +182,7 @@ function Invoke-DeploymentWizard {
             Read-Setting $current 'Collectors__Telegram__Password' 'Пароль двофакторного захисту Telegram' $true
             Read-Setting $current 'Collectors__Telegram__SessionPath' 'Шлях до Telegram session у контейнері'
         }
-        if (-not $selectedServicesOnly -or $Services -contains 'messaging' -or $Services -contains 'processor') {
+        if (-not $selectedServicesOnly -or $Services -contains 'processor') {
             Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
             Read-Setting $current 'Llm__Model' 'Модель LLM'
             Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
@@ -242,14 +197,6 @@ function Invoke-DeploymentWizard {
 $runWizard = $Wizard -or (-not $NonInteractive -and $PSBoundParameters.Count -eq 0)
 if ($runWizard) { Invoke-DeploymentWizard }
 
-if ($Broker) { Write-Warning "-Broker is no longer needed: RabbitMQ and messaging are enabled by default." }
-if ($DomainWriters) { Write-Warning "-DomainWriters is no longer needed: messaging domain writers are enabled by default." }
-if (-not $LegacyProcessor -and $PSBoundParameters.ContainsKey('ProcessorReplicas') -and $ProcessorReplicas -gt 0) {
-    $LegacyProcessor = $true
-    Write-Warning "Ненульове -ProcessorReplicas увімкнуло застарілий LegacyProcessor для сумісності. Надалі використовуйте -LegacyProcessor явно."
-}
-if ($LegacyProcessor -and $ProcessorReplicas -lt 1) { throw "-LegacyProcessor requires -ProcessorReplicas from 1 to 32." }
-if (-not $LegacyProcessor) { $ProcessorReplicas = 0 }
 $expectedVolume = "$ComposeProject-pgdata"
 if ($ComposeProject -notmatch '^puluj-g(?:-[a-z0-9][a-z0-9-]*)?$') { throw "ComposeProject '$ComposeProject' is not an isolated Puluj-G project name." }
 if ($ResetDatabase -and -not $ConfirmReset) { throw "-ResetDatabase is destructive and requires -ConfirmReset. Nothing was deleted." }
@@ -260,14 +207,7 @@ if (($ResetDatabase -or $InitializeDatabase) -and $Services.Count -gt 0 -and $Se
     $Services += 'migrate'
     Write-Host "Додано migrate: порожня або очищена БД спершу має отримати схему й seed-дані." -ForegroundColor Yellow
 }
-if ($Services.Count -gt 0 -and @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts') }).Count -gt 0 -and $Services -notcontains 'messaging') {
-    $Services += 'messaging'
-    Write-Host "Додано messaging: колектори за замовчуванням передають дані до єдиного durable ingress." -ForegroundColor Yellow
-}
-if (-not $LegacyProcessor -and $Services.Count -gt 0 -and $Services -contains 'processor') {
-    throw "processor is obsolete and disabled by default. Use -LegacyProcessor -ProcessorReplicas <1..32> to start it instead of messaging domain writers."
-}
-$changesDomainOwnership = $Services.Count -eq 0 -or $Services -contains 'messaging' -or $Services -contains 'processor'
+$runsProcessor = $Services.Count -eq 0 -or $Services -contains 'processor'
 $managesDatabase = $Services.Count -eq 0 -or $Services -contains 'postgis' -or $Services -contains 'migrate'
 $requiresMigrate = $Services.Count -eq 0 -or $Services -contains 'migrate'
 $partialComponentDeploy = $Services.Count -gt 0 -and -not $managesDatabase
@@ -335,20 +275,7 @@ else {
     throw "A database action needs postgis or migrate in -Services. The selected component deploy does not touch the database."
 }
 
-# Messaging owns the durable path and domain writes by default. Legacy processing is opt-in and then messaging remains
-# stage-only. Compose reads the values through ${…} substitution.
-$stageMessagingRoles = "relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics"
-$defaultMessagingRoles = "$stageMessagingRoles,track-worker,alert-worker,watchdog,incident-worker"
 $profileArgs = @()
-$env:MESSAGING_OUTBOX_ENABLED = "true"
-$env:MESSAGING_INGRESS_ENABLED = "true"
-if ($LegacyProcessor) {
-    $env:MESSAGING_WORKER_ROLES = $stageMessagingRoles
-    $env:PROCESSOR_REPLICAS = "$ProcessorReplicas"
-} else {
-    $env:MESSAGING_WORKER_ROLES = $defaultMessagingRoles
-    $env:PROCESSOR_REPLICAS = "0"
-}
 function Sql([string]$file) {
     # psql is not installed on the host: the script goes through the postgis container (Cyrillic-safe via stdin).
     Get-Content -Raw -Encoding UTF8 $file | docker exec -i $postgisContainer psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f -
@@ -400,7 +327,7 @@ function ComposeContainerId([string]$service) {
 # Stop only local processes that conflict with the selected components. A partial admin/API deployment must not
 # terminate collectors or workers that are doing useful local work.
 $localProcessNames = [System.Collections.Generic.List[string]]::new()
-if ($Services.Count -eq 0 -or @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts', 'processor', 'messaging') }).Count -gt 0) { $localProcessNames.Add('Puluj.Worker') }
+if ($Services.Count -eq 0 -or @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts', 'processor') }).Count -gt 0) { $localProcessNames.Add('Puluj.Worker') }
 if ($Services.Count -eq 0 -or $Services -contains 'api') { $localProcessNames.Add('Puluj.Api') }
 if ($Services.Count -eq 0 -or $Services -contains 'admin') { $localProcessNames.Add('Puluj.Admin') }
 if ($Services.Count -eq 0 -or $Services -contains 'analytics') { $localProcessNames.Add('Puluj.Analytics.Worker') }
@@ -412,26 +339,7 @@ if ($localProcessNames.Count -gt 0) {
     }
 }
 
-if ($changesDomainOwnership -and $LegacyProcessor) {
-    # The messaging consumers can have in-flight domain writes. Stop them before the obsolete owner starts.
-    Step "Перемикання на ЗАСТАРІЛИЙ processor: зупиняємо messaging перед його запуском"
-    Push-Location $deploy
-    try {
-        & docker compose -p $composeProject stop messaging
-        if ($LASTEXITCODE -ne 0) { throw "could not stop the messaging service" }
-    } finally { Pop-Location }
-}
-elseif ($changesDomainOwnership) {
-    # Default cutover: legacy processor must finish before messaging becomes the only domain writer owner.
-    Step "Перемикання на messaging за замовчуванням: зупиняємо застарілий processor"
-    Push-Location $deploy
-    try {
-        & docker compose -p $composeProject stop processor
-        if ($LASTEXITCODE -ne 0) { throw "could not stop the processor service" }
-    } finally { Pop-Location }
-}
-
-Step ($(if ($partialComponentDeploy) { "Часткова публікація: $($Services -join ', ') (залежності не змінюються)" } else { "Building and starting the stack" + $(if ($LegacyProcessor) { " (ЗАСТАРІЛИЙ processor: $ProcessorReplicas реплік)" } else { " (messaging за замовчуванням)" }) }))
+Step ($(if ($partialComponentDeploy) { "Часткова публікація: $($Services -join ', ') (залежності не змінюються)" } else { "Building and starting the stack (one processor)" }))
 Push-Location $deploy
 try {
     if (-not (Test-Path ".env")) { Write-Warning "deploy/.env is missing: compose will use the defaults from docker-compose.yml (ADMIN_TOKEN empty = panel only from localhost)" }
@@ -462,11 +370,9 @@ try {
     & docker @statusArgs
     $postgisContainer = if ($requiresMigrate) { ComposeContainerId "postgis" } else { $null }
     $processorContainers = @()
-    $messagingContainers = @()
-    if ($changesDomainOwnership) {
+    if ($runsProcessor) {
         $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
-        if (-not $LegacyProcessor -and $processorContainers.Count -gt 0) { throw "obsolete processor containers are still running after the messaging cutover: $($processorContainers -join ', ')" }
-        $messagingContainers = @(& docker compose -p $composeProject @profileArgs ps -q messaging | Where-Object { $_ })
+        if ($processorContainers.Count -ne 1) { throw "Expected exactly one processor container, found $($processorContainers.Count)." }
     }
 } finally { Pop-Location }
 
@@ -480,7 +386,7 @@ if (-not $SkipSql -and $requiresMigrate) {
 } elseif (-not $SkipSql -and $managesDatabase) { Write-Host "Пропущено SQL-корекції: обрано лише postgis, без migrate/schema check." -ForegroundColor Yellow }
 
 Step "Checks"
-if ($processorContainers.Count -gt 0 -or $messagingContainers.Count -gt 0) { Start-Sleep 20 }  # let active workers claim messages
+if ($processorContainers.Count -gt 0) { Start-Sleep 20 }  # let the processor claim messages
 if ($postgisContainer) {
     $since = (Get-Date).AddMinutes(-2).ToUniversalTime().ToString("o")
     $deadlocks = (docker logs --since $since $postgisContainer 2>&1 | Select-String "deadlock detected").Count
@@ -492,13 +398,6 @@ foreach ($c in $processorContainers) {
     $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
     if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
 }
-foreach ($c in $messagingContainers) {
-    $roles = docker exec $c printenv Worker__Roles 2>$null
-    Write-Host ("{0}: roles {1}" -f $c, $roles)
-    if ($changesDomainOwnership -and -not $LegacyProcessor -and $roles -notmatch "track-worker") { Write-Warning "$c does not run the default messaging domain writers (Worker__Roles=$roles)" }
-    $err = (docker logs --tail 500 $c 2>&1 | Select-String '"@l":"Error"').Count
-    if ($err -gt 0) { Write-Warning "$c has $err error line(s) in the last 500 — see docker logs $c" }
-}
 foreach ($u in @(
     if ($Services.Count -eq 0 -or $Services -contains 'api') { 'http://localhost:8090/api/health' }
     if ($Services.Count -eq 0 -or $Services -contains 'admin') { 'http://localhost:8091/api/health' }
@@ -507,16 +406,12 @@ foreach ($u in @(
     catch { Write-Warning "$u -> $($_.Exception.Message)" }
 }
 if ($requiresMigrate) {
-Step "Queue"
+Step "Processing state"
 @"
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;
 SELECT count(*) AS text_alerts_ended_before_start FROM air_alerts WHERE ended_at < started_at;
 SELECT key, left(value, 60) AS value FROM app_settings WHERE key LIKE 'Runtime:Worker:%' ORDER BY 1;
 SELECT count(*) FILTER (WHERE observation_id IS NOT NULL) AS targets_by_writers, count(*) FILTER (WHERE observation_id IS NULL) AS targets_by_legacy FROM targets;
-"@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
-@"
-SELECT subscription_id, outcome, count(*) FROM processing.deliveries GROUP BY 1, 2 ORDER BY 1, 2;
-SELECT count(*) AS outbox_unconfirmed FROM messaging.outbox WHERE confirmed_at IS NULL;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
 }
 Write-Host "`nГотово." -ForegroundColor Green
