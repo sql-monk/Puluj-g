@@ -114,8 +114,9 @@ function Select-Services {
         'collector-telegram' = 'зчитує повідомлення з Telegram-каналів'
         'collector-alerts' = 'отримує повітряні тривоги з alerts.in.ua'
         'processor' = 'обробляє raw_messages і оновлює цілі, треки та повітряні тривоги'
-        'api' = 'публічна карта й read-only HTTP API на порту 8090'
-        'admin' = 'приватна панель керування й діагностики на порту 8091'
+        'entity-extractor' = 'виконує Python-екстрактори та записує сутності в ee_* таблиці'
+        'api' = 'публічна карта з сутностями Entity Extractor на порту 8090'
+        'admin' = 'приватна панель керування та редактор Python-екстракторів на порту 8091'
         'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
     }
     $available = @($services.Keys)
@@ -165,7 +166,7 @@ function Invoke-DeploymentWizard {
         Write-Host "Часткова публікація: БД, міграції та її volume не змінюються." -ForegroundColor DarkGray
     }
 
-    $canConfigure = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('admin', 'collector-alerts', 'collector-telegram', 'processor') }).Count -gt 0
+    $canConfigure = -not $selectedServicesOnly -or @($Services | Where-Object { $_ -in @('admin', 'collector-alerts', 'collector-telegram', 'processor', 'entity-extractor') }).Count -gt 0
     if ($canConfigure -and (Read-YesNo "Ввести або змінити параметри вибраних компонентів зараз?" $false)) {
         $current = Get-DotEnvValues
         Step "Конфігурація (Enter зберігає поточне значення)"
@@ -182,20 +183,43 @@ function Invoke-DeploymentWizard {
             Read-Setting $current 'Collectors__Telegram__Password' 'Пароль двофакторного захисту Telegram' $true
             Read-Setting $current 'Collectors__Telegram__SessionPath' 'Шлях до Telegram session у контейнері'
         }
-        if (-not $selectedServicesOnly -or $Services -contains 'processor') {
+        if (-not $selectedServicesOnly -or $Services -contains 'processor' -or $Services -contains 'entity-extractor') {
             Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
             Read-Setting $current 'Llm__Model' 'Модель LLM'
             Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
         }
         if ($wizardSettings.Count -gt 0) {
             Update-DotEnv $wizardSettings
-            if ($managesDatabase) { $script:applyWizardSettingsToDatabase = Read-YesNo "Також застосувати runtime-настройки до app_settings цієї БД?" $true }
+            $script:applyWizardSettingsToDatabase = Read-YesNo "Також застосувати runtime-настройки до app_settings цієї БД?" $true
         }
     }
 }
 
 $runWizard = $Wizard -or (-not $NonInteractive -and $PSBoundParameters.Count -eq 0)
 if ($runWizard) { Invoke-DeploymentWizard }
+
+# Keep the EE database login and delivery API token separate from the admin token. Direct `docker compose`
+# retains local-development defaults, while every deployment through this script persists strong random values.
+$currentSecrets = Get-DotEnvValues
+$generatedSecrets = [ordered]@{}
+$neededEntitySecrets = @()
+if ($Services.Count -eq 0 -or $Services -contains 'entity-extractor' -or $Services -contains 'migrate') { $neededEntitySecrets += 'PULUJ_EE_PASSWORD' }
+if ($Services.Count -eq 0 -or $Services -contains 'entity-extractor' -or @($Services | Where-Object { $_ -in @('collector-alerts', 'collector-telegram') }).Count -gt 0) { $neededEntitySecrets += 'ENTITY_EXTRACTOR_TOKEN' }
+foreach ($secretKey in @($neededEntitySecrets | Select-Object -Unique)) {
+    if (-not $currentSecrets.ContainsKey($secretKey) -or [string]::IsNullOrWhiteSpace($currentSecrets[$secretKey])) {
+        $generatedSecrets[$secretKey] = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
+    }
+}
+if ($generatedSecrets.Count -gt 0) {
+    Update-DotEnv $generatedSecrets
+    Write-Host "Згенеровано окремі секрети доступу Entity Extractor." -ForegroundColor Green
+}
+if ($generatedSecrets.Contains('ENTITY_EXTRACTOR_TOKEN') -and $Services.Count -gt 0) {
+    foreach ($pairedService in @('entity-extractor', 'collector-alerts', 'collector-telegram')) {
+        if ($Services -notcontains $pairedService) { $Services += $pairedService }
+    }
+    Write-Host "Додано Entity Extractor і обидва collectors: новий service token має бути застосований з обох боків." -ForegroundColor Yellow
+}
 
 $expectedVolume = "$ComposeProject-pgdata"
 if ($ComposeProject -notmatch '^puluj-g(?:-[a-z0-9][a-z0-9-]*)?$') { throw "ComposeProject '$ComposeProject' is not an isolated Puluj-G project name." }
@@ -328,8 +352,8 @@ function ComposeContainerId([string]$service) {
 # terminate collectors or workers that are doing useful local work.
 $localProcessNames = [System.Collections.Generic.List[string]]::new()
 if ($Services.Count -eq 0 -or @($Services | Where-Object { $_ -in @('collector-telegram', 'collector-alerts', 'processor') }).Count -gt 0) { $localProcessNames.Add('Puluj.Worker') }
-if ($Services.Count -eq 0 -or $Services -contains 'api') { $localProcessNames.Add('Puluj.Api') }
-if ($Services.Count -eq 0 -or $Services -contains 'admin') { $localProcessNames.Add('Puluj.Admin') }
+if ($Services.Count -eq 0 -or $Services -contains 'api') { $localProcessNames.Add('Puluj.EntityApi'); $localProcessNames.Add('Puluj.Api') }
+if ($Services.Count -eq 0 -or $Services -contains 'admin') { $localProcessNames.Add('Puluj.EntityAdmin'); $localProcessNames.Add('Puluj.Admin') }
 if ($Services.Count -eq 0 -or $Services -contains 'analytics') { $localProcessNames.Add('Puluj.Analytics.Worker') }
 if ($localProcessNames.Count -gt 0) {
     $local = Get-Process -Name @($localProcessNames | Select-Object -Unique) -ErrorAction SilentlyContinue
@@ -337,6 +361,16 @@ if ($localProcessNames.Count -gt 0) {
         Step "Stopping local dev-run processes ($($local.Name -join ', '))"
         $local | Stop-Process -Force
     }
+}
+
+function Apply-EeDatabasePassword([string]$containerId) {
+    $values = Get-DotEnvValues
+    if (-not $values.ContainsKey('PULUJ_EE_PASSWORD') -or [string]::IsNullOrWhiteSpace($values['PULUJ_EE_PASSWORD'])) { return }
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes([string]$values['PULUJ_EE_PASSWORD']))
+    # Build the quoted ALTER ROLE command inside PostgreSQL; the secret never becomes shell syntax or output.
+    "SELECT format('ALTER ROLE puluj_ee PASSWORD %L', convert_from(decode('$encoded', 'base64'), 'UTF8')) \gexec" |
+        docker exec -i $containerId psql -U puluj -d puluj -v ON_ERROR_STOP=1 -f - | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Could not apply the generated Entity Extractor database password." }
 }
 
 Step ($(if ($partialComponentDeploy) { "Часткова публікація: $($Services -join ', ') (залежності не змінюються)" } else { "Building and starting the stack (one processor)" }))
@@ -365,10 +399,14 @@ try {
         docker logs $migrateContainer 2>&1 | Select-String -Pattern "Applying|migration|Seeding" | Select-Object -Last 8
     }
 
+    if ($Services.Count -eq 0 -or $Services -contains 'entity-extractor' -or $requiresMigrate) {
+        Apply-EeDatabasePassword (ComposeContainerId "postgis")
+    }
+
     Step "Containers"
     $statusArgs = @("compose", "-p", $composeProject) + $profileArgs + @("ps", "--format", "table {{.Name}}\t{{.Service}}\t{{.Status}}\t{{.Image}}") + $Services
     & docker @statusArgs
-    $postgisContainer = if ($requiresMigrate) { ComposeContainerId "postgis" } else { $null }
+    $postgisContainer = if ($requiresMigrate -or $applyWizardSettingsToDatabase) { ComposeContainerId "postgis" } else { $null }
     $processorContainers = @()
     if ($runsProcessor) {
         $processorContainers = @(& docker compose -p $composeProject ps -q processor | Where-Object { $_ })
@@ -376,7 +414,7 @@ try {
     }
 } finally { Pop-Location }
 
-if ($requiresMigrate) { Apply-WizardSettingsToDatabase }
+if ($applyWizardSettingsToDatabase) { Apply-WizardSettingsToDatabase }
 
 if (-not $SkipSql -and $requiresMigrate) {
     Step "One-off SQL: Failed raw messages back to Pending (deadlock victims of 15.09)"

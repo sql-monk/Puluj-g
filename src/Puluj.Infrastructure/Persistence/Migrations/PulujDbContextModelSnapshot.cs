@@ -163,6 +163,398 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.ToTable("collector_states", (string)null);
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDefinition", b =>
+                {
+                    b.Property<long>("EntityDefinitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("entity_definition_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("EntityDefinitionId"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("EntityName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("entity_name");
+
+                    b.Property<JsonDocument>("Fields")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("fields");
+
+                    b.Property<JsonDocument>("MapSettings")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("map_settings");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("table_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("EntityDefinitionId")
+                        .HasName("pk_ee_entity_definitions");
+
+                    b.HasIndex("EntityName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_entity_definitions_entity_name");
+
+                    b.HasIndex("TableName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_entity_definitions_table_name");
+
+                    b.ToTable("ee_entity_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDelivery", b =>
+                {
+                    b.Property<Guid>("DeliveryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_at");
+
+                    b.Property<string>("ClaimedBy")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("claimed_by");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("EnqueuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enqueued_at");
+
+                    b.Property<string>("LastError")
+                        .HasColumnType("text")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LeaseExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_expires_at");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("origin");
+
+                    b.Property<long>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<short?>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("DeliveryId")
+                        .HasName("pk_ee_delivery_queue");
+
+                    b.HasIndex("LeaseExpiresAt")
+                        .HasDatabaseName("ix_ee_delivery_queue_lease_expires_at")
+                        .HasFilter("status = 'in_progress'");
+
+                    b.HasIndex("Status", "EnqueuedAt")
+                        .HasDatabaseName("ix_ee_delivery_queue_status_enqueued_at");
+
+                    b.HasIndex(new[] { "RawMessageId" }, "ux_ee_delivery_queue_live_raw_message")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_delivery_queue_raw_message_id")
+                        .HasFilter("origin = 'live'");
+
+                    b.ToTable("ee_delivery_queue", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDeliveryAttempt", b =>
+                {
+                    b.Property<long>("DeliveryAttemptId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("delivery_attempt_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("DeliveryAttemptId"));
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<short?>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.HasKey("DeliveryAttemptId")
+                        .HasName("pk_ee_delivery_attempts");
+
+                    b.HasIndex("DeliveryId", "StartedAt")
+                        .HasDatabaseName("ix_ee_delivery_attempts_delivery_id_started_at");
+
+                    b.ToTable("ee_delivery_attempts", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityExtractorDefinition", b =>
+                {
+                    b.Property<long>("ExtractorId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("extractor_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("ExtractorId"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<int>("ExecutionOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("execution_order");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("TimeoutMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("timeout_ms");
+
+                    b.HasKey("ExtractorId")
+                        .HasName("pk_ee_extractors");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_extractors_name");
+
+                    b.HasIndex("Enabled", "ExecutionOrder")
+                        .HasDatabaseName("ix_ee_extractors_enabled_execution_order");
+
+                    b.ToTable("ee_extractors", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityExtractorRun", b =>
+                {
+                    b.Property<long>("ExtractorRunId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("extractor_run_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("ExtractorRunId"));
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_ms");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<long>("ExtractorId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("extractor_id");
+
+                    b.Property<long>("ProcessingRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_run_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Stderr")
+                        .HasColumnType("text")
+                        .HasColumnName("stderr");
+
+                    b.Property<string>("Stdout")
+                        .HasColumnType("text")
+                        .HasColumnName("stdout");
+
+                    b.Property<int>("WritesCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("writes_count");
+
+                    b.HasKey("ExtractorRunId")
+                        .HasName("pk_ee_extractor_runs");
+
+                    b.HasIndex("ExtractorId")
+                        .HasDatabaseName("ix_ee_extractor_runs_extractor_id");
+
+                    b.HasIndex("ProcessingRunId", "ExtractorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_extractor_runs_processing_run_id_extractor_id");
+
+                    b.ToTable("ee_extractor_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityProcessingRun", b =>
+                {
+                    b.Property<long>("ProcessingRunId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_run_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("ProcessingRunId"));
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<Guid>("ClaimToken")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()")
+                        .HasColumnName("claim_token");
+
+                    b.Property<Guid>("DeliveryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("delivery_id");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<long>("RawMessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("raw_message_id");
+
+                    b.Property<short?>("Result")
+                        .HasColumnType("smallint")
+                        .HasColumnName("result");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.HasKey("ProcessingRunId")
+                        .HasName("pk_ee_processing_runs");
+
+                    b.HasIndex("DeliveryId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ee_processing_runs_delivery_id");
+
+                    b.HasIndex("RawMessageId", "StartedAt")
+                        .HasDatabaseName("ix_ee_processing_runs_raw_message_id_started_at");
+
+                    b.ToTable("ee_processing_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityWriteAudit", b =>
+                {
+                    b.Property<long>("EntityWriteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("entity_write_id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("EntityWriteId"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("EntityDefinitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entity_definition_id");
+
+                    b.Property<long>("EntityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entity_id");
+
+                    b.Property<long?>("ExtractorRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("extractor_run_id");
+
+                    b.Property<long>("ProcessingRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("processing_run_id");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .HasColumnName("table_name");
+
+                    b.HasKey("EntityWriteId")
+                        .HasName("pk_ee_entity_writes");
+
+                    b.HasIndex("EntityDefinitionId")
+                        .HasDatabaseName("ix_ee_entity_writes_entity_definition_id");
+
+                    b.HasIndex("ExtractorRunId")
+                        .HasDatabaseName("ix_ee_entity_writes_extractor_run_id");
+
+                    b.HasIndex("ProcessingRunId", "CreatedAt")
+                        .HasDatabaseName("ix_ee_entity_writes_processing_run_id_created_at");
+
+                    b.ToTable("ee_entity_writes", (string)null);
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.EventKind", b =>
                 {
                     b.Property<int>("EventKindId")
@@ -1775,6 +2167,101 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.Navigation("Source");
                 });
 
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDelivery", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.RawMessage", "RawMessage")
+                        .WithMany()
+                        .HasForeignKey("RawMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_delivery_queue_raw_messages_raw_message_id");
+
+                    b.Navigation("RawMessage");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDeliveryAttempt", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EntityDelivery", "Delivery")
+                        .WithMany("DeliveryAttempts")
+                        .HasForeignKey("DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_delivery_attempts_ee_delivery_queue_delivery_id");
+
+                    b.Navigation("Delivery");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityExtractorRun", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EntityExtractorDefinition", "Extractor")
+                        .WithMany()
+                        .HasForeignKey("ExtractorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_extractor_runs_ee_extractors_extractor_id");
+
+                    b.HasOne("Puluj.Domain.Entities.EntityProcessingRun", "ProcessingRun")
+                        .WithMany("ExtractorRuns")
+                        .HasForeignKey("ProcessingRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_extractor_runs_ee_processing_runs_processing_run_id");
+
+                    b.Navigation("Extractor");
+
+                    b.Navigation("ProcessingRun");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityProcessingRun", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EntityDelivery", "Delivery")
+                        .WithOne()
+                        .HasForeignKey("Puluj.Domain.Entities.EntityProcessingRun", "DeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_processing_runs_ee_delivery_queue_delivery_id");
+
+                    b.HasOne("Puluj.Domain.Entities.RawMessage", "RawMessage")
+                        .WithMany()
+                        .HasForeignKey("RawMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_processing_runs_raw_messages_raw_message_id");
+
+                    b.Navigation("Delivery");
+
+                    b.Navigation("RawMessage");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityWriteAudit", b =>
+                {
+                    b.HasOne("Puluj.Domain.Entities.EntityDefinition", "EntityDefinition")
+                        .WithMany()
+                        .HasForeignKey("EntityDefinitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_entity_writes_ee_entity_definitions_entity_definition_id");
+
+                    b.HasOne("Puluj.Domain.Entities.EntityExtractorRun", "ExtractorRun")
+                        .WithMany("EntityWrites")
+                        .HasForeignKey("ExtractorRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_ee_entity_writes_ee_extractor_runs_extractor_run_id");
+
+                    b.HasOne("Puluj.Domain.Entities.EntityProcessingRun", "ProcessingRun")
+                        .WithMany()
+                        .HasForeignKey("ProcessingRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ee_entity_writes_ee_processing_runs_processing_run_id");
+
+                    b.Navigation("EntityDefinition");
+
+                    b.Navigation("ExtractorRun");
+
+                    b.Navigation("ProcessingRun");
+                });
+
             modelBuilder.Entity("Puluj.Domain.Entities.EventKindAudit", b =>
                 {
                     b.HasOne("Puluj.Domain.Entities.EventKind", null)
@@ -2046,6 +2533,21 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.Navigation("Target");
 
                     b.Navigation("Track");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityDelivery", b =>
+                {
+                    b.Navigation("DeliveryAttempts");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityExtractorRun", b =>
+                {
+                    b.Navigation("EntityWrites");
+                });
+
+            modelBuilder.Entity("Puluj.Domain.Entities.EntityProcessingRun", b =>
+                {
+                    b.Navigation("ExtractorRuns");
                 });
 
             modelBuilder.Entity("Puluj.Domain.Entities.EventKindRuleset", b =>

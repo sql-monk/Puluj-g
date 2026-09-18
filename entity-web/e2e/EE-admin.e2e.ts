@@ -1,0 +1,72 @@
+import { expect, test, type Route } from '@playwright/test'
+
+const ADMIN = 'http://localhost:5184'
+const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+
+test('EE Python editor highlights code, validates it, and saves without rebuilding', async ({ page }) => {
+  const saves: unknown[] = []
+  await page.route((url) => url.pathname.startsWith('/api/'), (route) => json(route, {}))
+  await page.route('**/api/admin/settings', (route) => json(route, []))
+  await page.route('**/api/admin/status', (route) => json(route, { alertsConfigured: false, telegramConfigured: false, llmConfigured: false, adminTokenSet: false, workerAlive: true }))
+  await page.route('**/api/admin/sources', (route) => json(route, []))
+  await page.route('**/api/admin/ee/extractors', async (route) => {
+    if (route.request().method() === 'PUT') {
+      saves.push(route.request().postDataJSON())
+      return json(route, { extractorId: 7 })
+    }
+    return json(route, [])
+  })
+  await page.route('**/api/admin/ee/extractors/validate', (route) => json(route, { valid: true, diagnostics: [] }))
+
+  await page.goto(`${ADMIN}/#/ee-extractors`)
+  await expect(page.getByRole('heading', { name: 'Python-екстрактори' })).toBeVisible()
+  await expect(page.locator('.cm-editor')).toBeVisible()
+  const keyword = page.locator('.cm-content span').filter({ hasText: 'def' }).first()
+  await expect(keyword).toBeVisible()
+  await expect(keyword).not.toHaveCSS('color', 'rgb(0, 0, 0)')
+
+  await page.getByLabel('Назва').fill('explosion parser')
+  await page.getByRole('button', { name: 'Перевірити синтаксис' }).click()
+  await expect(page.getByText('"valid": true')).toBeVisible()
+  await page.getByRole('button', { name: 'Зберегти' }).click()
+  await expect(page.getByText('Екстрактор збережено й буде використаний без перебудови контейнера.')).toBeVisible()
+  expect(saves).toHaveLength(1)
+  expect(saves[0]).toMatchObject({ name: 'explosion parser', enabled: true })
+})
+
+test('EE entity editor creates a concrete table definition with map fields', async ({ page }) => {
+  const creates: Record<string, unknown>[] = []
+  let definitions: Record<string, unknown>[] = []
+  await page.route((url) => url.pathname.startsWith('/api/'), (route) => json(route, {}))
+  await page.route('**/api/admin/settings', (route) => json(route, []))
+  await page.route('**/api/admin/status', (route) => json(route, { alertsConfigured: false, telegramConfigured: false, llmConfigured: false, adminTokenSet: false, workerAlive: true }))
+  await page.route('**/api/admin/sources', (route) => json(route, []))
+  await page.route('**/api/admin/ee/definitions', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON() as Record<string, unknown>
+      creates.push(body)
+      definitions = [{ entity_definition_id: 9, entity_name: body.entityName, table_name: 'ee_explosions', fields: body.fields, map_settings: body.map, enabled: true }]
+      return json(route, definitions[0])
+    }
+    return json(route, definitions)
+  })
+
+  await page.goto(`${ADMIN}/#/ee-definitions`)
+  await expect(page.getByRole('heading', { name: 'Нова конкретна сутність' })).toBeVisible()
+  await page.getByLabel('Назва, однина').fill('explosion')
+  await page.getByRole('button', { name: '＋ поле' }).click()
+  await page.getByLabel('Назва поля').nth(1).fill('latitude')
+  await page.getByLabel('Тип поля').nth(1).selectOption('decimal')
+  await page.getByRole('button', { name: '＋ поле' }).click()
+  await page.getByLabel('Назва поля').nth(2).fill('longitude')
+  await page.getByLabel('Тип поля').nth(2).selectOption('decimal')
+  await page.getByLabel('показувати').check()
+  await page.getByLabel('Latitude').fill('latitude')
+  await page.getByLabel('Longitude').fill('longitude')
+  await page.getByLabel('Час', { exact: true }).fill('occurredAt')
+  await page.getByRole('button', { name: 'Створити таблицю' }).click()
+
+  await expect(page.getByText('explosion', { exact: true })).toBeVisible()
+  expect(creates).toHaveLength(1)
+  expect(creates[0]).toMatchObject({ entityName: 'explosion', enabled: true, map: { enabled: true, renderer: 'point', latitudeField: 'latitude', longitudeField: 'longitude', timeField: 'occurredAt' } })
+})

@@ -1,0 +1,141 @@
+@import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Colour themes (store/useStore.ts THEMES; App.tsx sets data-theme on <html>).
+   Every panel is styled with the slate scale + white and a few blue / indigo accents, so a theme is a remap of those
+   Tailwind v4 variables. Themes with light text on dark panels also carry the `dark` class (dark: variants);
+   whether the basemap is dark is a separate flag (graphite = dark panels over the light map). */
+
+/* Sepia: warm paper, brown accents. Light. */
+html[data-theme="sepia"] {
+  --color-white: #fffaf0;
+  --color-slate-50: #fbf4e6;
+  --color-slate-100: #f4e9d2;
+  --color-slate-200: #e7d7b8;
+  --color-slate-300: #d3bd93;
+  --color-slate-400: #ad9265;
+  --color-slate-500: #85683f;
+  --color-slate-600: #66502f;
+  --color-slate-700: #4c3c24;
+  --color-slate-800: #33281a;
+  --color-slate-900: #221b11;
+  --color-slate-950: #15100a;
+  --color-blue-600: #9a5b12;
+  --color-blue-700: #7c480e;
+  --color-blue-800: #5e360b;
+  --color-blue-100: #f5e3c2;
+  --color-blue-900: #46280a;
+  --color-indigo-600: #9a5b12;
+  --color-indigo-700: #7c480e;
+  --color-indigo-300: #dcb87a;
+  --color-indigo-100: #f5e3c2;
+  --color-indigo-50: #faf0dc;
+  --color-emerald-50: #eef3dc;
+  --color-emerald-800: #4a5a1d;
+}
+
+/* Graphite: the middle one — neutral mid-grey panels with light text, over the light basemap. */
+html[data-theme="graphite"] {
+  --color-white: #f5f6f8;
+  --color-slate-50: #eef0f3;
+  --color-slate-100: #e2e5ea;
+  --color-slate-200: #cdd2d9;
+  --color-slate-300: #b0b7c1;
+  --color-slate-400: #8f98a5;
+  --color-slate-500: #717b89;
+  --color-slate-600: #5a6371;
+  --color-slate-700: #4a525f;
+  --color-slate-800: #3d444f;
+  --color-slate-900: #30363f;
+  --color-slate-950: #262b32;
+  --color-blue-600: #3b82f6;
+  --color-blue-700: #2f6fdd;
+}
+
+/* Midnight: deep blue-black, cool blue accents. Dark. */
+html[data-theme="midnight"] {
+  --color-white: #eef3ff;
+  --color-slate-50: #e6edfb;
+  --color-slate-100: #d3ddf3;
+  --color-slate-200: #b3c2e4;
+  --color-slate-300: #8ca2cf;
+  --color-slate-400: #6683b8;
+  --color-slate-500: #47639a;
+  --color-slate-600: #30477a;
+  --color-slate-700: #20335e;
+  --color-slate-800: #142346;
+  --color-slate-900: #0a1530;
+  --color-slate-950: #040a1c;
+  --color-blue-600: #2f7cf6;
+  --color-blue-700: #1f66d8;
+  --color-indigo-600: #4f6bef;
+  --color-indigo-700: #3f56d0;
+  --color-indigo-900: #1c2a70;
+  --color-indigo-100: #d8def8;
+  --color-indigo-300: #a9b6f0;
+}
+
+/* Olive: field green, olive-gold accents. Dark. */
+html[data-theme="olive"] {
+  --color-white: #f2f5ea;
+  --color-slate-50: #e9eedc;
+  --color-slate-100: #d9e1c6;
+  --color-slate-200: #bfcaa4;
+  --color-slate-300: #9dab80;
+  --color-slate-400: #7d8c60;
+  --color-slate-500: #5f6e46;
+  --color-slate-600: #485534;
+  --color-slate-700: #364128;
+  --color-slate-800: #262f1c;
+  --color-slate-900: #181f12;
+  --color-slate-950: #0d120a;
+  --color-blue-600: #7a9a2c;
+  --color-blue-700: #627d20;
+  --color-blue-800: #4a6017;
+  --color-blue-900: #33430f;
+  --color-blue-100: #e6ecd0;
+  --color-indigo-600: #8a9a35;
+  --color-indigo-700: #6f7d29;
+  --color-indigo-100: #e6ecd0;
+  --color-indigo-800: #4d581c;
+  --color-indigo-900: #363f12;
+  --color-indigo-300: #c6d28a;
+  --color-emerald-500: #9ccc3a;
+}
+
+.maplibregl-popup-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.maplibregl-popup-tip {
+  display: none;
+}
+
+/* Keep map controls clear of the top bar and of the feed panel, which owns the top-right corner:
+   collapsed it is a "Повідомлення (N)" button, so the zoom buttons drop below it; open (md+) it is a
+   w-96 column at right-3, so they move to its left. App.tsx sets data-feed on the root element. */
+.maplibregl-ctrl-top-right {
+  top: 44px;
+}
+[data-feed='closed'] .maplibregl-ctrl-top-right {
+  top: 6rem;
+}
+@media (min-width: 768px) {
+  [data-feed='open'] .maplibregl-ctrl-top-right {
+    top: 3.5rem;
+    right: calc(24rem + 1.25rem);
+  }
+}

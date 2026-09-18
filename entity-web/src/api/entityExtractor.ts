@@ -1,0 +1,75 @@
+import type { Geometry } from 'geojson'
+
+export interface EntityMapSettings {
+  visible: boolean
+  renderer: 'point' | 'icon' | 'line' | 'polygon'
+  labelField?: string
+  timeField?: string
+  statusField?: string
+  geometryField?: string
+  latitudeField?: string
+  longitudeField?: string
+  lifetimeMinutes?: number
+  svgIcon?: string
+  color?: string
+  width?: number
+  opacity?: number
+  dash?: string
+}
+
+export interface EntityDefinition {
+  entityName: string
+  tableName: string
+  fields: { name: string; type: string }[]
+  map: EntityMapSettings
+  enabled: boolean
+}
+
+export interface EntityItem {
+  entity: string
+  table: string
+  id: string
+  rawMessageId?: string
+  sourceId?: number
+  occurredAt?: string
+  values: Record<string, unknown>
+  geometry?: Geometry
+}
+
+export interface EntitySnapshot { generatedAt: string; at?: string; items: EntityItem[]; truncated: boolean; limitPerEntity: number }
+export interface EntityPage { items: EntityItem[]; nextCursor?: string; totalCount: number }
+
+async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, { headers: { Accept: 'application/json' }, signal })
+  if (!response.ok) throw new Error(`${path}: HTTP ${response.status}`)
+  return response.json() as Promise<T>
+}
+
+export const entityApi = {
+  definitions: (signal?: AbortSignal) => get<EntityDefinition[]>('/api/ee/definitions', signal),
+  snapshot: (at?: Date, signal?: AbortSignal) => get<EntitySnapshot>(`/api/ee/snapshot${at ? `?at=${encodeURIComponent(at.toISOString())}` : ''}`, signal),
+  catalogue: (params: { kind?: string; kinds?: string[]; q?: string; sourceIds?: number[]; from?: Date; to?: Date; limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
+    const query = new URLSearchParams()
+    if (params.kind) query.set('kind', params.kind)
+    if (params.kinds?.length) query.set('kinds', [...new Set(params.kinds)].join(','))
+    if (params.q) query.set('q', params.q)
+    if (params.sourceIds?.length) query.set('sourceIds', params.sourceIds.join(','))
+    if (params.from) query.set('from', params.from.toISOString())
+    if (params.to) query.set('to', params.to.toISOString())
+    if (params.limit !== undefined) query.set('limit', String(params.limit))
+    if (params.cursor) query.set('cursor', params.cursor)
+    return get<EntityPage>(`/api/ee/entities?${query}`, signal)
+  },
+  catalogueMany: async (params: { kinds?: string[]; q?: string; sourceIds?: number[]; from?: Date; to?: Date; limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
+    const kinds = [...new Set(params.kinds?.filter(Boolean) ?? [])]
+    return entityApi.catalogue({ kinds, q: params.q, sourceIds: params.sourceIds, from: params.from, to: params.to, limit: params.limit, cursor: params.cursor }, signal)
+  },
+  detail: (kind: string, id: string, signal?: AbortSignal) => get<EntityItem>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, signal),
+  history: (kind: string, id: string, signal?: AbortSignal) => get<EntityItem[]>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/history`, signal),
+}
+
+export function mergeEntityPages(kinds: string[], pages: EntityPage[]): EntityPage {
+  const items = pages.flatMap((page) => page.items).sort((left, right) => (right.occurredAt ?? '').localeCompare(left.occurredAt ?? '') || right.id.localeCompare(left.id))
+  const nextByKind = Object.fromEntries(kinds.map((kind, index) => [kind, pages[index]?.nextCursor ?? null]))
+  return { items, totalCount: pages.reduce((sum, page) => sum + page.totalCount, 0), nextCursor: Object.values(nextByKind).some(Boolean) ? JSON.stringify(nextByKind) : undefined }
+}

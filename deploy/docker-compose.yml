@@ -19,6 +19,8 @@ x-worker: &worker
   env_file: .env  # deploy/.env: compose reads it for ${…} substitution and passes it to the containers
   environment: &worker-env
     ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj;Password=${POSTGRES_PASSWORD:-puluj}"
+    EntityExtractor__Url: http://entity-extractor:8080
+    EntityExtractor__Token: "${ENTITY_EXTRACTOR_TOKEN:-entity-extractor-local-only}"
     OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
   volumes:
     - logs:/app/logs
@@ -123,11 +125,47 @@ services:
       Processing__Concurrency: "2"
       Serilog__WriteTo__1__Args__path: /app/logs/worker-processor-.log
 
+  # The only new service: receives raw-message HTTP requests, runs configurable Python extractors and the existing
+  # LLM fallback, then writes concrete entities to the registered ee_* tables. Delivery is hosted by the collector
+  # workers, so entity writes and table locks never hold up raw-message ingestion.
+  entity-extractor:
+    build:
+      context: ..
+      dockerfile: entity-extractor/Dockerfile
+    environment:
+      ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_ee;Password=${PULUJ_EE_PASSWORD:-puluj_ee}"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-ADMIN_TOKEN}
+      ENTITY_EXTRACTOR_TOKEN: "${ENTITY_EXTRACTOR_TOKEN:-entity-extractor-local-only}"
+      ENTITY_EXTRACTOR_CONCURRENCY: ${ENTITY_EXTRACTOR_CONCURRENCY:-4}
+      Llm__Enabled: ${Llm__Enabled:-false}
+      Llm__Model: ${Llm__Model:-claude-opus-5}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # Public map: read-only database role (created by the migrations; change the password with ALTER ROLE).
   api:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile.api
+      dockerfile: deploy/Dockerfile.entity-api
     environment:
       ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_reader;Password=${PULUJ_READER_PASSWORD:-puluj_reader}"
       ASPNETCORE_URLS: http://+:8080
@@ -155,12 +193,14 @@ services:
   admin:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile.admin
+      dockerfile: deploy/Dockerfile.entity-admin
     environment:
       ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_admin;Password=${PULUJ_ADMIN_PASSWORD:-puluj_admin}"
       ASPNETCORE_URLS: http://+:8081
       Admin__ApiUrl: http://api:8080
       Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
+      EntityExtractor__Url: http://entity-extractor:8080
+      EntityExtractor__AdminToken: ${ADMIN_TOKEN:-ADMIN_TOKEN}
       Logs__Directory: /app/logs
       Docker__Enabled: "true"
       Docker__ComposeDir: /deploy

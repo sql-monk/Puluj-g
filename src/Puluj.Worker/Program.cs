@@ -3,6 +3,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Puluj.Collectors;
 using Puluj.Infrastructure;
+using Puluj.Infrastructure.EntityExtraction;
 using Puluj.Infrastructure.Settings;
 using Puluj.Processing;
 using Puluj.Worker.Hosting;
@@ -54,6 +55,11 @@ if (roles.Contains(WorkerOptions.Alerts))
 if (collectors.Count > 0)
 {
     builder.Services.AddPulujCollectors(builder.Configuration, collectors);
+    builder.Services.Configure<EntityDeliveryOptions>(builder.Configuration.GetSection(EntityDeliveryOptions.Section));
+    builder.Services.AddSingleton<EntityDeliveryStore>();
+    builder.Services.AddSingleton(new EntityDeliveryIdentity(worker.InstanceName));
+    builder.Services.AddHttpClient<EntityDeliveryLoop>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<EntityDeliveryLoop>());
 }
 
 var host = builder.Build();

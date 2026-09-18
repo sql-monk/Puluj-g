@@ -1,0 +1,21 @@
+FROM node:24-alpine AS web
+WORKDIR /web
+COPY entity-web/package*.json ./
+RUN npm ci
+COPY entity-web/ ./
+RUN npm run build:user
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY Directory.Build.props Directory.Packages.props Puluj.sln ./
+COPY src/ src/
+RUN dotnet restore src/Puluj.EntityApi/Puluj.EntityApi.csproj
+RUN dotnet publish src/Puluj.EntityApi/Puluj.EntityApi.csproj -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build /app .
+COPY --from=web /src/Puluj.EntityApi/wwwroot ./wwwroot
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "Puluj.EntityApi.dll"]
