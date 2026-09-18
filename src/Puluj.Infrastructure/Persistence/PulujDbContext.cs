@@ -8,6 +8,13 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<Source> Sources => Set<Source>();
     public DbSet<RawMessage> RawMessages => Set<RawMessage>();
     public DbSet<LlmRequest> LlmRequests => Set<LlmRequest>();
+    public DbSet<EntityDelivery> EntityDeliveries => Set<EntityDelivery>();
+    public DbSet<EntityDeliveryAttempt> EntityDeliveryAttempts => Set<EntityDeliveryAttempt>();
+    public DbSet<EntityExtractorDefinition> EntityExtractors => Set<EntityExtractorDefinition>();
+    public DbSet<EntityDefinition> EntityDefinitions => Set<EntityDefinition>();
+    public DbSet<EntityProcessingRun> EntityProcessingRuns => Set<EntityProcessingRun>();
+    public DbSet<EntityExtractorRun> EntityExtractorRuns => Set<EntityExtractorRun>();
+    public DbSet<EntityWriteAudit> EntityWrites => Set<EntityWriteAudit>();
 
     public DbSet<TargetCategory> TargetCategories => Set<TargetCategory>();
     public DbSet<TargetClass> TargetClasses => Set<TargetClass>();

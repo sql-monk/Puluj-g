@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>puluj-entity-admin</UserSecretsId>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Puluj.Admin\Puluj.Admin.csproj" />
+    <ProjectReference Include="..\Puluj.Api\Puluj.Api.csproj" />
+    <ProjectReference Include="..\Puluj.Infrastructure\Puluj.Infrastructure.csproj" />
+    <ProjectReference Include="..\Puluj.Analytics\Puluj.Analytics.csproj" />
+    <ProjectReference Include="..\Puluj.Processing\Puluj.Processing.csproj" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+  </ItemGroup>
+  <Target Name="DropReferencedAppSettings" AfterTargets="ComputeFilesToPublish" BeforeTargets="_HandleFileConflictsForPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="($([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^appsettings(?:\..+)?\.json$')) and !$([System.String]::Copy('%(ResolvedFileToPublish.SourcePath)').StartsWith('$(MSBuildProjectDirectory)'))) or $([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.Identity)', 'Puluj\.Admin[\\/]wwwroot'))" />
+    </ItemGroup>
+  </Target>
+</Project>

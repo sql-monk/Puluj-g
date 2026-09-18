@@ -1,0 +1,32 @@
+FROM node:24-alpine AS web
+WORKDIR /web
+COPY entity-web/package*.json ./
+RUN npm ci
+COPY entity-web/ ./
+RUN npm run build:admin
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY Directory.Build.props Directory.Packages.props Puluj.sln ./
+COPY src/ src/
+RUN dotnet restore src/Puluj.EntityAdmin/Puluj.EntityAdmin.csproj
+RUN dotnet publish src/Puluj.EntityAdmin/Puluj.EntityAdmin.csproj -c Release -o /app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc \
+    && chmod a+r /etc/apt/keyrings/docker.asc \
+    && . /etc/os-release \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=build /app .
+COPY --from=web /src/Puluj.EntityAdmin/wwwroot ./wwwroot
+COPY data/corpus/ /app/data/corpus/
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 8081
+ENTRYPOINT ["dotnet", "Puluj.EntityAdmin.dll"]

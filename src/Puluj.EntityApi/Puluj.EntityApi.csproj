@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>puluj-entity-api</UserSecretsId>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Puluj.Api\Puluj.Api.csproj" />
+    <ProjectReference Include="..\Puluj.Infrastructure\Puluj.Infrastructure.csproj" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+  <Target Name="DropReferencedAppSettings" AfterTargets="ComputeFilesToPublish" BeforeTargets="_HandleFileConflictsForPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(ResolvedFileToPublish.RelativePath)', '^appsettings(?:\..+)?\.json$')) and !$([System.String]::Copy('%(ResolvedFileToPublish.SourcePath)').StartsWith('$(MSBuildProjectDirectory)'))" />
+    </ItemGroup>
+  </Target>
+</Project>

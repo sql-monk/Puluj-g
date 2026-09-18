@@ -7,7 +7,15 @@ obj/
 TestResults/
 web/node_modules/
 web/dist/
+entity-web/node_modules/
+entity-web/dist/
+entity-extractor/.venv/
+entity-extractor/.pytest_cache/
+entity-extractor/**/__pycache__/
+entity-extractor/**/*.pyc
 src/Puluj.Api/wwwroot/
+src/Puluj.EntityApi/wwwroot/
+src/Puluj.EntityAdmin/wwwroot/
 .env
 data/gazetteer/*.geojson
 data/gazetteer/*.csv
@@ -19,3 +27,4 @@ artifacts/
 deploy/docker-compose.override.yml
 Технічне завдання_ DWH історії повітряних тривог, обстрілів та воєнних подій в Україні.md
 .history/
+.tmp/
