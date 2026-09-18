@@ -21,8 +21,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
 
     public async Task InitializeAsync()
     {
-        await using var db = await Factory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE raw_messages, targets, target_tracks, air_alerts RESTART IDENTITY CASCADE");
+        await fixture.ResetDataAsync();
     }
     public Task DisposeAsync() => InitializeAsync(); // Do not leak this class's synthetic data into legacy tests.
 

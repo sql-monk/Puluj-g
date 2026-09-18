@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure;
@@ -80,6 +81,7 @@ public sealed class PipelineFixture : IAsyncLifetime
         {
             await seeder.SeedAsync(db, CancellationToken.None);
         }
+        await EnsureDeterministicSourcesAsync(db);
         await EnsureDeterministicGazetteerAsync(db);
         await Services.GetRequiredService<IndexProvider>().RefreshAsync(CancellationToken.None);
     }
@@ -93,11 +95,68 @@ public sealed class PipelineFixture : IAsyncLifetime
     {
         await using var db = await Services!.GetRequiredService<IDbContextFactory<PulujDbContext>>().CreateDbContextAsync();
         await ResetDataAsync(db);
+        await EnsureDeterministicSourcesAsync(db);
     }
 
     private static async Task ResetDataAsync(PulujDbContext db)
     {
         await db.Database.ExecuteSqlRawAsync("TRUNCATE track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages, llm_requests RESTART IDENTITY CASCADE");
+    }
+
+    /// <summary>
+    /// Operator-managed source configuration is intentionally mutable and may differ between checkouts. Integration
+    /// tests must not disappear when a local <c>data/sources.json</c> omits a fixture source, so keep the source
+    /// identities used by the pipeline scenarios inside the disposable test database.
+    /// </summary>
+    private static async Task EnsureDeterministicSourcesAsync(PulujDbContext db)
+    {
+        if (!await db.Sources.AnyAsync(source => source.Code == "alerts_in_ua"))
+        {
+            db.Sources.Add(new Source
+            {
+                Code = "alerts_in_ua",
+                Name = "alerts.in.ua",
+                Type = SourceType.RestApi,
+                Url = "https://api.alerts.in.ua/v1/alerts/active.json",
+                TrustLevel = 0.95,
+                Priority = 100,
+                Enabled = true,
+                PollingInterval = TimeSpan.FromSeconds(30),
+                Config = JsonDocument.Parse("""{"collector":"alerts_in_ua"}"""),
+            });
+        }
+
+        if (!await db.Sources.AnyAsync(source => source.Code == "tg_kpszsu"))
+        {
+            db.Sources.Add(new Source
+            {
+                Code = "tg_kpszsu",
+                Name = "Повітряні сили ЗС України",
+                Type = SourceType.Telegram,
+                Url = "https://t.me/kpszsu",
+                TrustLevel = 0.95,
+                Priority = 90,
+                Enabled = true,
+                Config = JsonDocument.Parse("""{"channel":"kpszsu","language":"uk","official":true}"""),
+            });
+        }
+
+        if (!await db.Sources.AnyAsync(source => source.Code == "tg_monitoringwar"))
+        {
+            db.Sources.Add(new Source
+            {
+                Code = "tg_monitoringwar",
+                Name = "monitorwar",
+                Type = SourceType.Telegram,
+                Url = "https://t.me/monitoringwar",
+                TrustLevel = 0.85,
+                Priority = 85,
+                Enabled = true,
+                Config = JsonDocument.Parse("""{"channel":"monitoringwar","language":"uk","official":false}"""),
+            });
+        }
+
+        await db.SaveChangesAsync();
     }
 
     /// <summary>

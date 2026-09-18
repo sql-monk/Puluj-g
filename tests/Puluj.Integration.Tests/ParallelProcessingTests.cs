@@ -159,7 +159,7 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
     }
 
     [Fact]
-    public async Task Two_processing_loops_share_the_backlog()
+    public async Task Two_processing_loops_elect_one_singleton_processor()
     {
         if (Services is null)
         {
@@ -204,8 +204,9 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
             Assert.Equal(ProcessingStatus.Processed, r.ProcessingStatus);
             Assert.Contains(r.ClaimedBy, new[] { "loop-A", "loop-B" });
         });
-        // Both instances took part: with 40 messages and two workers each, one instance never gets them all.
-        Assert.Equal(2, rows.Select(r => r.ClaimedBy).Distinct().Count());
+        // Deployment permits exactly one processor. A second loop may start, but the database advisory lock keeps
+        // it idle so scaling configuration cannot silently split resources between competing processor instances.
+        Assert.Single(rows.Select(r => r.ClaimedBy).Distinct());
         var perMessage = await check.Targets.AsNoTracking().Where(t => ids.Contains(t.RawMessageId)).GroupBy(t => t.RawMessageId).Select(g => g.Count()).ToListAsync();
         Assert.Equal(ids.Count, perMessage.Count);
         Assert.All(perMessage, n => Assert.Equal(1, n));

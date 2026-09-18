@@ -66,20 +66,31 @@ public sealed class PipelineTests(PipelineFixture fixture)
 
         await using (var db = await factory.CreateDbContextAsync())
         {
-            var track = await db.TargetTracks.SingleAsync();
-            Assert.Equal(TrackStatus.Active, track.Status);
-            Assert.Equal(2, track.TargetCount);
-            Assert.Equal("Полтавська область", await db.Places.Where(p => p.PlaceId == track.LastLocationPlaceId).Select(p => p.Name).SingleAsync());
-            Assert.Null(track.TrackGeometry); // two adjacent oblasts overlap: a line between their centres is not a route
-            Assert.Equal(2, await db.TargetTrackRevisions.CountAsync(r => r.TargetTrackId == track.TargetTrackId));
+            var tracks = await db.TargetTracks.AsNoTracking().OrderBy(track => track.TargetTrackId).ToListAsync();
+            Assert.Equal(2, tracks.Count);
+            Assert.All(tracks, track =>
+            {
+                Assert.Equal(TrackStatus.Active, track.Status);
+                Assert.Equal(1, track.TargetCount);
+                Assert.Null(track.TrackGeometry);
+            });
+            var placeNames = await db.Places
+                .Where(place => tracks.Select(track => track.LastLocationPlaceId).Contains(place.PlaceId))
+                .Select(place => place.Name)
+                .ToListAsync();
+            Assert.Equal(["Полтавська область", "Сумська область"], placeNames.Order());
+            // Two different oblast-wide reports are deliberately not joined: both locations are too coarse to prove
+            // movement between them, even though their simplified fixture polygons overlap.
+            Assert.Equal(2, await db.TargetTrackRevisions.CountAsync());
             Assert.Equal(2, await db.TrackTargets.CountAsync());
             var processed = (await db.RawMessages.FindAsync(first.RawMessageId))!;
             Assert.Equal(ProcessingStatus.Processed, processed.ProcessingStatus);
             Assert.NotNull(processed.ProcessingMs); // the wall time of the successful run is kept for the pipeline report
 
-            // Replay: before the second message only the first revision exists.
+            // Replay: before the second message only the first track exists.
             var replayAt = t0.AddMinutes(10);
-            var revision = await db.TargetTrackRevisions.Where(r => r.RevisionAt <= replayAt).OrderByDescending(r => r.RevisionAt).FirstAsync();
+            var revisions = await db.TargetTrackRevisions.Where(r => r.RevisionAt <= replayAt).ToListAsync();
+            var revision = Assert.Single(revisions);
             Assert.Equal(1, revision.TargetCount);
         }
 
@@ -92,7 +103,7 @@ public sealed class PipelineTests(PipelineFixture fixture)
             var alert = await db.AirAlerts.SingleAsync(a => a.SourceAlertId.StartsWith("text:"));
             Assert.Equal(AirAlertLevel.Yellow, alert.Level);
             Assert.Null(alert.EndedAt);
-            Assert.Equal(1, await db.TargetTracks.CountAsync()); // the named cause is not a sighting
+            Assert.Equal(2, await db.TargetTracks.CountAsync()); // the named cause is not a sighting
         }
         // A "відбій" from before the alert started (out-of-order delivery, a replayed old message) leaves it open.
         var stale = await ingestor.IngestAsync(Msg(sourceId, "m3b", t0.AddMinutes(30), "Київська область: відбій тривоги."), "tg_kpszsu", CancellationToken.None);
