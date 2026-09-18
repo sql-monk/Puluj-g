@@ -16,8 +16,6 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
     public DbSet<AnalysisRun> Runs => Set<AnalysisRun>();
     public DbSet<MessageFingerprint> Messages => Set<MessageFingerprint>();
     public DbSet<TrackFirst> TrackFirsts => Set<TrackFirst>();
-    /// <summary>P15: the lifecycle projection (per raw message per run) — DDL owned by the pipeline's `PulujDbContext` migrations (schema `analytics`), mapped here read/write without migrations.</summary>
-    public DbSet<Puluj.Domain.Entities.Analytics.MessageLifecycle> Lifecycle => Set<Puluj.Domain.Entities.Analytics.MessageLifecycle>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -55,11 +53,6 @@ public class AnalyticsDbContext(DbContextOptions<AnalyticsDbContext> options) : 
             e.Property(x => x.CategoryCode).HasMaxLength(64);
         });
 
-        b.Entity<Puluj.Domain.Entities.Analytics.MessageLifecycle>(e =>
-        {
-            e.ToTable("message_lifecycle", t => t.ExcludeFromMigrations()); // created by Puluj.Infrastructure migration AddMessageLifecycle (the `migrate` role runs before every consumer)
-            e.HasKey(x => new { x.RawMessageId, x.RunId });
-        });
     }
 
     public static void Configure(DbContextOptionsBuilder options, string connectionString)

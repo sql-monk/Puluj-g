@@ -8,7 +8,6 @@ RUN npm run build:user
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Directory.Build.props Directory.Packages.props Puluj.sln ./
-COPY contracts/ contracts/
 COPY src/ src/
 RUN dotnet restore src/Puluj.Api/Puluj.Api.csproj
 RUN dotnet publish src/Puluj.Api/Puluj.Api.csproj -c Release -o /app --no-restore

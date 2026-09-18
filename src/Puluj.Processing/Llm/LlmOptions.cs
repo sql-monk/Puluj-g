@@ -22,7 +22,7 @@ public sealed class LlmOptions
     /// <summary>Bumped whenever the prompt changes; stored with every LLM-derived target.</summary>
     public string PromptVersion { get; set; } = "1";
 
-    /// <summary>llm-worker (P06): provider attempts per request before `llm.failed{final:true}`; must stay below the queue's delivery limit.</summary>
+    /// <summary>Maximum provider attempts for one request.</summary>
     public int MaxAttempts { get; set; } = 3;
     /// <summary>llm-worker lease per request (ADR-0004 W8): another replica takes the job over once it expires; keep it above the provider timeout.</summary>
     public int LeaseSeconds { get; set; } = 90;

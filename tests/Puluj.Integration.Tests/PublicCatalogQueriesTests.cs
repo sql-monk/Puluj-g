@@ -17,7 +17,7 @@ public sealed class PublicCatalogQueriesTests(PipelineFixture fixture)
     {
         var factory = fixture.Services!.GetRequiredService<IDbContextFactory<PulujDbContext>>();
         await using var db = await factory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents, track_targets, target_track_revisions, target_tracks, target_links, targets, air_alerts, raw_messages RESTART IDENTITY CASCADE");
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE track_targets, target_track_revisions, target_tracks, target_links, targets, air_alerts, raw_messages RESTART IDENTITY CASCADE");
         var source = await db.Sources.OrderBy(x => x.SourceId).FirstAsync();
         var category = await db.TargetCategories.OrderBy(x => x.TargetCategoryId).FirstAsync();
         var kind = await db.EventKinds.OrderBy(x => x.EventKindId).FirstAsync();

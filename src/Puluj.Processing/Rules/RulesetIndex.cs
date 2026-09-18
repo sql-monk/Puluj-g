@@ -42,7 +42,7 @@ public sealed class RulesetIndex
 
     public int? Version { get; }
     public string State { get; }
-    /// <summary>What evidence and stage results cite: <c>v3</c> or <c>builtin</c>.</summary>
+    /// <summary>The ruleset identifier cited by parser evidence: <c>v3</c> or <c>builtin</c>.</summary>
     public string Id => Version is int v ? $"v{v}" : BuiltinId;
     public bool IsBuiltin => Version is null;
     /// <summary>Priority desc, then rule code asc — the resolution order.</summary>

@@ -4,14 +4,12 @@ namespace Puluj.Domain.Entities;
 
 /// <summary>
 /// Plan §8.3 (P08). One immutable version of the event-kind rule set. Exactly one version is <see cref="IsActive"/>
-/// for new jobs; <c>draft</c> is the only state whose rules may still change; <c>shadow</c> runs beside the active
-/// set on live traffic without touching results; rollback activates an older published version (a new audit entry,
+/// for new jobs; <c>draft</c> is the only state whose rules may still change; rollback activates an older published version (a new audit entry,
 /// never a rewrite of stored results).
 /// </summary>
 public class EventKindRuleset
 {
     public const string Draft = "draft";
-    public const string Shadow = "shadow";
     public const string Published = "published";
     public const string Superseded = "superseded";
 
@@ -66,8 +64,6 @@ public class EventKindRulesetAudit
     public const string Created = "created";
     public const string RulesReplaced = "rules_replaced";
     public const string Validated = "validated";
-    public const string ShadowStarted = "shadow_started";
-    public const string ShadowStopped = "shadow_stopped";
     public const string PublishedAction = "published";
     public const string RolledBack = "rolled_back";
 
@@ -95,20 +91,4 @@ public class EventKindAudit
     public DateTimeOffset At { get; set; }
     public JsonDocument? Before { get; set; }
     public JsonDocument? After { get; set; }
-}
-
-/// <summary>One segment where the shadow rule set disagreed with the live one (kind or rule); only disagreements are stored.</summary>
-public class EventKindRuleShadow
-{
-    public long ShadowId { get; set; }
-    public long RawMessageId { get; set; }
-    public Guid RunId { get; set; }
-    public int LiveVersion { get; set; }
-    public int ShadowVersion { get; set; }
-    public int SegmentIndex { get; set; }
-    public string? LiveKind { get; set; }
-    public string? ShadowKind { get; set; }
-    public string? LiveRule { get; set; }
-    public string? ShadowRule { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
 }

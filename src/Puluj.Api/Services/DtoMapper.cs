@@ -120,7 +120,7 @@ public sealed class DtoMapper(ReferenceCache refs)
 
     public static EventKindDto EventKind(EventKind k) =>
         new(k.EventKindId, k.Code, k.NameUk, k.Category.ToString().ToLowerInvariant(), k.DefaultSeverity, k.StateModel, k.RequiresLocationForMap,
-            k.RenderMode, k.MapColor, k.MapIcon, k.MapLifetime, k.CreatesIncident, k.MapVisible, k.SortOrder,
+            k.RenderMode, k.MapColor, k.MapIcon, k.MapLifetime, k.MapVisible, k.SortOrder,
             EventKindLegacyMap.ToEventType(k.Code)?.ToString(), k.PolicyVersion);
 
     public PlaceDto Place(ReferenceCache.PlaceInfo p) =>

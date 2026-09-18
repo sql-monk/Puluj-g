@@ -9,8 +9,8 @@ namespace Puluj.Integration.Tests;
 
 /// <summary>
 /// P12 (§8.7, ADR-0008): an admin edit of a kind's presentation is admin-owned from then on — a newer seed refreshes only the
-/// policy fields (dedup_policy, policy_version, category…) and leaves the edited presentation alone; the audit row records
-/// who/why/before/after; the review queue's jsonb predicates walk the bounded window through the read index.
+/// policy fields (policy_version, category…) and leaves the edited presentation alone; the audit row records
+/// who/why/before/after.
 /// </summary>
 [Collection(PipelineCollection.Name)]
 public sealed class CatalogAdminTests(PipelineFixture fixture)
@@ -47,7 +47,7 @@ public sealed class CatalogAdminTests(PipelineFixture fixture)
         {
             PolicyVersion = file.PolicyVersion + 7,
             Kinds = file.Kinds.Select(k => k.Code == "fire.reported"
-                ? k with { MapColor = "#000000", NameUk = "Пожежа (seed)", MapVisible = true, DedupPolicy = JsonSerializer.SerializeToElement(new { windowMinutes = 999, slackKm = 1 }) }
+                ? k with { MapColor = "#000000", NameUk = "Пожежа (seed)", MapVisible = true }
                 : k).ToList(),
         };
         await seeder.SeedAsync(db, newer, CancellationToken.None);
@@ -59,7 +59,6 @@ public sealed class CatalogAdminTests(PipelineFixture fixture)
         Assert.False(after.MapVisible);
         Assert.NotNull(after.PresentationOverriddenAt);
         Assert.Equal(newer.PolicyVersion, after.PolicyVersion);
-        Assert.Equal(999, after.DedupPolicy!.RootElement.GetProperty("windowMinutes").GetInt32());
         // A kind the admin never touched follows the file entirely.
         var explosion = await db.EventKinds.AsNoTracking().SingleAsync(k => k.Code == "impact.explosion.reported");
         Assert.Null(explosion.PresentationOverriddenAt);
@@ -76,37 +75,4 @@ public sealed class CatalogAdminTests(PipelineFixture fixture)
         await Services.GetRequiredService<Puluj.Processing.Indexes.IndexProvider>().RefreshAsync(CancellationToken.None);
     }
 
-    [Fact]
-    public async Task Review_queue_finds_ambiguous_and_near_links_inside_the_window()
-    {
-        await using var db = await Factory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents RESTART IDENTITY CASCADE");
-        var kind = await db.EventKinds.AsNoTracking().Where(k => k.Code == "impact.explosion.reported").Select(k => k.EventKindId).SingleAsync();
-        var now = DateTimeOffset.UtcNow;
-        for (var i = 1; i <= 3; i++)
-        {
-            db.Incidents.Add(new Incident { GenerationId = Guid.Empty, EventKindId = kind, State = Incident.Reported, FirstReportedAt = now.AddMinutes(-i), LastReportedAt = now.AddMinutes(-i), EventAt = now.AddMinutes(-i), Confidence = Domain.Enums.ConfidenceLevel.Medium, SourceCount = 1, Revision = 1, CreatedAt = now, UpdatedAt = now });
-        }
-        await db.SaveChangesAsync();
-        db.IncidentObservations.AddRange(
-            new IncidentObservation { IncidentId = 1, ObservationId = Guid.NewGuid(), GenerationId = Guid.Empty, SourceId = 1, Relation = IncidentObservation.Canonical, Score = 1, EffectiveAt = now, LinkedAt = now, PolicyVersion = "t", DecisionReason = JsonDocument.Parse("""{"considered": 0}""") },
-            new IncidentObservation { IncidentId = 2, ObservationId = Guid.NewGuid(), GenerationId = Guid.Empty, SourceId = 1, Relation = IncidentObservation.Ambiguous, Score = 0.7, EffectiveAt = now, LinkedAt = now, PolicyVersion = "t", DecisionReason = JsonDocument.Parse("""{"considered": 2, "ambiguous": [1, 3]}""") },
-            new IncidentObservation { IncidentId = 3, ObservationId = Guid.NewGuid(), GenerationId = Guid.Empty, SourceId = 2, Relation = IncidentObservation.Canonical, Score = 1, EffectiveAt = now, LinkedAt = now, PolicyVersion = "t", DecisionReason = JsonDocument.Parse("""{"considered": 1, "near_candidates": [1]}""") });
-        await db.SaveChangesAsync();
-
-        // The same predicate the endpoint uses: only the flagged links, newest first, inside the window.
-        var since = now.AddHours(-24);
-        var flagged = await db.IncidentObservations.AsNoTracking()
-            .Where(Puluj.Admin.Endpoints.IncidentEndpoints.ReviewPredicate(since))
-            .Select(o => o.IncidentId)
-            .ToListAsync();
-        Assert.Equal([2, 3], flagged.Order());
-        // The merge plan on the ambiguous pair is what the operator gets offered.
-        var pair = await db.Incidents.AsNoTracking().Include(i => i.Observations).Where(i => i.IncidentId == 2 || i.IncidentId == 1).ToListAsync();
-        var plan = Puluj.Processing.Incidents.IncidentStateWriter.PlanMerge(pair.Single(i => i.IncidentId == 2), pair.Single(i => i.IncidentId == 1));
-        Assert.True(plan.Allowed);
-        Assert.Single(plan.MovedObservationIds);
-        Assert.Equal(1, plan.SourceCountAfter); // the same channel on both sides
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents RESTART IDENTITY CASCADE");
-    }
 }

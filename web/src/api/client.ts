@@ -1,6 +1,6 @@
 import type { Geometry } from 'geojson'
 import type { DataQuery } from '../public/query'
-import type { AlertDto, EventKindDto, MapConfigDto, MapId, TargetDto, PlaceDto, PredecessorsDto, PublicCollectionPageDto, PublicEntityDetailsDto, PublicEntityKind, PublicEntityPageDto, PublicEntityRefDto, PublicEvidenceDto, PublicMessageDetailsDto, PublicMessagePageDto, PublicMessageResultDto, PublicMessageRevisionDto, PublicMessageTextChunkDto, PublicMessageRefDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
+import type { AlertDto, EventKindDto, MapConfigDto, MapId, TargetDto, PlaceDto, PredecessorsDto, PublicCollectionPageDto, PublicEntityDetailsDto, PublicEntityKind, PublicEntityPageDto, PublicEntityRefDto, PublicEvidenceDto, PublicMessageRefDto, RegionDto, ReplayDto, SnapshotDto, SourceDto, StatsAlertsDto, StatsRecognitionDto, StatsSourcesDto, StatsTargetsDto, TaxonomyDto, TimelineBucketDto, TrackDetailsDto } from './types'
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(path, { headers: { Accept: 'application/json' }, signal })
@@ -38,7 +38,6 @@ function mapQuery(filter?: DataQuery): string {
     confidence: filter.confidence,
     location: filter.location,
     hasResults: filter.hasResults,
-    outcome: filter.outcome,
     sort: filter.sort,
     cursor: filter.cursor,
     pageSize: filter.pageSize,
@@ -86,12 +85,6 @@ export const api = {
   publicEvidence: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEvidenceDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/evidence?${publicQuery({ cursor, dataset })}`),
   publicMessages: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicMessageRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/messages?${publicQuery({ cursor, dataset })}`),
   publicRelations: (kind: PublicEntityKind, id: string, cursor?: string, dataset = 'live') => get<PublicCollectionPageDto<PublicEntityRefDto>>(`/api/public/entities/${kind}/${encodeURIComponent(id)}/relations?${publicQuery({ cursor, dataset })}`),
-  /** U05 source-message catalogue: one row per persisted source revision, with string bigint IDs. */
-  publicMessagesIndex: (params: Record<string, string | number | boolean | undefined> = {}, signal?: AbortSignal) => get<PublicMessagePageDto>(`/api/public/messages?${publicQuery(params)}`, signal),
-  publicMessage: (id: string, dataset = 'live', signal?: AbortSignal) => get<PublicMessageDetailsDto>(`/api/public/messages/${encodeURIComponent(id)}?${publicQuery({ dataset })}`, signal),
-  publicMessageResults: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicCollectionPageDto<PublicMessageResultDto>>(`/api/public/messages/${encodeURIComponent(id)}/results?${publicQuery({ cursor, dataset})}`, signal),
-  publicMessageRevisions: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicCollectionPageDto<PublicMessageRevisionDto>>(`/api/public/messages/${encodeURIComponent(id)}/revisions?${publicQuery({ cursor, dataset})}`, signal),
-  publicMessageText: (id: string, cursor?: string, dataset = 'live', signal?: AbortSignal) => get<PublicMessageTextChunkDto>(`/api/public/messages/${encodeURIComponent(id)}/text?${publicQuery({ cursor, dataset})}`, signal),
   /** Alerts of one place over the last `hours`, ended ones included, newest first. */
   alertsHistory: (placeId: number, hours = 24) => get<AlertDto[]>(`/api/alerts/history?placeId=${placeId}&hours=${hours}`),
   searchPlaces: (q: string) => get<PlaceDto[]>(`/api/places/search?q=${encodeURIComponent(q)}&limit=8`),

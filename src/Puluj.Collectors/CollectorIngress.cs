@@ -23,14 +23,11 @@ public sealed class CollectorIngress(RawMessageIngestor ingestor, CollectorState
     /// <param name="live">False during a history load: store without waking processors until the ordered load is complete.</param>
     public async Task<IngressResult> PublishAsync(IncomingMessage msg, Source source, string collectorName, CollectorCheckpoint? checkpoint, bool live, CancellationToken ct)
     {
-        var result = await ingestor.IngestAsync(msg, source.Code, ct, enqueue: live);
+        var result = await ingestor.IngestAsync(msg, source.Code, ct, announceProcessor: live);
         if (checkpoint is not null)
         {
             await states.MarkSuccessAsync(source.SourceId, checkpoint.LastSourceMessageId, checkpoint.LastMessageAt, checkpoint.Cursor, ct);
         }
         return new IngressResult(true, result.RawMessageId, result.IsNew);
     }
-
-    /// <summary>Direct PostgreSQL writes are complete when PublishAsync returns, so there is no transport to drain.</summary>
-    public Task<bool> WaitForDrainAsync(IReadOnlyCollection<int> sourceIds, CancellationToken ct) => Task.FromResult(true);
 }

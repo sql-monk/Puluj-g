@@ -94,7 +94,7 @@ public static class PipelineReport
         var (from, unit, starts) = PipelineBuckets.Period(hours, now);
         var to = now;
 
-        // Messages: received by received_at, outcomes by processed_at, the queue as it is now; timings only exist for successes.
+        // Messages: received by received_at, outcomes by processed_at, current statuses; timings only exist for successes.
         var sourceRows = await db.Database.SqlQuery<SourceRow>($"""
             SELECT r.source_id AS source_id,
                    count(*) FILTER (WHERE r.received_at >= {from} AND r.received_at < {to}) AS received,
@@ -168,7 +168,7 @@ public static class PipelineReport
             WHERE claimed_by IS NOT NULL AND processing_status = 1 AND processed_at >= {from} AND processed_at < {to}
             GROUP BY 1
             """).ToListAsync(ct);
-        var queue = await db.Database.SqlQueryRaw<StatusCount>("SELECT processing_status AS status, count(*) AS count FROM raw_messages GROUP BY 1").ToListAsync(ct);
+        var processingStatuses = await db.Database.SqlQueryRaw<StatusCount>("SELECT processing_status AS status, count(*) AS count FROM raw_messages GROUP BY 1").ToListAsync(ct);
         var stages = await db.Database.SqlQuery<StageCount>($"SELECT stage AS stage, count(*) AS count FROM processing_errors WHERE occurred_at >= {from} AND occurred_at < {to} GROUP BY 1").ToListAsync(ct);
         var recent = await db.ProcessingErrors.AsNoTracking().OrderByDescending(e => e.OccurredAt).Take(RecentErrors)
             .Select(e => new ProcessingErrorDto(e.ProcessingErrorId, e.OccurredAt, e.Stage, e.Message, e.SourceId, e.RawMessageId, e.Exception))
@@ -238,7 +238,7 @@ public static class PipelineReport
             .Select(r => new PipelineInstanceDto(r.Instance, r.Processed, Round(r.P50Ms), Round(r.P90Ms), r.LastAt)).ToList();
 
         return new PipelineReportDto(from, to, unit, starts, totals, sourceDtos, timeline, instances,
-            queue.ToDictionary(q => ((ProcessingStatus)q.Status).ToString(), q => q.Count),
+            processingStatuses.ToDictionary(q => ((ProcessingStatus)q.Status).ToString(), q => q.Count),
             stages.OrderByDescending(s => s.Count).ToDictionary(s => s.Stage, s => s.Count),
             recent);
     }

@@ -7,8 +7,6 @@ import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
 import { WorkersPanel } from './WorkersPanel'
 import { PipelinePanel } from './PipelinePanel'
 import { CatalogPanel } from './CatalogPanel'
-import { IncidentsPanel } from './IncidentsPanel'
-import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 
 /** Where the public map lives (another service, another port); overridable at build time. */
 // The admin build is used both locally (:5268 → map :5267) and through Docker
@@ -16,7 +14,7 @@ import { MessageAnalyticsPanel } from './MessageAnalyticsPanel'
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'lifecycle' | 'catalog' | 'incidents' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'catalog' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
@@ -25,9 +23,7 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'pipeline', label: 'Конвеєр', group: 'Моніторинг' },
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
   { id: 'logs', label: 'Логи', group: 'Моніторинг' },
-  { id: 'lifecycle', label: 'Аналітика повідомлень', group: 'Аналітика' },
   { id: 'catalog', label: 'Каталог подій', group: 'Дані' },
-  { id: 'incidents', label: 'Інциденти', group: 'Дані' },
   { id: 'sources', label: 'Джерела', group: 'Налаштування' },
   { id: 'alerts', label: 'alerts.in.ua', group: 'Налаштування' },
   { id: 'telegram', label: 'Telegram', group: 'Налаштування' },
@@ -139,7 +135,7 @@ export default function AdminApp() {
       ) : (
         <div className="flex min-h-0 flex-1">
           <nav className="w-44 shrink-0 border-r border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-            {['Моніторинг', 'Аналітика', 'Налаштування'].map((group) => (
+            {['Моніторинг', 'Дані', 'Налаштування'].map((group) => (
               <div key={group} className="mb-2">
                 <div className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-wide text-slate-400">{group}</div>
                 {NAV.filter((n) => n.group === group).map((n) => (
@@ -160,9 +156,7 @@ export default function AdminApp() {
                 {section === 'pipeline' && <PipelinePanel />}
                 {section === 'db' && <DbPanel />}
                 {section === 'logs' && <LogsPanel />}
-                {section === 'lifecycle' && <MessageAnalyticsPanel />}
                 {section === 'catalog' && <CatalogPanel />}
-                {section === 'incidents' && <IncidentsPanel />}
                 {section === 'sources' && <SourcesEditor sources={sources} reload={load} notify={setMessage} />}
                 {section === 'alerts' && <AlertsSection {...props} />}
                 {section === 'telegram' && <TelegramSection {...props} />}

@@ -8,7 +8,7 @@ using Puluj.Processing.Rules;
 namespace Puluj.Admin.Endpoints;
 
 /// <summary>
-/// Plan §8.3 authoring flow (P08): rule-set versions, draft → rules → validate → preview/corpus → shadow → publish, and
+/// Rule-set versions: draft → rules → validate → preview/corpus → publish, and
 /// rollback. Every mutation needs an actor and a reason (audited by <see cref="RulesetService"/>); authorization is the
 /// admin bearer token (per-role RBAC — P12/P13). Preview and corpus run the real parser with the draft as the pinned set.
 /// </summary>
@@ -91,29 +91,6 @@ public static class RulesetEndpoints
             return Results.Ok(evaluator.Evaluate(candidate, cases, req?.SourceCode));
         }));
 
-        g.MapPost("/{version:int}/shadow", (int version, MutationRequest req, RulesetService rulesets, CancellationToken ct) => Guard(async () =>
-        {
-            if (Missing(req.Actor, req.Reason) is { } bad)
-            {
-                return bad;
-            }
-            await rulesets.StartShadowAsync(version, req.Actor!, req.Reason!, ct);
-            return Results.Ok(await rulesets.GetAsync(version, ct));
-        }));
-
-        g.MapPost("/{version:int}/shadow/stop", (int version, MutationRequest req, RulesetService rulesets, CancellationToken ct) => Guard(async () =>
-        {
-            if (Missing(req.Actor, req.Reason) is { } bad)
-            {
-                return bad;
-            }
-            await rulesets.StopShadowAsync(version, req.Actor!, req.Reason!, ct);
-            return Results.Ok(await rulesets.GetAsync(version, ct));
-        }));
-
-        g.MapGet("/{version:int}/shadow/report", (int version, DateTimeOffset? since, RulesetService rulesets, CancellationToken ct) => Guard(async () =>
-            Results.Ok(await rulesets.ShadowReportAsync(version, since, ct))));
-
         g.MapPost("/{version:int}/publish", (int version, MutationRequest req, RulesetService rulesets, CancellationToken ct) => Guard(async () =>
         {
             if (Missing(req.Actor, req.Reason) is { } bad)
@@ -180,7 +157,7 @@ public static class RulesetEndpoints
 
 /// <summary>
 /// The parser's indexes in the admin process: taxonomy/gazetteer/kinds loaded on first use and refreshed at most every
-/// 10 minutes, without the worker's background refresh (review N8); the rule-set pointers (active/shadow) are re-read on
+/// 10 minutes, without the worker's background refresh; the active rule-set pointer is re-read on
 /// every call, so the default preview baseline is the version that is live right now. Preview/corpus pass the draft explicitly.
 /// </summary>
 public sealed class AdminIndexes(IndexProvider provider, IDbContextFactory<PulujDbContext> factory, TimeProvider clock)

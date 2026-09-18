@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
-using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Persistence;
 
 namespace Puluj.Collectors.AlertsInUa;

@@ -158,7 +158,7 @@ public sealed class MapSnapshotTests(PipelineFixture fixture)
         var cached = Options.Create(new MapOptions());
         var uncached = Options.Create(uncachedOptions);
         return (
-            new SnapshotService(factory, mapper, TimeProvider.System, refs, cached, new IncidentQueries(factory, refs, TimeProvider.System, cached), NullLogger<SnapshotService>.Instance),
-            new SnapshotService(factory, mapper, TimeProvider.System, refs, uncached, new IncidentQueries(factory, refs, TimeProvider.System, uncached), NullLogger<SnapshotService>.Instance));
+            new SnapshotService(factory, mapper, TimeProvider.System, refs, cached),
+            new SnapshotService(factory, mapper, TimeProvider.System, refs, uncached));
     }
 }

@@ -1,6 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Puluj.Domain;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
@@ -10,7 +8,7 @@ using Puluj.Processing.Tests.Support;
 
 namespace Puluj.Processing.Tests.Seeding;
 
-/// <summary>P07 / plan §8.2: legacy mapping, seed file, contract parity and the per-message catalog snapshot.</summary>
+/// <summary>Legacy mapping, seed file validation and the per-message catalog snapshot.</summary>
 public sealed class EventKindCatalogTests
 {
     private static EventKindSeeder.EventKindsFile SeedFile()
@@ -18,9 +16,6 @@ public sealed class EventKindCatalogTests
         using var stream = File.OpenRead(Path.Combine(TestIndexes.RepoRoot, "data", "taxonomy", "event-kinds.json"));
         return JsonSerializer.Deserialize<EventKindSeeder.EventKindsFile>(stream, SeedFiles.Json)!;
     }
-
-    private static JsonObject CommonSchema() =>
-        JsonNode.Parse(File.ReadAllText(Path.Combine(TestIndexes.RepoRoot, "contracts", "messaging", "schemas", "common.schema.json")))!.AsObject();
 
     /// <summary>The §8.2 initial vocabulary plus the explicit unknown outcome; casualties.reported is deliberately absent.</summary>
     private static readonly string[] ExpectedCodes =
@@ -58,10 +53,7 @@ public sealed class EventKindCatalogTests
     {
         var file = SeedFile();
         EventKindSeeder.Validate(file);
-        Assert.Equal(2, file.PolicyVersion); // P10: dedupPolicy for incident kinds (ADR-0010)
-        var incidents = file.Kinds.Where(k => k.Category == "incident").ToList();
-        Assert.All(incidents, k => Assert.NotNull(k.DedupPolicy));
-        Assert.All(file.Kinds.Where(k => k.Category != "incident"), k => Assert.Null(k.DedupPolicy));
+        Assert.Equal(2, file.PolicyVersion);
         Assert.Equal(ExpectedCodes.Order(StringComparer.Ordinal), file.Kinds.Select(k => k.Code).Order(StringComparer.Ordinal));
         Assert.DoesNotContain(file.Kinds, k => k.Code == "casualties.reported");
         // Every legacy member is represented in the seed metadata exactly once, and only on its mapped code.
@@ -78,23 +70,19 @@ public sealed class EventKindCatalogTests
     }
 
     [Fact]
-    public void Seed_codes_and_categories_match_the_messaging_contract()
+    public void Seed_codes_and_categories_match_the_domain_vocabulary()
     {
-        var defs = CommonSchema()["$defs"]!;
-        var pattern = new Regex(defs["eventKindCode"]!["pattern"]!.GetValue<string>());
-        var categories = defs["observationCategory"]!["enum"]!.AsArray().Select(n => n!.GetValue<string>()).ToHashSet(StringComparer.Ordinal);
-        Assert.Equal(["alert", "incident", "info", "target"], categories.Order(StringComparer.Ordinal));
-        // The C# enum is the contract list, stored lowercase.
-        Assert.Equal(categories.Order(StringComparer.Ordinal), Enum.GetNames<EventKindCategory>().Select(n => n.ToLowerInvariant()).Order(StringComparer.Ordinal));
+        var categories = Enum.GetNames<EventKindCategory>().Select(n => n.ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(["alert", "event", "info", "target"], categories.Order(StringComparer.Ordinal));
         foreach (var k in SeedFile().Kinds)
         {
-            Assert.Matches(pattern, k.Code);
+            Assert.True(EventKindCodes.IsValid(k.Code));
             Assert.Contains(k.Category, categories);
         }
         // Codes the P01 fixtures already use exist in the seed with the category the fixtures assume.
         var byCode = SeedFile().Kinds.ToDictionary(k => k.Code);
         Assert.Equal("target", byCode["target.observed"].Category);
-        Assert.Equal("incident", byCode["air_defence.activity"].Category);
+        Assert.Equal("event", byCode["air_defence.activity"].Category);
         Assert.Equal("alert", byCode["alert.air_raid.started"].Category);
     }
 
@@ -102,7 +90,7 @@ public sealed class EventKindCatalogTests
     public void Seeder_validation_rejects_bad_code_duplicate_category_and_legacy_drift()
     {
         static EventKindSeeder.EventKindSeedEntry Kind(string code, string category = "info", JsonElement? metadata = null) =>
-            new(code, code, category, null, null, null, null, null, null, null, null, null, null, null, null, null, metadata);
+            new(code, code, category, null, null, null, null, null, null, null, null, null, null, null, metadata);
         var good = SeedFile().Kinds;
 
         Assert.Throws<InvalidOperationException>(() => EventKindSeeder.Validate(new(1, [.. good, Kind("BadCode")])));

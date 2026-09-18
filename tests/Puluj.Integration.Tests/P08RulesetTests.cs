@@ -16,7 +16,7 @@ namespace Puluj.Integration.Tests;
 
 /// <summary>
 /// P08 / plan §8.3 on a real PostGIS: seed bootstrap of rule-set v1 (idempotent), the authoring flow with its audit and
-/// the one-active invariant, the index provider's pin/shadow pointers, the legacy pipeline citing the pinned version,
+/// the one-active invariant, the index provider's pin and the direct pipeline citing the pinned version,
 /// and the migration's Down/Up. Tests share the fixture's database, so each one leaves the rule catalog as it found it
 /// (v1 active, nothing else) — see <see cref="ResetRulesetsAsync"/>.
 /// </summary>
@@ -52,7 +52,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
     }
 
     [Fact]
-    public async Task Authoring_flow_draft_rules_validate_shadow_publish_rollback_with_audit_and_one_active()
+    public async Task Authoring_flow_draft_rules_validate_publish_rollback_with_audit_and_one_active()
     {
         await ResetRulesetsAsync();
         var v2 = await Rulesets.CreateDraftAsync(null, Actor, "add fire", CancellationToken.None);
@@ -82,24 +82,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
         await Assert.ThrowsAsync<RulesetNotFoundException>(() => Rulesets.GetAsync(99, CancellationToken.None));
         await Assert.ThrowsAsync<ArgumentException>(() => Rulesets.PublishAsync(v2, "", "", CancellationToken.None));
 
-        await Rulesets.StartShadowAsync(v2, Actor, "shadow it", CancellationToken.None);
         var v3 = await Rulesets.CreateDraftAsync(1, Actor, "second draft", CancellationToken.None);
-        await Assert.ThrowsAsync<RulesetConflictException>(() => Rulesets.StartShadowAsync(v3, Actor, "x", CancellationToken.None)); // one shadow at a time
-        await using (var db = await Factory.CreateDbContextAsync())
-        {
-            // ...and the partial unique index says so even without the service.
-            await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(async () =>
-            {
-                var row = await db.EventKindRulesets.SingleAsync(r => r.Version == v3);
-                row.State = EventKindRuleset.Shadow;
-                await db.SaveChangesAsync();
-            });
-        }
-        // The way out of a bad shadow: stop it (back to draft), then shadow again.
-        await Rulesets.StopShadowAsync(v2, Actor, "looks wrong", CancellationToken.None);
-        Assert.Equal(EventKindRuleset.Draft, (await Rulesets.GetAsync(v2, CancellationToken.None)).Summary.State);
-        await Assert.ThrowsAsync<RulesetConflictException>(() => Rulesets.StopShadowAsync(v2, Actor, "x", CancellationToken.None)); // not shadowing
-        await Rulesets.StartShadowAsync(v2, Actor, "shadow again", CancellationToken.None);
 
         // Publish validates again (a stale earlier validation is never trusted) and moves the active pointer.
         await Rulesets.PublishAsync(v2, Actor, "go live", CancellationToken.None);
@@ -110,7 +93,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
             Assert.Equal([false, true, false], rows.Select(r => r.IsActive));
             Assert.Equal(Actor, rows[1].PublishedBy);
             var audit = await db.EventKindRulesetAudits.AsNoTracking().Where(a => a.Version == v2).OrderBy(a => a.AuditId).Select(a => a.Action).ToListAsync();
-            Assert.Equal([EventKindRulesetAudit.Created, EventKindRulesetAudit.RulesReplaced, EventKindRulesetAudit.RulesReplaced, EventKindRulesetAudit.Validated, EventKindRulesetAudit.ShadowStarted, EventKindRulesetAudit.ShadowStopped, EventKindRulesetAudit.ShadowStarted, EventKindRulesetAudit.Validated, EventKindRulesetAudit.PublishedAction], audit);
+            Assert.Equal([EventKindRulesetAudit.Created, EventKindRulesetAudit.RulesReplaced, EventKindRulesetAudit.RulesReplaced, EventKindRulesetAudit.Validated, EventKindRulesetAudit.Validated, EventKindRulesetAudit.PublishedAction], audit);
         }
         await Assert.ThrowsAsync<RulesetConflictException>(() => Rulesets.PublishAsync(v2, Actor, "again", CancellationToken.None)); // already published
 
@@ -168,24 +151,15 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
     }
 
     [Fact]
-    public async Task Index_provider_pins_active_then_pin_then_shadow_and_the_legacy_pipeline_cites_it()
+    public async Task Index_provider_pins_active_then_draft_and_the_direct_pipeline_cites_it()
     {
         await ResetRulesetsAsync();
         var provider = Services.GetRequiredService<IndexProvider>();
         await provider.RefreshAsync(CancellationToken.None);
         Assert.Equal("v1", provider.Rules.Id);
-        Assert.Null(provider.ShadowRules);
 
-        var v2 = await Rulesets.CreateDraftAsync(null, Actor, "shadow", CancellationToken.None);
+        var v2 = await Rulesets.CreateDraftAsync(null, Actor, "canary", CancellationToken.None);
         await Rulesets.ReplaceRulesAsync(v2, (await Rulesets.GetAsync(v2, CancellationToken.None)).Rules.Append(Fire).ToList(), Actor, "rules", CancellationToken.None);
-        await Rulesets.StartShadowAsync(v2, Actor, "shadow", CancellationToken.None);
-        await using (var db = await Factory.CreateDbContextAsync())
-        {
-            await provider.RefreshRulesAsync(db, CancellationToken.None);
-        }
-        Assert.Equal("v1", provider.Rules.Id);
-        Assert.Equal("v2", provider.ShadowRules!.Id);
-        Assert.Contains(provider.ShadowRules.Rules, r => r.Code == "fire.pozhezh");
 
         // Pin: an unknown version → warning, the active set stays; a draft only with RulesetPinAllowDraft; a published one → pinned.
         var options = Services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<RulesetOptions>>().CurrentValue;
@@ -195,7 +169,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
             options.RulesetPin = 99;
             await provider.RefreshRulesAsync(db, CancellationToken.None);
             Assert.Equal("v1", provider.Rules.Id);
-            options.RulesetPin = v2; // shadow (unpublished)
+            options.RulesetPin = v2; // draft (unpublished)
             await provider.RefreshRulesAsync(db, CancellationToken.None);
             Assert.Equal("v1", provider.Rules.Id);
             options.RulesetPinAllowDraft = true;
@@ -233,7 +207,6 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
         }
         await ResetRulesetsAsync();
         await provider.RefreshAsync(CancellationToken.None);
-        Assert.Null(provider.ShadowRules);
     }
 
     [Fact]
@@ -246,7 +219,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
         var index = applied.FindIndex(m => m.EndsWith("_AddEventKindRules", StringComparison.Ordinal));
         Assert.True(index > 0);
         await migrator.MigrateAsync(applied[index - 1]);
-        foreach (var table in new[] { "event_kind_rulesets", "event_kind_rules", "event_kind_ruleset_audit", "event_kind_rule_shadow" })
+        foreach (var table in new[] { "event_kind_rulesets", "event_kind_rules", "event_kind_ruleset_audit" })
         {
             Assert.False(await db.Database.SqlQueryRaw<bool>("SELECT to_regclass({0}) IS NOT NULL AS \"Value\"", table).SingleAsync(), table);
         }
@@ -264,7 +237,7 @@ public sealed class P08RulesetTests(PipelineFixture fixture)
     private async Task ResetRulesetsAsync()
     {
         await using var db = await Factory.CreateDbContextAsync();
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE event_kind_rule_shadow; DELETE FROM event_kind_ruleset_audit; DELETE FROM event_kind_rulesets");
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM event_kind_ruleset_audit; DELETE FROM event_kind_rulesets");
         var seeder = Services.GetServices<ISeeder>().OfType<EventKindRuleSeeder>().Single();
         await seeder.SeedAsync(db, CancellationToken.None);
     }

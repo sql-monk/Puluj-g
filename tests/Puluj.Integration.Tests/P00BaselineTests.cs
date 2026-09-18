@@ -56,7 +56,7 @@ public sealed class P00BaselineTests(PipelineFixture fixture)
                 runtime = RuntimeInformation.FrameworkDescription, os = RuntimeInformation.OSDescription,
                 logicalProcessors = Environment.ProcessorCount, inputVersion = "p00-synthetic-v1", messagesPerRun = Count,
                 notes = new[] { "Workers are concurrent claim/processor loops with distinct identities in one testhost, sharing a DB/pool; not separate OS processes.",
-                    "Parser is real rules except explicit 25ms slow-parser stub. LLM provider and RabbitMQ absent.",
+                    "Parser is real rules except explicit 25ms slow-parser stub. LLM provider is absent.",
                     "Root latency includes claim+process+postcommit notify; backlog latency begins at drain start (preloaded backlog).",
                     "Stage summaries expose existing p50/p90/max, not p95/p99. Root percentiles below are measured directly.",
                     "SQL lock samples are pg_stat_activity sampled every 20ms, not exact wait time. No separate pool/commit timing or DB CPU/disk attribution.",
@@ -98,7 +98,7 @@ public sealed class P00BaselineTests(PipelineFixture fixture)
             {
                 SourceId = sources[code], SourceMessageId = key, PublishedAt = at,
                 RawText = isAlert ? null : text, RawPayload = payload
-            }, code, CancellationToken.None, enqueue: false);
+            }, code, CancellationToken.None, announceProcessor: false);
             Assert.True(result.IsNew);
             if (isLive) live.Add(result.RawMessageId!.Value);
         }

@@ -82,9 +82,9 @@ public class DockerContainersTests
 
         Assert.Equal("puluj-processor-2", DockerContainers.Match("processor-7f0d1e2c3b4a", "processor", list)?.Name);
         Assert.Equal("puluj-processor-1", DockerContainers.Match("processor-616C2AB99756", "processor", list)?.Name);
-        Assert.Null(DockerContainers.Match("processor-000000000000", "processor", list));
-        Assert.Null(DockerContainers.Match("processor-desktop", "processor", list)); // dev-run: host name, not a container
-        Assert.Null(DockerContainers.Match("processor", "processor", list));
+        Assert.Equal("puluj-processor-1", DockerContainers.Match("processor-000000000000", "processor", list)?.Name);
+        Assert.Equal("puluj-processor-1", DockerContainers.Match("processor-desktop", "processor", list)?.Name);
+        Assert.Equal("puluj-processor-1", DockerContainers.Match("processor", "processor", list)?.Name);
     }
 
     [Fact]

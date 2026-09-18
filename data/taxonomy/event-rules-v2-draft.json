@@ -1,5 +1,5 @@
 {
-  "_comment": "P08 sample draft (not seeded): rules for three new kinds on top of v1, meant for validate/preview/corpus/shadow through the admin API. 'збит' stays air_defence.activity in v1; the interception rule outranks it only in this draft.",
+  "_comment": "Sample draft (not seeded): rules for three new kinds on top of v1, meant for validate/preview/corpus through the admin API. 'збит' stays air_defence.activity in v1; the interception rule outranks it only in this draft.",
   "parentVersion": 1,
   "reason": "draft v2: fire.reported, infrastructure.outage, air_defence.interception.reported",
   "rules": [

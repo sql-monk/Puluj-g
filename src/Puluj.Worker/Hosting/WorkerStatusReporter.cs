@@ -103,9 +103,7 @@ public sealed class WorkerStatusReporter(
                 _breaker.Calls,
                 _breaker.Failures),
             paused,
-            pause,
-            [],
-            null);
+            pause);
     }
 
     /// <summary>Processor time used since the previous call over the wall time that passed, per core, in percent.</summary>

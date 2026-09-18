@@ -7,13 +7,12 @@ using Puluj.Processing.Indexes;
 using Puluj.Processing.Parsing;
 using Puluj.Processing.Pipeline;
 using Puluj.Processing.Rules;
-using Puluj.Processing.Stages;
 using Puluj.Processing.Tests.Support;
 using Puluj.Processing.Text;
 
 namespace Puluj.Processing.Tests.Rules;
 
-/// <summary>P08: resolver semantics (tie-break, veto, scope), the new-kind path through RuleParser → TargetBuilder → FactMapper, validator and evaluator.</summary>
+/// <summary>Resolver semantics (tie-break, veto, scope), the new-kind path through RuleParser and TargetBuilder, validator and evaluator.</summary>
 public class ResolverTests
 {
     private static readonly Normalizer Normalizer = new();
@@ -97,7 +96,7 @@ public class ResolverTests
         Assert.Equal((0, 1), (Resolve(set, "Відключення світла у місті.")!.TokenStart, Resolve(set, "Відключення світла у місті.")!.TokenEnd));
     }
 
-    // ---- the new-kind path (review B1): RuleParser → TargetBuilder → FactMapper without an enum member ----
+    // ---- the new-kind path: RuleParser → TargetBuilder without an enum member ----
 
     private static RulesetIndex V2()
     {
@@ -122,7 +121,7 @@ public class ResolverTests
     }
 
     [Fact]
-    public void Kind_without_enum_member_survives_parser_builder_and_mapper()
+    public void Kind_without_enum_member_survives_parser_and_builder()
     {
         var kinds = Kinds();
         var indexes = new StaticIndexes { Rules = V2(), EventKinds = kinds };
@@ -145,12 +144,6 @@ public class ResolverTests
         Assert.Equal("fire.pozhezh", target.ParserMetadata!.RootElement.GetProperty("ruleCode").GetString());
         Assert.Equal("v2", target.ParserMetadata!.RootElement.GetProperty("rulesetVersion").GetString());
 
-        var json = FactMapper.ToFact(target, kinds, indexes.Gazetteer, fact, n.Language, RuleParser.Version);
-        Assert.Equal("fire.reported", json["event_kind_code"]!.GetValue<string>());
-        Assert.Equal("incident", json["category"]!.GetValue<string>());
-        Assert.Equal("v2", json["evidence"]!["ruleset_version"]!.GetValue<string>());
-        Assert.Equal("fire.pozhezh", json["evidence"]!["rule_code"]!.GetValue<string>());
-        Assert.NotNull(json["evidence"]!["rule_span"]);
     }
 
     [Fact]

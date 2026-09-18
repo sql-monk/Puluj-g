@@ -4,27 +4,17 @@ import type { MapLayerMouseEvent } from 'maplibre-gl'
 // worker entry explicitly here and MapLibre is pointed at it.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { MapId, RegionDto } from '../api/types'
-import type { MapFocus } from '../public/mapLink'
-import { geometryForFocus } from '../public/mapLink'
+import type { RegionDto } from '../api/types'
 import type { MapPalette } from './palette'
 import LinkPopup from '../components/LinkPopup'
 import EventPopup from '../components/EventPopup'
-import IncidentLegend from '../components/IncidentLegend'
-import IncidentPopup from '../components/IncidentPopup'
-import { useIncidentStore } from '../store/useIncidentStore'
-import { incidentHitAt, withoutIncidentEvents, INCIDENT_HIT_LAYERS } from './incidentLayer'
-import { useIncidentLayer } from './useIncidentLayer'
 import RegionPopup from '../components/RegionPopup'
 import TrackPopup from '../components/TrackPopup'
 import { effectiveNow, useStore, type Theme } from '../store/useStore'
 import { getPalette } from './palette'
 import { replay } from '../replay/engine'
 import { buildAlertLayer, buildEventLayer, buildReplayLayers, buildTrackLayers, emptyCollection, visibleTracks } from './geojson'
-import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addSelectionLayers, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
-import { useRegionCamera } from './useRegionCamera'
-import { regionFromHits, selectedRegionFromHit } from './regionSelection'
-import { hoverLabel } from './hover'
+import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addEventLayers, addIcons, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
 
 maplibregl.setWorkerUrl(maplibreWorkerUrl)
 
@@ -34,20 +24,20 @@ interface Props {
   dark: boolean
   theme: Theme
   onPickHome: ((lon: number, lat: number) => void) | null
-  onDetails: (trackId: MapId) => void
-  layoutKey: string
-  focus: MapFocus | null
+  onDetails: () => void
+  layoutKey?: string
+  focus?: unknown
 }
 
 /** Country-wide MapLibre map with all Puluj layers. Data flows one way: store -> GeoJSON sources. */
-export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey, focus }: Props) {
+export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
   // Where the viewer clicked to select the current track: the popup opens there, not at the marker.
   const [clickAt, setClickAt] = useState<[number, number] | null>(null)
   const [eventClickAt, setEventClickAt] = useState<[number, number] | null>(null)
-  const [selectedEventId, setSelectedEventId] = useState<MapId | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
   // Name of the raion / oblast under the cursor, moved by the hover handler directly (no render per mouse move).
   const tip = useRef<HTMLDivElement>(null)
   const styleLoaded = useRef(false)
@@ -81,49 +71,16 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
   const placeGeometries = useStore((s) => s.placeGeometries)
   const ensurePlaceGeometry = useStore((s) => s.ensurePlaceGeometry)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
-  const regionCameraRequest = useStore((s) => s.regionCameraRequest)
   const selectRegion = useStore((s) => s.selectRegion)
   const clock = effectiveNow({ mode, at, now })
 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
-  const selectedRegion = regionsById.get(selectedRegionId ?? -1)
-  useRegionCamera({ map: mapInstance, container, geometry: selectedRegion?.geometry ?? (selectedRegionId === null ? undefined : placeGeometries[selectedRegionId]), placeId: selectedRegionId, ensureGeometry: ensurePlaceGeometry, request: regionCameraRequest, layoutKey })
-  const focusPlaceId = focus?.locators.find((locator) => locator.placeId !== undefined)?.placeId ?? null
-  const focusGeometry = geometryForFocus(focus?.locators ?? []) ?? geometryForFocus((focus?.locators ?? []).flatMap((locator) => locator.placeId === undefined ? [] : [{ geometry: regionsById.get(locator.placeId)?.geometry ?? placeGeometries[locator.placeId] }]))
-  useRegionCamera({ map: mapInstance, container, geometry: focusGeometry, placeId: focusPlaceId, ensureGeometry: ensurePlaceGeometry, request: focus ? `${focus.selection.kind}:${focus.selection.id}` : '', layoutKey })
-  useEffect(() => {
-    if (!focus) return
-    for (const placeId of new Set(focus.locators.map((locator) => locator.placeId).filter((placeId): placeId is number => placeId !== undefined))) void ensurePlaceGeometry(placeId)
-  }, [ensurePlaceGeometry, focus])
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
-  const tracksRef = useRef(tracks)
-  tracksRef.current = tracks
-  const eventsRef = useRef(events)
-  eventsRef.current = events
   // The alert fill (one feature per alerted place, nested polygons cut out) is rebuilt only when alerts change:
   // the apply effect below runs on every clock tick and track update.
   const alertList = useMemo(() => (filters.alerts ? Object.values(alerts) : []), [alerts, filters.alerts])
   const alertLayer = useMemo(() => buildAlertLayer(alertList, regionsById, placeGeometries), [alertList, regionsById, placeGeometries])
-  // P11: incidents (the catalog-driven layer); the legacy event markers of incident kinds are hidden while it is on (one marker per explosion).
-  const incidents = useIncidentLayer({ map: mapInstance, palette, clock, regionsById, placeGeometries, ensurePlaceGeometry })
-  const incidentCatalog = useIncidentStore((s) => s.catalog)
-  const incidentById = useIncidentStore((s) => s.byId)
-  const incidentByIdRef = useRef(incidentById)
-  incidentByIdRef.current = incidentById
-  const incidentCatalogRef = useRef(incidentCatalog)
-  incidentCatalogRef.current = incidentCatalog
-  const legacyEvents = useMemo(() => withoutIncidentEvents(Object.values(events), incidentCatalog, filters.events), [events, incidentCatalog, filters.events])
-  // The click handler is registered once; the incident selection goes through a ref so it sees the current hook.
-  const incidentSelect = useRef<(id: number | null, at?: [number, number]) => void>(() => {})
-  incidentSelect.current = (id, at) => {
-    if (id === null) incidents.close()
-    else {
-      incidents.select(id)
-      if (at) incidents.setClickAt(at)
-    }
-  }
-
 
   useEffect(() => {
     if (!container.current || mapRef.current) return
@@ -159,52 +116,37 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
       setRegionClickAt(trackId === null ? [e.lngLat.lng, e.lngLat.lat] : null)
       setSelectedEventId(null)
       setEventClickAt(null)
-      incidentSelect.current(null)
       if (trackId !== null) return
-      const incidentId = incidentHitAt(map, e.point)
-      if (incidentId !== null) {
-        selectRegion(null)
-        setRegionClickAt(null)
-        incidentSelect.current(incidentId, [e.lngLat.lng, e.lngLat.lat])
-        return
-      }
       const event = map.queryRenderedFeatures(e.point, { layers: ['event-points'] })[0]
       if (event?.properties?.id !== undefined) {
         selectRegion(null)
         setRegionClickAt(null)
-        setSelectedEventId(event.properties.id)
+        setSelectedEventId(Number(event.properties.id))
         setEventClickAt([e.lngLat.lng, e.lngLat.lat])
         return
       }
-      // A district click first establishes its parent oblast; only a second
-      // click within that selected oblast can enter the district.
-      const region = regionFromHits(map.queryRenderedFeatures(e.point, { layers: ['alerts-fill', 'raions-fill', 'oblasts-fill'] }), regionsRef.current)
-      selectRegion(selectedRegionFromHit(region, useStore.getState().selectedRegionId, regionsRef.current))
+      // No marker under the cursor: (de)select the oblast for the feed filter and outline highlight.
+      // Raion first (the level alerts are published at), the oblast where no raion polygon is drawn.
+      const ob = map.queryRenderedFeatures(e.point, { layers: ['alerts-fill', 'raions-fill', 'oblasts-fill'] })[0]
+      const regionId = ob?.layer.id === 'alerts-fill' ? ob.properties?.placeId : ob?.properties?.id
+      selectRegion(regionId === undefined ? null : Number(regionId))
     })
     const regionLayers = ['raions-fill', 'oblasts-fill', 'alerts-fill']
-    pointerCursor(map, [...regionLayers, 'event-points', ...INCIDENT_HIT_LAYERS])
+    pointerCursor(map, [...regionLayers, 'event-points'])
     // Target under the cursor (within the hit radius): enlarged glyph, pointer cursor. Registered before the region
     // hover, whose resolver reads its state on the same mousemove.
     const hover = trackHover(map, { fallbackLayers: regionLayers, enabled: () => !pickRef.current })
     // Hover: the raion under the cursor with its oblast; the oblast alone where no raion polygon is drawn. An alerted
     // oblast is only hit through its alert fill (placeId = the oblast), which sits above the raion fill, so the raion
     // is looked for among every hit before an oblast is accepted. No region tip while a target is hovered.
-    const stopHover = regionHover(map, tip.current!, regionLayers, (hits, e) => {
-      const trackId = hover.current()
-      const track = trackId === null ? undefined : tracksRef.current[trackId]
-      const eventFeature = map.queryRenderedFeatures(e.point, { layers: ['event-points'] })[0]
-      const event = eventFeature?.properties?.id === undefined ? undefined : eventsRef.current[String(eventFeature.properties.id)]
-      // Unlike incidentHitAt this never zooms a cluster: hovering must be read-only.
-      const incidentFeature = map.queryRenderedFeatures(e.point, { layers: INCIDENT_HIT_LAYERS.filter((layer) => map.getLayer(layer)) })
-        .find((feature) => feature.properties?.point_count === undefined && feature.properties?.id !== undefined)
-      const incident = incidentFeature?.properties?.id === undefined ? undefined : incidentByIdRef.current[Number(incidentFeature.properties.id)]
+    const stopHover = regionHover(map, tip.current!, regionLayers, (hits) => {
+      if (hover.current() !== null) return null
       const byId = regionsRef.current
-      const region = regionFromHits(hits, byId)
-      const parent = region?.parentId !== undefined ? byId.get(region.parentId) : undefined
-      const eventLabel = event?.type?.label ?? (event?.eventType === 'ExplosionReport' ? 'Повідомлення про вибух' : event?.eventType === 'AirDefenseActivity' ? 'Повідомлення про роботу ППО' : event ? 'Повідомлення про подію' : undefined)
-      const label = hoverLabel({ target: track?.type.label, event: eventLabel, incident: incident ? incidentCatalogRef.current.kindOf(incident.kind).name : undefined, region: region ? (parent ? `${region.name} · ${parent.name}` : region.name) : undefined })
-      if (!label) return null
-      return { id: track?.id ?? event?.id ?? incident?.id ?? region!.id, geometry: track || event || incident ? undefined : region?.geometry, label }
+      const regionsHit = hits.map((hit) => byId.get(Number(hit.layer.id === 'alerts-fill' ? hit.properties?.placeId : hit.properties?.id))).filter((r): r is RegionDto => !!r)
+      const region = regionsHit.find((r) => r.level === 'District') ?? regionsHit.find((r) => r.level === 'Region' || r.level === 'City')
+      if (!region) return null
+      const parent = region.parentId !== undefined ? byId.get(region.parentId) : undefined
+      return { id: region.id, geometry: region.geometry, label: parent ? `${region.name} · ${parent.name}` : region.name }
     })
     map.on('error', (e) => console.error('[map]', e.error?.message ?? e))
     if (import.meta.env.DEV) Object.assign(window, { __map: map, __maplibre: maplibregl })
@@ -247,7 +189,7 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
       // a second while playing); live: the snapshot's tracks with their vectors.
       if (mode === 'history') setTrackData(map, buildReplayLayers(replay.positions(replay.t || clock.getTime(), filters), palette, selectedTrackId))
       else setTrackData(map, buildTrackLayers(visibleTracks(tracks, filters, clock), clock, regionsById, filters, { home, selectedId: selectedTrackId, palette, predecessors, selectedLink }))
-      setData(map, 'events', buildEventLayer(legacyEvents, clock, filters, incidentCatalog.colorOfLegacy))
+      setData(map, 'events', buildEventLayer(Object.values(events), clock, filters))
       // An alerted oblast is drawn by the alert layer instead of the base fill, so the colours never blend;
       // raion / hromada alerts sit on top of the land fill. Hromada and city polygons are fetched on first need.
       for (const a of alertList) if (!regionsById.has(a.placeId) && !placeGeometries[a.placeId]) ensurePlaceGeometry(a.placeId)
@@ -264,11 +206,10 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
       const selected = regionsById.get(selectedRegionId ?? -1)
       setData(map, 'selected-region', selected ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: selected.geometry, properties: {} }] } : emptyCollection())
       setData(map, 'home', home ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [home.lon, home.lat] }, properties: {} }] } : emptyCollection())
-      setData(map, 'selected-evidence', focusGeometry ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: focusGeometry, properties: { key: focus ? `${focus.selection.kind}:${focus.selection.id}` : '' } }] } : emptyCollection())
     }
     if (styleLoaded.current) apply()
     else map.once('style.load', apply)
-  }, [mode, tracks, legacyEvents, incidentCatalog, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry, focus, focusGeometry])
+  }, [mode, tracks, events, alertList, alertLayer, regions, regionsById, filters, home, clock, selectedRegionId, selectedTrackId, selectedLink, palette, predecessors, placeGeometries, ensurePlaceGeometry])
 
   // Replay: every frame of the replay clock moves the markers, straight into the source, without a render.
   useEffect(() => {
@@ -286,17 +227,17 @@ export default function MapView({ dark, theme, onPickHome, onDetails, layoutKey,
     loadPredecessors(selectedTrackId)
   }, [selectedTrackId, selectedSeenAt, loadPredecessors])
 
+  useEffect(() => { mapRef.current?.resize() }, [layoutKey])
+
   // MapLibre's own (unlayered) CSS sets position on .maplibregl-map and would override Tailwind's layered
   // utilities, so the positioned wrapper is a separate element.
   return (
     <div className="absolute inset-0">
       <div ref={container} className="h-full w-full" />
       <div ref={tip} hidden className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-white/95 px-2 py-1 text-xs shadow dark:bg-slate-900/95 dark:text-slate-100" />
-      {mapInstance && selectedTrack && !selectedLink && <TrackPopup map={mapInstance} track={selectedTrack} anchor={clickAt} onDetails={() => onDetails(selectedTrack.id)} onClose={() => select(null)} />}
+      {mapInstance && selectedTrack && !selectedLink && <TrackPopup map={mapInstance} track={selectedTrack} anchor={clickAt} onDetails={onDetails} onClose={() => select(null)} />}
       {mapInstance && selectedLink && linkClickAt && <LinkPopup map={mapInstance} link={selectedLink} anchor={linkClickAt} onClose={() => selectLink(null)} />}
       {mapInstance && selectedEvent && eventClickAt && <EventPopup map={mapInstance} event={selectedEvent} anchor={eventClickAt} onClose={() => setSelectedEventId(null)} />}
-      {mapInstance && incidents.selected && incidents.clickAt && <IncidentPopup map={mapInstance} incident={incidents.selected} anchor={incidents.clickAt} onClose={incidents.close} />}
-      {filters.events && <IncidentLegend onOpen={(i) => incidents.open(i)} />}
       {mapInstance && !selectedTrack && selectedRegionId !== null && regionClickAt && <RegionPopup map={mapInstance} placeId={selectedRegionId} anchor={regionClickAt} onClose={() => selectRegion(null)} />}
     </div>
   )
@@ -319,7 +260,7 @@ function addLayers(map: maplibregl.Map, p: MapPalette) {
     firstSymbol,
   )
   map.addLayer(
-    { id: 'oblasts-line', type: 'line', source: 'oblasts', paint: { 'line-color': p.oblastLine, 'line-width': 1.2, 'line-opacity': 0.76 } },
+    { id: 'oblasts-line', type: 'line', source: 'oblasts', paint: { 'line-color': p.oblastLine, 'line-width': 0.9, 'line-opacity': 0.6 } },
     firstSymbol,
   )
   // Raions: an invisible fill for hit-testing and a hairline outline that gets a little firmer when zoomed in.
@@ -348,5 +289,4 @@ function addLayers(map: maplibregl.Map, p: MapPalette) {
   map.addLayer({ id: 'alerts-line', type: 'line', source: 'alerts', paint: { 'line-color': alert.line, 'line-opacity': 0.9, 'line-width': 1.4 } }, firstSymbol)
 
   addTrackLayers(map, p)
-  addSelectionLayers(map, p)
 }

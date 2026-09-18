@@ -48,9 +48,9 @@ pwsh scripts/deploy.ps1 -NonInteractive
 ## Що таке Puluj-G
 
 Puluj-G збирає повідомлення з первинних джерел, зберігає їхнє походження,
-обробляє їх у tracks та incidents і показує перевірний read-side на публічній
-мапі. Адміністративний контур дає операторам інструменти для контролю джерел,
-налаштувань, єдиного processor і review.
+обробляє їх у спостереження, треки та повітряні тривоги й показує перевірний
+read-side на публічній мапі. Адміністративний контур дає операторам інструменти
+для контролю джерел, налаштувань і єдиного processor.
 
 Система допомагає перетворити потік повідомлень на керовані, простежувані
 спостереження; вона не встановлює істину, точну геолокацію або
@@ -63,11 +63,11 @@ Puluj-G збирає повідомлення з первинних джерел
 
 Первинні джерела надходять через колектори: кожен оригінал одразу зберігається в
 PostgreSQL `raw_messages`. Один processor забирає Pending рядки, виконує нормалізацію,
-розбір і запис tracks, alerts та incidents. Другий екземпляр блокується на рівні Compose і PostgreSQL. API віддає read-side і realtime-сповіщення публічній
+розбір і запис targets, tracks та alerts. Другий екземпляр блокується на рівні Compose і PostgreSQL. API віддає read-side і realtime-сповіщення публічній
 карті, а admin і analytics працюють з операційними та похідними даними.
 
 Деталі: [колектори й ingestion](docs/collectors-ingestion.md),
-[кореляція та provenance](docs/correlation-tracks-incidents.md),
+[кореляція та provenance](docs/correlation-tracks.md),
 [public API/read-side](docs/public-api-read-side.md),
 [admin-процедури](docs/admin-operations.md) і
 [аналітичний сервіс](docs/analytics-service.md).
@@ -79,7 +79,7 @@ PostgreSQL `raw_messages`. Один processor забирає Pending рядки,
 | Користувач | [Публічна карта й приватність](docs/web-clients.md), [public API та evidence](docs/public-api-read-side.md) |
 | Розробник | [Доменна модель і дані](docs/domain-data-model.md), [колектори та обробка](docs/collectors-ingestion.md), [web-клієнти](docs/web-clients.md) |
 | Оператор | [Розгортання й конфігурація](docs/deployment-operations.md), [admin-контур](docs/admin-operations.md), [analytics](docs/analytics-service.md) |
-| Інтегратор | [Public API, realtime і контракти](docs/public-api-read-side.md), [provenance треків та incidents](docs/correlation-tracks-incidents.md) |
+| Інтегратор | [Public API і realtime](docs/public-api-read-side.md), [provenance треків](docs/correlation-tracks.md) |
 
 Повний навігаційний індекс, правила документації та реєстр схем — у
 [docs/README.md](docs/README.md).

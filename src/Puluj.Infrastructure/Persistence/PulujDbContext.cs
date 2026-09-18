@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Puluj.Domain.Entities;
-using Puluj.Domain.Entities.Messaging;
-using Puluj.Domain.Entities.Processing;
 
 namespace Puluj.Infrastructure.Persistence;
 
@@ -21,7 +19,6 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<EventKindRule> EventKindRules => Set<EventKindRule>();
     public DbSet<EventKindRulesetAudit> EventKindRulesetAudits => Set<EventKindRulesetAudit>();
     public DbSet<EventKindAudit> EventKindAudits => Set<EventKindAudit>();
-    public DbSet<EventKindRuleShadow> EventKindRuleShadows => Set<EventKindRuleShadow>();
 
     public DbSet<Place> Places => Set<Place>();
 
@@ -36,30 +33,6 @@ public class PulujDbContext(DbContextOptions<PulujDbContext> options) : DbContex
     public DbSet<ProcessingError> ProcessingErrors => Set<ProcessingError>();
     public DbSet<UserLocation> UserLocations => Set<UserLocation>();
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
-
-    // Message platform (P03, ADR-0006): schemas `messaging` and `processing`; written with plain SQL in the same
-    // transaction as the business result, read through EF for reconciliation, admin and tests.
-    public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
-    public DbSet<InboxEntry> Inbox => Set<InboxEntry>();
-    public DbSet<ArchivedEvent> ArchivedEvents => Set<ArchivedEvent>();
-    public DbSet<SubscriptionLane> SubscriptionLanes => Set<SubscriptionLane>();
-    public DbSet<ControlAudit> ControlAudits => Set<ControlAudit>();
-    /// <summary>P15: the lifecycle projection (`analytics.message_lifecycle`), DDL owned here, written by the `message-analytics` consumer and the analytics backfill.</summary>
-    public DbSet<Puluj.Domain.Entities.Analytics.MessageLifecycle> MessageLifecycle => Set<Puluj.Domain.Entities.Analytics.MessageLifecycle>();
-    public DbSet<EventLink> EventLinks => Set<EventLink>();
-    public DbSet<SubscriptionRegistration> Subscriptions => Set<SubscriptionRegistration>();
-    public DbSet<TopologyVersionRecord> TopologyVersions => Set<TopologyVersionRecord>();
-    public DbSet<ProcessingRun> ProcessingRuns => Set<ProcessingRun>();
-    public DbSet<ProcessingGeneration> ProcessingGenerations => Set<ProcessingGeneration>();
-    public DbSet<StageResult> StageResults => Set<StageResult>();
-    public DbSet<ProcessingAttempt> ProcessingAttempts => Set<ProcessingAttempt>();
-    public DbSet<Delivery> Deliveries => Set<Delivery>();
-    public DbSet<QuarantineEntry> Quarantine => Set<QuarantineEntry>();
-    public DbSet<Extraction> Extractions => Set<Extraction>();
-    public DbSet<Incident> Incidents => Set<Incident>();
-    public DbSet<IncidentObservation> IncidentObservations => Set<IncidentObservation>();
-    public DbSet<IncidentRevision> IncidentRevisions => Set<IncidentRevision>();
-    public DbSet<Observation> Observations => Set<Observation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

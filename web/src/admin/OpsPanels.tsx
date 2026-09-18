@@ -229,12 +229,12 @@ export function DbPanel() {
 
   const reprocess = async () => {
     if (confirmation !== 'REPROCESS') return
-    if (!window.confirm('Очистити всі похідні дані, зберегти raw_messages і поставити їх у чергу на повторну обробку? Цю дію не можна скасувати.')) return
+    if (!window.confirm('Очистити всі похідні дані, зберегти raw_messages і позначити їх Pending для повторної обробки? Цю дію не можна скасувати.')) return
     setReprocessing(true)
     setActionMessage(null)
     try {
       const result = await admin.ops.reprocess()
-      setActionMessage(`У чергу поставлено ${fmtNum(result.queued)} повідомлень${result.analyticsReset ? '; аналітику також очищено.' : '.'}`)
+      setActionMessage(`${fmtNum(result.pending)} повідомлень позначено Pending${result.analyticsReset ? '; аналітику також очищено.' : '.'}`)
       setConfirmation('')
       reload()
     } catch (e) {
@@ -350,17 +350,17 @@ export function DbPanel() {
         {queryResult && <QueryResult result={queryResult} />}
       </Section>
       <Section title="Повторна обробка повідомлень" badge={<Badge ok={null} text="не запускається автоматично" />}>
-        <p className="text-xs text-slate-500">Збереже <code>raw_messages</code>, а похідні дані (цілі, треки, тривоги, зв’язки, помилки обробки, статистику та аналітику) очистить. Усі збережені повідомлення повернуться в чергу для обробки за часом публікації. Джерела, налаштування та довідники не змінюються.</p>
+        <p className="text-xs text-slate-500">Збереже <code>raw_messages</code>, а похідні дані (цілі, треки, тривоги, зв’язки, помилки обробки, статистику та аналітику) очистить. Усі збережені повідомлення стануть Pending і будуть оброблені за часом публікації. Джерела, налаштування та довідники не змінюються.</p>
         <label className="block text-xs">Введіть <code>REPROCESS</code> для розблокування дії
           <input className="ml-2 rounded border border-red-300 px-2 py-1 font-mono dark:border-red-800 dark:bg-slate-800" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
         </label>
         <div className="flex items-center gap-2">
-          <button className="rounded border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300" disabled={confirmation !== 'REPROCESS' || reprocessing} onClick={() => void reprocess()}>{reprocessing ? 'Очищаю й ставлю в чергу…' : 'Очистити похідні дані та перепроцесити'}</button>
+          <button className="rounded border border-red-300 px-3 py-1 text-xs text-red-700 disabled:opacity-50 dark:border-red-800 dark:text-red-300" disabled={confirmation !== 'REPROCESS' || reprocessing} onClick={() => void reprocess()}>{reprocessing ? 'Очищаю й готую повторну обробку…' : 'Очистити похідні дані та перепроцесити'}</button>
           {actionMessage && <span className={`text-xs ${actionMessage.startsWith('Помилка:') ? 'text-red-600' : 'text-emerald-600'}`}>{actionMessage}</span>}
         </div>
       </Section>
       <Section title="Небезпечна зона" badge={<Badge ok={false} text="безповоротно" />}>
-        <p className="text-xs text-slate-500">Зупиняє колектори, processors, messaging та analytics, а потім видаляє всі робочі дані: повідомлення, цілі, треки, тривоги, інциденти, стан обробки, черги й аналітику. Схема БД, міграції, налаштування, доступ адміна, джерела та довідники залишаються.</p>
+        <p className="text-xs text-slate-500">Зупиняє колектори, processor та analytics, а потім видаляє всі робочі дані: повідомлення, цілі, треки, тривоги, стан обробки й аналітику. Схема БД, міграції, налаштування, доступ адміна, джерела та довідники залишаються.</p>
         <label className="mt-2 block text-xs">Введіть <code>DELETE ALL DATA</code> для розблокування дії
           <input className="ml-2 rounded border border-red-300 px-2 py-1 font-mono dark:border-red-800 dark:bg-slate-800" value={clearConfirmation} onChange={(e) => setClearConfirmation(e.target.value)} />
         </label>

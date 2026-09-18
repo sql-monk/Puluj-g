@@ -40,12 +40,6 @@ public class TargetTrack
     /// <summary>Source and id of the newest target, used by the correlator to keep one source's parallel reports apart.</summary>
     public int? LastSourceId { get; set; }
     public long? LastTargetId { get; set; }
-    /// <summary>P09 aggregate revision (envelope.aggregate_revision of the last track.changed); incremented only by the track-worker.</summary>
-    public int Revision { get; set; }
-    /// <summary>event_id / correlation_id of the last track.changed — the causation chain for watchdog commands.</summary>
-    public Guid? LastEventId { get; set; }
-    public Guid? LastCorrelationId { get; set; }
-
     public ICollection<TrackTarget> Targets { get; set; } = [];
 }
 

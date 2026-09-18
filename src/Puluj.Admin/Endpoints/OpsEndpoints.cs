@@ -10,7 +10,6 @@ using Puluj.Admin.Docker;
 using Puluj.Api.Services;
 using Puluj.Domain.Entities;
 using Puluj.Infrastructure.Ingestion;
-using Puluj.Infrastructure.Messaging;
 using Puluj.Contracts;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Settings;
@@ -26,12 +25,12 @@ namespace Puluj.Admin;
 public static partial class OpsEndpoints
 {
     private static readonly TimeSpan WorkerStale = TimeSpan.FromSeconds(90);
-    private static readonly string[] OperationalSchemas = ["public", "analytics", "messaging", "processing"];
+    private static readonly string[] OperationalSchemas = ["public", "analytics"];
     private static readonly HashSet<string> ResetExcludedTables = new(StringComparer.Ordinal)
     {
         "__EFMigrationsHistory", "spatial_ref_sys", "app_settings", "sources", "places",
         "target_categories", "target_classes", "target_families", "target_models", "target_model_aliases",
-        "event_kinds", "event_kind_rulesets", "event_kind_rules", "event_kind_ruleset_audit", "event_kind_audit", "event_kind_rule_shadow",
+        "event_kinds", "event_kind_rulesets", "event_kind_rules", "event_kind_ruleset_audit", "event_kind_audit",
     };
 
     public static IEndpointRouteBuilder MapOpsEndpoints(this IEndpointRouteBuilder app)
@@ -88,19 +87,18 @@ public static partial class OpsEndpoints
             {
                 return Results.Conflict(new { error = $"Обробку призупинено: {paused}" });
             }
-            var queued = await reprocess.ResetAsync(ct);
+            var pending = await reprocess.ResetAsync(ct);
             // The analytics schema is another derived view of raw_messages. It can be absent before its worker first starts.
             var analyticsStatus = await analytics.StatusAsync(ct);
             if (analyticsStatus.Initialized)
             {
                 await analytics.ResetAsync(ct);
             }
-            return Results.Ok(new { queued, analyticsReset = analyticsStatus.Initialized });
+            return Results.Ok(new { pending, analyticsReset = analyticsStatus.Initialized });
         });
 
-        // Testing without real sources: inject a message as if a collector had received it. Takes the same path as the
-        // collectors: the single ingress when Messaging:Ingress:Enabled (the raw-writer stores it), the direct store otherwise.
-        ops.MapPost("/dev/ingest", async (IngestRequest req, ReferenceCache refs, RawMessageIngestor ingestor, IngressWriter ingress, TimeProvider clock, CancellationToken ct) =>
+        // Testing without real sources: inject a message through the same direct database path as the collectors.
+        ops.MapPost("/dev/ingest", async (IngestRequest req, ReferenceCache refs, RawMessageIngestor ingestor, TimeProvider clock, CancellationToken ct) =>
         {
             var source = refs.Sources.Values.FirstOrDefault(s => s.Code == req.SourceCode);
             if (source is null)
@@ -118,11 +116,6 @@ public static partial class OpsEndpoints
                     : JsonDocument.Parse("{\"kind\":\"dev.ingest\"}"),
                 Url = null,
             };
-            if (ingress.Enabled)
-            {
-                var published = await ingress.PublishAsync(message, source.Code, "dev", null, live: true, ct);
-                return Results.Ok(new { published.EventId, published.Lane, RawMessageId = (long?)null, IsNew = (bool?)null });
-            }
             var result = await ingestor.IngestAsync(message, source.Code, ct);
             return Results.Ok(result);
         });
@@ -245,7 +238,6 @@ public static partial class OpsEndpoints
             x.LlmRequestId, x.OccurredAt, x.RawMessageId, x.SourceId, SourceCode = x.Source!.Code, x.Worker, x.Model, x.PromptVersion,
             x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens,
             x.EstimatedCostUsd, x.FactsCount, x.Error, x.RequestText, x.SystemPrompt, x.ResponseText,
-            x.RequestId, x.RunId, x.FencingToken, x.AttemptId, x.ProviderRequestId,
             RequestPayload = x.RequestPayload, ResponsePayload = x.ResponsePayload, // verbatim bodies (what was sent, what came back)
         }).FirstOrDefaultAsync(ct);
         if (x is null)
@@ -325,11 +317,11 @@ public static partial class OpsEndpoints
     /// shutdown; one that died leaves a stale value, which is shown as down for a while and then forgotten.
     /// </summary>
     public static List<(string Name, DateTimeOffset At)> WorkerHeartbeats(IReadOnlyDictionary<string, AppSetting> all, DateTimeOffset now) =>
-        Puluj.Infrastructure.Messaging.Ops.WorkerStatusDocuments.Heartbeats(all, now); // shared with the P13 ops snapshot
+        WorkerStatusDocuments.Heartbeats(all, now);
 
     /// <summary>The instance's own status document (`Runtime:Worker:{name}:Status`, §2.1); null when absent or unreadable.</summary>
     public static WorkerStatusDto? WorkerStatus(IReadOnlyDictionary<string, AppSetting> all, string name) =>
-        Puluj.Infrastructure.Messaging.Ops.WorkerStatusDocuments.Status(all, name);
+        WorkerStatusDocuments.Status(all, name);
 
     private sealed record ClaimRow(string ClaimedBy, long ProcessedDay, long InProgress);
 

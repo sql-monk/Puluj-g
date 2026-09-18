@@ -4,7 +4,7 @@
            The steps are idempotent: a second run rebuilds what changed and applies outstanding migrations to the
            existing database; it never replaces its data or settings.
 .PARAMETER NoBuild   Restart with the existing images (no `--build`).
-.PARAMETER SkipSql   Skip the one-off SQL scripts (scripts/requeue-failed.sql, scripts/fix-text-alert-ends.sql).
+.PARAMETER SkipSql   Skip the one-off SQL scripts (scripts/reset-failed-processing.sql, scripts/fix-text-alert-ends.sql).
 .PARAMETER Services  Rebuild only these compose services (e.g. api,admin); default — the whole stack.
 .PARAMETER DatabaseVolume
            Existing Docker volume that contains PostgreSQL data. Defaults to puluj-g-pgdata.
@@ -113,7 +113,7 @@ function Select-Services {
         'migrate' = 'одноразово застосовує EF-міграції й seed-дані'
         'collector-telegram' = 'зчитує повідомлення з Telegram-каналів'
         'collector-alerts' = 'отримує повітряні тривоги з alerts.in.ua'
-        'processor' = 'обробляє raw_messages, треки, alerts та incidents'
+        'processor' = 'обробляє raw_messages і оновлює цілі, треки та повітряні тривоги'
         'api' = 'публічна карта й read-only HTTP API на порту 8090'
         'admin' = 'приватна панель керування й діагностики на порту 8091'
         'analytics' = 'будує аналітичні індекси та звіти з повідомлень'
@@ -380,7 +380,7 @@ if ($requiresMigrate) { Apply-WizardSettingsToDatabase }
 
 if (-not $SkipSql -and $requiresMigrate) {
     Step "One-off SQL: Failed raw messages back to Pending (deadlock victims of 15.09)"
-    Sql (Join-Path $root "scripts\requeue-failed.sql")
+    Sql (Join-Path $root "scripts\reset-failed-processing.sql")
     Step "One-off SQL: text alerts closed by an out-of-order 'відбій' (ended_at < started_at) reopened for the watchdog"
     Sql (Join-Path $root "scripts\fix-text-alert-ends.sql")
 } elseif (-not $SkipSql -and $managesDatabase) { Write-Host "Пропущено SQL-корекції: обрано лише postgis, без migrate/schema check." -ForegroundColor Yellow }

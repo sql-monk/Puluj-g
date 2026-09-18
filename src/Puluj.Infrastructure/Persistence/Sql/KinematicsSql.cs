@@ -144,6 +144,7 @@ END $$;
     /// Kept separately so upgrades replace a function body installed by an earlier migration.
     /// </summary>
     public const string OnTargetDuplicate = """
+
 CREATE OR REPLACE FUNCTION puluj_on_target_duplicate() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE o targets;

@@ -21,7 +21,6 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, IOp
     public GazetteerIndex Gazetteer { get; private set; } = GazetteerIndex.Empty;
     public EventKindIndex EventKinds { get; private set; } = EventKindIndex.Empty;
     public RulesetIndex Rules { get; private set; } = RulesetIndex.Builtin;
-    public RulesetIndex? ShadowRules { get; private set; }
 
     /// <summary>Completes after the first successful load.</summary>
     public Task Ready => _ready.Task;
@@ -34,11 +33,11 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, IOp
         EventKinds = await LoadEventKindsAsync(db, ct);
         await RefreshRulesAsync(db, ct);
         _ready.TrySetResult();
-        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places, {Kinds} event kinds, rules {Ruleset} (shadow {Shadow})", Taxonomy.Aliases.Count, Gazetteer.Count, EventKinds.Count, Rules.Id, ShadowRules?.Id ?? "none");
+        logger.LogInformation("Indexes loaded: {Aliases} aliases, {Places} places, {Kinds} event kinds, rules {Ruleset}", Taxonomy.Aliases.Count, Gazetteer.Count, EventKinds.Count, Rules.Id);
     }
 
     /// <summary>
-    /// Re-reads the active (or pinned) and shadow rule sets when their versions changed. Cheap enough for the short
+    /// Re-reads the active (or pinned) rule set when its version changes. Cheap enough for the short
     /// poll: a version pointer query, and the rules only when the pointer moved. The pin never crashes the worker:
     /// an unknown or unpublished pin logs a warning once and the active set is used.
     /// </summary>
@@ -63,12 +62,6 @@ public sealed class IndexProvider(IDbContextFactory<PulujDbContext> factory, IOp
         {
             Rules = target is int v && await RulesetService.LoadAsync(db, v, ct) is { } data ? RulesetIndex.From(data) : RulesetIndex.Builtin;
             logger.LogInformation("Rule set pinned: {Ruleset} ({State}, {Rules} rules)", Rules.Id, Rules.State, Rules.Rules.Count);
-        }
-        var shadow = await db.EventKindRulesets.AsNoTracking().Where(r => r.State == EventKindRuleset.Shadow).Select(r => (int?)r.Version).SingleOrDefaultAsync(ct);
-        if (shadow != ShadowRules?.Version)
-        {
-            ShadowRules = shadow is int sv && await RulesetService.LoadAsync(db, sv, ct) is { } sdata ? RulesetIndex.From(sdata) : null;
-            logger.LogInformation("Shadow rule set: {Shadow}", ShadowRules?.Id ?? "none");
         }
     }
 

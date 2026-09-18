@@ -16,7 +16,7 @@ export const SERVICE_NOTE: Record<string, string> = {
   'collector-telegram': 'нові пости Telegram не збиратимуться',
   'collector-alerts': 'тривоги не оновлюватимуться',
   analytics: 'аналітика джерел не оновлюватиметься',
-  processor: 'ця репліка перестане обробляти повідомлення; її claim-и повернуться в чергу за 5 хв',
+  processor: 'processor перестане обробляти повідомлення; незавершені claim-и повернуться у Pending після завершення lease',
 }
 
 export type Stage = 'parse' | 'lock' | 'store' | 'total'

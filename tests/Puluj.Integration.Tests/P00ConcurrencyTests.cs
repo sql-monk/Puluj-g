@@ -44,7 +44,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
                 tasks.Add(Processor().ProcessAsync(id, CancellationToken.None));
                 await WaitForStoreWaiters(tasks.Count);
             }
-            // Both real transactions are parked before derived reads; release in the established queue order.
+            // Both real transactions are parked before derived reads; release them in the established order.
             await tx.CommitAsync();
         }
         Assert.All(await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30)), n => Assert.Equal(1, n));
@@ -288,7 +288,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
         {
             SourceId = sourceId, SourceMessageId = key, RawText = text,
             RawPayload = JsonSerializer.SerializeToDocument(new { test = key }), PublishedAt = at
-        }, source, CancellationToken.None, enqueue: false);
+        }, source, CancellationToken.None, announceProcessor: false);
         Assert.True(result.IsNew);
         return result.RawMessageId!.Value;
     }
@@ -305,7 +305,7 @@ public sealed class P00ConcurrencyTests(PipelineFixture fixture) : IAsyncLifetim
                 kind = end ? "alert.finished" : "alert.started", at = end ? At.AddMinutes(10) : At, test = key,
                 alert = new { id = alertId, location_title = "Сумська область", location_oblast = "Сумська область", location_type = "oblast", alert_type = "air_raid", started_at = At }
             })
-        }, "alerts_in_ua", CancellationToken.None, enqueue: false);
+        }, "alerts_in_ua", CancellationToken.None, announceProcessor: false);
         Assert.True(result.IsNew);
         return result.RawMessageId!.Value;
     }

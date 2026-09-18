@@ -38,6 +38,5 @@
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
     <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
     <!-- P02 transport spike (tests only until P03) -->
-    <PackageVersion Include="Testcontainers.RabbitMq" Version="4.15.0" />
   </ItemGroup>
 </Project>

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Options;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
-using Puluj.Infrastructure.Messaging;
 using Puluj.Infrastructure.Settings;
 using TL;
 
@@ -35,7 +34,7 @@ public sealed class TelegramCollector(
     private TelegramOptions _o = new();
     private TelegramRequestGate? _requestGate;
     private TelegramRpcExecutor? _rpc;
-    /// <summary>True while the whole-history load runs: live posts are stored without being queued, like the history.</summary>
+    /// <summary>True while the whole-history load runs: live posts are stored without waking the processor, like the history.</summary>
     private volatile bool _loadingHistory;
 
     public bool Handles(Source source) => options.CurrentValue.Enabled && source.Type == SourceType.Telegram && Username(source) is not null;
@@ -275,17 +274,11 @@ public sealed class TelegramCollector(
         {
             var scheduler = new TelegramBackfillScheduler(clock, _o.HistoryWorkers);
             await scheduler.RunAsync(pending, (job, schedulerCt) => LoadHistoryPageAsync(client, job, schedulerCt), ct);
-            // Everything is in: rebuild in order. Held until now so no message was processed out of sequence. Through the
-            // ingress the raw rows are written by the raw-writer: wait until every published message of these channels
-            // has one, otherwise the rebuild would start before the history is complete.
-            await settings.SetStatusAsync(StatusKey, "history: waiting for the raw-writer", ct);
-            if (!await ingress.WaitForDrainAsync(pending.Select(p => p.Source.SourceId).ToList(), ct))
-            {
-                await settings.SetStatusAsync(StatusKey, "history: drain timeout, rebuilding anyway", ct);
-            }
+            // Everything is in PostgreSQL: rebuild in order. Processing stayed paused so no historical message could be
+            // handled before an earlier message from the same load was stored.
             await settings.SetStatusAsync(StatusKey, "history: rebuilding derived data", ct);
-            var queued = await reprocess.ResetAsync(ct);
-            logger.LogInformation("Telegram: history load complete, {Count} raw message(s) queued for processing in order", queued);
+            var pendingCount = await reprocess.ResetAsync(ct);
+            logger.LogInformation("Telegram: history load complete, {Count} raw message(s) are Pending for processing in order", pendingCount);
         }
         finally
         {
@@ -350,7 +343,7 @@ public sealed class TelegramCollector(
         {
             var last = i == toStore.Count - 1;
             var checkpoint = last ? new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)) : null;
-            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, SubscriberCount(job.Channel), job.Channel.title, enqueue: false, checkpoint: checkpoint))
+            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, SubscriberCount(job.Channel), job.Channel.title, announceProcessor: false, checkpoint: checkpoint))
             {
                 stored++;
             }
@@ -433,12 +426,12 @@ public sealed class TelegramCollector(
         }
         var (source, username, title, subscriberCount) = entry;
         // An edit does not move the id checkpoint (it belongs to an old post); the date still counts as activity.
-        await StoreAsync(m, source, username, CancellationToken.None, subscriberCount, title, enqueue: !_loadingHistory,
+        await StoreAsync(m, source, username, CancellationToken.None, subscriberCount, title, announceProcessor: !_loadingHistory,
             checkpoint: new CollectorCheckpoint(isEdit ? null : m.id.ToString(), ToUtc(m.date)));
     }
 
     /// <summary>Publishes one post (or edit); returns whether it was stored/accepted (false for service messages and known duplicates).</summary>
-    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, int? subscriberCount = null, string? channelTitle = null, bool enqueue = true, CollectorCheckpoint? checkpoint = null)
+    private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, int? subscriberCount = null, string? channelTitle = null, bool announceProcessor = true, CollectorCheckpoint? checkpoint = null)
     {
         if (string.IsNullOrWhiteSpace(m.message) && m.media is null)
         {
@@ -460,7 +453,7 @@ public sealed class TelegramCollector(
             RawText = m.message,
             RawPayload = payload.ToDocument(),
             Url = $"https://t.me/{username}/{m.id}",
-        }, source, Name, checkpoint, live: enqueue, ct);
+        }, source, Name, checkpoint, live: announceProcessor, ct);
         return result.Stored;
     }
 

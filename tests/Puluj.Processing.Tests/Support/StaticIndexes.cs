@@ -8,5 +8,4 @@ public sealed class StaticIndexes : IIndexes
     public GazetteerIndex Gazetteer => TestIndexes.Gazetteer;
     public EventKindIndex EventKinds { get; init; } = EventKindIndex.Empty;
     public Puluj.Processing.Rules.RulesetIndex Rules { get; init; } = Puluj.Processing.Rules.RulesetIndex.Builtin;
-    public Puluj.Processing.Rules.RulesetIndex? ShadowRules { get; init; }
 }

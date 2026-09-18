@@ -104,11 +104,11 @@ services:
       Worker__Roles: alerts
       Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-alerts-.log
 
-  # Parsing, correlation, track watchdog (and the LLM fallback). Every replica claims messages
+  # Parsing, correlation, track watchdog (and the LLM fallback). The single processor claims messages
   # from raw_messages (status InProgress + claimed_by), so a message is processed exactly once; parsing runs in
-  # parallel, while only messages that touch the same track category or alert region are serialised. Worker__AppendHostName gives each replica its own name
-  # (heartbeat, claimed_by, `app` in the shared log file). Processing__Concurrency = workers per replica.
-  # For a strictly ordered, reproducible rebuild run one replica with Processing__Concurrency=1.
+  # in parallel, while derived-state writes are serialised. Worker__AppendHostName gives the process a traceable name
+  # (heartbeat, claimed_by, `app` in the shared log file). Processing__Concurrency controls its internal workers.
+  # For a strictly ordered, reproducible rebuild set Processing__Concurrency=1.
   processor:
     <<: *worker
     # A fixed name makes `docker compose --scale processor=N` fail for N > 1.

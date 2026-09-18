@@ -50,8 +50,6 @@ builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetEvaluator>();
 builder.Services.AddSingleton<Puluj.Processing.Rules.RulesetPreview>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.AdminIndexes>();
 builder.Services.AddSingleton<Puluj.Admin.Endpoints.KindCorpus>();
-// Incident administration keeps the same state writer as the processing code.
-builder.Services.AddSingleton<Puluj.Processing.Incidents.IncidentStateWriter>();
 // Container management through the docker CLI and the mounted socket; off unless Docker__Enabled (the compose stack sets it).
 builder.Services.AddOptions<DockerOptions>().Bind(builder.Configuration.GetSection(DockerOptions.Section));
 builder.Services.AddSingleton<DockerService>();
@@ -74,7 +72,6 @@ app.MapHealthChecks("/api/health", new HealthCheckOptions { ResponseWriter = Hea
 app.MapAdminEndpoints();
 app.MapOpsEndpoints();
 Puluj.Admin.Endpoints.RulesetEndpoints.MapRulesetEndpoints(app);
-Puluj.Admin.Endpoints.IncidentEndpoints.MapIncidentEndpoints(app);
 Puluj.Admin.Endpoints.CatalogEndpoints.MapCatalogEndpoints(app); // P12 catalog editor
 app.MapAnalyticsEndpoints();
 

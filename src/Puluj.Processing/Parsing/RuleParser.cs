@@ -18,7 +18,7 @@ public sealed class RuleParser(IIndexes indexes) : IParser
     /// <summary>Parses with the rule set the indexes currently pin (taken once for the whole message).</summary>
     public IReadOnlyList<ParsedFact> Parse(NormalizedMessage message, ParseContext ctx) => Parse(message, ctx, indexes.Rules).Facts;
 
-    /// <summary>Parses with an explicit rule set (the stage worker pins one snapshot per job; preview/shadow use another version).</summary>
+    /// <summary>Parses with an explicit rule set so preview and canary runs can choose another version.</summary>
     public ParseResult Parse(NormalizedMessage message, ParseContext ctx, RulesetIndex ruleset)
     {
         var taxonomy = indexes.Taxonomy;

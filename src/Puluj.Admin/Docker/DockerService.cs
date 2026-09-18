@@ -19,7 +19,7 @@ public sealed class DockerService(IOptions<DockerOptions> options, ILogger<Docke
 {
     private static readonly HashSet<string> DataWriterServices = new(StringComparer.OrdinalIgnoreCase)
     {
-        "collector-telegram", "collector-alerts", "processor", "analytics", "messaging",
+        "collector-telegram", "collector-alerts", "processor", "analytics",
     };
     private static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(60); // compose scale pulls nothing but may wait on health checks
     private static readonly TimeSpan ListTtl = TimeSpan.FromSeconds(5);

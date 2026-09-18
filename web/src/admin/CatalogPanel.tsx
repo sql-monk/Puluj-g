@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { AdminError } from '../api/admin'
 import { adminCatalog, type AdminCatalogDto, type AdminKindDto, type KindAuditDto, type KindUpdate } from '../api/adminCatalog'
 import { Badge, Section } from '../components/settings/fields'
-import { ICON_SHAPE } from '../catalog/catalog'
-import { shapeLabel } from '../lib/incidentLabels'
+
+const shapeLabel: Record<string, string> = { circle: 'Коло', triangle: 'Трикутник', diamond: 'Ромб', square: 'Квадрат', cross: 'Хрест', shield: 'Щит', hex: 'Шестикутник' }
+const iconShape: Record<string, string> = { 'air-defence': 'shield', interception: 'shield', alert: 'shield', launch: 'triangle', damage: 'square', evacuation: 'square' }
 
 interface Draft {
   nameUk: string
@@ -24,7 +25,7 @@ function draftOf(k: AdminKindDto): Draft {
 /**
  * Catalog editor (plan §8.7, P12, ADR-0008): the presentation of every event kind — name, map colour/icon/lifetime,
  * visibility, render mode, sort order, enabled — with a required actor/reason on every change and the audit history.
- * The policy fields (category, dedup policy, state model, creates_incident) belong to the seed and are shown read-only.
+ * The policy fields (category and state model) belong to the seed and are shown read-only.
  * Presentation changes reach the map after the API's catalog refresh (up to 10 minutes) and a page reload.
  */
 export function CatalogPanel() {
@@ -105,8 +106,7 @@ export function CatalogPanel() {
     <>
       <Section title="Каталог подій" badge={<Badge ok={null} text={`${catalog.kinds.length} видів`} />}>
         <p className="text-xs text-slate-600 dark:text-slate-300">
-          Презентація (назва, колір, іконка, час на мапі, видимість, порядок, увімкнено) — редагується тут і далі не перезаписується seed; політика (категорія, dedup, state model) — з
-          seed (ADR-0008/0010). Кожна зміна потребує <b>actor</b> і <b>reason</b> і лишає запис в аудиті.
+          Презентація (назва, колір, іконка, час на мапі, видимість, порядок, увімкнено) — редагується тут і далі не перезаписується seed; категорія й state model — із seed. Кожна зміна потребує <b>actor</b> і <b>reason</b> і лишає запис в аудиті.
         </p>
         <div className="flex flex-wrap gap-2 text-xs">
           <label className="flex items-center gap-1">
@@ -149,12 +149,11 @@ export function CatalogPanel() {
                     <td className="py-1 pr-2">{isEditing ? <input aria-label="Назва" className="w-40 rounded border px-1 dark:bg-slate-800" value={draft.nameUk} onChange={(e) => setDraft({ ...draft, nameUk: e.target.value })} /> : k.nameUk}</td>
                     <td className="py-1 pr-2">
                       {k.category}
-                      {k.createsIncident && <span className="ml-1 text-slate-500">· incident</span>}
                     </td>
                     <td className="py-1 pr-2">
                       <span aria-hidden="true" className="mr-1 inline-block h-3 w-3 rounded-sm border border-slate-400 align-middle" style={{ background: (isEditing ? draft.mapColor : k.mapColor) || 'transparent' }} />
                       {isEditing ? <input aria-label="Колір" className="w-20 rounded border px-1 font-mono dark:bg-slate-800" value={draft.mapColor} onChange={(e) => setDraft({ ...draft, mapColor: e.target.value })} placeholder="#rrggbb" /> : <span className="font-mono">{k.mapColor ?? '—'}</span>}
-                      <span className="ml-1 text-slate-500">{shapeLabel[ICON_SHAPE[(isEditing ? draft.mapIcon : k.mapIcon) ?? 'unknown'] ?? 'circle']}</span>
+                      <span className="ml-1 text-slate-500">{shapeLabel[iconShape[(isEditing ? draft.mapIcon : k.mapIcon) ?? 'unknown'] ?? 'circle']}</span>
                     </td>
                     <td className="py-1 pr-2">
                       {isEditing ? (

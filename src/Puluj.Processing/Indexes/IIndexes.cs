@@ -9,6 +9,4 @@ public interface IIndexes
     EventKindIndex EventKinds { get; }
     /// <summary>Plan §8.3 rule-set snapshot pinned per message (P08); <see cref="Rules.RulesetIndex.Builtin"/> before the catalog is seeded.</summary>
     Rules.RulesetIndex Rules { get; }
-    /// <summary>The rule set in state `shadow`, compared beside the live one; null when there is none.</summary>
-    Rules.RulesetIndex? ShadowRules { get; }
 }

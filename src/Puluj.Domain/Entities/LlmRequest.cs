@@ -34,10 +34,4 @@ public class LlmRequest
     public JsonDocument? ResponsePayload { get; set; }
     public string? Error { get; set; }
 
-    // P06 provenance of a request made by the llm-worker (null for the legacy in-process fallback).
-    public Guid? RequestId { get; set; }
-    public Guid? RunId { get; set; }
-    public int? FencingToken { get; set; }
-    public long? AttemptId { get; set; }
-    public string? ProviderRequestId { get; set; }
 }

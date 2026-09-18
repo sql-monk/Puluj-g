@@ -8,7 +8,7 @@ using Puluj.Infrastructure.Persistence;
 namespace Puluj.Api.Services;
 
 /// <summary>Read side: live snapshot, historical replay from revisions (spec §20), track details with provenance (spec §18).</summary>
-public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, DtoMapper mapper, TimeProvider clock, ReferenceCache refs, IOptions<MapOptions> options, IncidentQueries incidents, ILogger<SnapshotService> logger)
+public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, DtoMapper mapper, TimeProvider clock, ReferenceCache refs, IOptions<MapOptions> options)
 {
     /// <summary>In history mode, tracks last reported earlier than this before `at` are not part of a snapshot.</summary>
     private static readonly TimeSpan HistoryWindow = TimeSpan.FromHours(3);
@@ -72,12 +72,7 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
         var fixes = await FixesAsync(db, ids, null, ct);
         var messages = await MessageIdsAsync(db, ids, null, ct);
         var events = await MapEventsAsync(db, since, null, filter, ct);
-        var (incidentRows, truncated) = filter?.IsFiltered == true ? (Array.Empty<IncidentDto>() as IReadOnlyList<IncidentDto>, false) : await incidents.LiveAsync(now, ct);
-        if (truncated)
-        {
-            logger.LogWarning("Live snapshot carries only the newest {Limit} incidents of the last {Hours} h; the client pages the rest through /api/incidents", Map.IncidentSnapshotLimit, Map.IncidentHours);
-        }
-        return new SnapshotDto(now, false, tracks.Select(t => mapper.Track(t, sources.GetValueOrDefault(t.TargetTrackId, []), fixes.GetValueOrDefault(t.TargetTrackId), messages.GetValueOrDefault(t.TargetTrackId))).ToList(), alerts.Select(mapper.Alert).ToList(), events, incidentRows, truncated);
+        return new SnapshotDto(now, false, tracks.Select(t => mapper.Track(t, sources.GetValueOrDefault(t.TargetTrackId, []), fixes.GetValueOrDefault(t.TargetTrackId), messages.GetValueOrDefault(t.TargetTrackId))).ToList(), alerts.Select(mapper.Alert).ToList(), events);
     }
 
     public async Task<SnapshotDto> AtAsync(DateTimeOffset at, bool activeOnly, CancellationToken ct, MapFilter? filter = null)
@@ -111,12 +106,10 @@ public sealed class SnapshotService(IDbContextFactory<PulujDbContext> factory, D
             .ToListAsync(ct);
         if (filter is not null) alerts = alerts.Where(a => filter.AllowsAlert(a) && filter.AllowsPlace(a.PlaceId, refs) && filter.AllowsLocation(true) && filter.AllowsText(refs.Place(a.PlaceId)?.Name)).ToList();
         var events = await MapEventsAsync(db, since, at, filter, ct);
-        // Incidents in history mode are what the system knew at `at` (recorded mode, ADR-0011), never today's reconstruction.
-        var (incidentRows, incidentsTruncated) = filter?.IsFiltered == true ? (Array.Empty<IncidentDto>() as IReadOnlyList<IncidentDto>, false) : await incidents.AtAsync(at, ct);
         return new SnapshotDto(at, true,
             visible.OrderByDescending(r => r.LastSeenAt).Select(r => mapper.Track(r, sources.GetValueOrDefault(r.TargetTrackId, []), fixes.GetValueOrDefault(r.TargetTrackId), messages.GetValueOrDefault(r.TargetTrackId))).ToList(),
             alerts.Select(mapper.Alert).ToList(),
-            events, incidentRows, incidentsTruncated);
+            events);
     }
 
     /// <summary>Map events are individual facts, not tracks: only show a reported location, never an invented point.</summary>

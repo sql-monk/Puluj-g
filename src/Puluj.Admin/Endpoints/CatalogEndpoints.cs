@@ -10,7 +10,7 @@ namespace Puluj.Admin.Endpoints;
 /// <summary>
 /// Plan §8.7 catalog editor (P12, ADR-0008): the presentation of an event kind — name, map colour/icon/lifetime/visibility,
 /// render mode, sort order, enabled, requires-location — is admin-owned once edited (`presentation_overridden_at`); the
-/// policy fields (category, severity, state model, creates_incident, dedup_policy, metadata, policy_version) stay with the
+/// policy fields (category, severity, state model, metadata, policy_version) stay with the
 /// seed. Every change writes an audit row (actor, reason, before/after). Disabling a kind that carries a legacy mapping
 /// would silence its P08 rules — refused without `force`.
 /// </summary>
@@ -158,9 +158,9 @@ public static partial class CatalogEndpoints
     private static object Dto(EventKind k) => new
     {
         k.EventKindId, k.Code, k.NameUk, Category = k.Category.ToString().ToLowerInvariant(), k.DefaultSeverity, k.StateModel, k.RequiresLocationForMap, k.RenderMode, k.MapColor, k.MapIcon,
-        MapLifetime = k.MapLifetime?.ToString(), k.CreatesIncident, k.Enabled, k.MapVisible, k.SortOrder, k.PolicyVersion, k.PresentationOverriddenAt,
+        MapLifetime = k.MapLifetime?.ToString(), k.Enabled, k.MapVisible, k.SortOrder, k.PolicyVersion, k.PresentationOverriddenAt,
         LegacyEventType = HasLegacyMapping(k) ? k.Metadata!.RootElement.GetProperty("legacyEventType").GetString() : null,
-        DedupPolicy = k.DedupPolicy?.RootElement, Metadata = k.Metadata?.RootElement,
+        Metadata = k.Metadata?.RootElement,
     };
 
     [GeneratedRegex("^#[0-9a-fA-F]{6}$")]

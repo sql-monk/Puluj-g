@@ -2,12 +2,10 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Puluj.Admin.Endpoints;
 using Puluj.Domain.Entities;
-using Puluj.Domain.Enums;
-using Puluj.Processing.Incidents;
 
 namespace Puluj.Admin.Tests;
 
-/// <summary>P12 (§8.7): the catalog editor's validation (400/422), the legacy-mapping guard, the audit snapshot, and the merge plan shared with the incident command.</summary>
+/// <summary>The catalog editor's validation, legacy-mapping guard, and audit snapshot.</summary>
 public class CatalogEndpointsTests
 {
     private static CatalogEndpoints.UpdateRequest Req(string? actor = "ops", string? reason = "why", string? color = null, string? icon = null, string? lifetime = null, string? mode = null, int? sort = null, string? name = null) =>
@@ -76,43 +74,6 @@ public class CatalogEndpointsTests
         Assert.Equal("02:00:00", snapshot.GetProperty("mapLifetime").GetString());
         Assert.Equal(40, snapshot.GetProperty("sortOrder").GetInt32());
         Assert.True(snapshot.GetProperty("enabled").GetBoolean());
-        Assert.False(snapshot.TryGetProperty("dedupPolicy", out _)); // seed-owned: never in the admin audit
     }
 
-    private static Incident Inc(long id, int kind, string state = Incident.Reported, Guid? generation = null, params (int Source, DateTimeOffset At)[] links)
-    {
-        var i = new Incident { IncidentId = id, EventKindId = kind, State = state, GenerationId = generation ?? Guid.Empty, FirstReportedAt = DateTimeOffset.UnixEpoch, LastReportedAt = DateTimeOffset.UnixEpoch, Revision = 1, Confidence = ConfidenceLevel.Medium, AccuracyKm = 15, Geometry = Puluj.Infrastructure.Persistence.Geo.Point(36.23, 49.99) };
-        foreach (var (source, at) in links)
-        {
-            i.Observations.Add(new IncidentObservation { IncidentId = id, ObservationId = Guid.NewGuid(), SourceId = source, Relation = IncidentObservation.Supports, EffectiveAt = at, LinkedAt = at, PolicyVersion = "t" });
-        }
-        return i;
-    }
-
-    [Fact]
-    public void Merge_plan_applies_the_command_rules_and_predicts_the_aggregate()
-    {
-        var t0 = new DateTimeOffset(2026, 9, 16, 12, 0, 0, TimeSpan.Zero);
-        var source = Inc(1, 5, links: [(1, t0), (2, t0.AddMinutes(5))]);
-        var target = Inc(2, 5, Incident.Confirmed, links: [(2, t0.AddMinutes(-10)), (3, t0.AddMinutes(20))]);
-        target.Revision = 4;
-        source.AccuracyKm = 3; // the more precise location wins
-        source.Confidence = ConfidenceLevel.High;
-        var plan = IncidentStateWriter.PlanMerge(source, target);
-        Assert.True(plan.Allowed);
-        Assert.Equal(2, plan.MovedObservationIds.Count);
-        Assert.Equal(3, plan.SourceCountAfter); // sources 1, 2, 3
-        Assert.Equal(t0.AddMinutes(-10), plan.FirstReportedAtAfter);
-        Assert.Equal(t0.AddMinutes(20), plan.LastReportedAtAfter);
-        Assert.Equal(Incident.Confirmed, plan.StateAfter); // the target's state never changes on merge
-        Assert.Equal("source", plan.LocationFrom);
-        Assert.Equal(3, plan.AccuracyKmAfter);
-        Assert.Equal(ConfidenceLevel.High, plan.ConfidenceAfter);
-        Assert.Equal(4, plan.TargetRevision);
-
-        Assert.Equal("an incident cannot be merged into itself", IncidentStateWriter.PlanMerge(source, source).Refusal);
-        Assert.Contains("different kinds", IncidentStateWriter.PlanMerge(source, Inc(3, 7)).Refusal);
-        Assert.Contains("retracted", IncidentStateWriter.PlanMerge(source, Inc(3, 5, Incident.Retracted)).Refusal);
-        Assert.Contains("generations", IncidentStateWriter.PlanMerge(source, Inc(3, 5, generation: Guid.NewGuid())).Refusal);
-    }
 }

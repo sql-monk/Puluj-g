@@ -7,7 +7,7 @@ using Puluj.Infrastructure.Persistence;
 
 namespace Puluj.Infrastructure.Rules;
 
-/// <summary>The request cannot be applied in the rule set's current state (wrong state, another shadow, lost publish race).</summary>
+/// <summary>The request cannot be applied in the rule set's current state.</summary>
 public sealed class RulesetConflictException(string message) : Exception(message);
 
 public sealed class RulesetNotFoundException(int version) : Exception($"rule set v{version} does not exist");
@@ -29,7 +29,7 @@ public sealed record RulesetSummary(int Version, string State, bool IsActive, in
 public sealed record RulesetDetails(RulesetSummary Summary, IReadOnlyList<RuleDefinition> Rules, IReadOnlyList<EventKindRulesetAudit> Audit);
 
 /// <summary>
-/// Plan §8.3 authoring flow (P08): draft → rules → validate → (shadow) → publish → rollback, every step audited with
+/// Authoring flow: draft → rules → validate → publish → rollback, every step audited with
 /// actor and reason. Rows of a non-draft version are never updated; publishing and rollback only move the
 /// <c>is_active</c> pointer (one active version, enforced by a partial unique index) and the state column.
 /// </summary>
@@ -189,45 +189,6 @@ public sealed class RulesetService(IDbContextFactory<PulujDbContext> factory, Ti
         return RulesetValidator.Validate(snapshot.Rules.Select(r => r.Definition).ToList(), kinds, sources);
     }
 
-    /// <summary>Takes a shadow set out of the comparison (back to draft) — the way out when the shadow turned out wrong; its rows stay for the report.</summary>
-    public async Task StopShadowAsync(int version, string actor, string reason, CancellationToken ct)
-    {
-        RequireActor(actor, reason);
-        await using var db = await factory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await LockAsync(db, ct);
-        var row = await db.EventKindRulesets.SingleOrDefaultAsync(r => r.Version == version, ct) ?? throw new RulesetNotFoundException(version);
-        if (row.State != EventKindRuleset.Shadow)
-        {
-            throw new RulesetConflictException($"rule set v{version} is {row.State}; only a shadow set can stop shadowing");
-        }
-        row.State = EventKindRuleset.Draft;
-        db.EventKindRulesetAudits.Add(Audit(version, EventKindRulesetAudit.ShadowStopped, actor, reason, clock.GetUtcNow(), null));
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-    }
-
-    public async Task StartShadowAsync(int version, string actor, string reason, CancellationToken ct)
-    {
-        RequireActor(actor, reason);
-        await using var db = await factory.CreateDbContextAsync(ct);
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await LockAsync(db, ct);
-        var row = await db.EventKindRulesets.SingleOrDefaultAsync(r => r.Version == version, ct) ?? throw new RulesetNotFoundException(version);
-        if (row.State != EventKindRuleset.Draft)
-        {
-            throw new RulesetConflictException($"rule set v{version} is {row.State}; only a draft can start shadowing");
-        }
-        if (await db.EventKindRulesets.AnyAsync(r => r.State == EventKindRuleset.Shadow, ct))
-        {
-            throw new RulesetConflictException("another rule set is already shadowing; publish it or stop its shadow first");
-        }
-        row.State = EventKindRuleset.Shadow;
-        db.EventKindRulesetAudits.Add(Audit(version, EventKindRulesetAudit.ShadowStarted, actor, reason, clock.GetUtcNow(), null));
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-    }
-
     /// <summary>Validates (always, so a stale earlier validation cannot be reused), then makes the version the active one; the previous active becomes superseded.</summary>
     public async Task<ValidationReport> PublishAsync(int version, string actor, string reason, CancellationToken ct)
     {
@@ -236,9 +197,9 @@ public sealed class RulesetService(IDbContextFactory<PulujDbContext> factory, Ti
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         await LockAsync(db, ct);
         var row = await db.EventKindRulesets.SingleOrDefaultAsync(r => r.Version == version, ct) ?? throw new RulesetNotFoundException(version);
-        if (row.State is not (EventKindRuleset.Draft or EventKindRuleset.Shadow))
+        if (row.State != EventKindRuleset.Draft)
         {
-            throw new RulesetConflictException($"rule set v{version} is {row.State}; publish a draft or a shadow set (use rollback for an older published version)");
+            throw new RulesetConflictException($"rule set v{version} is {row.State}; publish a draft (use rollback for an older published version)");
         }
         var now = clock.GetUtcNow();
         var report = await ValidateAsync(db, version, ct);
@@ -283,23 +244,6 @@ public sealed class RulesetService(IDbContextFactory<PulujDbContext> factory, Ti
         db.EventKindRulesetAudits.Add(Audit(version, EventKindRulesetAudit.RolledBack, actor, reason, now, new JsonObject { ["from_version"] = previous }));
         await SaveActivationAsync(db, tx, ct);
         logger.LogWarning("Rule set rolled back to v{Version} by {Actor} ({Reason}); previous active: {Previous}", version, actor, reason, previous?.ToString() ?? "none");
-    }
-
-    public sealed record ShadowReport(int ShadowVersion, DateTimeOffset Since, long Disagreements, IReadOnlyList<ShadowPair> ByKind, IReadOnlyList<ShadowPair> ByRule, IReadOnlyList<long> SampleRawMessageIds);
-    public sealed record ShadowPair(string? Live, string? Shadow, long Count);
-
-    public async Task<ShadowReport> ShadowReportAsync(int version, DateTimeOffset? since, CancellationToken ct)
-    {
-        await using var db = await factory.CreateDbContextAsync(ct);
-        _ = await db.EventKindRulesets.AsNoTracking().SingleOrDefaultAsync(r => r.Version == version, ct) ?? throw new RulesetNotFoundException(version);
-        var from = since ?? clock.GetUtcNow().AddDays(-7);
-        var q = db.EventKindRuleShadows.AsNoTracking().Where(s => s.ShadowVersion == version && s.CreatedAt >= from);
-        var byKind = (await q.GroupBy(s => new { s.LiveKind, s.ShadowKind }).Select(g => new { g.Key.LiveKind, g.Key.ShadowKind, Count = g.LongCount() }).OrderByDescending(p => p.Count).Take(50).ToListAsync(ct))
-            .Select(p => new ShadowPair(p.LiveKind, p.ShadowKind, p.Count)).ToList();
-        var byRule = (await q.GroupBy(s => new { s.LiveRule, s.ShadowRule }).Select(g => new { g.Key.LiveRule, g.Key.ShadowRule, Count = g.LongCount() }).OrderByDescending(p => p.Count).Take(50).ToListAsync(ct))
-            .Select(p => new ShadowPair(p.LiveRule, p.ShadowRule, p.Count)).ToList();
-        var sample = await q.GroupBy(s => s.RawMessageId).Select(g => new { Raw = g.Key, Last = g.Max(s => s.ShadowId) }).OrderByDescending(x => x.Last).Take(20).Select(x => x.Raw).ToListAsync(ct);
-        return new ShadowReport(version, from, await q.LongCountAsync(ct), byKind, byRule, sample);
     }
 
     // ---- helpers ----

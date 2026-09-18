@@ -3,7 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using Puluj.Infrastructure.Messaging;
+using Puluj.Infrastructure.Notifications;
 using Puluj.Infrastructure.Persistence;
 
 namespace Puluj.Infrastructure.Ingestion;
@@ -21,9 +21,9 @@ public sealed class RawMessageIngestor(
     TimeProvider clock,
     ILogger<RawMessageIngestor> logger)
 {
-    /// <param name="enqueue">False while a history load is running: the message is stored Pending and the processors
+    /// <param name="announceProcessor">False while a history load is running: the message is stored Pending and the processors
     /// pick it up later in publication order, together with everything else the load brings.</param>
-    public async Task<IngestResult> IngestAsync(IncomingMessage msg, string sourceCode, CancellationToken ct, bool enqueue = true)
+    public async Task<IngestResult> IngestAsync(IncomingMessage msg, string sourceCode, CancellationToken ct, bool announceProcessor = true)
     {
         var receivedAt = clock.GetUtcNow();
         var hash = ComputeHash(sourceCode, msg.RawText, msg.RawPayload?.RootElement.GetRawText());
@@ -57,7 +57,7 @@ public sealed class RawMessageIngestor(
         if (result is long id)
         {
             metrics.RawReceived(sourceCode, receivedAt - msg.PublishedAt);
-            if (enqueue)
+            if (announceProcessor)
             {
                 await notifier.PublishAsync(new PulujEvent(PulujEventType.RawMessageStored, id, receivedAt), ct);
             }

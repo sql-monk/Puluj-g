@@ -22,7 +22,7 @@ public static class EndpointRouteBuilderExtensions
         api.MapGet("/map/config", (IOptions<MapOptions> map, HttpContext http) =>
         {
             http.Response.Headers.CacheControl = "public, max-age=300";
-            return new MapConfigDto(map.Value.LifetimeOptionsMinutes, (int)map.Value.MaxLifetime.TotalMinutes, map.Value.FeedHours, map.Value.IncidentHours);
+            return new MapConfigDto(map.Value.LifetimeOptionsMinutes, (int)map.Value.MaxLifetime.TotalMinutes, map.Value.FeedHours);
         });
 
         // Live state or the state at a moment in the past (spec §20). Same shape for both.
@@ -69,25 +69,6 @@ public static class EndpointRouteBuilderExtensions
             catch (MapFutureHistoryException ex) { return Results.BadRequest(new { code = "future_history", detail = ex.Message }); }
         });
 
-        // P11 (ADR-0011): incidents inside a bounded window, keyset-paged; `mode=recorded&asOf=` is what the system knew then.
-        // Suppressed (moderated) incidents are never listed here — the admin API has its own list.
-        api.MapGet("/incidents", async (DateTimeOffset? from, DateTimeOffset? to, string? state, string? kind, string? category, string? cursor, int? limit, string? mode, DateTimeOffset? asOf,
-            IncidentQueries incidents, CancellationToken ct) =>
-        {
-            try
-            {
-                return Results.Ok(await incidents.ListAsync(new IncidentQueries.Query(from, to, state, kind, category, cursor, limit, mode, asOf, IncludeSuppressed: false), ct));
-            }
-            catch (IncidentQueries.QueryException ex)
-            {
-                return Results.BadRequest(new { error = ex.Message });
-            }
-        });
-
-        // One incident with its evidence links and revisions; `?revision=N` shows the state as recorded at that revision.
-        api.MapGet("/incidents/{id:long}", async (long id, int? revision, IncidentQueries incidents, CancellationToken ct) =>
-            await incidents.DetailsAsync(id, revision, ct) is { } details ? Results.Ok(details) : Results.NotFound());
-
         // U04 public catalogue: distinct from the legacy map endpoints.  PublicCatalogQueries is an allow-list adapter
         // over the existing read side; it never returns raw text/payload or parser metadata and its large collections page.
         api.MapGet("/public/entities", async (string? entityKinds, string? q, string? eventKinds, string? eventCategories, string? categoryIds, string? classIds, string? familyIds, string? modelIds,
@@ -123,36 +104,6 @@ public static class EndpointRouteBuilderExtensions
         {
             try { return await catalogue.RelationPageAsync(kind, id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
             catch (PublicCatalogQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
-        });
-
-        // U05 public source-message catalogue. A message row is one saved revision; raw text/payload and worker stage
-        // JSON stay behind the allow-list implemented by PublicMessageQueries.
-        api.MapGet("/public/messages", async (string? q, string? sourceIds, bool? hasResults, string? outcome, string? eventKinds,
-            string? categoryIds, string? classIds, string? familyIds, string? modelIds, int? regionId, string? location, string? confidence,
-            DateTimeOffset? from, DateTimeOffset? to, string? cursor, int? pageSize, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
-        {
-            try { return Results.Ok(await messages.ListAsync(new PublicMessageQueries.Query(q, sourceIds, hasResults, outcome, eventKinds, categoryIds, classIds, familyIds, modelIds, regionId, location, confidence, from, to, cursor, pageSize, dataset), ct)); }
-            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
-        });
-        api.MapGet("/public/messages/{id:long}", async (long id, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
-        {
-            try { return await messages.DetailsAsync(id, dataset, ct) is { } details ? Results.Ok(details) : Results.NotFound(); }
-            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
-        });
-        api.MapGet("/public/messages/{id:long}/results", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
-        {
-            try { return await messages.ResultsPageAsync(id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
-            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
-        });
-        api.MapGet("/public/messages/{id:long}/revisions", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
-        {
-            try { return await messages.RevisionsPageAsync(id, cursor, limit, dataset, ct) is { } page ? Results.Ok(page) : Results.NotFound(); }
-            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
-        });
-        api.MapGet("/public/messages/{id:long}/text", async (long id, string? cursor, int? limit, string? dataset, PublicMessageQueries messages, CancellationToken ct) =>
-        {
-            try { return await messages.TextAsync(id, cursor, limit, dataset, ct) is { } text ? Results.Ok(text) : Results.NotFound(); }
-            catch (PublicMessageQueries.QueryException ex) { return Results.Problem(ex.Message, statusCode: ex.StatusCode); }
         });
 
         // Historical disabled models remain available to a detail/catalogue client when explicitly asked; existing UI

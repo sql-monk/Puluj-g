@@ -10,7 +10,7 @@ using Puluj.Infrastructure.Persistence;
 namespace Puluj.Api.Services;
 
 /// <summary>
-/// U04's public, read-only catalogue adapter.  It deliberately composes the existing target/track/alert/incident read
+/// Public, read-only catalogue adapter over the direct processor's target, track and alert read models.
 /// models instead of introducing a second aggregate writer.  Every database query is bounded; the final merge holds at
 /// most one page from each kind, rather than materialising a historical catalogue in memory.
 /// </summary>
@@ -24,7 +24,7 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
     private const string BestEffortConsistency = "best_effort_live";
     private const int MaxCollectionOffset = 10_000;
     // This key is deliberately stable across processes: a continuation may be served by another replica. The HMAC
-    // binds the otherwise opaque offset to its entity, collection, and generation descriptor; it is not an auth token.
+    // binds the otherwise opaque offset to its entity, collection, and dataset descriptor; it is not an auth token.
     private static readonly byte[] CollectionCursorKey = SHA256.HashData(Encoding.UTF8.GetBytes("puluj-public-catalogue-cursor-v1"));
 
     public sealed record Query(
@@ -46,16 +46,13 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private sealed record Candidate(int Rank, long NumericId, DateTimeOffset At, PublicEntitySummaryDto Summary);
 
-    private static readonly string[] EntityKinds = ["track", "incident", "alert", "observation"];
+    private static readonly string[] EntityKinds = ["track", "alert", "observation"];
 
     public async Task<PublicEntityPageDto> ListAsync(Query query, CancellationToken ct)
     {
         var filter = Validate(query);
         await using var db = await factory.CreateDbContextAsync(ct);
-        var activeGeneration = await ActiveGenerationAsync(db, ct);
-        if (filter.Kinds.Contains("incident") && activeGeneration is null)
-            throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
-        var actualDataset = Dataset(activeGeneration);
+        var actualDataset = LiveDataset;
         EnsureDataset(filter.Dataset, actualDataset);
         filter = filter with { Dataset = actualDataset, After = DecodeCursor(query.Cursor, filter.Fingerprint, actualDataset) };
 
@@ -64,17 +61,13 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         {
             candidates.AddRange(await TracksAsync(db, filter, ct));
         }
-        if (filter.Kinds.Contains("incident") && activeGeneration is not null)
-        {
-            candidates.AddRange(await IncidentsAsync(db, filter, activeGeneration.Value, ct));
-        }
         if (filter.Kinds.Contains("alert"))
         {
             candidates.AddRange(await AlertsAsync(db, filter, ct));
         }
         if (filter.Kinds.Contains("observation"))
         {
-            candidates.AddRange(await ObservationsAsync(db, filter, activeGeneration, ct));
+            candidates.AddRange(await ObservationsAsync(db, filter, ct));
         }
 
         var ordered = candidates
@@ -88,26 +81,23 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         }
         var next = more ? EncodeCursor(ordered[^1], filter.Fingerprint, filter.Dataset) : null;
         return new PublicEntityPageDto(filter.From, filter.To, filter.Dataset, BestEffortConsistency, ordered.Select(x => x.Summary).ToList(), next,
-            RefreshRecommended: query.Cursor is not null, Capabilities(activeGeneration is not null));
+            RefreshRecommended: query.Cursor is not null, Capabilities());
     }
 
     public async Task<PublicEntityDetailsDto?> DetailsAsync(string kind, long id, string? dataset, string? historyBasis, DateTimeOffset? at, CancellationToken ct)
     {
         ValidateDetail(kind, dataset, historyBasis, at);
         await using var db = await factory.CreateDbContextAsync(ct);
-        var activeGeneration = await ActiveGenerationAsync(db, ct);
-        if (kind == "incident" && activeGeneration is null)
-            throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
-        EnsureDataset(dataset, Dataset(activeGeneration));
-        var actualDataset = Dataset(activeGeneration);
-        var entity = await OneAsync(db, kind, id, activeGeneration, at, ct);
+        EnsureDataset(dataset, LiveDataset);
+        var actualDataset = LiveDataset;
+        var entity = await OneAsync(db, kind, id, at, ct);
         if (entity is null)
         {
             return null;
         }
-        var evidence = await EvidenceAsync(db, kind, id, null, DetailPreviewSize, activeGeneration, Scope(kind, id, actualDataset, "evidence"), ct);
-        var messages = await MessagesAsync(db, kind, id, null, DetailPreviewSize, activeGeneration, Scope(kind, id, actualDataset, "messages"), ct);
-        var relations = await RelationsAsync(db, kind, id, null, DetailPreviewSize, activeGeneration, Scope(kind, id, actualDataset, "relations"), ct);
+        var evidence = await EvidenceAsync(db, kind, id, null, DetailPreviewSize, Scope(kind, id, actualDataset, "evidence"), ct);
+        var messages = await MessagesAsync(db, kind, id, null, DetailPreviewSize, Scope(kind, id, actualDataset, "messages"), ct);
+        var relations = await RelationsAsync(db, kind, id, null, DetailPreviewSize, Scope(kind, id, actualDataset, "relations"), ct);
         var root = $"/api/public/entities/{kind}/{id}";
         var query = "?dataset=" + Uri.EscapeDataString(actualDataset);
         return new PublicEntityDetailsDto(entity,
@@ -119,43 +109,34 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
                 ["evidence"] = root + "/evidence" + query,
                 ["messages"] = root + "/messages" + query,
                 ["relations"] = root + "/relations" + query,
-            }, Capabilities(activeGeneration is not null));
+            }, Capabilities());
     }
 
     public async Task<PublicCollectionPageDto<PublicEvidenceDto>?> EvidencePageAsync(string kind, long id, string? cursor, int? limit, string? dataset, CancellationToken ct)
     {
         ValidateCollection(kind, dataset);
         await using var db = await factory.CreateDbContextAsync(ct);
-        var generation = await ActiveGenerationAsync(db, ct);
-        if (kind == "incident" && generation is null)
-            throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
-        var actualDataset = Dataset(generation);
+        var actualDataset = LiveDataset;
         EnsureDataset(dataset, actualDataset);
-        return await ExistsAsync(db, kind, id, generation, ct) ? await EvidenceAsync(db, kind, id, cursor, PageSize(limit), generation, Scope(kind, id, actualDataset, "evidence"), ct) : null;
+        return await ExistsAsync(db, kind, id, ct) ? await EvidenceAsync(db, kind, id, cursor, PageSize(limit), Scope(kind, id, actualDataset, "evidence"), ct) : null;
     }
 
     public async Task<PublicCollectionPageDto<PublicMessageRefDto>?> MessagePageAsync(string kind, long id, string? cursor, int? limit, string? dataset, CancellationToken ct)
     {
         ValidateCollection(kind, dataset);
         await using var db = await factory.CreateDbContextAsync(ct);
-        var generation = await ActiveGenerationAsync(db, ct);
-        if (kind == "incident" && generation is null)
-            throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
-        var actualDataset = Dataset(generation);
+        var actualDataset = LiveDataset;
         EnsureDataset(dataset, actualDataset);
-        return await ExistsAsync(db, kind, id, generation, ct) ? await MessagesAsync(db, kind, id, cursor, PageSize(limit), generation, Scope(kind, id, actualDataset, "messages"), ct) : null;
+        return await ExistsAsync(db, kind, id, ct) ? await MessagesAsync(db, kind, id, cursor, PageSize(limit), Scope(kind, id, actualDataset, "messages"), ct) : null;
     }
 
     public async Task<PublicCollectionPageDto<PublicEntityRefDto>?> RelationPageAsync(string kind, long id, string? cursor, int? limit, string? dataset, CancellationToken ct)
     {
         ValidateCollection(kind, dataset);
         await using var db = await factory.CreateDbContextAsync(ct);
-        var generation = await ActiveGenerationAsync(db, ct);
-        if (kind == "incident" && generation is null)
-            throw new QueryException("incident projection is unavailable; reload when the active generation is ready", StatusCodes.Status503ServiceUnavailable);
-        var actualDataset = Dataset(generation);
+        var actualDataset = LiveDataset;
         EnsureDataset(dataset, actualDataset);
-        return await ExistsAsync(db, kind, id, generation, ct) ? await RelationsAsync(db, kind, id, cursor, PageSize(limit), generation, Scope(kind, id, actualDataset, "relations"), ct) : null;
+        return await ExistsAsync(db, kind, id, ct) ? await RelationsAsync(db, kind, id, cursor, PageSize(limit), Scope(kind, id, actualDataset, "relations"), ct) : null;
     }
 
     private Filter Validate(Query q)
@@ -222,7 +203,7 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private void ValidateDetail(string kind, string? dataset, string? historyBasis, DateTimeOffset? at)
     {
-        if (!EntityKinds.Contains(kind, StringComparer.Ordinal)) throw new QueryException("kind must be track|incident|alert|observation");
+        if (!EntityKinds.Contains(kind, StringComparer.Ordinal)) throw new QueryException("kind must be track|alert|observation");
         if (!string.IsNullOrWhiteSpace(historyBasis) || at is not null)
         {
             if (!string.Equals(historyBasis, "reconstructed", StringComparison.OrdinalIgnoreCase) || at is null)
@@ -235,12 +216,8 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private void ValidateCollection(string kind, string? dataset) => ValidateDetail(kind, dataset, null, null);
 
-    private static string Dataset(Guid? activeGeneration) => activeGeneration is Guid generation ? $"{LiveDataset}:{generation:N}" : LiveDataset;
-    private static void EnsureDataset(Filter filter, Guid? activeGeneration) => EnsureDataset(filter.Dataset, Dataset(activeGeneration));
     private static void EnsureDataset(string? dataset, string actualDataset)
     {
-        // `live` starts a request; the returned generation descriptor must be echoed on a continuation.  A changed active
-        // generation is a defined reload signal rather than silently mixing incident pages.
         if (!string.IsNullOrWhiteSpace(dataset) && !string.Equals(dataset, LiveDataset, StringComparison.OrdinalIgnoreCase)
             && !string.Equals(dataset, actualDataset, StringComparison.OrdinalIgnoreCase))
             throw new QueryException("dataset is no longer active; reload", StatusCodes.Status409Conflict);
@@ -258,21 +235,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         var ids = rows.Select(x => x.TargetTrackId).ToList();
         var matched = await TrackEvidenceAsync(db, ids, f, ct);
         return rows.Select(t => new Candidate(0, t.TargetTrackId, t.LastSeenAt, WithoutGeometry(TrackSummary(t, matched.GetValueOrDefault(t.TargetTrackId))))).ToList();
-    }
-
-    private async Task<List<Candidate>> IncidentsAsync(PulujDbContext db, Filter f, Guid generation, CancellationToken ct)
-    {
-        // As with tracks, all evidence predicates (including the interval) live on one incident-observation row.
-        var incidentIds = MatchingIncidentIds(db, f);
-        var q = db.Incidents.AsNoTracking().Where(i => i.GenerationId == generation && !i.Suppressed && incidentIds.Contains(i.IncidentId));
-        if (f.States.Count > 0) q = q.Where(i => f.States.Contains(i.State));
-        if (f.HasLocation is bool located) q = located ? q.Where(i => i.LocationKind != LocationKind.Unknown) : q.Where(i => i.LocationKind == LocationKind.Unknown);
-        if (f.RegionPlaces.Count > 0) q = q.Where(i => i.LocationPlaceId.HasValue && f.RegionPlaces.Contains(i.LocationPlaceId.Value));
-        q = ApplyIncidentCursor(q, f.After).OrderByDescending(i => i.LastReportedAt).ThenByDescending(i => i.IncidentId).Take(f.Limit + 1);
-        var rows = await q.ToListAsync(ct);
-        var ids = rows.Select(x => x.IncidentId).ToList();
-        var evidence = await IncidentEvidenceAsync(db, ids, f, ct);
-        return rows.Select(i => new Candidate(1, i.IncidentId, i.LastReportedAt, WithoutGeometry(IncidentSummary(i, evidence.GetValueOrDefault(i.IncidentId))))).ToList();
     }
 
     private async Task<List<Candidate>> AlertsAsync(PulujDbContext db, Filter f, CancellationToken ct)
@@ -295,14 +257,12 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         return rows.Select(a => new Candidate(2, a.AirAlertId, a.StartedAt, WithoutGeometry(AlertSummary(a)))).ToList();
     }
 
-    private async Task<List<Candidate>> ObservationsAsync(PulujDbContext db, Filter f, Guid? generation, CancellationToken ct)
+    private async Task<List<Candidate>> ObservationsAsync(PulujDbContext db, Filter f, CancellationToken ct)
     {
         var q = TargetMatches(db.Targets.AsNoTracking(), f);
         // A fact represented by an available canonical aggregate is not duplicated in the list.  Its direct observation URL
         // remains available through DetailsAsync, including when the projection was switched on after the fact was written.
         q = q.Where(t => !db.TrackTargets.Any(tt => tt.TargetId == t.TargetId));
-        if (generation is Guid g)
-            q = q.Where(t => !db.IncidentObservations.Any(o => o.LegacyTargetId == t.TargetId && o.GenerationId == g));
         q = ApplyTargetCursor(q, f.After).OrderByDescending(t => t.ObservedAt).ThenByDescending(t => t.TargetId).Take(f.Limit + 1);
         var rows = await q.ToListAsync(ct);
         return rows.Select(t => new Candidate(3, t.TargetId, t.ObservedAt, WithoutGeometry(ObservationSummary(t)))).ToList();
@@ -357,25 +317,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private IQueryable<long> TargetMatchIds(PulujDbContext db, Filter f) => TargetMatches(db.Targets.AsNoTracking(), f).Select(t => t.TargetId);
 
-    private IQueryable<long> MatchingIncidentIds(PulujDbContext db, Filter f)
-    {
-        var observations = db.IncidentObservations.AsNoTracking().Where(o => o.EffectiveAt >= f.From && o.EffectiveAt < f.To);
-        if (f.Sources.Count > 0) observations = observations.Where(o => f.Sources.Contains(o.SourceId));
-        if (NeedsTargetOnlyFilter(f))
-        {
-            var targetIds = TargetMatchesStatic(db.Targets.AsNoTracking(), f).Select(t => t.TargetId);
-            observations = observations.Where(o => o.LegacyTargetId.HasValue && targetIds.Contains(o.LegacyTargetId.Value));
-        }
-        return observations.Select(o => o.IncidentId);
-    }
-
-    private bool MatchesObservation(IncidentObservation observation, Target? target, Filter f)
-    {
-        if (observation.EffectiveAt < f.From || observation.EffectiveAt >= f.To) return false;
-        if (f.Sources.Count > 0 && !f.Sources.Contains(observation.SourceId)) return false;
-        return !NeedsTargetOnlyFilter(f) || target is not null && MatchesTarget(target, f);
-    }
-
     private bool MatchesTarget(Target target, Filter f)
     {
         if (f.EventKinds.Count > 0 && (!target.EventKindId.HasValue || !f.EventKinds.Contains(target.EventKindId.Value))) return false;
@@ -413,20 +354,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
             matched.FirstOrDefault(x => x.Id == id)?.Sources.Order().ToList() ?? []));
     }
 
-    private async Task<Dictionary<long, EvidenceStats>> IncidentEvidenceAsync(PulujDbContext db, List<long> ids, Filter f, CancellationToken ct)
-    {
-        if (ids.Count == 0) return [];
-        var all = db.IncidentObservations.AsNoTracking().Where(x => ids.Contains(x.IncidentId));
-        var totals = await all.GroupBy(x => x.IncidentId).Select(g => new { Id = g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Id, x => x.Count, ct);
-        // Load only the bounded page's evidence rows.  This predicate keeps all criteria on one observation/target pair.
-        var rows = await all.ToListAsync(ct);
-        var targetIds = rows.Where(o => o.LegacyTargetId is not null).Select(o => o.LegacyTargetId!.Value).Distinct().ToList();
-        var targets = await db.Targets.AsNoTracking().Where(t => targetIds.Contains(t.TargetId)).ToDictionaryAsync(t => t.TargetId, ct);
-        var matched = rows.Where(o => MatchesObservation(o, targets.GetValueOrDefault(o.LegacyTargetId ?? -1), f)).GroupBy(o => o.IncidentId)
-            .ToDictionary(g => g.Key, g => new EvidenceStats(totals.GetValueOrDefault(g.Key), g.Count(), g.Select(x => x.SourceId).Distinct().Order().ToList()));
-        return ids.ToDictionary(id => id, id => matched.GetValueOrDefault(id) ?? new EvidenceStats(totals.GetValueOrDefault(id), 0, []));
-    }
-
     private sealed record EvidenceStats(int Total, int Matched, IReadOnlyList<int> Sources);
 
     private PublicEntitySummaryDto TrackSummary(TargetTrack t, EvidenceStats? evidence) => new("track", t.TargetTrackId.ToString(), $"Трек #{t.TargetTrackId}", null, null,
@@ -434,15 +361,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         t.LastLocationKind.ToString().ToLowerInvariant(), t.LastLocationPlaceId, refs.Place(t.LastLocationPlaceId)?.Name, refs.RegionOf(t.LastLocationPlaceId)?.Id,
         evidence?.Sources ?? [], evidence?.Total ?? t.TargetCount, evidence?.Matched ?? t.TargetCount, t.LastLocation is not null || t.LastLocationPlaceId is not null,
         Locator(t.LastLocationKind, t.LastLocationPlaceId, t.LastLocation, t.LastLocationAccuracyKm, t.LastSeenAt));
-
-    private PublicEntitySummaryDto IncidentSummary(Incident i, EvidenceStats? evidence)
-    {
-        var kind = refs.EventKinds.GetValueOrDefault(i.EventKindId);
-        return new("incident", i.IncidentId.ToString(), kind?.NameUk ?? $"Подія #{i.IncidentId}", kind?.Code, kind?.NameUk, null, i.LastReportedAt,
-            i.State, i.Confidence.ToString().ToLowerInvariant(), i.LocationKind.ToString().ToLowerInvariant(), i.LocationPlaceId, refs.Place(i.LocationPlaceId)?.Name, refs.RegionOf(i.LocationPlaceId)?.Id,
-            evidence?.Sources ?? [], evidence?.Total ?? 0, evidence?.Matched ?? 0, i.Geometry is not null || i.LocationPlaceId is not null,
-            Locator(i.LocationKind, i.LocationPlaceId, i.Geometry, i.AccuracyKm, i.EventAt));
-    }
 
     private PublicEntitySummaryDto AlertSummary(AirAlert a) => new("alert", a.AirAlertId.ToString(), $"Тривога: {refs.Place(a.PlaceId)?.Name ?? $"#{a.PlaceId}"}", "air_alert", "Повітряна тривога", null,
         a.StartedAt, a.EndedAt is null ? "active" : "closed", null, "place", a.PlaceId, refs.Place(a.PlaceId)?.Name, refs.RegionOf(a.PlaceId)?.Id,
@@ -461,26 +379,34 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
 
     private PublicMapLocatorDto Locator(LocationKind kind, int? placeId, Geometry? geometry, double? accuracy, DateTimeOffset at) =>
         new(kind == LocationKind.Unknown ? null : kind.ToString().ToLowerInvariant(), placeId, refs.Place(placeId)?.Name, refs.RegionOf(placeId)?.Id,
-            IncidentQueries.Precision(kind, accuracy, refs.Place(placeId)), geometry, at,
+            Precision(kind), geometry, at,
             geometry is null && placeId is null ? "no_reported_location" : null);
 
     private static PublicEntitySummaryDto WithoutGeometry(PublicEntitySummaryDto summary) => summary with { Map = summary.Map with { Geometry = null } };
+
+    private static string Precision(LocationKind kind) => kind switch
+    {
+        LocationKind.Point => "point",
+        LocationKind.City => "city",
+        LocationKind.District => "district",
+        LocationKind.Region or LocationKind.Area => "region",
+        _ => "unknown",
+    };
 
     private string? Classification(int category, int? @class, int? family, int? model) =>
         model is int m && refs.Models.TryGetValue(m, out var md) ? md.CanonicalName : family is int f && refs.Families.TryGetValue(f, out var fa) ? fa.Name :
         @class is int c && refs.Classes.TryGetValue(c, out var cl) ? cl.Name : refs.Categories.GetValueOrDefault(category)?.Name;
 
-    private async Task<PublicEntitySummaryDto?> OneAsync(PulujDbContext db, string kind, long id, Guid? generation, DateTimeOffset? at, CancellationToken ct) => kind switch
+    private async Task<PublicEntitySummaryDto?> OneAsync(PulujDbContext db, string kind, long id, DateTimeOffset? at, CancellationToken ct) => kind switch
     {
         "track" => await TrackAtAsync(db, id, at, ct),
-        "incident" when generation is Guid g => await db.Incidents.AsNoTracking().FirstOrDefaultAsync(x => x.IncidentId == id && x.GenerationId == g && !x.Suppressed, ct) is { } i ? IncidentSummary(i, null) : null,
         "alert" => await AlertAtAsync(db, id, at, ct),
         "observation" => await db.Targets.AsNoTracking().FirstOrDefaultAsync(x => x.TargetId == id, ct) is { } o ? ObservationSummary(o) : null,
         _ => null,
     };
 
-    private async Task<bool> ExistsAsync(PulujDbContext db, string kind, long id, Guid? generation, CancellationToken ct) =>
-        await OneAsync(db, kind, id, generation, null, ct) is not null;
+    private async Task<bool> ExistsAsync(PulujDbContext db, string kind, long id, CancellationToken ct) =>
+        await OneAsync(db, kind, id, null, ct) is not null;
 
     /// <summary>Uses the append-only revision, rather than the current track row, for an exact reconstructed frame.</summary>
     private async Task<PublicEntitySummaryDto?> TrackAtAsync(PulujDbContext db, long id, DateTimeOffset? at, CancellationToken ct)
@@ -513,14 +439,13 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         return AlertSummary(alert);
     }
 
-    private async Task<PublicCollectionPageDto<PublicEvidenceDto>> EvidenceAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, Guid? generation, string scope, CancellationToken ct)
+    private async Task<PublicCollectionPageDto<PublicEvidenceDto>> EvidenceAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, string scope, CancellationToken ct)
     {
         var offset = Offset(cursor, scope);
         return kind switch
         {
             "observation" => Page(await ObservationEvidenceAsync(db, id, ct), offset, limit, scope),
             "track" => await TrackEvidencePagedAsync(db, id, offset, limit, scope, ct),
-            "incident" when generation is not null => await IncidentEvidencePagedAsync(db, id, generation.Value, offset, limit, scope, ct),
             "alert" => Page(await AlertEvidenceAsync(db, id, ct), offset, limit, scope),
             _ => new PublicCollectionPageDto<PublicEvidenceDto>([], null, 0),
         };
@@ -541,19 +466,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         return new PublicCollectionPageDto<PublicEvidenceDto>(items, offset + items.Count < total ? EncodeOffset(offset + items.Count, scope) : null, total);
     }
 
-    private async Task<PublicCollectionPageDto<PublicEvidenceDto>> IncidentEvidencePagedAsync(PulujDbContext db, long id, Guid generation, int offset, int limit, string scope, CancellationToken ct)
-    {
-        var query = db.IncidentObservations.AsNoTracking().Where(x => x.IncidentId == id && x.GenerationId == generation);
-        var total = await query.CountAsync(ct);
-        var rows = await query.OrderBy(x => x.EffectiveAt).ThenBy(x => x.ObservationId).Skip(offset).Take(limit).ToListAsync(ct);
-        var targetIds = rows.Where(x => x.LegacyTargetId is not null).Select(x => x.LegacyTargetId!.Value).ToList();
-        var targets = await db.Targets.AsNoTracking().Where(x => targetIds.Contains(x.TargetId)).ToDictionaryAsync(x => x.TargetId, ct);
-        var items = rows.Select(x => targets.TryGetValue(x.LegacyTargetId ?? -1, out var t)
-            ? Evidence("incident", id, t, x.Relation, x.Score, x.ObservationId)
-            : new PublicEvidenceDto("incident", id.ToString(), x.ObservationId.ToString(), null, x.SourceId, x.EffectiveAt, null, null, null, null, x.Relation, Math.Round(x.Score, 3))).ToList();
-        return new PublicCollectionPageDto<PublicEvidenceDto>(items, offset + items.Count < total ? EncodeOffset(offset + items.Count, scope) : null, total);
-    }
-
     private async Task<List<PublicEvidenceDto>> AlertEvidenceAsync(PulujDbContext db, long id, CancellationToken ct)
     {
         var a = await db.AirAlerts.AsNoTracking().FirstOrDefaultAsync(x => x.AirAlertId == id, ct);
@@ -562,12 +474,12 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
             new PublicEvidenceDto("alert", id.ToString(), null, null, a.SourceId, index == 0 ? a.StartedAt : a.EndedAt ?? a.StartedAt, "air_alert", null, "place", a.PlaceId, index == 0 ? "start_message" : "end_message", null)).ToList();
     }
 
-    private PublicEvidenceDto Evidence(string entityKind, long entityId, Target t, string relation, double? score, Guid? observationId = null) => new(entityKind, entityId.ToString(), (observationId ?? t.ObservationId)?.ToString(), t.TargetId.ToString(), t.SourceId,
+    private PublicEvidenceDto Evidence(string entityKind, long entityId, Target t, string relation, double? score) => new(entityKind, entityId.ToString(), null, t.TargetId.ToString(), t.SourceId,
         t.ObservedAt, t.EventKindId is int k ? refs.EventKinds.GetValueOrDefault(k)?.Code : null,
         t.TargetCategoryId is int cat ? Classification(cat, t.TargetClassId, t.TargetFamilyId, t.TargetModelId) : null,
         t.LocationKind.ToString().ToLowerInvariant(), t.LocationPlaceId, relation, score is double s ? Math.Round(s, 3) : null);
 
-    private async Task<PublicCollectionPageDto<PublicMessageRefDto>> MessagesAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, Guid? generation, string scope, CancellationToken ct)
+    private async Task<PublicCollectionPageDto<PublicMessageRefDto>> MessagesAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, string scope, CancellationToken ct)
     {
         // Correlated EXISTS preserves raw-message de-duplication in SQL.  Do not first materialise every evidence ID:
         // a very large aggregate must still cost one bounded page query.
@@ -575,8 +487,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         {
             "observation" => db.RawMessages.AsNoTracking().Where(r => db.Targets.Any(t => t.TargetId == id && t.RawMessageId == r.RawMessageId)),
             "track" => db.RawMessages.AsNoTracking().Where(r => db.TrackTargets.Any(tt => tt.TargetTrackId == id && db.Targets.Any(t => t.TargetId == tt.TargetId && t.RawMessageId == r.RawMessageId))),
-            "incident" when generation is not null => db.RawMessages.AsNoTracking().Where(r => db.IncidentObservations.Any(o => o.IncidentId == id && o.GenerationId == generation && o.LegacyTargetId != null &&
-                db.Targets.Any(t => t.TargetId == o.LegacyTargetId.Value && t.RawMessageId == r.RawMessageId))),
             "alert" => db.RawMessages.AsNoTracking().Where(r => db.AirAlerts.Any(a => a.AirAlertId == id && (a.StartRawMessageId == r.RawMessageId || a.EndRawMessageId == r.RawMessageId))),
             _ => db.RawMessages.AsNoTracking().Where(_ => false),
         };
@@ -587,14 +497,13 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         return new PublicCollectionPageDto<PublicMessageRefDto>(page, offset + page.Count < total ? EncodeOffset(offset + page.Count, scope) : null, total);
     }
 
-    private async Task<PublicCollectionPageDto<PublicEntityRefDto>> RelationsAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, Guid? generation, string scope, CancellationToken ct)
+    private async Task<PublicCollectionPageDto<PublicEntityRefDto>> RelationsAsync(PulujDbContext db, string kind, long id, string? cursor, int limit, string scope, CancellationToken ct)
     {
         var offset = Offset(cursor, scope);
         return kind switch
         {
             "observation" => await ObservationRelationsPagedAsync(db, id, offset, limit, scope, ct),
             "track" => await TrackRelationsPagedAsync(db, id, offset, limit, scope, ct),
-            "incident" when generation is not null => await IncidentRelationsPagedAsync(db, id, generation.Value, offset, limit, scope, ct),
             _ => new PublicCollectionPageDto<PublicEntityRefDto>([], null, 0),
         };
     }
@@ -636,15 +545,6 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
         var total = await query.CountAsync(ct);
         var rows = await query.OrderBy(x => x.Sequence).Skip(offset).Take(limit).Select(x => new { x.TargetId, x.AssociationConfidence }).ToListAsync(ct);
         var items = rows.Select(x => new PublicEntityRefDto("observation", x.TargetId.ToString(), null, "aggregate_evidence", x.AssociationConfidence)).ToList();
-        return new PublicCollectionPageDto<PublicEntityRefDto>(items, offset + items.Count < total ? EncodeOffset(offset + items.Count, scope) : null, total);
-    }
-
-    private async Task<PublicCollectionPageDto<PublicEntityRefDto>> IncidentRelationsPagedAsync(PulujDbContext db, long id, Guid generation, int offset, int limit, string scope, CancellationToken ct)
-    {
-        var query = db.IncidentObservations.AsNoTracking().Where(x => x.IncidentId == id && x.GenerationId == generation);
-        var total = await query.CountAsync(ct);
-        var rows = await query.OrderBy(x => x.EffectiveAt).ThenBy(x => x.ObservationId).Skip(offset).Take(limit).ToListAsync(ct);
-        var items = rows.Select(x => new PublicEntityRefDto("observation", x.LegacyTargetId?.ToString() ?? x.ObservationId.ToString(), null, x.Relation, x.Score)).ToList();
         return new PublicCollectionPageDto<PublicEntityRefDto>(items, offset + items.Count < total ? EncodeOffset(offset + items.Count, scope) : null, total);
     }
 
@@ -728,17 +628,13 @@ public sealed class PublicCatalogQueries(IDbContextFactory<PulujDbContext> facto
     private static bool Contains(string? haystack, string needle) => haystack?.Contains(needle, StringComparison.OrdinalIgnoreCase) == true;
     private static string? fingerprintOnlyQ(Filter f) => f.Q;
 
-    private static IReadOnlyDictionary<string, bool> Capabilities(bool incidents) => new Dictionary<string, bool>
+    private static IReadOnlyDictionary<string, bool> Capabilities() => new Dictionary<string, bool>
     {
-        ["tracks"] = true, ["observations"] = true, ["alerts"] = true, ["incidents"] = incidents, ["historicalDataset"] = false,
+        ["tracks"] = true, ["observations"] = true, ["alerts"] = true, ["historicalDataset"] = false,
         ["alertTaxonomy"] = false, ["alertConfidence"] = false,
     };
 
-    private static async Task<Guid?> ActiveGenerationAsync(PulujDbContext db, CancellationToken ct) =>
-        await db.ProcessingGenerations.AsNoTracking().Where(g => g.IsActive).Select(g => (Guid?)g.GenerationId).SingleOrDefaultAsync(ct);
-
     private static IQueryable<TargetTrack> ApplyTrackCursor(IQueryable<TargetTrack> q, Cursor? cursor) => cursor is null ? q : q.Where(x => x.LastSeenAt < new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) || (x.LastSeenAt == new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) && (0 > cursor.Rank || 0 == cursor.Rank && x.TargetTrackId < cursor.Id)));
-    private static IQueryable<Incident> ApplyIncidentCursor(IQueryable<Incident> q, Cursor? cursor) => cursor is null ? q : q.Where(x => x.LastReportedAt < new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) || (x.LastReportedAt == new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) && (1 > cursor.Rank || 1 == cursor.Rank && x.IncidentId < cursor.Id)));
     private static IQueryable<AirAlert> ApplyAlertCursor(IQueryable<AirAlert> q, Cursor? cursor) => cursor is null ? q : q.Where(x => x.StartedAt < new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) || (x.StartedAt == new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) && (2 > cursor.Rank || 2 == cursor.Rank && x.AirAlertId < cursor.Id)));
     private static IQueryable<Target> ApplyTargetCursor(IQueryable<Target> q, Cursor? cursor) => cursor is null ? q : q.Where(x => x.ObservedAt < new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) || (x.ObservedAt == new DateTimeOffset(cursor.Ticks, TimeSpan.Zero) && (3 > cursor.Rank || 3 == cursor.Rank && x.TargetId < cursor.Id)));
 }

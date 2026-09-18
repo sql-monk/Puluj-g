@@ -126,7 +126,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
             "VALUES ({0}, {1}, 0, {2}, 1, {3}, 0, 0, 0, 1, false, 0, 0, 0, 2, 'p07')", rawId, sourceId, At, kindId);
         var ex = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync("DELETE FROM event_kinds WHERE event_kind_id = {0}", kindId));
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, ex.SqlState);
-        var dup = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync("INSERT INTO event_kinds (code, name_uk, category, requires_location_for_map, creates_incident, enabled, map_visible, sort_order, policy_version) VALUES ('target.observed', 'dup', 'target', false, false, true, true, 0, 1)"));
+        var dup = await Assert.ThrowsAsync<PostgresException>(() => db.Database.ExecuteSqlRawAsync("INSERT INTO event_kinds (code, name_uk, category, requires_location_for_map, enabled, map_visible, sort_order, policy_version) VALUES ('target.observed', 'dup', 'target', false, true, true, 0, 1)"));
         Assert.Equal(PostgresErrorCodes.UniqueViolation, dup.SqlState);
         await Truncate(db);
     }
@@ -149,7 +149,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
         {
             SourceId = telegram, SourceMessageId = "p07-text", PublishedAt = At, RawText = "Шахеди на Сумщині курсом на Полтавщину.",
             RawPayload = JsonDocument.Parse("{\"kind\":\"test\"}"),
-        }, "tg_kpszsu", CancellationToken.None, enqueue: false);
+        }, "tg_kpszsu", CancellationToken.None, announceProcessor: false);
         var structured = await ingestor.IngestAsync(new()
         {
             SourceId = alerts, SourceMessageId = "p07-alert:start", PublishedAt = At,
@@ -158,7 +158,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
                 kind = "alert.started", at = At,
                 alert = new { id = "p07-31", location_title = "Сумська область", location_oblast = "Сумська область", location_type = "oblast", alert_type = "air_raid", started_at = At },
             }),
-        }, "alerts_in_ua", CancellationToken.None, enqueue: false);
+        }, "alerts_in_ua", CancellationToken.None, announceProcessor: false);
         Assert.Equal(1, await processor.ProcessAsync(text.RawMessageId!.Value, CancellationToken.None));
         Assert.Equal(1, await processor.ProcessAsync(structured.RawMessageId!.Value, CancellationToken.None));
 
@@ -166,7 +166,7 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
         var observed = targets.Single(t => t.RawMessageId == text.RawMessageId);
         Assert.Equal(EventType.TargetObserved, observed.EventType);
         Assert.Equal("target.observed", observed.EventKind!.Code);
-        Assert.Equal(2, observed.ParserMetadata!.RootElement.GetProperty("eventKindPolicyVersion").GetInt32()); // P10: dedupPolicy for incident kinds
+        Assert.Equal(2, observed.ParserMetadata!.RootElement.GetProperty("eventKindPolicyVersion").GetInt32());
         var started = targets.Single(t => t.RawMessageId == structured.RawMessageId);
         Assert.Equal(EventType.AirRaidAlert, started.EventType);
         Assert.Equal("alert.air_raid.started", started.EventKind!.Code);

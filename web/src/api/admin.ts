@@ -267,7 +267,7 @@ export interface PipelineReportDto {
   sources: PipelineSourceDto[]
   timeline: PipelineBucketDto[]
   instances: PipelineInstanceDto[]
-  queue: Record<string, number>
+  processingStatuses: Record<string, number>
   errorsByStage: Record<string, number>
   recentErrors: ProcessingErrorDto[]
 }
@@ -448,7 +448,7 @@ export const admin = {
     dbTableRows: (name: string, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}`),
     maintainTable: (name: string, action: 'analyze' | 'vacuum' | 'reindex') => call<{ name: string; operation: string; elapsedMs: number }>('POST', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/${action}`, {}),
     dbQuery: (sql: string) => call<DbQueryResultDto>('POST', '/api/admin/ops/db/query', { sql }),
-    reprocess: () => call<{ queued: number; analyticsReset: boolean }>('POST', '/api/admin/ops/reprocess', { confirmation: 'REPROCESS_DERIVED_DATA' }),
+    reprocess: () => call<{ pending: number; analyticsReset: boolean }>('POST', '/api/admin/ops/reprocess', { confirmation: 'REPROCESS_DERIVED_DATA' }),
     clearOperationalData: () => call<{ tables: number; stoppedContainers: number }>('POST', '/api/admin/ops/db/clear', { confirmation: 'DELETE_ALL_OPERATIONAL_DATA' }),
     logFiles: () => call<LogFileDto[]>('GET', '/api/admin/logs/files'),
     logTail: (file: string, lines: number, filter: string, level: string) => {

@@ -232,7 +232,7 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
             SourceMessageId = "broken:start",
             PublishedAt = DateTimeOffset.UtcNow.AddHours(-1),
             RawPayload = JsonDocument.Parse("{\"kind\":\"alert.started\"}"),
-        }, "alerts_in_ua", CancellationToken.None, enqueue: false);
+        }, "alerts_in_ua", CancellationToken.None, announceProcessor: false);
         var id = broken.RawMessageId!.Value;
         var processor = ActivatorUtilities.CreateInstance<RawMessageProcessor>(Services, new ProcessorIdentity("A"));
 
@@ -300,7 +300,7 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
     {
         public int Calls;
 
-        public Task OnTargetsAsync(PulujDbContext db, IReadOnlyList<Domain.Entities.Target> targets, Domain.Entities.Source source, ICollection<Infrastructure.Messaging.PulujEvent> events, CancellationToken ct)
+        public Task OnTargetsAsync(PulujDbContext db, IReadOnlyList<Domain.Entities.Target> targets, Domain.Entities.Source source, ICollection<Infrastructure.Notifications.PulujEvent> events, CancellationToken ct)
         {
             if (++Calls == 1)
             {
@@ -340,7 +340,7 @@ public sealed class ParallelProcessingTests(PipelineFixture fixture)
                 PublishedAt = t0.AddMinutes(10 * i),
                 RawText = $"Шахеди на Сумщині курсом на Полтавщину. #{prefix}{i}",
                 RawPayload = JsonDocument.Parse("{\"kind\":\"test\"}"),
-            }, "tg_kpszsu", CancellationToken.None, enqueue: false);
+            }, "tg_kpszsu", CancellationToken.None, announceProcessor: false);
             Assert.True(result.IsNew);
             ids.Add(result.RawMessageId!.Value);
         }

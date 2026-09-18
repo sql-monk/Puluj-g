@@ -11,7 +11,7 @@ const PERIODS: { hours: 24 | 168 | 720; label: string }[] = [
 ]
 
 /**
- * What the pipeline did in the period: totals, per bucket, per source, per instance, the queue and the errors.
+ * What the pipeline did in the period: totals, per bucket, per source, per instance, current processing statuses and errors.
  * One request per period; polled every 15 s.
  */
 export function PipelinePanel() {
@@ -58,7 +58,7 @@ export function PipelinePanel() {
       {data && (
         <Section title="Помилки" badge={<Badge ok={data.totals.errors === 0 ? true : data.totals.errors < 20 ? null : false} text={`${fmtNum(data.totals.errors)} за період`} />}>
           <div className="flex flex-wrap gap-2 text-xs">
-            {Object.entries(data.queue).map(([k, v]) => (
+            {Object.entries(data.processingStatuses).map(([k, v]) => (
               <span key={k} className="rounded bg-slate-100 px-2 py-0.5 dark:bg-slate-800">
                 {k}: {fmtNum(v)}
               </span>

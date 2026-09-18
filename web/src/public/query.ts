@@ -18,7 +18,6 @@ export interface DataQuery {
   confidence?: string
   location?: string
   hasResults?: boolean
-  outcome?: string
   sort?: string
   cursor?: string
   pageSize?: number
@@ -31,8 +30,8 @@ export interface ParsedDataQuery {
 }
 
 const LIST_KEYS = ['eventKinds', 'entityKinds', 'eventCategories', 'categoryIds', 'classIds', 'familyIds', 'modelIds', 'sourceIds'] as const
-const ALL_KEYS = [...LIST_KEYS, 'regionId', 'from', 'to', 'q', 'status', 'confidence', 'location', 'hasResults', 'outcome', 'sort', 'cursor', 'pageSize'] as const
-const CANONICAL_ORDER = ['metric', 'preset', 'eventKinds', 'entityKinds', 'eventCategories', 'categoryIds', 'classIds', 'familyIds', 'modelIds', 'sourceIds', 'regionId', 'from', 'to', 'q', 'status', 'confidence', 'location', 'hasResults', 'outcome', 'sort', 'cursor', 'pageSize', 'dataset']
+const ALL_KEYS = [...LIST_KEYS, 'regionId', 'from', 'to', 'q', 'status', 'confidence', 'location', 'hasResults', 'sort', 'cursor', 'pageSize'] as const
+const CANONICAL_ORDER = ['metric', 'preset', 'eventKinds', 'entityKinds', 'eventCategories', 'categoryIds', 'classIds', 'familyIds', 'modelIds', 'sourceIds', 'regionId', 'from', 'to', 'q', 'status', 'confidence', 'location', 'hasResults', 'sort', 'cursor', 'pageSize', 'dataset']
 
 const empty = (): DataQuery => ({ eventKinds: [], entityKinds: [], eventCategories: [], categoryIds: [], classIds: [], familyIds: [], modelIds: [], sourceIds: [] })
 
@@ -92,7 +91,7 @@ export function parseDataQuery(params: URLSearchParams): ParsedDataQuery {
   }
   const q = params.get('q')?.trim()
   if (q) value.q = q
-  for (const key of ['status', 'confidence', 'location', 'outcome', 'sort', 'cursor'] as const) {
+  for (const key of ['status', 'confidence', 'location', 'sort', 'cursor'] as const) {
     const valueAtKey = params.get(key)?.trim()
     if (valueAtKey) value[key] = valueAtKey
   }
@@ -155,7 +154,7 @@ export function serializeDataQuery(base: URLSearchParams, value: DataQuery): URL
     params.set('to', value.to.toISOString())
   }
   if (value.q?.trim()) params.set('q', value.q.trim())
-  for (const key of ['status', 'confidence', 'location', 'outcome', 'sort', 'cursor'] as const) if (value[key]) params.set(key, value[key])
+  for (const key of ['status', 'confidence', 'location', 'sort', 'cursor'] as const) if (value[key]) params.set(key, value[key])
   if (value.hasResults !== undefined) params.set('hasResults', String(value.hasResults))
   if (value.pageSize) params.set('pageSize', String(value.pageSize))
   if (value.dataset) params.set('dataset', value.dataset)

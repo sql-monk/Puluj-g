@@ -18,7 +18,7 @@ namespace Puluj.Collectors.AlertsInUa;
 /// offers is `month_ago`) for every oblast, on top of the live collector that only sees the active feed. Each closed
 /// alert becomes the same pair of RawMessages the live collector produces (`{id}:start` / `{id}:end`, payload kind
 /// alert.started / alert.finished), so AlertsInUaHandler needs no second format and an alert already stored live is
-/// skipped by the (source, source_message_id) uniqueness. The messages are stored Pending without a queue signal: the
+/// skipped by the (source, source_message_id) uniqueness. The messages are stored Pending without a processor wake-up: the
 /// processors take them in publication order. Progress (oblasts done) lives in app_settings
 /// (`Runtime:AlertsInUa:History`), so a restart resumes and a completed period is not loaded twice; set a different
 /// period, or clear the key, to load again. The history endpoint allows 2 calls a minute, hence the pacing.

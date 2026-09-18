@@ -101,7 +101,6 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
         </span>
         {nav(publicHash(routeFor('analytics')), 'Аналітика', route.section === 'analytics')}
         {nav(publicHash(routeFor('entities')), 'Цілі і події', route.section === 'entities')}
-        {nav(publicHash(routeFor('messages')), 'Повідомлення', route.section === 'messages')}
       </nav>
       <span className="ml-auto flex items-center gap-1.5">
         {map && mode === 'history' && at && <span className="rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white">історія · {at.toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}

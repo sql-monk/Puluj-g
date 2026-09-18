@@ -27,19 +27,7 @@ public sealed class PulujMetrics
         _llmCalls = meter.CreateCounter<long>("puluj.llm.calls");
         _rawProcessed = meter.CreateCounter<long>("puluj.rawmessages.processed", description: "Raw messages finished by this instance, by outcome");
         _processingStage = meter.CreateHistogram<double>("puluj.processing.stage", unit: "ms", description: "Time per pipeline stage of one raw message: parse, lock (waiting for the store lock), store");
-        _writerStage = meter.CreateHistogram<double>("puluj.writer.stage", unit: "ms", description: "P09 domain writers, per subscription: lock_wait, apply (sinks; the commit is the consumer's)");
-        _writerOutcomes = meter.CreateCounter<long>("puluj.writer.outcomes", description: "P09 domain writers: noop reasons, deadlocks, changes emitted");
     }
-
-    private readonly Histogram<double> _writerStage;
-    private readonly Counter<long> _writerOutcomes;
-
-    /// <summary>§7: pool/lock/apply/commit measured separately, per subscription.</summary>
-    public void WriterStage(string subscription, string stage, double milliseconds) =>
-        _writerStage.Record(milliseconds, new KeyValuePair<string, object?>("subscription", subscription), new KeyValuePair<string, object?>("stage", stage));
-
-    public void WriterOutcome(string subscription, string outcome) =>
-        _writerOutcomes.Add(1, new KeyValuePair<string, object?>("subscription", subscription), new KeyValuePair<string, object?>("outcome", outcome));
 
     public void RawReceived(string source, TimeSpan latency)
     {

@@ -59,9 +59,6 @@ public class Target
 
     /// <summary>Set when this target repeats an earlier one (kept for provenance).</summary>
     public long? DuplicateOfTargetId { get; set; }
-    /// <summary>P09: the observation (processing.observations) this row materializes; null for rows the legacy loop wrote. Unique when set (idempotent writers).</summary>
-    public Guid? ObservationId { get; set; }
-
     public string ParserVersion { get; set; } = "";
     /// <summary>Matched rules, text spans, LLM prompt version — everything needed to explain the result.</summary>
     public JsonDocument? ParserMetadata { get; set; }

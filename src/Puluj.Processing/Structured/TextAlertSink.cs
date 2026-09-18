@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
-using Puluj.Infrastructure.Messaging;
+using Puluj.Infrastructure.Notifications;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Processing.Pipeline;
 

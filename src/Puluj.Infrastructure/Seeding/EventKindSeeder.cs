@@ -138,14 +138,12 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
         ApplyPolicy(row, k, policyVersion);
     }
 
-    /// <summary>The seed-owned fields only (ADR-0008/0010): category, severity, state model, incident policy, metadata, presentation json, policy version.</summary>
+    /// <summary>The seed-owned fields only: category, severity, state model, metadata, presentation json and policy version.</summary>
     private static void ApplyPolicy(EventKind row, EventKindSeedEntry k, int policyVersion)
     {
         row.Category = Enum.Parse<EventKindCategory>(k.Category, true);
         row.DefaultSeverity = k.DefaultSeverity;
         row.StateModel = k.StateModel;
-        row.CreatesIncident = k.CreatesIncident ?? false;
-        row.DedupPolicy = ToDoc(k.DedupPolicy);
         row.Presentation = ToDoc(k.Presentation);
         row.Metadata = ToDoc(k.Metadata);
         row.PolicyVersion = policyVersion;
@@ -157,8 +155,8 @@ public sealed class EventKindSeeder(SeedFiles files, IOptions<SeedOptions> optio
 
     public sealed record EventKindSeedEntry(
         string Code, string NameUk, string Category, string? DefaultSeverity, string? StateModel, bool? RequiresLocationForMap,
-        string? RenderMode, string? MapColor, string? MapIcon, string? MapLifetime, bool? CreatesIncident, bool? Enabled, bool? MapVisible,
-        int? SortOrder, JsonElement? DedupPolicy, JsonElement? Presentation, JsonElement? Metadata)
+        string? RenderMode, string? MapColor, string? MapIcon, string? MapLifetime, bool? Enabled, bool? MapVisible,
+        int? SortOrder, JsonElement? Presentation, JsonElement? Metadata)
     {
         /// <summary><c>metadata.legacyEventType</c>, when the kind mirrors a legacy enum member.</summary>
         public EventType? LegacyEventType =>

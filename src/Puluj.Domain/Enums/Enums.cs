@@ -79,15 +79,14 @@ public enum EventType
 }
 
 /// <summary>
-/// Plan §8.2 / contracts observationCategory. Which domain owner an observation of a kind belongs to; stored as the
-/// lowercase contract string (target, alert, incident, info), not as a number.
+/// Which presentation family an observation kind belongs to; stored as a lowercase string.
 /// </summary>
 public enum EventKindCategory
 {
     Target = 0,
     Alert = 1,
-    Incident = 2,
-    /// <summary>Feed-only: no track, alert or incident owner (civil notices, unknown).</summary>
+    Event = 2,
+    /// <summary>Feed-only: no track or alert owner (civil notices, unknown).</summary>
     Info = 3,
 }
 

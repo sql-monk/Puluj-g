@@ -7,16 +7,11 @@ import type { MapPalette } from './palette'
 import LinkPopup from '../components/LinkPopup'
 import RegionPopup from '../components/RegionPopup'
 import TrackPopup from '../components/TrackPopup'
-import IncidentLegend from '../components/IncidentLegend'
-import IncidentPopup from '../components/IncidentPopup'
-import { incidentHitAt, INCIDENT_HIT_LAYERS } from './incidentLayer'
-import { useIncidentLayer } from './useIncidentLayer'
 import { effectiveNow, useStore, type Theme } from '../store/useStore'
 import { getPalette } from './palette'
 import { replay } from '../replay/engine'
 import { buildAlertLayer, buildReplayLayers, buildTrackLayers, emptyCollection, isPolygonAlert, visibleTracks } from './geojson'
 import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, TEXT_FONT, addIcons, addTrackLayers, addTrackSources, alertPaint, pointerCursor, regionHover, hitAt, setData, setTrackData, trackHover } from './layers'
-import { useRegionCamera } from './useRegionCamera'
 
 /** The city itself; the view opens on it with a margin of surroundings. */
 const KYIV_BOUNDS: [[number, number], [number, number]] = [
@@ -37,8 +32,8 @@ const DATA_BOUNDS: [[number, number], [number, number]] = [
 interface Props {
   dark: boolean
   theme: Theme
-  onDetails: (trackId: import('../api/types').MapId) => void
-  layoutKey: string
+  onDetails: () => void
+  layoutKey?: string
 }
 
 /** Kyiv page: the city with its ten districts and a ring of surroundings, its own MapLibre instance and layer set. */
@@ -77,13 +72,10 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
   const placeGeometries = useStore((s) => s.placeGeometries)
   const ensurePlaceGeometry = useStore((s) => s.ensurePlaceGeometry)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
-  const regionCameraRequest = useStore((s) => s.regionCameraRequest)
   const selectRegion = useStore((s) => s.selectRegion)
   const clock = effectiveNow({ mode, at, now })
 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
-  const selectedRegion = regionsById.get(selectedRegionId ?? -1)
-  useRegionCamera({ map: mapInstance, container, geometry: selectedRegion?.geometry ?? (selectedRegionId === null ? undefined : placeGeometries[selectedRegionId]), placeId: selectedRegionId, ensureGeometry: ensurePlaceGeometry, request: regionCameraRequest, layoutKey })
   const regionsRef = useRef(regionsById)
   regionsRef.current = regionsById
   const kyiv = useMemo(() => regions.find((r) => r.level === 'City' && r.countryCode === 'UA' && r.name === 'Київ'), [regions])
@@ -91,16 +83,6 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
   // The alert fill is rebuilt only when alerts change (the apply effect runs on every clock tick).
   const alertList = useMemo(() => (filters.alerts ? Object.values(alerts) : []), [alerts, filters.alerts])
   const alertLayer = useMemo(() => buildAlertLayer(alertList, regionsById, placeGeometries), [alertList, regionsById, placeGeometries])
-  // P11: the same incident layer as the country map (parity by construction); Kyiv's district polygons come from the regions payload.
-  const incidents = useIncidentLayer({ map: mapInstance, palette, clock, regionsById, placeGeometries, ensurePlaceGeometry })
-  const incidentSelect = useRef<(id: number | null, at?: [number, number]) => void>(() => {})
-  incidentSelect.current = (id, at) => {
-    if (id === null) incidents.close()
-    else {
-      incidents.select(id)
-      if (at) incidents.setClickAt(at)
-    }
-  }
 
   useEffect(() => {
     if (!container.current || mapRef.current) return
@@ -132,15 +114,7 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
       select(trackId)
       setClickAt(trackId === null ? null : [e.lngLat.lng, e.lngLat.lat])
       setRegionClickAt(trackId === null ? [e.lngLat.lng, e.lngLat.lat] : null)
-      incidentSelect.current(null)
       if (trackId !== null) return
-      const incidentId = incidentHitAt(map, e.point)
-      if (incidentId !== null) {
-        selectRegion(null)
-        setRegionClickAt(null)
-        incidentSelect.current(incidentId, [e.lngLat.lng, e.lngLat.lat])
-        return
-      }
       // District under the cursor (also through an alert fill), else the city, else nothing.
       const district = map.queryRenderedFeatures(e.point, { layers: ['districts-hit'] })[0]?.properties?.id
       if (district !== undefined) {
@@ -150,7 +124,7 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
       const alert = map.queryRenderedFeatures(e.point, { layers: ['alerts-fill'] })[0]?.properties?.placeId
       selectRegion(alert === undefined ? null : Number(alert))
     })
-    pointerCursor(map, ['districts-hit', 'alerts-fill', ...INCIDENT_HIT_LAYERS])
+    pointerCursor(map, ['districts-hit', 'alerts-fill'])
     // Target under the cursor (within the hit radius): enlarged glyph, pointer cursor; registered before the district hover.
     const hover = trackHover(map, { fallbackLayers: ['districts-hit', 'alerts-fill'] })
     // Hover: the city district under the cursor (the hit fill covers the districts even under an alert fill); no tip
@@ -196,10 +170,10 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
           ? buildReplayLayers(replay.positions(replay.t || clock.getTime(), filters), palette, selectedTrackId)
           : buildTrackLayers(visibleTracks(tracks, filters, clock), clock, regionsById, filters, { home, selectedId: selectedTrackId, palette, predecessors, selectedLink })
       // Keep only tracks that touch the page: their marker or the end of their forecast lies inside the data box.
-      const near = new Set<string>()
-      for (const f of layers.points.features) if (inBox(f.geometry.coordinates)) near.add(String(f.id))
-      for (const f of layers.forecasts.features) if (f.geometry.type === 'Point' && inBox(f.geometry.coordinates)) near.add(String(f.id))
-      const only = <G extends Geometry, P>(fc: FeatureCollection<G, P>): FeatureCollection<G, P> => ({ type: 'FeatureCollection', features: fc.features.filter((f) => near.has(String((f.properties as { id: unknown }).id))) })
+      const near = new Set<number>()
+      for (const f of layers.points.features) if (inBox(f.geometry.coordinates)) near.add(Number(f.id))
+      for (const f of layers.forecasts.features) if (f.geometry.type === 'Point' && inBox(f.geometry.coordinates)) near.add(Number(f.id))
+      const only = <G extends Geometry, P>(fc: FeatureCollection<G, P>): FeatureCollection<G, P> => ({ type: 'FeatureCollection', features: fc.features.filter((f) => near.has(Number((f.properties as { id: number }).id))) })
       setTrackData(map, { points: only(layers.points), fixes: only(layers.fixes), forecasts: only(layers.forecasts), areas: only(layers.areas), predecessors: only(layers.predecessors) })
 
       for (const a of alertList) if (!regionsById.has(a.placeId) && !placeGeometries[a.placeId]) ensurePlaceGeometry(a.placeId)
@@ -242,15 +216,15 @@ export default function KyivMapView({ dark, theme, onDetails, layoutKey }: Props
     loadPredecessors(selectedTrackId)
   }, [selectedTrackId, selectedSeenAt, loadPredecessors])
 
+  useEffect(() => { mapRef.current?.resize() }, [layoutKey])
+
   return (
     <div className="absolute inset-0">
       <div ref={container} className="h-full w-full" />
       <div ref={tip} hidden className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-white/95 px-2 py-1 text-xs shadow dark:bg-slate-900/95 dark:text-slate-100" />
-      {mapInstance && selectedTrack && !selectedLink && <TrackPopup map={mapInstance} track={selectedTrack} anchor={clickAt} onDetails={() => onDetails(selectedTrack.id)} onClose={() => select(null)} />}
+      {mapInstance && selectedTrack && !selectedLink && <TrackPopup map={mapInstance} track={selectedTrack} anchor={clickAt} onDetails={onDetails} onClose={() => select(null)} />}
       {mapInstance && selectedLink && linkClickAt && <LinkPopup map={mapInstance} link={selectedLink} anchor={linkClickAt} onClose={() => selectLink(null)} />}
       {mapInstance && !selectedTrack && selectedRegionId !== null && regionClickAt && <RegionPopup map={mapInstance} placeId={selectedRegionId} anchor={regionClickAt} onClose={() => selectRegion(null)} />}
-      {mapInstance && incidents.selected && incidents.clickAt && <IncidentPopup map={mapInstance} incident={incidents.selected} anchor={incidents.clickAt} onClose={incidents.close} />}
-      {filters.events && <IncidentLegend onOpen={(i) => incidents.open(i)} />}
     </div>
   )
 }

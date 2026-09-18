@@ -50,7 +50,7 @@ public sealed class ReprocessService(IDbContextFactory<PulujDbContext> factory, 
         }
         await tx.CommitAsync(ct);
         var pending = await db.RawMessages.CountAsync(r => r.ProcessingStatus == Puluj.Domain.Enums.ProcessingStatus.Pending, ct);
-        logger.LogInformation("Reprocess: {Count} raw message(s) queued for processing in publication order", pending);
+        logger.LogInformation("Reprocess: {Count} raw message(s) are Pending for processing in publication order", pending);
         return pending;
     }
 

@@ -14,16 +14,16 @@ public sealed class EventKindDtoTests
         var dto = DtoMapper.EventKind(new EventKind
         {
             EventKindId = 5, Code = "alert.air_raid.ended", NameUk = "Відбій", Category = EventKindCategory.Alert, StateModel = "interval",
-            RequiresLocationForMap = true, RenderMode = "area", MapColor = "#43a047", MapIcon = "alert-off", CreatesIncident = false,
+            RequiresLocationForMap = true, RenderMode = "area", MapColor = "#43a047", MapIcon = "alert-off",
             MapVisible = true, SortOrder = 21, PolicyVersion = 1,
         });
         Assert.Equal("alert", dto.Category);
         Assert.Equal(nameof(EventType.AlertCancelled), dto.LegacyEventType);
         Assert.Equal(5, dto.Id);
 
-        var noLegacy = DtoMapper.EventKind(new EventKind { EventKindId = 6, Code = "fire.reported", NameUk = "Пожежа", Category = EventKindCategory.Incident });
+        var noLegacy = DtoMapper.EventKind(new EventKind { EventKindId = 6, Code = "fire.reported", NameUk = "Пожежа", Category = EventKindCategory.Event });
         Assert.Null(noLegacy.LegacyEventType); // no invented enum value for new kinds
-        Assert.Equal("incident", noLegacy.Category);
+        Assert.Equal("event", noLegacy.Category);
     }
 
     [Fact]

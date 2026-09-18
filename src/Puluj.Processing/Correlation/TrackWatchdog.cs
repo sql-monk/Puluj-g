@@ -3,7 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Puluj.Domain.Enums;
-using Puluj.Infrastructure.Messaging;
+using Puluj.Infrastructure.Notifications;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Processing.Indexes;
 

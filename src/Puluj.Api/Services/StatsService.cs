@@ -35,7 +35,7 @@ public sealed class StatsService(IDbContextFactory<PulujDbContext> factory, Refe
     private async Task<T> CachedAsync<T>(string section, DateTimeOffset? from, DateTimeOffset? to, StatsFilter filter, Func<Period, StatsFilter, CancellationToken, Task<T>> compute, CancellationToken ct)
     {
         var (start, end) = StatsBuckets.Clamp(from, to, clock.GetUtcNow());
-        var generation = await ActiveGenerationKeyAsync(ct);
+        const string generation = "direct";
         var key = $"stats|{section}|live|generation={generation}|{start:O}|{end:O}|{filter.CacheKey}";
         Task<object> task;
         if (!cache.TryGetValue(key, out Task<object>? cached) || cached is null)
@@ -160,12 +160,6 @@ public sealed class StatsService(IDbContextFactory<PulujDbContext> factory, Refe
     }
 
     private static Task<List<T>> Rows<T>(PulujDbContext db, string sql, CancellationToken ct) => db.Database.SqlQueryRaw<T>(sql).ToListAsync(ct);
-    private async Task<string> ActiveGenerationKeyAsync(CancellationToken ct)
-    {
-        await using var db = await factory.CreateDbContextAsync(ct);
-        var active = await db.ProcessingGenerations.AsNoTracking().Where(x => x.IsActive).Select(x => x.GenerationId).OrderBy(x => x).ToListAsync(ct);
-        return active.Count == 0 ? "none" : string.Join(',', active);
-    }
     private static long[][] EmptyMatrix(int rows, int columns) => Enumerable.Range(0, rows).Select(_ => new long[columns]).ToArray();
     private static string Ts(DateTimeOffset value) => $"TIMESTAMPTZ '{value.UtcDateTime.ToString("O", CultureInfo.InvariantCulture)}'";
 }

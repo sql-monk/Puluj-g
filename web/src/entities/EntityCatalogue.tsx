@@ -13,7 +13,7 @@ export function entityParams(q: DataQuery) {
   }
 }
 export function mergeEntityPage(old: PublicEntitySummaryDto[], page: PublicEntitySummaryDto[]) { return [...old, ...page.filter((x) => !old.some((y) => y.kind === x.kind && y.id === x.id))] }
-const label: Record<PublicEntityKind, string> = { track: 'Трек', incident: 'Подія', alert: 'Тривога', observation: 'Спостереження' }
+const label: Record<PublicEntityKind, string> = { track: 'Трек', alert: 'Тривога', observation: 'Спостереження' }
 const listCache = new Map<string, { items: PublicEntitySummaryDto[]; next?: string; scroll: number }>()
 const CACHE_LIMIT = 8
 function saveListCache(key: string, value: { items: PublicEntitySummaryDto[]; next?: string; scroll: number }) { listCache.delete(key); listCache.set(key, value); while (listCache.size > CACHE_LIMIT) listCache.delete(listCache.keys().next().value!) }
@@ -53,7 +53,7 @@ function EntityDetail({ route, kind, id }: { route: PublicRoute; kind: PublicEnt
   return <Page><a href={publicHash({ section: 'entities', query: route.query })}>← До каталогу</a><h1 className="mt-3">{label[entity.kind]}: {entity.title}</h1><p>{entity.catalogKindName ?? entity.classification ?? 'Без класифікації'} · {time(entity.at)} · {entity.placeName ?? 'Без локації'}</p>
     {entity.mapAvailable ? <a href={mapHref(route, { kind: entity.kind, id: entity.id }, entity.map, entity.state === 'active')} className="mt-2 inline-block rounded bg-slate-200 px-3 py-1 dark:bg-slate-700">Показати на мапі</a> : <button disabled title={entity.map.unavailableReason ?? 'Немає підтвердженої геометрії для мапи'} className="mt-2 rounded bg-slate-200 px-3 py-1 disabled:opacity-50 dark:bg-slate-700">Показати на мапі</button>}
     <Paged title={`Докази (${data.evidence.totalCount})`} initial={data.evidence} load={(cursor) => api.publicEvidence(kind, id, cursor, route.query.get('dataset') ?? 'live')} render={(e: PublicEvidenceDto) => `${e.catalogKind ?? 'факт'} · ${time(e.at)} · ${e.relation}${e.score !== undefined ? ` · ${Math.round(e.score * 100)}%` : ''}`} keyOf={(e: PublicEvidenceDto) => `${e.entityId}:${e.observationId ?? e.targetId ?? e.at}`} />
-    <Paged title={`Пов’язані повідомлення (${data.messages.totalCount})`} initial={data.messages} load={(cursor) => api.publicMessages(kind, id, cursor, route.query.get('dataset') ?? 'live')} render={(m: PublicMessageRefDto) => <><a className="underline" href={publicHash({ section: 'messages', detail: { id: m.id }, query: route.query })}>Повідомлення {m.id}</a> · {time(m.publishedAt)}</>} keyOf={(m: PublicMessageRefDto) => m.id} />
+    <Paged title={`Пов’язані повідомлення (${data.messages.totalCount})`} initial={data.messages} load={(cursor) => api.publicMessages(kind, id, cursor, route.query.get('dataset') ?? 'live')} render={(m: PublicMessageRefDto) => <>{m.url?.startsWith('http') ? <a className="underline" href={m.url} target="_blank" rel="noreferrer">Оригінал {m.id}</a> : `Повідомлення ${m.id}`} · {time(m.publishedAt)}</>} keyOf={(m: PublicMessageRefDto) => m.id} />
     <Paged title={`Пов’язані сутності (${data.relations.totalCount})`} initial={data.relations} load={(cursor) => api.publicRelations(kind, id, cursor, route.query.get('dataset') ?? 'live')} render={(r: PublicEntityRefDto) => <><a className="underline" href={href(route, r.kind, r.id)}>{label[r.kind]}: {r.title ?? r.id}</a> · {r.relation}{r.probability !== undefined ? ` · ${Math.round(r.probability * 100)}%` : ''}</>} keyOf={(r: PublicEntityRefDto) => `${r.kind}:${r.id}`} />
   </Page>
 }

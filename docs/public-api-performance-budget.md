@@ -18,10 +18,10 @@ API/SPA, реальні публічні HTTP endpoints і браузерний 
 
 | Операція | Набір даних або межа | Очікуваний результат | Доказ |
 | --- | --- | --- | --- |
-| Схема й детермінований fixture | Тимчасовий PostGIS; 123 raw-повідомлення, 123 факти, активні track/incident/alert, факти з координатами й без них | Успішне завершення без fallback-БД | Маніфест `test-u13-actual.ps1` |
+| Схема й детермінований fixture | Тимчасовий PostGIS; raw-повідомлення, факти, активні track/alert, факти з координатами й без них | Успішне завершення без fallback-БД | Маніфест `test-u13-actual.ps1` |
 | Публічні повідомлення | Сторінка 100 елементів і непрозоре продовження у фіксованому вікні `from/to` | HTTP 200, рівно 100 рядків на першій сторінці, continuation приймається | Preflight runner-а та реальний API |
 | Деталі повідомлення | Збережений ланцюг revision і точний 64-бітний ID target | HTTP 200, 2 revision, десятковий ID не змінюється | Preflight і API-контракт Playwright |
-| Каталог сутностей | Fixture для track, incident, alert; active-фільтр і історичні деталі track | HTTP 200, видно всі три види агрегатів | Preflight runner-а |
+| Каталог сутностей | Fixture для track, observation та alert; active-фільтр і історичні деталі track | HTTP 200, видно підтримувані види сутностей | Preflight runner-а |
 | Публічний UI у браузері | Зібрана SPA, яку віддає API, desktop viewport | Доступні маршрути messages/entities; aXe не знаходить порушень | `E13-actual-api.e2e.ts`, screenshot і report |
 | Досяжність hub карти | Реальний endpoint SignalR negotiate | HTTP 200 із connection id | `E13-actual-api.e2e.ts` |
 

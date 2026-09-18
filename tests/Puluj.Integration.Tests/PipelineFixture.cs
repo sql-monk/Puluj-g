@@ -97,10 +97,7 @@ public sealed class PipelineFixture : IAsyncLifetime
 
     private static async Task ResetDataAsync(PulujDbContext db)
     {
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE incident_revisions, incident_observations, incidents, track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages RESTART IDENTITY CASCADE");
-        // P03 schemas have no FK to raw_messages; they must be cleared separately. Lifecycle is durable derived data
-        // and must not leak from a prior class into an exact-count pipeline assertion.
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE messaging.outbox, messaging.inbox, messaging.events, messaging.event_links, processing.runs, processing.generations, processing.attempts, processing.deliveries, processing.quarantine, processing.stage_results, processing.extractions, processing.observations, llm_requests, analytics.message_lifecycle RESTART IDENTITY CASCADE");
+        await db.Database.ExecuteSqlRawAsync("TRUNCATE track_targets, target_track_revisions, target_tracks, targets, air_alerts, processing_errors, raw_messages, llm_requests RESTART IDENTITY CASCADE");
     }
 
     /// <summary>

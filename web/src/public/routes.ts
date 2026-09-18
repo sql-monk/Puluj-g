@@ -1,6 +1,6 @@
 import { canonicalizeQuery } from './query'
 
-export type PublicSection = 'map' | 'analytics' | 'entities' | 'messages'
+export type PublicSection = 'map' | 'analytics' | 'entities'
 export type MapMode = 'live' | 'history'
 
 export interface PublicRoute {
@@ -35,8 +35,8 @@ function pathOf(hash: string): string {
   return (start.split('?', 1)[0] || '/').replace(/\/+$/, '') || '/'
 }
 
-function isEntityKind(value: string): value is 'track' | 'incident' | 'alert' | 'observation' {
-  return value === 'track' || value === 'incident' || value === 'alert' || value === 'observation'
+function isEntityKind(value: string): value is 'track' | 'alert' | 'observation' {
+  return value === 'track' || value === 'alert' || value === 'observation'
 }
 
 function analyticsQuery(query: URLSearchParams): URLSearchParams {
@@ -69,9 +69,7 @@ export function publicHash(route: PublicRoute): string {
       ? `#/map/${route.mapMode ?? 'live'}`
       : route.section === 'entities' && route.detail
         ? `#/entities/${route.detail.kind ?? 'observation'}/${route.detail.id}`
-        : route.section === 'messages' && route.detail
-          ? `#/messages/${route.detail.id}`
-          : `#/${route.section}`
+        : `#/${route.section}`
   const query = new URLSearchParams(route.query)
   if (route.preset === 'kyiv') query.set('preset', 'kyiv')
   const encoded = canonicalizeQuery(query).toString()
@@ -99,15 +97,10 @@ export function parsePublicHash(hash: string): ParsedRoute {
     route = { section: 'analytics', query: analyticsQuery(query) }
   } else if (path === '/entities') {
     route = { section: 'entities', query }
-  } else if (path === '/messages') {
-    route = { section: 'messages', query }
   } else {
-    const entity = path.match(/^\/entities\/(track|incident|alert|observation)\/([^/]+)$/)
-    const message = path.match(/^\/messages\/([^/]+)$/)
+    const entity = path.match(/^\/entities\/(track|alert|observation)\/([^/]+)$/)
     const entityId = entity ? decodedId(entity[2]) : null
-    const messageId = message ? decodedId(message[1]) : null
     if (entity && entityId && isEntityKind(entity[1])) route = { section: 'entities', detail: { kind: entity[1], id: entityId }, query }
-    else if (message && messageId) route = { section: 'messages', detail: { id: messageId }, query }
     else route = { section: 'map', mapMode: 'live', query: new URLSearchParams() }
   }
 

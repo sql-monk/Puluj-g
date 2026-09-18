@@ -2,7 +2,7 @@ import type { Geometry } from 'geojson'
 import type { PublicEntityKind, PublicMapLocatorDto } from '../api/types'
 import { publicHash, type MapMode, type PublicRoute } from './routes'
 
-export type MapSelectionKind = PublicEntityKind | 'message'
+export type MapSelectionKind = PublicEntityKind
 
 export interface MapSelection {
   kind: MapSelectionKind
@@ -17,7 +17,7 @@ export interface MapFocus {
   unavailable?: string
 }
 
-const selectionKinds = new Set<MapSelectionKind>(['track', 'incident', 'alert', 'observation', 'message'])
+const selectionKinds = new Set<MapSelectionKind>(['track', 'alert', 'observation'])
 
 export function parseMapSelection(query: URLSearchParams): MapSelection | null {
   const value = query.get('select')
@@ -35,7 +35,7 @@ export function parseMapReturn(query: URLSearchParams): string | null {
   const value = query.get('return')
   if (!value || !value.startsWith('#/')) return null
   const path = value.slice(1).split('?', 1)[0]
-  return /^(\/map\/(?:live|history)|\/entities(?:\/(?:track|incident|alert|observation)\/\d+)?|\/messages(?:\/\d+)?|\/analytics)$/.test(path) ? value : null
+  return /^(\/map\/(?:live|history)|\/entities(?:\/(?:track|alert|observation)\/\d+)?|\/analytics)$/.test(path) ? value : null
 }
 
 function returnHash(route: PublicRoute): string {

@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Puluj.Analytics;
 using Puluj.Analytics.Analysis;
-using Puluj.Analytics.Lifecycle;
 using Puluj.Analytics.Persistence;
 using Puluj.Contracts;
 
@@ -41,8 +40,8 @@ public sealed class AnalyticsInitializer(IDbContextFactory<AnalyticsDbContext> f
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
-/// <summary>Runs the analysis on a timer: drain the backlog, sleep `Analytics:Interval`, repeat. Consecutive failures are counted for /health. P15: the same pass advances the lifecycle backfill and runs the reconciliation sweep.</summary>
-public sealed class AnalysisLoop(AnalysisRunner runner, LifecycleBackfill backfill, LifecycleReconciliation reconciliation, IOptions<AnalyticsOptions> options, TimeProvider clock, ILogger<AnalysisLoop> logger) : BackgroundService
+/// <summary>Runs the analysis on a timer: drain the backlog, sleep `Analytics:Interval`, repeat. Consecutive failures are counted for /health.</summary>
+public sealed class AnalysisLoop(AnalysisRunner runner, IOptions<AnalyticsOptions> options, TimeProvider clock, ILogger<AnalysisLoop> logger) : BackgroundService
 {
     public int ConsecutiveFailures { get; private set; }
     public DateTimeOffset? LastRunAt { get; private set; }
@@ -57,9 +56,6 @@ public sealed class AnalysisLoop(AnalysisRunner runner, LifecycleBackfill backfi
             try
             {
                 await runner.RunOnceAsync(ct);
-                // P15 (ADR-0013): the lifecycle projection — a bounded backfill step (durable evidence → rows) and the reconciliation of the recent window.
-                await backfill.RunAsync(options.Value.LifecycleBackfillBatch, options.Value.LifecycleBackfillBatchesPerPass, ct);
-                await reconciliation.RunAsync(options.Value.LifecycleReconcileWindow, options.Value.LifecycleReconcileGrace, ct);
                 ConsecutiveFailures = 0;
                 LastError = null;
             }

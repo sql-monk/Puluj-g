@@ -2,7 +2,7 @@ using System.Text.RegularExpressions;
 
 namespace Puluj.Domain;
 
-/// <summary>Contract shape of an event kind code (contracts/messaging/schemas/common.schema.json eventKindCode).</summary>
+/// <summary>Stable dotted shape of an event-kind code.</summary>
 public static partial class EventKindCodes
 {
     [GeneratedRegex(@"^[a-z_]+(\.[a-z_]+)+$")]

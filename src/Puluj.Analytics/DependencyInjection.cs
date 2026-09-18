@@ -30,9 +30,6 @@ public static class DependencyInjection
         services.AddDbContextFactory<AnalyticsDbContext>(o => AnalyticsDbContext.Configure(o, connectionString));
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<AnalyticsReportService>();
-        services.AddSingleton<Lifecycle.LifecycleReportService>();
-        services.AddSingleton<Lifecycle.LifecycleBackfill>(); // the worker's loop drives it; the admin panel can too (audited)
-        services.AddSingleton<Lifecycle.LifecycleReconciliation>();
         return services;
     }
 }

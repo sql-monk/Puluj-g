@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Puluj.Infrastructure;
 using Puluj.Infrastructure.Ingestion;
-using Puluj.Infrastructure.Messaging;
+using Puluj.Infrastructure.Notifications;
 using Puluj.Processing.Indexes;
 
 namespace Puluj.Processing.Pipeline;
@@ -20,7 +20,7 @@ namespace Puluj.Processing.Pipeline;
 /// The housekeeping task re-reads the pause flag and returns claims of dead instances to Pending.
 /// </summary>
 public sealed class ProcessingLoop(
-    IRawMessageQueue queue,
+    IRawMessageSignalBuffer signals,
     PgNotifyListener notifications,
     RawMessageProcessor processor,
     RawMessageClaims claims,
@@ -59,7 +59,7 @@ public sealed class ProcessingLoop(
         }
     }
 
-    /// <summary>Queues every raw message announced over NOTIFY. A claim decides who processes it; a duplicate id is harmless.</summary>
+    /// <summary>Records every raw-message wake-up announced over NOTIFY. A claim decides who processes it; a duplicate id is harmless.</summary>
     private async Task ListenAsync(CancellationToken ct)
     {
         try
@@ -68,7 +68,7 @@ public sealed class ProcessingLoop(
             {
                 if (evt.Type == PulujEventType.RawMessageStored)
                 {
-                    await queue.EnqueueAsync(evt.Id, ct);
+                    await signals.AnnounceAsync(evt.Id, ct);
                 }
             }
         }
@@ -86,7 +86,7 @@ public sealed class ProcessingLoop(
                 if (_paused is not null)
                 {
                     // Announced ids are dropped: they stay Pending in the database and are taken in order after the pause.
-                    while (queue.TryDequeue(out _))
+                    while (signals.TryTake(out _))
                     {
                     }
                     await IdleAsync(ct);
@@ -95,7 +95,7 @@ public sealed class ProcessingLoop(
                 long? id = null;
                 try
                 {
-                    if (queue.TryDequeue(out var announced))
+                    if (signals.TryTake(out var announced))
                     {
                         id = await claims.ClaimAsync(announced, identity.Name, ct) ? announced : null;
                         if (id is null)
@@ -151,7 +151,7 @@ public sealed class ProcessingLoop(
     private async Task IdleAsync(CancellationToken ct)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var signal = queue.WaitToReadAsync(linked.Token).AsTask();
+        var signal = signals.WaitAsync(linked.Token).AsTask();
         var tick = Task.Delay(options.Value.PendingPollInterval, linked.Token);
         await Task.WhenAny(signal, tick);
         linked.Cancel();

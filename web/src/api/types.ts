@@ -316,7 +316,7 @@ export interface TimelineBucketDto {
 
 // U04 public catalogue. Bigint database identities are intentionally strings here: JavaScript numbers cannot safely
 // represent every server ID, and the catalogue must round-trip direct links without precision loss.
-export type PublicEntityKind = 'track' | 'incident' | 'alert' | 'observation'
+export type PublicEntityKind = 'track' | 'alert' | 'observation'
 export interface PublicMapLocatorDto {
   locationKind?: string
   placeId?: number
@@ -383,31 +383,6 @@ export interface PublicEntityDetailsDto {
   capabilities: Record<string, boolean>
 }
 
-export interface PublicMessageSummaryDto {
-  id: string
-  sourceId: number
-  sourceCode?: string
-  publishedAt: string
-  receivedAt: string
-  sourceMessageKey: string
-  sourceRevision: string
-  revisionGroup: string
-  excerpt?: string
-  outcome: string
-  outcomeSource: 'stage_result' | 'legacy'
-  url?: string
-  urlText?: string
-  resultCount: number
-  matchedResultCount: number
-  locatedResultCount: number
-  unlocatedResultCount: number
-  hasText: boolean
-}
-export interface PublicMessagePageDto { from: string; to: string; dataset: string; consistency: string; items: PublicMessageSummaryDto[]; nextCursor?: string; refreshRecommended: boolean }
-export interface PublicMessageResultDto { targetId: string; observationId?: string; segmentIndex: number; segmentText?: string; catalogKind?: string; classification?: string; at: string; confidence: string; sourceId: number; mapAvailable: boolean; map: PublicMapLocatorDto; relations: PublicEntityRefDto[] }
-export interface PublicMessageRevisionDto { id: string; publishedAt: string; sourceRevision: string; isCurrent: boolean }
-export interface PublicMessageDetailsDto { message: PublicMessageSummaryDto; textState: string; text?: string; results: PublicCollectionPageDto<PublicMessageResultDto>; revisions: PublicCollectionPageDto<PublicMessageRevisionDto>; directRelations: PublicEntityRefDto[]; links: Record<string, string> }
-export interface PublicMessageTextChunkDto { state: string; text?: string; offset: number; totalLength: number; nextCursor?: string }
 
 // Statistics page (GET /api/stats/{targets|alerts|sources|recognition}?from&to): one payload per tab for one period.
 // Per-bucket arrays are aligned with `period.bucketStarts`.
