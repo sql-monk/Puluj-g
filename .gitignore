@@ -18,3 +18,4 @@ logs/
 artifacts/
 deploy/docker-compose.override.yml
 Технічне завдання_ DWH історії повітряних тривог, обстрілів та воєнних подій в Україні.md
+.history/

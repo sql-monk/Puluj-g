@@ -37,24 +37,24 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=4GB
+      - shared_buffers=2GB
       - -c
-      - effective_cache_size=10GB
+      - effective_cache_size=4GB
       - -c
       - work_mem=16MB
       - -c
-      - maintenance_work_mem=512MB
+      - maintenance_work_mem=256MB
       - -c
-      - max_wal_size=8GB
+      - max_wal_size=2GB
       - -c
-      - min_wal_size=2GB
+      - min_wal_size=500MB
       - -c
       - checkpoint_timeout=15min
       - -c
       - checkpoint_completion_target=0.9
     # PostgreSQL dynamic shared-memory segments use /dev/shm. The Docker default (64 MiB)
     # is insufficient for concurrent workers and the 4 GiB shared buffer cache.
-    shm_size: 5g
+    shm_size: 4g
     environment:
       POSTGRES_DB: puluj
       POSTGRES_USER: puluj
