@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { admin, type CollectorStatusDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
+import { telegramTitle, telegramUsername } from '../components/settings/sources'
 import { sortCollectors, type CollectorSortKey } from './collectors'
 import { Bars, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 
@@ -138,8 +139,13 @@ export function CollectorsPanel() {
             {rows.map((c) => (
               <tr key={c.sourceId} className={`border-t border-slate-100 dark:border-slate-800 ${c.enabled ? '' : 'opacity-50'}`}>
                 <td className="py-1.5 pr-2">
-                  <div>{c.name} <span className="text-slate-400">{c.code}</span></div>
-                  {c.type === 'Telegram' && (c.channelTitle || c.subscriberCount != null) && <div className="text-slate-400">{c.channelTitle ?? 'назву не отримано'}{c.subscriberCount != null ? ` · ${c.subscriberCount.toLocaleString('uk-UA')} підписників` : ''}</div>}
+                  {c.type === 'Telegram' ? (
+                    <>
+                      <div className="font-bold text-slate-900 dark:text-white">{telegramTitle(c.name, c.channelTitle)}</div>
+                      <div className="text-[11px] text-slate-400">{telegramUsername(c.channel)}</div>
+                      {c.subscriberCount != null && <div className="text-[11px] text-slate-400">{c.subscriberCount.toLocaleString('uk-UA')} підписників</div>}
+                    </>
+                  ) : <div>{c.name} <span className="text-slate-400">{c.code}</span></div>}
                 </td>
                 <td className="pr-2">{c.type}</td>
                 <td className="pr-2">

@@ -97,7 +97,6 @@ function ProcessorsBlock({ workers, containers }: { workers: WorkerInstanceDto[]
     </Section>
   )
 }
-
 function InstanceCard({ w, container, docker, onAct }: { w: WorkerInstanceDto; container?: ContainerDto; docker: boolean; onAct: (c: ContainerDto, verb: 'restart' | 'stop' | 'start') => Promise<void> }) {
   const health = instanceHealth(w)
   const s = w.status

@@ -94,6 +94,8 @@ export interface CollectorStatusDto {
   /** Latest channel metadata disclosed by Telegram in a collected post. */
   channelTitle?: string
   subscriberCount?: number
+  /** Configured Telegram username, normalized without '@'. */
+  channel?: string
 }
 export interface ProcessingErrorDto {
   id: number

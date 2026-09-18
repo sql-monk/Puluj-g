@@ -68,6 +68,9 @@ export default function AdminApp() {
       setStatus(st)
       setSources(src)
       setAuthNeeded(false)
+      // A poll can recover after a transient admin/API failure. Keep an explicit
+      // success notification, but do not leave a stale error below a fresh table.
+      setMessage((current) => (current?.ok === false ? null : current))
     } catch (e) {
       if (e instanceof AdminError && (e.status === 401 || e.status === 403)) setAuthNeeded(true)
       else setMessage({ ok: false, text: (e as Error).message })

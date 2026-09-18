@@ -1,0 +1,279 @@
+# One container per service. The Worker image is built once and started with different Worker__Roles
+# (migrate | telegram | alerts | messaging | processing). Messaging is the default durable pipeline; the obsolete
+# `processor` is explicitly scaled to zero unless an operator enables legacy mode.
+#
+#   postgis ─┬─ migrate (one-shot: migrations + seed) ─┬─ collector-telegram ─┐
+#            │                                          ├─ collector-alerts   ─┼─ ingress → outbox → RabbitMQ → messaging
+#            │                                          ├─ processor (obsolete; 0 replicas by default)
+#            │                                          ├─ api    (public map, read-only role)
+#            │                                          ├─ admin  (settings, status, logs)
+#            │                                          └─ analytics (source analytics: who copies whom; own schema)
+
+name: puluj-g
+
+x-worker: &worker
+  image: puluj-g-worker
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile.worker
+  env_file: .env  # deploy/.env: compose reads it for ${…} substitution and passes it to the containers
+  environment: &worker-env
+    ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj;Password=${POSTGRES_PASSWORD:-puluj}"
+    OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+  volumes:
+    - logs:/app/logs
+  depends_on:
+    postgis:
+      condition: service_healthy
+    migrate:
+      condition: service_completed_successfully
+  restart: unless-stopped
+
+services:
+  postgis:
+    image: postgis/postgis:17-3.5
+    # Tuned for the local 32 GiB Docker host during large history ingestion. Keep this configuration in Compose,
+    # rather than altering the external pgdata volume, so deployments stay reproducible.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=4GB
+      - -c
+      - effective_cache_size=10GB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - max_wal_size=8GB
+      - -c
+      - min_wal_size=2GB
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - checkpoint_completion_target=0.9
+    # PostgreSQL dynamic shared-memory segments use /dev/shm. The Docker default (64 MiB)
+    # is insufficient for several messaging workers and the 4 GiB shared buffer cache.
+    shm_size: 5g
+    environment:
+      POSTGRES_DB: puluj
+      POSTGRES_USER: puluj
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-puluj}
+    ports:
+      - "5442:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U puluj -d puluj"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Default durable transport: one RabbitMQ node with quorum queues and management UI on 15672. It is intentionally
+  # part of the normal Compose stack; HA across three fault domains is still not provided by this local topology.
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    hostname: puluj-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-puluj}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-puluj}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
+  # Default P03–P15 pipeline: topology declare, outbox relay, reconciliation/cleanup (`relay`), archive (`archive`), raw-writer
+  # (`raw-writer`), normalizer and rules/structured parser (`normalizer`, `parser`), the LLM worker (`llm-worker`, needs Llm__Enabled +
+  # ANTHROPIC_API_KEY to actually call the model) and the extraction finalizer (`finalizer`) with one DLQ consumer for all.
+  # By default this service also owns tracks, alerts and incidents. Legacy mode removes those roles and explicitly
+  # enables the obsolete `processor` instead; they must never own the same rows concurrently.
+  messaging:
+    <<: *worker
+    environment:
+      <<: *worker-env
+      Worker__Name: messaging
+      Worker__AppendHostName: "true"
+      # Default: messaging owns the domain writers and processor stays at 0. scripts/deploy.ps1 -LegacyProcessor
+      # removes the writer roles here before starting the obsolete processor.
+      Worker__Roles: ${MESSAGING_WORKER_ROLES:-relay,archive,raw-writer,normalizer,parser,llm-worker,finalizer,projection,replay,message-analytics,track-worker,alert-worker,watchdog,incident-worker}
+      Messaging__Enabled: "true"
+      Messaging__Broker__Host: rabbitmq
+      Messaging__Broker__Port: "5672"
+      Messaging__Broker__VirtualHost: ${RABBITMQ_VHOST:-/}
+      Messaging__Broker__User: ${RABBITMQ_USER:-puluj}
+      Messaging__Broker__Password: ${RABBITMQ_PASSWORD:-puluj}
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-messaging-.log
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  # Applies migrations (including the puluj_reader / puluj_admin roles) and the seed data, then exits.
+  # Every other service waits for it, so a schema change is applied exactly once before anything starts.
+  migrate:
+    <<: *worker
+    environment:
+      <<: *worker-env
+      Worker__Name: migrate
+      Worker__Roles: migrate
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-migrate-.log
+    depends_on:
+      postgis:
+        condition: service_healthy
+    restart: "no"
+
+  # Telegram MTProto collector: the only container that needs the session file and the my.telegram.org credentials.
+  collector-telegram:
+    <<: *worker
+    environment:
+      <<: *worker-env
+      Worker__Name: collector-telegram
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-true}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}
+      Worker__Roles: telegram
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-telegram-.log
+    volumes:
+      - tgsession:/app/session
+      - logs:/app/logs
+
+  # alerts.in.ua poller.
+  collector-alerts:
+    <<: *worker
+    environment:
+      <<: *worker-env
+      Worker__Name: collector-alerts
+      Messaging__Outbox__Enabled: ${MESSAGING_OUTBOX_ENABLED:-true}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}
+      Worker__Roles: alerts
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-collector-alerts-.log
+
+  # OBSOLETE monolithic path. It is disabled by default; use scripts/deploy.ps1 -LegacyProcessor -ProcessorReplicas N
+  # only for a controlled rollback. It claims raw messages directly and owns the same domain rows as messaging normally does.
+  # Parsing, correlation, track watchdog (and the LLM fallback). Every replica claims messages
+  # from raw_messages (status InProgress + claimed_by), so a message is processed exactly once; parsing runs in
+  # parallel, while only messages that touch the same track category or alert region are serialised. Worker__AppendHostName gives each replica its own name
+  # (heartbeat, claimed_by, `app` in the shared log file). Processing__Concurrency = workers per replica.
+  # For a strictly ordered, reproducible rebuild run one replica with Processing__Concurrency=1.
+  processor:
+    <<: *worker
+    deploy:
+      replicas: ${PROCESSOR_REPLICAS:-0}
+    environment:
+      <<: *worker-env
+      Worker__Name: processor
+      Worker__AppendHostName: "true"
+      Worker__Roles: processing
+      Processing__Concurrency: "2"
+      Serilog__WriteTo__1__Args__path: /app/logs/worker-processor-.log
+
+  # Public map: read-only database role (created by the migrations; change the password with ALTER ROLE).
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_reader;Password=${PULUJ_READER_PASSWORD:-puluj_reader}"
+      ASPNETCORE_URLS: http://+:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+    ports:
+      - "8090:8080"
+    volumes:
+      - logs:/app/logs
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Admin panel: settings, status, statistics and logs of every service; read-write role, own port. Keep it off the
+  # public internet (or set Admin__Token).
+  #
+  # Container management (panel → "Воркери"): the host's Docker socket is mounted, and the image carries the docker CLI
+  # with the compose plugin, so the panel can restart / stop containers of this project and scale `processor`
+  # (`docker compose up --scale`, run against the same compose files through the read-only /deploy mount). Security:
+  # whoever controls the socket controls the host (root-equivalent) — the panel only ever touches containers labelled
+  # with this compose project and refuses admin / postgis / migrate, but the socket itself has no such limit, so the
+  # admin port must stay private (firewall / VPN) and Admin__Token set. Drop the socket line and Docker__Enabled to
+  # run the panel without any of this.
+  admin:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.admin
+    environment:
+      ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj_admin;Password=${PULUJ_ADMIN_PASSWORD:-puluj_admin}"
+      ASPNETCORE_URLS: http://+:8081
+      Admin__ApiUrl: http://api:8080
+      Admin__Token: ${ADMIN_TOKEN:-ADMIN_TOKEN}
+      Messaging__Ingress__Enabled: ${MESSAGING_INGRESS_ENABLED:-true}  # /dev/ingest takes the durable collectors' path
+      # P13: optional second source for the queues panel (ready/unacked per queue, node alarms); the AMQP user needs the `management` tag.
+      Messaging__Broker__ManagementUrl: ${RABBITMQ_MANAGEMENT_URL:-}
+      Messaging__Broker__User: ${RABBITMQ_USER:-puluj}
+      Messaging__Broker__Password: ${RABBITMQ_PASSWORD:-puluj}
+      Logs__Directory: /app/logs
+      Docker__Enabled: "true"
+      Docker__ComposeDir: /deploy
+      Docker__Project: puluj-g
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+    ports:
+      - "8091:8081"
+    volumes:
+      - logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/deploy:ro  # compose files + .env (+ docker-compose.override.yml) for `docker compose ... --scale`
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Source analytics: indexes the message texts into the `analytics` schema (who copies whom, forwards, activity,
+  # track firsts); the admin panel reads that schema. Owner role: it applies its own migrations. Port not published.
+  analytics:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.analytics
+    env_file: .env
+    environment:
+      ConnectionStrings__Puluj: "Host=postgis;Port=5432;Database=puluj;Username=puluj;Password=${POSTGRES_PASSWORD:-puluj}"
+      ASPNETCORE_URLS: http://+:8082
+      Analytics__Name: analytics
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+    volumes:
+      - logs:/app/logs
+    depends_on:
+      postgis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "dotnet", "Puluj.Analytics.Worker.dll", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    # Keep database storage outside Compose's lifecycle. `scripts/deploy.ps1` refuses to create it unless
+    # -InitializeDatabase was explicitly supplied, preventing an accidental empty database on redeploy.
+    name: ${PULUJ_PGDATA_VOLUME:-puluj-g-pgdata}
+    external: true
+  tgsession:
+  logs:
+  # RabbitMQ node data (quorum queue segments). Broker is transport, not the source of truth (ADR-0004): losing it
+  # loses only unconsumed transport copies, which the outbox/archive re-publish.
+  rabbitmq:

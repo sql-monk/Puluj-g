@@ -407,9 +407,12 @@ public static partial class OpsEndpoints
                     perHour[i] += c.Count;
                 }
             }
+            var channel = s.Config is not null && s.Config.RootElement.TryGetProperty("channel", out var configuredChannel) && configuredChannel.ValueKind == JsonValueKind.String
+                ? configuredChannel.GetString()
+                : null;
             return new CollectorStatusDto(s.SourceId, s.Code, s.Name, s.Type.ToString(), s.Enabled,
                 st?.LastPolledAt, st?.LastSuccessAt, st?.LastMessageAt, st?.LastError, st?.ConsecutiveFailures ?? 0,
-                perHour.Sum(), perHour, telegram.GetValueOrDefault(s.SourceId)?.ChannelTitle, telegram.GetValueOrDefault(s.SourceId)?.SubscriberCount);
+                perHour.Sum(), perHour, telegram.GetValueOrDefault(s.SourceId)?.ChannelTitle, telegram.GetValueOrDefault(s.SourceId)?.SubscriberCount, channel);
         }).ToList();
         return Results.Ok(list);
     }

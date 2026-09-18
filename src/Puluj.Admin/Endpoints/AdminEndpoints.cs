@@ -381,9 +381,9 @@ public static class AdminEndpoints
     {
         var rows = await db.Database.SqlQuery<TelegramChannelInfo>($"""
             SELECT DISTINCT ON (r.source_id)
-                r.source_id AS "SourceId",
-                r.raw_payload ->> 'channelTitle' AS "ChannelTitle",
-                NULLIF(r.raw_payload ->> 'subscriberCount', '')::int AS "SubscriberCount"
+                r.source_id AS source_id,
+                r.raw_payload ->> 'channelTitle' AS channel_title,
+                NULLIF(r.raw_payload ->> 'subscriberCount', '')::int AS subscriber_count
             FROM raw_messages r
             WHERE r.raw_payload IS NOT NULL
               AND (r.raw_payload ? 'channelTitle' OR r.raw_payload ? 'subscriberCount')

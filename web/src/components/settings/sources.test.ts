@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AdminSourceDto } from '../../api/admin'
-import { filterSources, sortSources } from './sources'
+import { filterSources, sortSources, telegramTitle, telegramUsername } from './sources'
 
 const source = (name: string, overrides: Partial<AdminSourceDto> = {}): AdminSourceDto => ({
   id: name.charCodeAt(0),
@@ -29,5 +29,12 @@ describe('source settings table helpers', () => {
     const rows = [source('Бета', { priority: 20 }), source('Альфа', { priority: 20 }), source('Гамма', { priority: 5 })]
     expect(sortSources(rows, 'priority', true).map((x) => x.name)).toEqual(['Гамма', 'Альфа', 'Бета'])
     expect(sortSources(rows, 'priority', false).map((x) => x.name)).toEqual(['Альфа', 'Бета', 'Гамма'])
+  })
+
+  it('uses Telegram metadata title first and always formats the username separately', () => {
+    expect(telegramTitle('Повітряні сили', '  Офіційний канал  ')).toBe('Офіційний канал')
+    expect(telegramTitle('Повітряні сили', '  ')).toBe('Повітряні сили')
+    expect(telegramUsername('kpszsu')).toBe('@kpszsu')
+    expect(telegramUsername('@kpszsu')).toBe('@kpszsu')
   })
 })

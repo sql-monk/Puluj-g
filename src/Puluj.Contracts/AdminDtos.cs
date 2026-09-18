@@ -38,7 +38,7 @@ public sealed record OpsOverviewDto(DateTimeOffset GeneratedAt, IReadOnlyList<Se
 public sealed record CollectorStatusDto(
     int SourceId, string Code, string Name, string Type, bool Enabled,
     DateTimeOffset? LastPolledAt, DateTimeOffset? LastSuccessAt, DateTimeOffset? LastMessageAt, string? LastError, int ConsecutiveFailures,
-    long Messages24h, IReadOnlyList<int> PerHour, string? ChannelTitle = null, int? SubscriberCount = null);
+    long Messages24h, IReadOnlyList<int> PerHour, string? ChannelTitle = null, int? SubscriberCount = null, string? Channel = null);
 
 public sealed record ProcessingErrorDto(long Id, DateTimeOffset OccurredAt, string Stage, string Message, int? SourceId, long? RawMessageId, string? Exception);
 

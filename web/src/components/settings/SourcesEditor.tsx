@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { admin, type AdminSourceDto, type SourcePatch } from '../../api/admin'
 import { Badge, Section } from './fields'
-import { filterSources, sortSources, type SourceSortKey } from './sources'
+import { filterSources, sortSources, telegramTitle, telegramUsername, type SourceSortKey } from './sources'
 
 interface Props {
   sources: AdminSourceDto[]
@@ -282,14 +282,18 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                 <tr key={s.id} className={`border-t border-slate-100 dark:border-slate-800 ${s.enabled ? '' : 'opacity-60'}`}>
                   <td className="py-1.5 pr-2"><input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleSelected(s.id)} aria-label={`Вибрати ${s.name}`} /></td>
                   <td className="py-1.5 pr-2">
-                    <div className="font-medium">{s.name}</div>
-                    <div className="text-slate-400">
-                      {s.channel ? `@${s.channel}` : (s.url ?? s.code)}
-                      {s.type === 'Telegram' && s.channelTitle && ` · ${s.channelTitle}`}
-                      {s.type === 'Telegram' && s.subscriberCount != null && ` · ${s.subscriberCount.toLocaleString('uk-UA')} підписників`}
-                      {s.homeRegion && ` · ${s.homeRegion}`}
-                      {s.type !== 'Telegram' && (s.hasToken ? ' · токен ✓' : ' · без токена')}
-                    </div>
+                    {s.type === 'Telegram' ? (
+                      <>
+                        <div className="font-bold text-slate-900 dark:text-white">{telegramTitle(s.name, s.channelTitle)}</div>
+                        <div className="text-[11px] text-slate-400">{telegramUsername(s.channel)}</div>
+                        {s.subscriberCount != null && <div className="text-[11px] text-slate-400">{s.subscriberCount.toLocaleString('uk-UA')} підписників</div>}
+                      </>
+                    ) : (
+                      <>
+                        <div className="font-medium">{s.name}</div>
+                        <div className="text-slate-400">{s.url ?? s.code}{s.homeRegion && ` · ${s.homeRegion}`}{s.hasToken ? ' · токен ✓' : ' · без токена'}</div>
+                      </>
+                    )}
                   </td>
                   <td className="pr-2">{typeLabel[s.type] ?? s.type}</td>
                   <td className="pr-2">{Math.round(s.trustLevel * 100)}%</td>

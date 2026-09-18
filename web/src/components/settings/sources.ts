@@ -2,6 +2,16 @@ import type { AdminSourceDto } from '../../api/admin'
 
 export type SourceSortKey = 'name' | 'type' | 'trustLevel' | 'priority' | 'status' | 'rawMessageCount'
 
+/** Telegram's observed title is preferred, but a configured source name remains a reliable fallback. */
+export function telegramTitle(name: string, channelTitle?: string): string {
+  return channelTitle?.trim() || name
+}
+
+/** The stored channel value is normalized without '@'; tolerate a legacy value that still includes it. */
+export function telegramUsername(channel?: string): string {
+  return channel?.trim() ? `@${channel.trim().replace(/^@+/, '')}` : 'username не задано'
+}
+
 export function filterSources(sources: AdminSourceDto[], query: string): AdminSourceDto[] {
   const term = query.trim().toLocaleLowerCase('uk')
   if (!term) return sources
