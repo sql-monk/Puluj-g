@@ -295,7 +295,7 @@ public sealed class TelegramCollector(
         Messages_MessagesBase history;
         try
         {
-            history = await GetTelegramRpcAsync(() => client.Messages_GetHistory(job.Channel, offset_id: Math.Max(1, state.LastId), add_offset: -limit, limit: limit), "history", ct);
+            history = await GetTelegramRpcAsync(() => client.Messages_GetHistory(job.Channel, offset_id: Math.Max(1, state.LastId), add_offset: -limit, limit: limit), "history", ct, floodRetries: 0);
         }
         catch (RpcException ex) when (ex.Code == 420)
         {
@@ -382,10 +382,31 @@ public sealed class TelegramCollector(
 
     private static JsonDocument WriteCursor(TelegramHistoryState cursor) => JsonSerializer.SerializeToDocument(new { history = cursor });
 
-    private async Task<T> GetTelegramRpcAsync<T>(Func<Task<T>> rpc, string operation, CancellationToken ct)
+    /// <summary>
+    /// One RPC through the request gate. A FLOOD_WAIT is retried a few times: the gate has already applied the
+    /// cooldown, so the retry simply waits it out. Without this the ~300 startup calls (resolve + recent backfill for
+    /// every channel) would crash the collector on the first flood and the restart would issue them all again.
+    /// The history loop handles 420 itself (per-source NextAttemptAt) and never sees a retry here.
+    /// </summary>
+    private async Task<T> GetTelegramRpcAsync<T>(Func<Task<T>> rpc, string operation, CancellationToken ct, int floodRetries = 3)
     {
         var executor = _rpc ?? throw new InvalidOperationException("Telegram RPC executor is not initialized.");
-        return await executor.ExecuteAsync(rpc, operation, ct);
+        for (var attempt = 0; ; attempt++)
+        {
+            var started = clock.GetTimestamp();
+            try
+            {
+                return await executor.ExecuteAsync(rpc, operation, ct);
+            }
+            catch (RpcException ex) when (ex.Code == 420 && attempt < floodRetries)
+            {
+                logger.LogWarning("Telegram: {Operation} flood wait {Seconds}s; retrying after the cooldown ({Attempt}/{Retries})", operation, ex.X, attempt + 1, floodRetries);
+            }
+            finally
+            {
+                logger.LogDebug("Telegram: {Operation} RPC took {Elapsed:N0} ms", operation, clock.GetElapsedTime(started).TotalMilliseconds);
+            }
+        }
     }
 
     private static bool IsTerminalHistoryError(RpcException ex) => ex.Code is 400 or 403 or 404;

@@ -141,17 +141,23 @@ public class TelegramBackfillSchedulerTests
     }
 
     [Fact]
-    public async Task Request_gate_never_starts_two_history_rpcs_together()
+    public async Task Request_gate_paces_issue_time_but_lets_history_rpcs_overlap()
     {
-        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(1));
-        var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(1));
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(50), TimeSpan.FromMilliseconds(50), TimeSpan.FromSeconds(1));
+        var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(5));
         var active = 0;
         var maximum = 0;
+        var issued = new List<TimeSpan>();
+        var elapsed = Stopwatch.StartNew();
 
         async Task<int> RpcAsync()
         {
+            lock (issued)
+            {
+                issued.Add(elapsed.Elapsed);
+            }
             maximum = Math.Max(maximum, Interlocked.Increment(ref active));
-            await Task.Delay(20);
+            await Task.Delay(400);
             Interlocked.Decrement(ref active);
             return 1;
         }
@@ -160,7 +166,21 @@ public class TelegramBackfillSchedulerTests
             executor.ExecuteAsync(RpcAsync, "one", CancellationToken.None),
             executor.ExecuteAsync(RpcAsync, "two", CancellationToken.None));
 
-        Assert.Equal(1, maximum);
+        Assert.Equal(2, maximum);
+        Assert.True(issued[1] - issued[0] >= TimeSpan.FromMilliseconds(40), $"Second RPC was issued only {issued[1] - issued[0]} after the first.");
+    }
+
+    [Fact]
+    public async Task Flood_received_by_one_rpc_blocks_the_next_issue()
+    {
+        var gate = new TelegramRequestGate(TimeProvider.System, TimeSpan.FromMilliseconds(1), TimeSpan.FromMilliseconds(1), TimeSpan.FromSeconds(2));
+        var executor = new TelegramRpcExecutor(gate, TimeSpan.FromSeconds(5));
+
+        await Assert.ThrowsAsync<RpcException>(() => executor.ExecuteAsync<int>(() => throw new RpcException(420, "FLOOD_WAIT_1"), "flooded", CancellationToken.None));
+        var elapsed = Stopwatch.StartNew();
+        await executor.ExecuteAsync(() => Task.FromResult(1), "after-flood", CancellationToken.None);
+
+        Assert.True(elapsed.Elapsed >= TimeSpan.FromMilliseconds(1500), $"Cooldown was only {elapsed.Elapsed}.");
     }
 
     [Fact]

@@ -34,7 +34,8 @@ internal sealed class TelegramBackfillJob
 internal sealed class TelegramBackfillScheduler(TimeProvider clock, int workers)
 {
     private readonly object _sync = new();
-    private readonly int _workers = Math.Clamp(workers, 1, 2);
+    // Each worker keeps one history RPC in flight; the request gate spaces their issue times.
+    private readonly int _workers = Math.Clamp(workers, 1, 4);
     private List<TelegramBackfillJob> _ring = [];
     private int _next;
 
@@ -187,10 +188,7 @@ internal sealed class TelegramRequestGate
         await _mutex.WaitAsync(ct);
         try
         {
-            var now = _clock.GetUtcNow();
-            _lastFlood = now;
-            _interval = TimeSpan.FromMilliseconds(Math.Min(_maximum.TotalMilliseconds, Math.Max(_interval.TotalMilliseconds * 2, _minimum.TotalMilliseconds)));
-            _blockedUntil = new[] { _blockedUntil, now.AddSeconds(Math.Max(1, seconds) + 1) }.Max();
+            ApplyFlood(seconds);
         }
         finally
         {
@@ -198,10 +196,16 @@ internal sealed class TelegramRequestGate
         }
     }
 
-    /// <summary>Issues an RPC while holding the coordinator, so a received flood is applied before another call can start.</summary>
+    /// <summary>
+    /// Paces the *issue* of an RPC (one every interval, none during a flood cooldown) but does not hold the coordinator
+    /// while the RPC is in flight: a history page takes ~1.5 s to come back from Telegram, so serialising the calls
+    /// would cap the whole import at one page per RPC round trip regardless of how many workers run. Up to one RPC per
+    /// worker overlaps; a received flood or timeout is applied when it arrives and stops every later issue.
+    /// </summary>
     public async Task<T> ExecuteAsync<T>(Func<Task<T>> rpc, TimeSpan timeout, string operation, CancellationToken ct)
     {
         await _mutex.WaitAsync(ct);
+        Task<T>? pending;
         try
         {
             if (_poisoned is not null)
@@ -220,43 +224,52 @@ internal sealed class TelegramRequestGate
             {
                 await Task.Delay(at - now, ct);
             }
-            Task<T>? pending = null;
             try
             {
                 pending = rpc();
-                return await pending.WaitAsync(timeout, ct);
             }
-            catch (RpcException ex) when (ex.Code == 420)
+            catch (Exception ex)
             {
-                await ApplyFloodAsync(ex.X, ct);
-                throw;
-            }
-            catch (TimeoutException ex) when (!ct.IsCancellationRequested)
-            {
-                var timeoutException = new TelegramRpcTimeoutException(operation, ex);
-                _poisoned = timeoutException;
-                if (pending is not null)
-                {
-                    _ = ObserveLateFailureAsync(pending);
-                }
-                await ApplyFloodAsync((int)Math.Ceiling(timeout.TotalSeconds), ct);
-                throw timeoutException;
+                pending = Task.FromException<T>(ex);
             }
         }
         finally
         {
             _mutex.Release();
         }
+        try
+        {
+            return await pending.WaitAsync(timeout, ct);
+        }
+        catch (RpcException ex) when (ex.Code == 420)
+        {
+            await FloodAsync(ex.X, ct);
+            throw;
+        }
+        catch (TimeoutException ex) when (!ct.IsCancellationRequested)
+        {
+            var timeoutException = new TelegramRpcTimeoutException(operation, ex);
+            _ = ObserveLateFailureAsync(pending);
+            await _mutex.WaitAsync(CancellationToken.None);
+            try
+            {
+                _poisoned ??= timeoutException;
+                ApplyFlood((int)Math.Ceiling(timeout.TotalSeconds));
+            }
+            finally
+            {
+                _mutex.Release();
+            }
+            throw timeoutException;
+        }
     }
 
-    private Task ApplyFloodAsync(int seconds, CancellationToken ct)
+    private void ApplyFlood(int seconds)
     {
-        ct.ThrowIfCancellationRequested();
         var now = _clock.GetUtcNow();
         _lastFlood = now;
         _interval = TimeSpan.FromMilliseconds(Math.Min(_maximum.TotalMilliseconds, Math.Max(_interval.TotalMilliseconds * 2, _minimum.TotalMilliseconds)));
         _blockedUntil = new[] { _blockedUntil, now.AddSeconds(Math.Max(1, seconds) + 1) }.Max();
-        return Task.CompletedTask;
     }
 
     private static async Task ObserveLateFailureAsync(Task task)
