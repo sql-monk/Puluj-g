@@ -337,25 +337,17 @@ public sealed class TelegramCollector(
         }
         var toStore = page.Where(m => ToUtc(m.date) >= state.Since).ToList();
         var lastId = page[^1].id;
-        var stored = state.Stored;
         var next = state with { LastId = lastId, Stored = state.Stored + toStore.Count, Pages = state.Pages + 1, NextAttemptAt = null, LastFailureKind = null };
-        for (var i = 0; i < toStore.Count; i++)
-        {
-            var last = i == toStore.Count - 1;
-            var checkpoint = last ? new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)) : null;
-            if (await StoreAsync(toStore[i], job.Source, job.Username, ct, SubscriberCount(job.Channel), job.Channel.title, announceProcessor: false, checkpoint: checkpoint))
-            {
-                stored++;
-            }
-        }
+        // The whole page and its cursor commit in one transaction (ids are monotonic within a channel): a crash cannot
+        // move the cursor past an unstored post, and 100 posts cost one round trip instead of 100. Service messages are
+        // not stored but still move the cursor.
+        var subscriberCount = SubscriberCount(job.Channel);
+        var batch = toStore.Where(m => !IsServiceMessage(m)).Select(m => ToIncoming(m, job.Source, job.Username, subscriberCount, job.Channel.title)).ToList();
+        var storedNow = await ingress.PublishBatchAsync(batch, job.Source, Name, new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)), live: false, ct);
         job.State = next;
-        if (toStore.Count == 0)
-        {
-            await states.MarkSuccessAsync(job.Source.SourceId, null, ToUtc(page[^1].date), WriteCursor(job.State), ct);
-        }
         if (job.State.Pages % 20 == 0)
         {
-            logger.LogInformation("Telegram: @{Username} history … id {LastId} ({Date:yyyy-MM-dd HH:mm}), {Stored} stored", job.Username, lastId, ToUtc(page[^1].date), stored);
+            logger.LogInformation("Telegram: @{Username} history … id {LastId} ({Date:yyyy-MM-dd HH:mm}), {Stored} stored", job.Username, lastId, ToUtc(page[^1].date), state.Stored + storedNow);
         }
     }
 
@@ -433,7 +425,7 @@ public sealed class TelegramCollector(
     /// <summary>Publishes one post (or edit); returns whether it was stored/accepted (false for service messages and known duplicates).</summary>
     private async Task<bool> StoreAsync(Message m, Source source, string username, CancellationToken ct, int? subscriberCount = null, string? channelTitle = null, bool announceProcessor = true, CollectorCheckpoint? checkpoint = null)
     {
-        if (string.IsNullOrWhiteSpace(m.message) && m.media is null)
+        if (IsServiceMessage(m))
         {
             if (checkpoint is not null)
             {
@@ -441,9 +433,17 @@ public sealed class TelegramCollector(
             }
             return false; // service messages still move the cursor
         }
+        var result = await ingress.PublishAsync(ToIncoming(m, source, username, subscriberCount, channelTitle), source, Name, checkpoint, live: announceProcessor, ct);
+        return result.Stored;
+    }
+
+    private static bool IsServiceMessage(Message m) => string.IsNullOrWhiteSpace(m.message) && m.media is null;
+
+    private static IncomingMessage ToIncoming(Message m, Source source, string username, int? subscriberCount, string? channelTitle)
+    {
         var payload = TelegramMessagePayload.From(m, username, subscriberCount, channelTitle);
         var revision = payload.EditDate is null ? "0" : $"e{payload.EditDate.Value.ToUnixTimeSeconds()}";
-        var result = await ingress.PublishAsync(new IncomingMessage
+        return new IncomingMessage
         {
             SourceId = source.SourceId,
             SourceMessageId = revision == "0" ? m.id.ToString() : $"{m.id}:{revision}",
@@ -453,8 +453,7 @@ public sealed class TelegramCollector(
             RawText = m.message,
             RawPayload = payload.ToDocument(),
             Url = $"https://t.me/{username}/{m.id}",
-        }, source, Name, checkpoint, live: announceProcessor, ct);
-        return result.Stored;
+        };
     }
 
     private static string? Username(Source source)

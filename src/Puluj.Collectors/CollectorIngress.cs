@@ -30,4 +30,15 @@ public sealed class CollectorIngress(RawMessageIngestor ingestor, CollectorState
         }
         return new IngressResult(true, result.RawMessageId, result.IsNew);
     }
+
+    /// <summary>
+    /// Stores a page of messages from one source in one transaction together with the checkpoint (plan §6.1 for the
+    /// whole page: either every message and the cursor land, or nothing does). Returns how many were new.
+    /// </summary>
+    public async Task<int> PublishBatchAsync(IReadOnlyList<IncomingMessage> msgs, Source source, string collectorName, CollectorCheckpoint? checkpoint, bool live, CancellationToken ct)
+    {
+        var results = await ingestor.IngestBatchAsync(msgs, source.Code, ct, announceProcessor: live, inSameTransaction: checkpoint is null ? null :
+            (db, token) => states.MarkSuccessAsync(db, source.SourceId, checkpoint.LastSourceMessageId, checkpoint.LastMessageAt, checkpoint.Cursor, token));
+        return results.Count(r => r.IsNew);
+    }
 }

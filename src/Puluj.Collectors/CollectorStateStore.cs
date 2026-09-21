@@ -19,7 +19,14 @@ public sealed class CollectorStateStore(IDbContextFactory<PulujDbContext> factor
         UpdateAsync(sourceId, s => s.LastPolledAt = clock.GetUtcNow(), ct);
 
     public Task MarkSuccessAsync(int sourceId, string? lastSourceMessageId, DateTimeOffset? lastMessageAt, JsonDocument? cursor, CancellationToken ct) =>
-        UpdateAsync(sourceId, s =>
+        UpdateAsync(sourceId, MarkSuccess(lastSourceMessageId, lastMessageAt, cursor), ct);
+
+    /// <summary>Same as <see cref="MarkSuccessAsync(int, string?, DateTimeOffset?, JsonDocument?, CancellationToken)"/> on a caller's context, so the checkpoint commits in the caller's transaction.</summary>
+    public Task MarkSuccessAsync(PulujDbContext db, int sourceId, string? lastSourceMessageId, DateTimeOffset? lastMessageAt, JsonDocument? cursor, CancellationToken ct) =>
+        UpdateAsync(db, sourceId, MarkSuccess(lastSourceMessageId, lastMessageAt, cursor), ct);
+
+    private Action<CollectorState> MarkSuccess(string? lastSourceMessageId, DateTimeOffset? lastMessageAt, JsonDocument? cursor) =>
+        s =>
         {
             var now = clock.GetUtcNow();
             s.LastPolledAt = now;
@@ -38,7 +45,7 @@ public sealed class CollectorStateStore(IDbContextFactory<PulujDbContext> factor
             {
                 s.Cursor = cursor;
             }
-        }, ct);
+        };
 
     public Task MarkFailureAsync(int sourceId, string error, CancellationToken ct) =>
         UpdateAsync(sourceId, s =>
@@ -59,6 +66,11 @@ public sealed class CollectorStateStore(IDbContextFactory<PulujDbContext> factor
     private async Task UpdateAsync(int sourceId, Action<CollectorState> mutate, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
+        await UpdateAsync(db, sourceId, mutate, ct);
+    }
+
+    private static async Task UpdateAsync(PulujDbContext db, int sourceId, Action<CollectorState> mutate, CancellationToken ct)
+    {
         var state = await db.CollectorStates.FirstOrDefaultAsync(s => s.SourceId == sourceId, ct);
         if (state is null)
         {
