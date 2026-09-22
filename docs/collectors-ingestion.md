@@ -21,6 +21,15 @@ source-specific config і secrets. `CollectorSupervisor` бере лише enabl
 а також relevant collector options, перезапускає колектори з новою
 конфігурацією без перезапуску процесу.
 
+Рядки `sources` створюють `SourceSeeder` з `data/sources.json` (лише коди,
+яких ще немає — БД володіє джерелами) і `POST /api/admin/sources`. Обидва
+шляхи тримають інваріант «один Telegram-канал — одне джерело»: код Telegram
+джерела — `tg_<username lowercase>` з `Puluj.Domain.SourceCodes`, а перед
+додаванням канал (`config.channel`, без урахування регістру) звіряється з
+усіма наявними Telegram рядками незалежно від їхнього коду. Seeder пропускає
+такий запис із warning у лог, admin API відповідає `409` із кодом наявного
+джерела. Правила кодів — у [naming.md](naming.md#коди-джерел).
+
 Telegram collector працює для Telegram sources з username у config. Він
 зберігає нові й відредаговані channel posts: edit має ту саму key, але окрему
 revision, тому оригінал не втрачається. alerts.in.ua полить active alerts і
@@ -117,3 +126,13 @@ message identity, published time, оригінальний text/payload та URL
   resolve; неуспішний канал позначається станом помилки та не вимикає інших.
 - Trust level — атрибут джерела, не автоматичне підтвердження незалежності
   повідомлень або географічної точності.
+- Унікальність Telegram-каналу гарантує лише застосунок (seeder і admin API),
+  не БД: унікальний індекс на `lower(config->>'channel')` для `type = Telegram`
+  свідомо не доданий, бо в робочій БД ще лишаються пари одного каналу під двома
+  кодами (`kudy_letyt`/`tg_kudy_letyt`, `raketa_trevoga`/`tg_raketa_trevoga`),
+  і міграція з таким індексом зупинила б `migrate`, а з ним і весь стек. Коли
+  ці пари розібрані (вимкнути дубль, видалити його raw-повідомлення й рядок),
+  індекс можна додати міграцією через `scripts/add-migration.ps1`:
+  `CREATE UNIQUE INDEX ux_sources_telegram_channel ON sources
+  (lower(config->>'channel')) WHERE type = 2`. Прямий `INSERT` у `sources`
+  повз seeder/API захисту не має.

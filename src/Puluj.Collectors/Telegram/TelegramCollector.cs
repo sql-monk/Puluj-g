@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Puluj.Domain;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
@@ -477,32 +478,10 @@ public sealed class TelegramCollector(
         };
     }
 
-    private static string? Username(Source source)
-    {
-        if (source.Config is null || !source.Config.RootElement.TryGetProperty("channel", out var c))
-        {
-            return null;
-        }
-        var s = NormalizeUsername(c.GetString());
-        return string.IsNullOrEmpty(s) ? null : s;
-    }
+    private static string? Username(Source source) => SourceCodes.TelegramChannel(source);
 
-    /// <summary>Accepts "@name", "name", "https://t.me/name" or "t.me/name/123" and returns "name".</summary>
-    public static string? NormalizeUsername(string? raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw))
-        {
-            return null;
-        }
-        var s = raw.Trim();
-        var idx = s.IndexOf("t.me/", StringComparison.OrdinalIgnoreCase);
-        if (idx >= 0)
-        {
-            s = s[(idx + 5)..];
-        }
-        s = s.TrimStart('@').Split('/', '?', '#')[0].Trim();
-        return s.Length == 0 ? null : s;
-    }
+    /// <summary>Accepts "@name", "name", "https://t.me/name" or "t.me/name/123" and returns "name". See <see cref="SourceCodes"/>.</summary>
+    public static string? NormalizeUsername(string? raw) => SourceCodes.NormalizeTelegramUsername(raw);
 
     public static bool IsValidApiHash(string? hash) => hash is { Length: 32 } && hash.All(Uri.IsHexDigit);
 

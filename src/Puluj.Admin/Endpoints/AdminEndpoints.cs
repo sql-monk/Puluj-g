@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Puluj.Contracts;
+using Puluj.Domain;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Persistence;
@@ -213,7 +214,13 @@ public static class AdminEndpoints
                 var cfg = s.Config is null ? new JsonObject() : JsonNode.Parse(s.Config.RootElement.GetRawText())!.AsObject();
                 if (req.Channel is not null)
                 {
-                    cfg["channel"] = Puluj.Collectors.Telegram.TelegramCollector.NormalizeUsername(req.Channel) ?? "";
+                    var channel = SourceCodes.NormalizeTelegramUsername(req.Channel);
+                    // Moving a source onto a channel another source already collects would duplicate that channel.
+                    if (s.Type == SourceType.Telegram && await FindTelegramChannelAsync(db, channel, exceptId: id, ct) is { } dup)
+                    {
+                        return Results.Conflict(new { error = $"канал @{channel} уже є джерелом '{dup.Code}'" });
+                    }
+                    cfg["channel"] = channel ?? "";
                     if (s.Type == SourceType.Telegram && string.IsNullOrWhiteSpace(req.Url))
                     {
                         s.Url = $"https://t.me/{cfg["channel"]}";
@@ -257,16 +264,24 @@ public static class AdminEndpoints
             {
                 return Results.BadRequest(new { error = "type must be Telegram|RestApi|Rss|Web" });
             }
-            var channel = Puluj.Collectors.Telegram.TelegramCollector.NormalizeUsername(req.Channel);
+            var channel = SourceCodes.NormalizeTelegramUsername(req.Channel);
             if (type == SourceType.Telegram && string.IsNullOrEmpty(channel))
             {
                 return Results.BadRequest(new { error = "для Telegram потрібен username каналу" });
             }
             await using var db = await factory.CreateDbContextAsync(ct);
-            var code = type == SourceType.Telegram ? $"tg_{channel!.ToLowerInvariant()}" : $"{type.ToString().ToLowerInvariant()}_{Guid.NewGuid():N}"[..16];
+            // Codes follow docs/naming.md ("Коди джерел"): tg_<username lowercase> for Telegram, so one channel always
+            // maps to one code.
+            var code = type == SourceType.Telegram ? SourceCodes.Telegram(channel!) : $"{type.ToString().ToLowerInvariant()}_{Guid.NewGuid():N}"[..16];
             if (await db.Sources.AnyAsync(x => x.Code == code, ct))
             {
                 return Results.Conflict(new { error = $"джерело '{code}' уже існує" });
+            }
+            // A legacy code (seeded before the convention) may already cover this channel: one channel, one source, or
+            // the collector reads it twice. Case-insensitive on the username, like Telegram itself.
+            if (type == SourceType.Telegram && await FindTelegramChannelAsync(db, channel, exceptId: null, ct) is { } dup)
+            {
+                return Results.Conflict(new { error = $"канал @{channel} уже є джерелом '{dup.Code}'" });
             }
             var s = new Source
             {
@@ -390,6 +405,20 @@ public static class AdminEndpoints
             ORDER BY r.source_id, r.received_at DESC, r.raw_message_id DESC
             """).ToListAsync(ct);
         return rows.ToDictionary(x => x.SourceId);
+    }
+
+    /// <summary>
+    /// The Telegram source that already collects <paramref name="channel"/> (any code, username case-insensitive), or null.
+    /// The channel lives in jsonb config, so the few Telegram rows are compared in memory rather than with an expression index.
+    /// </summary>
+    private static async Task<Source?> FindTelegramChannelAsync(PulujDbContext db, string? channel, int? exceptId, CancellationToken ct)
+    {
+        if (string.IsNullOrEmpty(channel))
+        {
+            return null;
+        }
+        var telegram = await db.Sources.AsNoTracking().Where(x => x.Type == SourceType.Telegram && x.SourceId != exceptId).ToListAsync(ct);
+        return SourceCodes.FindTelegramChannel(telegram, channel);
     }
 
     private static AdminSourceDto ToDto(Source s, DateTimeOffset now, long rawCount, TelegramChannelInfo? telegram = null)
