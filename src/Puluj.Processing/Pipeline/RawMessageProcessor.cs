@@ -64,7 +64,11 @@ public sealed class RawMessageProcessor(
     {
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
-        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT raw_message_id FROM raw_messages WHERE raw_message_id = {rawMessageId} FOR UPDATE", ct);
+        // NO KEY UPDATE, not FOR UPDATE: the same fence against claims, sweeps and other instances (their UPDATEs wait),
+        // but a row referencing this message from another connection while it is being processed — the LLM audit row,
+        // written outside this transaction so it survives a rollback — only needs KEY SHARE for its FK check, and
+        // FOR UPDATE would make that insert wait for this transaction, which is itself waiting for the parse.
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT raw_message_id FROM raw_messages WHERE raw_message_id = {rawMessageId} FOR NO KEY UPDATE", ct);
         var raw = await db.RawMessages.Include(r => r.Source).FirstOrDefaultAsync(r => r.RawMessageId == rawMessageId, ct);
         if (raw is null || !OwnedByMe(raw))
         {

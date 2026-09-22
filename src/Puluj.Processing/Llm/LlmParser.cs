@@ -131,13 +131,15 @@ public sealed class LlmParser : IParser
         }
         _breaker.Attempt();
         var started = _clock.GetUtcNow();
+        // What went over the wire, kept for the audit row even when the call throws before there is an answer.
+        var wire = new WirePayloads();
         try
         {
-            var answer = await AskAsync(message.Text, ct);
+            var answer = await AskAsync(message.Text, wire, ct);
             var mapped = Map(answer.Result, message);
             _breaker.Reset();
             _metrics.LlmCall(mapped.Count > 0 ? "facts" : "empty");
-            await AuditAsync(ctx, message.Text, answer, answer.Refused ? "refusal" : mapped.Count > 0 ? "facts" : "empty", null, null, mapped.Count, started, ct);
+            await AuditAsync(ctx, message.Text, answer, wire, answer.Refused ? "refusal" : mapped.Count > 0 ? "facts" : "empty", null, null, mapped.Count, started, ct);
             return mapped;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -149,7 +151,7 @@ public sealed class LlmParser : IParser
             _metrics.LlmCall(ex is AnthropicRateLimitException ? "429" : "api_error");
             // The API's own message (billing, auth, a rejected schema) says it all; the stack trace would only repeat the SDK.
             var detail = ErrorMessage(ex);
-            await AuditAsync(ctx, message.Text, null, ex is AnthropicRateLimitException ? "429" : "api_error", (int)ex.StatusCode, detail, 0, started, ct);
+            await AuditAsync(ctx, message.Text, null, wire, ex is AnthropicRateLimitException ? "429" : "api_error", (int)ex.StatusCode, detail, 0, started, ct);
             if (_breaker.Trip(ex.StatusCode, detail, _clock.GetUtcNow()) is { } pause)
             {
                 _logger.LogWarning("LLM request failed with {Status}: {Detail}; model paused for {Pause}", (int)ex.StatusCode, detail, pause);
@@ -163,7 +165,7 @@ public sealed class LlmParser : IParser
         {
             _metrics.LlmCall("error");
             _breaker.Fail();
-            await AuditAsync(ctx, message.Text, null, "error", null, ex.Message, 0, started, ct);
+            await AuditAsync(ctx, message.Text, null, wire, "error", null, ex.Message, 0, started, ct);
             _logger.LogWarning(ex, "LLM fallback failed");
         }
         return facts;
@@ -233,12 +235,13 @@ public sealed class LlmParser : IParser
         }
     }
 
-    private async Task<LlmAnswer> AskAsync(string text, CancellationToken ct)
+    private async Task<LlmAnswer> AskAsync(string text, WirePayloads wire, CancellationToken ct)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
         var parameters = CreateParams(_options.Model, 2048, _systemPrompt.Value, text);
         var requestPayload = RequestPayload(parameters);
+        wire.Request = requestPayload; // before the call: a timeout or a transport error still leaves the request on record
         Message response;
         try
         {
@@ -246,17 +249,11 @@ public sealed class LlmParser : IParser
         }
         catch (AnthropicApiException ex)
         {
-            _lastRequestPayload = requestPayload; // audited by the catch in ParseAsync together with the error body
-            _lastResponsePayload = ErrorPayload(ex);
-            throw;
-        }
-        catch (Exception)
-        {
-            _lastRequestPayload = requestPayload;
-            _lastResponsePayload = null;
+            wire.Response = ErrorPayload(ex); // the error body, audited by the catch in ParseAsync
             throw;
         }
         var responsePayload = ResponsePayload(response);
+        wire.Response = responsePayload;
         if (response.StopReason == "refusal")
         {
             _logger.LogInformation("LLM declined to classify the message");
@@ -268,12 +265,17 @@ public sealed class LlmParser : IParser
             response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0, response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens, requestPayload, responsePayload);
     }
 
-    [ThreadStatic] private static string? _lastRequestPayload;
-    [ThreadStatic] private static string? _lastResponsePayload;
+    /// <summary>The request body as sent and the response (or error) body as received, per call — not per thread: an
+    /// async continuation may resume anywhere, so a thread-static slot would lose the payload of a failed call.</summary>
+    private sealed class WirePayloads
+    {
+        public string? Request { get; set; }
+        public string? Response { get; set; }
+    }
 
     /// <summary>Audit must never make an otherwise usable parsing result fail. A cost is an estimate from the exact
     /// provider usage object and the price card active at this instant, kept with the row for historical accuracy.</summary>
-    private async Task AuditAsync(ParseContext ctx, string requestText, LlmAnswer? answer, string outcome, int? statusCode, string? error, int factsCount, DateTimeOffset started, CancellationToken ct)
+    private async Task AuditAsync(ParseContext ctx, string requestText, LlmAnswer? answer, WirePayloads wire, string outcome, int? statusCode, string? error, int factsCount, DateTimeOffset started, CancellationToken ct)
     {
         if (_auditFactory is null)
         {
@@ -308,12 +310,10 @@ public sealed class LlmParser : IParser
                 RequestText = requestText,
                 SystemPrompt = _systemPrompt.Value,
                 ResponseText = answer?.ResponseText,
-                RequestPayload = ToDocument(answer?.RequestPayload ?? _lastRequestPayload),
-                ResponsePayload = ToDocument(answer?.ResponsePayload ?? _lastResponsePayload),
+                RequestPayload = ToDocument(answer?.RequestPayload ?? wire.Request),
+                ResponsePayload = ToDocument(answer?.ResponsePayload ?? wire.Response),
                 Error = error,
             });
-            _lastRequestPayload = null;
-            _lastResponsePayload = null;
             await db.SaveChangesAsync(ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
