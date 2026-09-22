@@ -54,9 +54,19 @@ public sealed class TrackWatchdog(
         // Reset fences the raw table before Store. Take the read lock in the same order, not inside Store.
         await db.Database.ExecuteSqlRawAsync("LOCK TABLE raw_messages IN ACCESS SHARE MODE", ct);
         await db.Database.ExecuteSqlInterpolatedAsync(AdvisoryLocks.Take(AdvisoryLocks.Store), ct);
+        // One min() per status, not "status IN (Pending, InProgress)": each single-status predicate matches a partial
+        // index (ix_raw_messages_pending_published, ix_raw_messages_in_progress_claimed_at) and costs a few pages, while
+        // the OR made every sweep a parallel seq scan of raw_messages under the Store lock.
         var oldestPending = await db.RawMessages.AsNoTracking()
-            .Where(r => r.ProcessingStatus == ProcessingStatus.Pending || r.ProcessingStatus == ProcessingStatus.InProgress)
+            .Where(r => r.ProcessingStatus == ProcessingStatus.Pending)
             .MinAsync(r => (DateTimeOffset?)r.PublishedAt, ct);
+        var oldestInProgress = await db.RawMessages.AsNoTracking()
+            .Where(r => r.ProcessingStatus == ProcessingStatus.InProgress)
+            .MinAsync(r => (DateTimeOffset?)r.PublishedAt, ct);
+        if (oldestInProgress is { } ip && (oldestPending is null || ip < oldestPending))
+        {
+            oldestPending = ip;
+        }
         var now = oldestPending is { } p && p < wall.AddMinutes(-30) ? p : wall;
         var active = await db.TargetTracks.Where(t => t.Status == TrackStatus.Active).ToListAsync(ct);
         var closed = new List<long>();

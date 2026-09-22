@@ -451,7 +451,6 @@ Step "Processing state"
 SELECT processing_status, count(*) FROM raw_messages GROUP BY 1 ORDER BY 1;
 SELECT count(*) AS text_alerts_ended_before_start FROM air_alerts WHERE ended_at < started_at;
 SELECT key, left(value, 60) AS value FROM app_settings WHERE key LIKE 'Runtime:Worker:%' ORDER BY 1;
-SELECT count(*) FILTER (WHERE observation_id IS NOT NULL) AS targets_by_writers, count(*) FILTER (WHERE observation_id IS NULL) AS targets_by_legacy FROM targets;
 "@ | docker exec -i $postgisContainer psql -U puluj -d puluj -f -
 }
 Write-Host "`nГотово." -ForegroundColor Green

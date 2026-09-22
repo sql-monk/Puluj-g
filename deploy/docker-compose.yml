@@ -39,21 +39,25 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=2GB
+      - shared_buffers=8GB
       - -c
-      - effective_cache_size=4GB
+      - effective_cache_size=16GB
       - -c
-      - work_mem=16MB
+      - work_mem=128MB
       - -c
-      - maintenance_work_mem=256MB
+      - maintenance_work_mem=1024MB
       - -c
-      - max_wal_size=2GB
+      - max_wal_size=8GB
       - -c
       - min_wal_size=500MB
       - -c
       - checkpoint_timeout=15min
       - -c
       - checkpoint_completion_target=0.9
+      # Cumulative per-query statistics (pg_stat_statements): the extension is created by a migration but only
+      # works when the library is preloaded here. Restart-only setting.
+      - -c
+      - shared_preload_libraries=pg_stat_statements
     # PostgreSQL dynamic shared-memory segments use /dev/shm. The Docker default (64 MiB)
     # is insufficient for concurrent workers and the 4 GiB shared buffer cache.
     shm_size: 4g

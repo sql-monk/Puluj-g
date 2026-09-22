@@ -11,6 +11,7 @@ using Puluj.Analytics.Reporting;
 using Puluj.EntityAdmin.Docker;
 using Puluj.Api.Services;
 using Puluj.Domain.Entities;
+using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Ingestion;
 using Puluj.Contracts;
 using Puluj.Infrastructure.Persistence;
@@ -41,14 +42,19 @@ public static partial class EntityOpsEndpoints
     private static async Task<IReadOnlyDictionary<int, TelegramChannelInfo>> LatestTelegramInfoAsync(PulujDbContext db, CancellationToken ct)
     {
         var rows = await db.Database.SqlQuery<TelegramChannelInfo>($"""
-            SELECT DISTINCT ON (r.source_id)
-                r.source_id AS source_id,
-                r.raw_payload ->> 'channelTitle' AS channel_title,
-                NULLIF(r.raw_payload ->> 'subscriberCount', '')::int AS subscriber_count
-            FROM raw_messages r
-            WHERE r.raw_payload IS NOT NULL
-              AND (r.raw_payload ? 'channelTitle' OR r.raw_payload ? 'subscriberCount')
-            ORDER BY r.source_id, r.received_at DESC, r.raw_message_id DESC
+            SELECT s.source_id AS source_id,
+                   r.raw_payload ->> 'channelTitle' AS channel_title,
+                   NULLIF(r.raw_payload ->> 'subscriberCount', '')::int AS subscriber_count
+            FROM sources s
+            CROSS JOIN LATERAL (
+                SELECT r.raw_payload
+                FROM raw_messages r
+                WHERE r.source_id = s.source_id
+                  AND r.raw_payload IS NOT NULL
+                  AND (r.raw_payload ? 'channelTitle' OR r.raw_payload ? 'subscriberCount')
+                ORDER BY r.received_at DESC, r.raw_message_id DESC
+                LIMIT 1) r
+            WHERE s.type = {(int)SourceType.Telegram}
             """).ToListAsync(ct);
         return rows.ToDictionary(x => x.SourceId);
     }
