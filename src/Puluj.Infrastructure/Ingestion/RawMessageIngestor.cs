@@ -22,6 +22,13 @@ public sealed class RawMessageIngestor(
     TimeProvider clock,
     ILogger<RawMessageIngestor> logger)
 {
+    /// <summary>
+    /// Inserts normally take milliseconds, but they queue behind an ACCESS EXCLUSIVE request on raw_messages (a reprocess
+    /// fence, a migration). Npgsql's default 30 s would then throw and take the collector down with it; a longer wait keeps
+    /// the message and its checkpoint in flight until the fence commits. ReprocessService keeps its fence far shorter than this.
+    /// </summary>
+    public const int CommandTimeoutSeconds = 120;
+
     /// <param name="announceProcessor">False while a history load is running: the message is stored Pending and the processors
     /// pick it up later in publication order, together with everything else the load brings.</param>
     public async Task<IngestResult> IngestAsync(IncomingMessage msg, string sourceCode, CancellationToken ct, bool announceProcessor = true)
@@ -39,7 +46,7 @@ public sealed class RawMessageIngestor(
             VALUES (@source_id, @source_message_id, @key, @revision, @published_at, @received_at, @raw_text, @raw_payload, @url, @hash, 0, 0)
             ON CONFLICT DO NOTHING
             RETURNING raw_message_id
-            """, conn);
+            """, conn) { CommandTimeout = CommandTimeoutSeconds };
         cmd.Parameters.AddWithValue("source_id", msg.SourceId);
         cmd.Parameters.AddWithValue("source_message_id", msg.SourceMessageId);
         cmd.Parameters.AddWithValue("key", identity.SourceMessageKey);
@@ -122,7 +129,7 @@ public sealed class RawMessageIngestor(
                 ORDER BY m.ord
                 ON CONFLICT DO NOTHING
                 RETURNING source_message_key, source_revision, raw_message_id
-                """, conn, (NpgsqlTransaction)tx.GetDbTransaction());
+                """, conn, (NpgsqlTransaction)tx.GetDbTransaction()) { CommandTimeout = CommandTimeoutSeconds };
             cmd.Parameters.AddWithValue("received_at", receivedAt);
             cmd.Parameters.AddWithValue("source_ids", sourceIds);
             cmd.Parameters.AddWithValue("source_message_ids", messageIds);

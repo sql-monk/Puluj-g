@@ -83,7 +83,8 @@ public static partial class OpsEndpoints
             {
                 return Results.BadRequest(new { error = "Для цієї операції потрібне точне підтвердження." });
             }
-            if (await reprocess.PausedAsync(ct) is { } paused)
+            // A history load owns the pause; a pause left by an earlier reprocess (in progress or failed) is ours to run over.
+            if (await reprocess.PausedAsync(ct) is { } paused && !ReprocessService.OwnsPause(paused))
             {
                 return Results.Conflict(new { error = $"Обробку призупинено: {paused}" });
             }

@@ -15,4 +15,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Puluj.Integration.Tests" />
+  </ItemGroup>
 </Project>

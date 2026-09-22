@@ -28,6 +28,8 @@ public sealed class TelegramCollector(
     ILogger<TelegramCollector> logger) : ICollector
 {
     public const string StatusKey = "Telegram:Status";
+    /// <summary>Processing pause reasons written by the history load start with this (ReprocessService tells its own apart).</summary>
+    public const string HistoryPausePrefix = "history load:";
 
     public string Name => "telegram";
 
@@ -141,6 +143,13 @@ public sealed class TelegramCollector(
         if (o.BackfillSince is { } since)
         {
             await LoadHistoryAsync(client, since, ct);
+        }
+        else if (await reprocess.PausedAsync(ct) is { } reason && IsHistoryPause(reason))
+        {
+            // The load that set this pause was abandoned (BackfillSince removed while it was interrupted): what it stored is
+            // Pending and the processors take it oldest-published first, so there is nothing left to hold them for.
+            logger.LogWarning("Telegram: processing was paused by a history load that is no longer configured ({Reason}); resuming", reason);
+            await reprocess.ResumeAsync(ct);
         }
         logger.LogInformation("Telegram: listening to {Count} channel(s)", _channels.Count);
         await settings.SetStatusAsync(StatusKey, $"listening: {_channels.Count} channel(s) as @{user.username ?? user.first_name}", ct);
@@ -267,26 +276,54 @@ public sealed class TelegramCollector(
         }
         if (pending.Count == 0)
         {
+            if (await reprocess.PausedAsync(ct) is { } reason && IsHistoryPause(reason))
+            {
+                // Every channel is done but an earlier run was interrupted before its rebuild finished: finish it now.
+                logger.LogInformation("Telegram: history load was interrupted after the last page ({Reason}); rebuilding derived data now", reason);
+                await RebuildAfterHistoryAsync(ct);
+                await reprocess.ResumeAsync(CancellationToken.None);
+            }
             return;
         }
         _loadingHistory = true;
-        await reprocess.PauseAsync($"history load: {pending.Count} channel(s) since {since:yyyy-MM-dd}", ct);
+        await reprocess.PauseAsync($"{HistoryPausePrefix} {pending.Count} channel(s) since {since:yyyy-MM-dd}", ct);
+        var completed = false;
         try
         {
             var scheduler = new TelegramBackfillScheduler(clock, _o.HistoryWorkers);
             await scheduler.RunAsync(pending, (job, schedulerCt) => LoadHistoryPageAsync(client, job, schedulerCt), ct);
-            // Everything is in PostgreSQL: rebuild in order. Processing stayed paused so no historical message could be
-            // handled before an earlier message from the same load was stored.
-            await settings.SetStatusAsync(StatusKey, "history: rebuilding derived data", ct);
-            var pendingCount = await reprocess.ResetAsync(ct);
-            logger.LogInformation("Telegram: history load complete, {Count} raw message(s) are Pending for processing in order", pendingCount);
+            await RebuildAfterHistoryAsync(ct);
+            completed = true;
         }
         finally
         {
             _loadingHistory = false;
-            await reprocess.ResumeAsync(CancellationToken.None);
+            if (completed)
+            {
+                await reprocess.ResumeAsync(CancellationToken.None);
+            }
+            else
+            {
+                // A crash or restart in the middle of the load: the pause stays, so no historical message is processed
+                // before the load resumes from its cursors (next session) and rebuilds everything in order. If the load
+                // is abandoned instead, RunSessionAsync lifts the pause when BackfillSince is gone.
+                logger.LogWarning("Telegram: history load interrupted; processing stays paused until the load resumes and finishes");
+            }
         }
     }
+
+    /// <summary>
+    /// Everything is in PostgreSQL: rebuild in order. Processing stayed paused so no historical message could be
+    /// handled before an earlier message from the same load was stored.
+    /// </summary>
+    private async Task RebuildAfterHistoryAsync(CancellationToken ct)
+    {
+        await settings.SetStatusAsync(StatusKey, "history: rebuilding derived data", ct);
+        var pendingCount = await reprocess.ResetAsync(ct);
+        logger.LogInformation("Telegram: history load complete, {Count} raw message(s) are Pending for processing in order", pendingCount);
+    }
+
+    private static bool IsHistoryPause(string reason) => reason.StartsWith(HistoryPausePrefix, StringComparison.Ordinal);
 
     private async Task LoadHistoryPageAsync(WTelegram.Client client, TelegramBackfillJob job, CancellationToken ct)
     {
@@ -344,7 +381,20 @@ public sealed class TelegramCollector(
         // not stored but still move the cursor.
         var subscriberCount = SubscriberCount(job.Channel);
         var batch = toStore.Where(m => !IsServiceMessage(m)).Select(m => ToIncoming(m, job.Source, job.Username, subscriberCount, job.Channel.title)).ToList();
-        var storedNow = await ingress.PublishBatchAsync(batch, job.Source, Name, new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)), live: false, ct);
+        int storedNow;
+        try
+        {
+            storedNow = await ingress.PublishBatchAsync(batch, job.Source, Name, new CollectorCheckpoint(null, ToUtc(page[^1].date), WriteCursor(next)), live: false, ct);
+        }
+        catch (Npgsql.NpgsqlException ex) when (ex.IsTransient && !ct.IsCancellationRequested)
+        {
+            // The database was briefly unavailable or the insert waited behind a table lock (a reprocess fence): nothing
+            // was committed, the cursor did not move. The same page is fetched and stored again on the next attempt
+            // instead of taking the whole MTProto session down.
+            job.State = state with { NextAttemptAt = clock.GetUtcNow().AddSeconds(30), LastFailureKind = "db_transient" };
+            logger.LogWarning(ex, "Telegram: @{Username} history page not stored (transient database error); retrying in 30s", job.Username);
+            return;
+        }
         job.State = next;
         if (job.State.Pages % 20 == 0)
         {

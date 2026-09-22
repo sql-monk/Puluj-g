@@ -73,7 +73,17 @@ errors (400/403/404, зокрема private або revoked канал) заве�
 `UpdateManager` стартує до scheduler-а: live posts та edits негайно durable
 ingest-яться з тією самою raw identity, навіть коли history триває. Existing
 safe ordering semantics лишають derived processing на паузі до history drain і
-rebuild у publication order; це не означає втрати live даних. Binary media не
+rebuild у publication order; це не означає втрати live даних. Пауза
+(`Runtime:Processing:Paused`, значення з префіксом `history load:`) належить
+history load: аварійний вихід чи restart посеред завантаження її **не знімає**,
+щоб історичні повідомлення не оброблялися шматками; наступна сесія продовжує з
+курсорів і знімає паузу після rebuild. Якщо всі канали вже `done`, а пауза
+лишилась (перерваний rebuild), нова сесія виконує rebuild і знімає її; якщо
+`BackfillSince` прибрали — колектор знімає покинуту history-паузу сам. Сторінка
+історії, яку не вдалося записати через transient помилку БД (timeout за
+локом, обрив з'єднання), повторюється через 30 с без перезапуску MTProto
+сесії; insert-и колекторів чекають лок до 120 с
+(`RawMessageIngestor.CommandTimeoutSeconds`). Binary media не
 завантажуються під час history: зберігається лише metadata в raw payload.
 Takeout не є автоматичним fallback: його можна додавати лише окремим explicit
 initial-import режимом із власним session lifecycle та операційним canary.

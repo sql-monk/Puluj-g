@@ -8,6 +8,6 @@ Ruleset API підтримує draft → replace rules → validate → preview/
 
 `POST /api/admin/sources` створює Telegram джерело з кодом `tg_<username lowercase>` ([правила кодів](naming.md#коди-джерел)) і відповідає `409`, якщо цей канал уже є джерелом під будь-яким кодом; те саме при зміні `channel` через `PUT /api/admin/sources/{id}`. Джерела з повідомленнями не видаляються — їх вимикають.
 
-`POST /api/admin/ops/reprocess` вимагає точного `REPROCESS_DERIVED_DATA`, очищує похідні targets/tracks/alerts і повертає raw rows у Pending. Оригінали в `raw_messages`, sources, settings і довідники не видаляються.
+`POST /api/admin/ops/reprocess` вимагає точного `REPROCESS_DERIVED_DATA`, очищує похідні targets/tracks/alerts і повертає raw rows у Pending. Оригінали в `raw_messages`, sources, settings і довідники не видаляються. Ексклюзивний лок на `raw_messages` тримається лише мить: масове скидання статусів іде батчами без локу, а похідні таблиці чистяться під advisory-локом Store, тож колектори продовжують писати. На час операції ставиться пауза `reprocess: …`; якщо операція обірвалась, пауза лишається з причиною `reprocess: failed …` — повторний виклик того самого ендпоінта дозволений поверх неї і завершує роботу (ідемпотентно). Пауза `history load: …` належить Telegram history load; поверх неї reprocess повертає `409`. Той самий порядок у [`scripts/reprocess.sql`](../scripts/reprocess.sql).
 
 Після зміни перевірте `/api/health`, один processor heartbeat, зменшення Pending, відсутність нових Failed і контрольний об'єкт через API.
