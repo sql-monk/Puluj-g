@@ -93,7 +93,9 @@ function Read-Setting([hashtable]$Current, [string]$Key, [string]$Label, [bool]$
 }
 
 function Update-DotEnv([System.Collections.IDictionary]$Values) {
-    $lines = if (Test-Path -LiteralPath $envFile) { [System.Collections.Generic.List[string]]@(Get-Content -LiteralPath $envFile) } else { [System.Collections.Generic.List[string]]::new() }
+    # ::new([string[]]…), not a cast: casting an array to List[string] hands back a fixed-size collection whose Add() throws.
+    $lines = [System.Collections.Generic.List[string]]::new()
+    if (Test-Path -LiteralPath $envFile) { $lines.AddRange([string[]]@(Get-Content -LiteralPath $envFile)) }
     foreach ($entry in $Values.GetEnumerator()) {
         $key = $entry.Key
         # Single quotes keep $, # and whitespace literal for Docker Compose. A literal quote is escaped in dotenv syntax.
