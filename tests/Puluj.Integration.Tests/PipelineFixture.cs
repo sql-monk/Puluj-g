@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Puluj.Domain;
 using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure;
@@ -126,37 +127,51 @@ public sealed class PipelineFixture : IAsyncLifetime
             });
         }
 
-        if (!await db.Sources.AnyAsync(source => source.Code == "tg_kpszsu"))
+        await EnsureTelegramFixtureAsync(db, new Source
         {
-            db.Sources.Add(new Source
-            {
-                Code = "tg_kpszsu",
-                Name = "Повітряні сили ЗС України",
-                Type = SourceType.Telegram,
-                Url = "https://t.me/kpszsu",
-                TrustLevel = 0.95,
-                Priority = 90,
-                Enabled = true,
-                Config = JsonDocument.Parse("""{"channel":"kpszsu","language":"uk","official":true}"""),
-            });
-        }
+            Code = "tg_kpszsu",
+            Name = "Повітряні сили ЗС України",
+            Type = SourceType.Telegram,
+            Url = "https://t.me/kpszsu",
+            TrustLevel = 0.95,
+            Priority = 90,
+            Enabled = true,
+            Config = JsonDocument.Parse("""{"channel":"kpszsu","language":"uk","official":true}"""),
+        });
 
-        if (!await db.Sources.AnyAsync(source => source.Code == "tg_monitoringwar"))
+        await EnsureTelegramFixtureAsync(db, new Source
         {
-            db.Sources.Add(new Source
-            {
-                Code = "tg_monitoringwar",
-                Name = "monitorwar",
-                Type = SourceType.Telegram,
-                Url = "https://t.me/monitoringwar",
-                TrustLevel = 0.85,
-                Priority = 85,
-                Enabled = true,
-                Config = JsonDocument.Parse("""{"channel":"monitoringwar","language":"uk","official":false}"""),
-            });
-        }
+            Code = "tg_monitoringwar",
+            Name = "monitorwar",
+            Type = SourceType.Telegram,
+            Url = "https://t.me/monitoringwar",
+            TrustLevel = 0.85,
+            Priority = 85,
+            Enabled = true,
+            Config = JsonDocument.Parse("""{"channel":"monitoringwar","language":"uk","official":false}"""),
+        });
 
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Adds a fixture Telegram source unless its code exists. data/sources.json may have seeded the same channel under
+    /// its plain code; one channel is one source (ux_sources_telegram_channel), so that row gives way to the fixture's —
+    /// raw_messages were truncated just before, and nothing in the tests refers to the plain code.
+    /// </summary>
+    private static async Task EnsureTelegramFixtureAsync(PulujDbContext db, Source wanted)
+    {
+        if (await db.Sources.AnyAsync(source => source.Code == wanted.Code))
+        {
+            return;
+        }
+        var telegram = await db.Sources.Where(s => s.Type == SourceType.Telegram).ToListAsync();
+        if (SourceCodes.FindTelegramChannel(telegram, SourceCodes.TelegramChannel(wanted)) is { } other)
+        {
+            db.Sources.Remove(other);
+            await db.SaveChangesAsync(); // before the insert: the unique index sees one channel at a time
+        }
+        db.Sources.Add(wanted);
     }
 
     /// <summary>

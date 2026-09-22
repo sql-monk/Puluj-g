@@ -136,13 +136,9 @@ message identity, published time, оригінальний text/payload та URL
   resolve; неуспішний канал позначається станом помилки та не вимикає інших.
 - Trust level — атрибут джерела, не автоматичне підтвердження незалежності
   повідомлень або географічної точності.
-- Унікальність Telegram-каналу гарантує лише застосунок (seeder і admin API),
-  не БД: унікальний індекс на `lower(config->>'channel')` для `type = Telegram`
-  свідомо не доданий, бо в робочій БД ще лишаються пари одного каналу під двома
-  кодами (`kudy_letyt`/`tg_kudy_letyt`, `raketa_trevoga`/`tg_raketa_trevoga`),
-  і міграція з таким індексом зупинила б `migrate`, а з ним і весь стек. Коли
-  ці пари розібрані (вимкнути дубль, видалити його raw-повідомлення й рядок),
-  індекс можна додати міграцією через `scripts/add-migration.ps1`:
-  `CREATE UNIQUE INDEX ux_sources_telegram_channel ON sources
-  (lower(config->>'channel')) WHERE type = 2`. Прямий `INSERT` у `sources`
-  повз seeder/API захисту не має.
+- Унікальність Telegram-каналу тримають три шари: seeder і admin API (зрозуміла
+  відмова з кодом наявного джерела) і унікальний індекс
+  `ux_sources_telegram_channel` на `lower(config->>'channel') WHERE type = 2`
+  (міграція `AddUniqueTelegramChannel`). Міграція спершу перевіряє наявні дані
+  й зупиняється з переліком каналів-дублів: тоді дубль треба вимкнути,
+  видалити його raw-повідомлення й рядок і повторити `migrate`.
