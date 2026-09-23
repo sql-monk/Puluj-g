@@ -15,7 +15,7 @@ async function openReplay(page: Page, at = from) {
       window.__vite_plugin_react_preamble_installed__ = true;
       await import('/src/components/ReplayBar.audit.tsx');
     </script></body></html>` }))
-  await page.route('**/api/**', (route) => route.abort())
+  await page.route(url => url.pathname.startsWith('/api/'), (route) => route.abort())
   await page.goto(`/replay-audit#${new URLSearchParams({ from, to, at })}`)
   await expect(page.getByRole('region', { name: 'Відтворення історії' })).toBeVisible()
 }

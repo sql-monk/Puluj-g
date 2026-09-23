@@ -10,7 +10,7 @@ async function mount(page: Page, paged = false) {
   await count(page, 1)
 }
 async function count(page: Page, expected: number) {
-  await expect.poll(() => page.evaluate(() => (window as any).pending.length)).toBe(expected)
+  await expect.poll(() => page.evaluate(() => (window as any).pending?.length ?? 0)).toBe(expected)
 }
 async function settle(page: Page, index: number, value: unknown, reject = false) {
   await page.evaluate(({ index, value, reject }) => {

@@ -19,7 +19,7 @@ async function mockApp(page: Page, onSnapshot?: (route: Route) => Promise<void>)
   page.on('pageerror', error => errors.push(error.message))
   // Empty style has no remote tiles, sprites or fonts; map overlays still use real MapLibre.
   await page.route('https://tiles.openfreemap.org/**', route => json(route, { version: 8, sources: {}, layers: [] }))
-  await page.route('**/api/**', async route => {
+  await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const url = new URL(route.request().url())
     switch (url.pathname) {
       case '/api/map/config': return json(route, { lifetimeOptionsMinutes: [15, 30, 60, 120], maxLifetimeMinutes: 120, feedHours: 24 })
