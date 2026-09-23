@@ -56,7 +56,9 @@ public static class DependencyInjection
         services.AddSingleton<TargetBuilder>();
         services.AddSingleton<AlertsInUaHandler>();
         services.AddSingleton<LlmParser>(); // the mapping/prompt owner and IParser implementation
-        services.TryAddSingleton<ILlmCompletion, AnthropicCompletion>();
+        services.AddSingleton<AnthropicCompletion>();
+        services.AddSingleton<OpenAiCompatibleCompletion>(); // OpenAI and Ollama
+        services.TryAddSingleton<ILlmCompletion, LlmCompletionRouter>(); // Llm:Provider, read per call
         return services;
     }
 }

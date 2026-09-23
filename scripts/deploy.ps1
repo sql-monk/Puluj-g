@@ -187,8 +187,11 @@ function Invoke-DeploymentWizard {
         }
         if (-not $selectedServicesOnly -or $Services -contains 'processor' -or $Services -contains 'entity-extractor') {
             Read-Setting $current 'Llm__Enabled' 'Увімкнути LLM fallback (true/false)'
+            Read-Setting $current 'Llm__Provider' 'Провайдер LLM (Anthropic / OpenAI / Ollama)'
             Read-Setting $current 'Llm__Model' 'Модель LLM'
+            Read-Setting $current 'Llm__BaseUrl' 'Base URL для OpenAI/Ollama (порожньо = типовий; Ollama з Docker: http://host.docker.internal:11434/v1)'
             Read-Setting $current 'ANTHROPIC_API_KEY' 'Anthropic API key' $true
+            Read-Setting $current 'OPENAI_API_KEY' 'OpenAI API key' $true
         }
         if ($wizardSettings.Count -gt 0) {
             Update-DotEnv $wizardSettings
@@ -320,8 +323,9 @@ function Apply-WizardSettingsToDatabase {
         'Collectors__Telegram__Phone' = 'Collectors:Telegram:Phone'
         'Collectors__Telegram__Password' = 'Collectors:Telegram:Password'
         'Llm__Enabled' = 'Llm:Enabled'
+        'Llm__Provider' = 'Llm:Provider'
         'Llm__Model' = 'Llm:Model'
-        'ANTHROPIC_API_KEY' = 'Llm:ApiKey'
+        'Llm__BaseUrl' = 'Llm:BaseUrl'
     }
     $secretKeys = @('Admin:Token', 'Collectors:AlertsInUa:Token', 'Collectors:Telegram:ApiHash', 'Collectors:Telegram:Password', 'Llm:ApiKey')
     $statements = [System.Collections.Generic.List[string]]::new()

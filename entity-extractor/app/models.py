@@ -79,8 +79,10 @@ class EntityDefinition(BaseModel):
 
 class LlmSettings(BaseModel):
     enabled: bool = False
+    provider: str | None = None  # Anthropic | OpenAI | Ollama; None = the Llm__Provider environment fallback
     model: str = "claude-opus-5"
     api_key: str | None = None
+    base_url: str | None = None  # OpenAI-compatible endpoint (OpenAI, Ollama); None = the provider default
     timeout_seconds: int = 20
     max_output_tokens: int = 1024
     max_calls_per_minute: int = 20

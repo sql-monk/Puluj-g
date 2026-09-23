@@ -1,9 +1,6 @@
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
-using Anthropic;
-using Anthropic.Exceptions;
-using Anthropic.Models.Messages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -40,14 +37,13 @@ public sealed class LlmParser : IParser
     private readonly Lazy<string> _systemPrompt;
     private readonly IDbContextFactory<PulujDbContext>? _auditFactory;
     private readonly string _workerName;
-    private readonly object _clientLock = new();
-    private AnthropicClient? _client;
-    private string? _clientKey;
-    private bool _warnedNoKey;
+    private readonly ILlmCompletion? _completion;
+    private string? _warnedConfig;
 
     public LlmParser(RuleParser rules, IIndexes indexes, INormalizer normalizer, IOptionsMonitor<LlmOptions> options, LlmBreaker breaker, PulujMetrics metrics, TimeProvider clock, ILogger<LlmParser> logger,
-        IDbContextFactory<PulujDbContext>? auditFactory = null, ProcessorIdentity? identity = null)
+        IDbContextFactory<PulujDbContext>? auditFactory = null, ProcessorIdentity? identity = null, ILlmCompletion? completion = null)
     {
+        _completion = completion;
         _rules = rules;
         _clock = clock;
         _breaker = breaker;
@@ -71,42 +67,39 @@ public sealed class LlmParser : IParser
 
     public string Version => $"llm-{_options.Model}-p{_options.PromptVersion}";
 
-    /// <summary>Client is (re)created when the key changes — the admin UI can enable the fallback at runtime.</summary>
-    private AnthropicClient? Client
+    /// <summary>Enabled, a known provider and its key (Ollama needs none). Read per message — the admin UI can switch the
+    /// fallback and the provider at runtime; each distinct misconfiguration is logged once.</summary>
+    private bool IsConfigured
     {
         get
         {
             var o = _options;
-            if (!o.Enabled)
+            if (!o.Enabled || _completion is null)
             {
-                return null;
+                return false;
             }
-            var key = string.IsNullOrWhiteSpace(o.ApiKey) ? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") : o.ApiKey;
-            if (string.IsNullOrEmpty(key))
+            string? problem = null;
+            if (!o.TryGetProvider(out var provider))
             {
-                if (!_warnedNoKey)
-                {
-                    _warnedNoKey = true;
-                    _logger.LogWarning("Llm:Enabled is true but no API key (Llm:ApiKey / ANTHROPIC_API_KEY); LLM fallback disabled");
-                }
-                return null;
+                problem = $"Llm:Provider '{o.Provider}' is not one of Anthropic, OpenAI, Ollama";
             }
-            lock (_clientLock)
+            else if (LlmOptions.RequiresApiKey(provider) && string.IsNullOrEmpty(LlmOptions.ResolveApiKey(provider, o.ApiKey)))
             {
-                if (_client is null || _clientKey != key)
-                {
-                    _client = new AnthropicClient { ApiKey = key };
-                    _clientKey = key;
-                }
-                return _client;
+                problem = $"no API key for {provider} (Llm:ApiKey / {LlmOptions.ApiKeyVariable(provider)})";
             }
+            if (problem is not null && problem != _warnedConfig)
+            {
+                _warnedConfig = problem;
+                _logger.LogWarning("Llm:Enabled is true but {Problem}; LLM fallback disabled", problem);
+            }
+            return problem is null;
         }
     }
 
     public async Task<IReadOnlyList<ParsedFact>> ParseAsync(NormalizedMessage message, ParseContext ctx, CancellationToken ct)
     {
         var facts = _rules.Parse(message, ctx);
-        if (facts.Count > 0 || Client is null || !LooksLikeTargetReport(message))
+        if (facts.Count > 0 || !LooksLikeTargetReport(message) || !IsConfigured)
         {
             return facts;
         }
@@ -146,123 +139,84 @@ public sealed class LlmParser : IParser
         {
             throw;
         }
-        catch (AnthropicApiException ex)
+        catch (LlmCompletionException ex) when (ex.StatusCode is { } status)
         {
-            _metrics.LlmCall(ex is AnthropicRateLimitException ? "429" : "api_error");
+            var outcome = ex.Code == "rate_limited" ? "429" : "api_error";
+            _metrics.LlmCall(outcome);
             // The API's own message (billing, auth, a rejected schema) says it all; the stack trace would only repeat the SDK.
-            var detail = ErrorMessage(ex);
-            await AuditAsync(ctx, message.Text, null, wire, ex is AnthropicRateLimitException ? "429" : "api_error", (int)ex.StatusCode, detail, 0, started, ct);
-            if (_breaker.Trip(ex.StatusCode, detail, _clock.GetUtcNow()) is { } pause)
+            var detail = ex.Message;
+            await AuditAsync(ctx, message.Text, null, wire, outcome, (int)status, detail, 0, started, ct);
+            if (_breaker.Trip(status, detail, _clock.GetUtcNow()) is { } pause)
             {
-                _logger.LogWarning("LLM request failed with {Status}: {Detail}; model paused for {Pause}", (int)ex.StatusCode, detail, pause);
+                _logger.LogWarning("LLM request failed with {Status}: {Detail}; model paused for {Pause}", (int)status, detail, pause);
             }
             else
             {
-                _logger.LogWarning("LLM request failed with {Status}: {Detail}", (int)ex.StatusCode, detail);
+                _logger.LogWarning("LLM request failed with {Status}: {Detail}", (int)status, detail);
             }
         }
-        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException or JsonException)
+        catch (Exception ex) when (ex is LlmCompletionException or TimeoutException or OperationCanceledException or JsonException)
         {
             _metrics.LlmCall("error");
             _breaker.Fail();
             await AuditAsync(ctx, message.Text, null, wire, "error", null, ex.Message, 0, started, ct);
-            _logger.LogWarning(ex, "LLM fallback failed");
-        }
-        return facts;
-    }
-
-    /// <summary>The API's error message out of the response body ({"type":"error","error":{"type":..,"message":..}}), else the exception's.</summary>
-    private static string ErrorMessage(AnthropicApiException ex)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(ex.ResponseBody);
-            if (doc.RootElement.TryGetProperty("error", out var error))
+            if (ex is LlmCompletionException failure)
             {
-                var type = error.TryGetProperty("type", out var t) ? t.GetString() : null;
-                var message = error.TryGetProperty("message", out var m) ? m.GetString() : null;
-                if (message is not null)
-                {
-                    return type is null ? message : $"{type}: {message}";
-                }
+                _logger.LogWarning("LLM fallback failed ({Code}): {Detail}", failure.Code, failure.Message);
+            }
+            else
+            {
+                _logger.LogWarning(ex, "LLM fallback failed");
             }
         }
-        catch (JsonException)
-        {
-        }
-        return ex.Message;
+        return facts;
     }
 
     /// <summary>Heuristic behind the LLM fallback: the text mentions something that reads like a target report even though the rules found nothing.</summary>
     internal static bool LooksLikeTargetReport(NormalizedMessage message) =>
         message.Segments.SelectMany(s => s.Tokens).Any(t => TriggerStems.Any(stem => t.Text.StartsWith(stem, StringComparison.Ordinal)));
 
-    /// <summary>The one request shape both callers send (legacy parser and the llm-worker's <see cref="AnthropicCompletion"/>).</summary>
-    internal static MessageCreateParams CreateParams(string model, int maxTokens, string systemPrompt, string text) => new()
+    /// <summary>A provider body as JSON when it is JSON, else the text wrapped in a JSON string; null when empty.</summary>
+    internal static string? BodyAsJson(string? body)
     {
-        Model = model,
-        MaxTokens = maxTokens,
-        System = new List<TextBlockParam> { new() { Text = systemPrompt, CacheControl = new CacheControlEphemeral() } },
-        OutputConfig = new OutputConfig
-        {
-            Effort = Effort.Low,
-            Format = new JsonOutputFormat { Schema = Schema() },
-        },
-        Messages = [new() { Role = Role.User, Content = text }],
-    };
-
-    /// <summary>The request body verbatim (what the SDK serializes and sends): audited with every call.</summary>
-    internal static string RequestPayload(MessageCreateParams parameters) => JsonSerializer.Serialize(parameters.RawBodyData);
-
-    /// <summary>The response body verbatim (the SDK's backing JSON of the message object).</summary>
-    internal static string ResponsePayload(Message response) => JsonSerializer.Serialize(response.RawData);
-
-    /// <summary>The error body of a failed call, as JSON when the API returned JSON, else the text wrapped in a JSON string.</summary>
-    internal static string? ErrorPayload(AnthropicApiException ex)
-    {
-        if (string.IsNullOrEmpty(ex.ResponseBody))
+        if (string.IsNullOrEmpty(body))
         {
             return null;
         }
         try
         {
-            using var doc = JsonDocument.Parse(ex.ResponseBody);
+            using var doc = JsonDocument.Parse(body);
             return doc.RootElement.GetRawText();
         }
         catch (JsonException)
         {
-            return JsonSerializer.Serialize(ex.ResponseBody);
+            return JsonSerializer.Serialize(body);
         }
     }
 
     private async Task<LlmAnswer> AskAsync(string text, WirePayloads wire, CancellationToken ct)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-        var parameters = CreateParams(_options.Model, 2048, _systemPrompt.Value, text);
-        var requestPayload = RequestPayload(parameters);
-        wire.Request = requestPayload; // before the call: a timeout or a transport error still leaves the request on record
-        Message response;
+        var o = _options;
+        var request = new LlmCompletionRequest(text, _systemPrompt.Value, o.Model, o.PromptVersion, 2048, TimeSpan.FromSeconds(o.TimeoutSeconds));
+        LlmCompletionResult result;
         try
         {
-            response = await Client!.Messages.Create(parameters, cancellationToken: timeout.Token);
+            result = await _completion!.CompleteAsync(request, ct);
         }
-        catch (AnthropicApiException ex)
+        catch (LlmCompletionException ex)
         {
-            wire.Response = ErrorPayload(ex); // the error body, audited by the catch in ParseAsync
+            // What went out and the error body, audited by the catch in ParseAsync.
+            wire.Request = ex.RequestPayload;
+            wire.Response = ex.ResponsePayload;
             throw;
         }
-        var responsePayload = ResponsePayload(response);
-        wire.Response = responsePayload;
-        if (response.StopReason == "refusal")
-        {
-            _logger.LogInformation("LLM declined to classify the message");
-            return new LlmAnswer(new LlmResponse([]), null, true, response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0,
-                response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens, requestPayload, responsePayload);
-        }
-        var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(b => b.Text));
-        return new LlmAnswer(JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]), json, false,
-            response.Usage.InputTokens, response.Usage.CacheCreationInputTokens ?? 0, response.Usage.CacheReadInputTokens ?? 0, response.Usage.OutputTokens, requestPayload, responsePayload);
+        wire.Request = result.RequestPayload;
+        wire.Response = result.ResponsePayload;
+        var answer = result.Refused || result.ResponseJson is null
+            ? new LlmResponse([])
+            : JsonSerializer.Deserialize<LlmResponse>(result.ResponseJson, JsonOptions) ?? new LlmResponse([]);
+        return new LlmAnswer(answer, result.ResponseJson, result.Refused, result.InputTokens, result.CacheCreationInputTokens, result.CacheReadInputTokens, result.OutputTokens,
+            result.RequestPayload, result.ResponsePayload);
     }
 
     /// <summary>The request body as sent and the response (or error) body as received, per call — not per thread: an
@@ -288,7 +242,10 @@ public sealed class LlmParser : IParser
             var cacheWrite = answer?.CacheCreationInputTokens;
             var cacheRead = answer?.CacheReadInputTokens;
             var output = answer?.OutputTokens;
-            decimal? cost = input is null ? null : LlmCost.Calculate(o, input.Value, cacheWrite!.Value, cacheRead!.Value, output!.Value);
+            var provider = o.TryGetProvider(out var p) ? p : (LlmProvider?)null;
+            decimal? cost = input is null ? null
+                : provider == LlmProvider.Ollama ? 0m // a local model: nothing billed, whatever the price card says
+                : LlmCost.Calculate(o, input.Value, cacheWrite!.Value, cacheRead!.Value, output!.Value);
             await using var db = await _auditFactory.CreateDbContextAsync(ct);
             db.LlmRequests.Add(new LlmRequest
             {
@@ -296,7 +253,7 @@ public sealed class LlmParser : IParser
                 SourceId = ctx.SourceId,
                 OccurredAt = _clock.GetUtcNow(),
                 Worker = _workerName,
-                Model = o.Model,
+                Model = provider is null or LlmProvider.Anthropic ? o.Model : $"{provider.Value.ToString().ToLowerInvariant()}/{o.Model}",
                 PromptVersion = o.PromptVersion,
                 Outcome = outcome,
                 StatusCode = statusCode,
@@ -326,10 +283,9 @@ public sealed class LlmParser : IParser
     public IReadOnlyList<ParsedFact> MapJson(string json, NormalizedMessage message) =>
         Map(JsonSerializer.Deserialize<LlmResponse>(json, JsonOptions) ?? new LlmResponse([]), message);
 
-    /// <summary>The system prompt (taxonomy codes included) and the JSON output schema, shared with <see cref="AnthropicCompletion"/> so the worker asks the same question as the in-process fallback.</summary>
+    /// <summary>The system prompt (taxonomy codes included) and the JSON output schema every provider is asked with.</summary>
     internal string SystemPrompt => _systemPrompt.Value;
     internal static Dictionary<string, JsonElement> OutputSchema() => Schema();
-    internal static string ProviderErrorMessage(AnthropicApiException ex) => ErrorMessage(ex);
 
     private IReadOnlyList<ParsedFact> Map(LlmResponse response, NormalizedMessage message)
     {

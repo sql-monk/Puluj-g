@@ -9,6 +9,7 @@ using Puluj.Domain.Entities;
 using Puluj.Domain.Enums;
 using Puluj.Infrastructure.Persistence;
 using Puluj.Infrastructure.Settings;
+using Puluj.Processing.Llm;
 
 namespace Puluj.Admin;
 
@@ -27,7 +28,7 @@ public static class AdminEndpoints
         "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit", "Collectors:Telegram:BackfillSince",
         "Collectors:Telegram:HistoryWorkers", "Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval",
     ];
-    private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Model", "Llm:ApiKey", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
+    private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Provider", "Llm:Model", "Llm:ApiKey", "Llm:BaseUrl", "Llm:TimeoutSeconds", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly string[] TelegramIntervalKeys = ["Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval"];
     private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly IReadOnlyDictionary<string, (double Min, double Max)> CorrelationRanges = new Dictionary<string, (double, double)>
@@ -53,7 +54,9 @@ public static class AdminEndpoints
         ["Collectors:Telegram:HistoryMinimumInterval"] = "00:00:00.500",
         ["Collectors:Telegram:HistoryMaximumInterval"] = "00:00:08",
         ["Llm:Enabled"] = "false",
+        ["Llm:Provider"] = "Anthropic",
         ["Llm:Model"] = "claude-opus-5",
+        ["Llm:TimeoutSeconds"] = "20",
         ["Llm:InputUsdPerMillionTokens"] = "5",
         ["Llm:OutputUsdPerMillionTokens"] = "25",
         ["Llm:CacheWriteUsdPerMillionTokens"] = "6.25",
@@ -64,6 +67,10 @@ public static class AdminEndpoints
         ["Correlation:SlackKm"] = "8",
         ["Correlation:CoarseLocationAccuracyKm"] = "80",
     };
+
+    /// <summary>The configured provider (Anthropic when unset or unknown), for the API-key environment fallback.</summary>
+    private static LlmProvider LlmProviderOf(IConfiguration config) =>
+        new LlmOptions { Provider = config["Llm:Provider"] ?? "" }.TryGetProvider(out var provider) ? provider : LlmProvider.Anthropic;
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -77,7 +84,7 @@ public static class AdminEndpoints
                 var effective = config[key];
                 if (key == "Llm:ApiKey" && string.IsNullOrEmpty(effective))
                 {
-                    effective = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+                    effective = LlmOptions.ResolveApiKey(LlmProviderOf(config), null);
                 }
                 var secret = SettingsStore.SecretKeys.Contains(key);
                 var source = db.ContainsKey(key) ? "db" : !string.IsNullOrEmpty(effective) ? "config" : Defaults.ContainsKey(key) ? "default" : "none";
@@ -127,6 +134,19 @@ public static class AdminEndpoints
             {
                 return Results.BadRequest(new { error = "Telegram history intervals мають відповідати правилу: minimum ≤ request ≤ maximum." });
             }
+            if (req.Values.TryGetValue("Llm:Provider", out var provider) && !string.IsNullOrWhiteSpace(provider) && !new LlmOptions { Provider = provider }.TryGetProvider(out _))
+            {
+                return Results.BadRequest(new { error = "Llm:Provider має бути одним із: Anthropic, OpenAI, Ollama." });
+            }
+            if (req.Values.TryGetValue("Llm:BaseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl)
+                && !(Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"))
+            {
+                return Results.BadRequest(new { error = "Llm:BaseUrl має бути абсолютною http(s)-адресою, наприклад http://host.docker.internal:11434/v1." });
+            }
+            if (req.Values.TryGetValue("Llm:TimeoutSeconds", out var llmTimeout) && !string.IsNullOrWhiteSpace(llmTimeout) && (!int.TryParse(llmTimeout, out var seconds) || seconds is < 1 or > 600))
+            {
+                return Results.BadRequest(new { error = "Llm:TimeoutSeconds має бути числом від 1 до 600." });
+            }
             foreach (var (key, value) in req.Values.Where(x => LlmPriceKeys.Contains(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
             {
                 if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var price) || price < 0)
@@ -155,12 +175,14 @@ public static class AdminEndpoints
             var now = clock.GetUtcNow();
             var workers = OpsEndpoints.WorkerHeartbeats(db, now);
             var heartbeat = workers.Count > 0 ? workers[0].At : (DateTimeOffset?)null;
-            var llmKey = config["Llm:ApiKey"] ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+            var llmProvider = LlmProviderOf(config);
+            var llmReady = new LlmOptions { Provider = config["Llm:Provider"] ?? "" }.TryGetProvider(out _)
+                           && (!LlmOptions.RequiresApiKey(llmProvider) || !string.IsNullOrEmpty(LlmOptions.ResolveApiKey(llmProvider, config["Llm:ApiKey"])));
             return new AdminStatusDto(
                 AlertsConfigured: config.GetValue<bool>("Collectors:AlertsInUa:Enabled") && !string.IsNullOrEmpty(alertsToken),
                 TelegramConfigured: config.GetValue<bool>("Collectors:Telegram:Enabled") && config.GetValue<int>("Collectors:Telegram:ApiId") != 0
                                     && !string.IsNullOrEmpty(config["Collectors:Telegram:ApiHash"]) && !string.IsNullOrEmpty(config["Collectors:Telegram:Phone"]),
-                LlmConfigured: config.GetValue<bool>("Llm:Enabled") && !string.IsNullOrEmpty(llmKey),
+                LlmConfigured: config.GetValue<bool>("Llm:Enabled") && llmReady,
                 TelegramStatus: db.TryGetValue("Runtime:Telegram:Status", out var ts) ? ts.Value : null,
                 AdminTokenSet: !string.IsNullOrEmpty(config["Admin:Token"]),
                 WorkerAlive: heartbeat is not null && now - heartbeat.Value < TimeSpan.FromSeconds(90),

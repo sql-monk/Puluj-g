@@ -59,6 +59,50 @@ export function Field({
   )
 }
 
+/** Drop-down bound to a settings key; the value shown is the draft, else the effective value. */
+export function Select({
+  label,
+  setting,
+  draft,
+  onChange,
+  options,
+  hint,
+}: {
+  label: string
+  setting?: SettingDto
+  draft: Draft
+  onChange: (key: string, value: string | null) => void
+  options: { value: string; label: string }[]
+  hint?: string
+}) {
+  if (!setting) return null
+  const value = draft[setting.key] ?? setting.value ?? ''
+  const known = options.some((o) => o.value.toLowerCase() === value.toLowerCase())
+  return (
+    <label className="block text-sm">
+      <span className="mb-0.5 flex items-baseline justify-between">
+        <span className="font-medium">{label}</span>
+        <span className="text-[11px] text-slate-400">
+          {setting.source === 'db' ? 'з налаштувань' : setting.source === 'config' ? 'з конфігурації' : setting.source === 'default' ? 'типово' : 'не задано'}
+        </span>
+      </span>
+      <select
+        className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800"
+        value={known ? options.find((o) => o.value.toLowerCase() === value.toLowerCase())!.value : value}
+        onChange={(e) => onChange(setting.key, e.target.value)}
+      >
+        {!known && <option value={value}>{value || '—'}</option>}
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      {hint && <span className="text-[11px] text-slate-500">{hint}</span>}
+    </label>
+  )
+}
+
 export function Toggle({ label, setting, draft, onChange, hint }: { label: string; setting?: SettingDto; draft: Draft; onChange: (key: string, value: string | null) => void; hint?: string }) {
   if (!setting) return null
   const raw = draft[setting.key] ?? setting.value ?? 'false'

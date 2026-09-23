@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { admin, AdminError, getAdminToken, setAdminToken, type AdminSourceDto, type AdminStatusDto, type SettingDto } from '../api/admin'
-import { Badge, Field, findSetting, Section, Toggle, type Draft } from '../components/settings/fields'
+import { Badge, Field, findSetting, Section, Select, Toggle, type Draft } from '../components/settings/fields'
 import LlmUsagePanel from './LlmUsagePanel'
 import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
@@ -315,14 +315,37 @@ function TelegramSection({ status, draft, change, s, notify, reload }: TabProps)
   )
 }
 
+const LLM_PROVIDERS = [
+  { value: 'Anthropic', label: 'Anthropic (Claude)', model: 'claude-opus-5' },
+  { value: 'OpenAI', label: 'OpenAI', model: 'gpt-5-mini' },
+  { value: 'Ollama', label: 'Ollama (локально)', model: 'qwen3:8b' },
+]
+
 function LlmSection({ status, draft, change, s }: TabProps) {
+  const selected = (draft['Llm:Provider'] ?? s('Llm:Provider')?.value ?? 'Anthropic').toLowerCase()
+  const provider = LLM_PROVIDERS.find((p) => p.value.toLowerCase() === selected) ?? LLM_PROVIDERS[0]
+  const providerLabel = provider.label
   return (
     <>
-      <Section title="LLM fallback (Anthropic)" badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? 'увімкнено' : 'вимкнено'} />}>
+      <Section title={`LLM fallback (${providerLabel})`} badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? 'увімкнено' : 'вимкнено'} />}>
         <p className="text-xs text-slate-500">Викликається лише коли правила не знайшли нічого в тексті, схожому на повідомлення про загрозу. Модель може повертати лише коди з таксономії; невідомі місця відкидаються.</p>
         <Toggle label="Увімкнути" setting={s('Llm:Enabled')} draft={draft} onChange={change} />
-        <Field label="Модель" setting={s('Llm:Model')} draft={draft} onChange={change} placeholder="claude-opus-5" />
-        <Field label="API key" setting={s('Llm:ApiKey')} draft={draft} onChange={change} type="password" hint="або змінна середовища ANTHROPIC_API_KEY" />
+        <Select label="Провайдер" setting={s('Llm:Provider')} draft={draft} onChange={change} options={LLM_PROVIDERS} hint="Перемикається без перезапуску; модель і ключ мають відповідати провайдеру." />
+        <Field label="Модель" setting={s('Llm:Model')} draft={draft} onChange={change} placeholder={provider.model} />
+        {provider.value !== 'Ollama' && (
+          <Field label="API key" setting={s('Llm:ApiKey')} draft={draft} onChange={change} type="password" hint={`або змінна середовища ${provider.value === 'OpenAI' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'}`} />
+        )}
+        {provider.value !== 'Anthropic' && (
+          <Field
+            label="Base URL"
+            setting={s('Llm:BaseUrl')}
+            draft={draft}
+            onChange={change}
+            placeholder={provider.value === 'Ollama' ? 'http://localhost:11434/v1' : 'https://api.openai.com/v1'}
+            hint={provider.value === 'Ollama' ? 'OpenAI-сумісний endpoint Ollama. З Docker: http://host.docker.internal:11434/v1' : 'порожньо = api.openai.com; або будь-який OpenAI-сумісний сервер'}
+          />
+        )}
+        <Field label="Таймаут, с" setting={s('Llm:TimeoutSeconds')} draft={draft} onChange={change} type="number" hint={provider.value === 'Ollama' ? 'локальна модель відповідає повільніше — варто 60+' : undefined} />
         <Field label="Input, $ / млн токенів" setting={s('Llm:InputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
         <Field label="Output, $ / млн токенів" setting={s('Llm:OutputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
         <Field label="Cache write, $ / млн" setting={s('Llm:CacheWriteUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />

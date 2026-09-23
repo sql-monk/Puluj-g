@@ -9,12 +9,12 @@ using Microsoft.Extensions.Options;
 namespace Puluj.Processing.Llm;
 
 /// <summary>
-/// <see cref="ILlmCompletion"/> over the Anthropic SDK: the same system prompt and JSON schema as <see cref="LlmParser"/>,
+/// <see cref="ILlmCompletion"/> over the Anthropic SDK: the system prompt and JSON schema of <see cref="LlmParser"/>,
 /// the budget of the request, a refusal reported as such, and every failure mapped to the provider-neutral
 /// <see cref="LlmCompletionException"/> (429 → rate_limited retryable; 5xx → provider_error retryable; timeout →
 /// provider_timeout retryable; 4xx → provider_error terminal; unparsable answer → invalid_response terminal).
 /// </summary>
-public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOptions> options, ILogger<AnthropicCompletion> logger) : ILlmCompletion
+public sealed class AnthropicCompletion(IOptionsMonitor<LlmOptions> options, ILogger<AnthropicCompletion> logger) : ILlmCompletion
 {
     private readonly object _clientLock = new();
     private AnthropicClient? _client;
@@ -22,8 +22,7 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
 
     public async Task<LlmCompletionResult> CompleteAsync(LlmCompletionRequest request, CancellationToken ct)
     {
-        var o = options.CurrentValue;
-        var key = string.IsNullOrWhiteSpace(o.ApiKey) ? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") : o.ApiKey;
+        var key = LlmOptions.ResolveApiKey(LlmProvider.Anthropic, options.CurrentValue.ApiKey);
         if (string.IsNullOrEmpty(key))
         {
             throw new LlmCompletionException("no_api_key", "Llm:ApiKey / ANTHROPIC_API_KEY is not configured", retryable: false);
@@ -40,12 +39,12 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
         }
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(request.Timeout);
-        var parameters = LlmParser.CreateParams(request.Model, Math.Clamp(request.MaxOutputTokens, 64, 8192), parser.SystemPrompt, request.Text);
-        var requestPayload = LlmParser.RequestPayload(parameters); // verbatim body, audited even when the call fails
+        var parameters = CreateParams(request.Model, Math.Clamp(request.MaxOutputTokens, 64, 8192), request.SystemPrompt, request.Text);
+        var requestPayload = JsonSerializer.Serialize(parameters.RawBodyData); // verbatim body, audited even when the call fails
         try
         {
             var response = await client.Messages.Create(parameters, cancellationToken: timeout.Token);
-            var responsePayload = LlmParser.ResponsePayload(response);
+            var responsePayload = JsonSerializer.Serialize(response.RawData);
             var usage = response.Usage;
             if (response.StopReason == "refusal")
             {
@@ -55,7 +54,7 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
             var json = string.Concat(response.Content.Select(b => b.Value).OfType<TextBlock>().Select(b => b.Text));
             try
             {
-                using var _ = JsonDocument.Parse(json); // the worker maps it; here only "is it JSON at all"
+                using var _ = JsonDocument.Parse(json); // the caller maps it; here only "is it JSON at all"
             }
             catch (JsonException ex)
             {
@@ -65,12 +64,12 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
         }
         catch (AnthropicRateLimitException ex)
         {
-            throw new LlmCompletionException("rate_limited", LlmParser.ProviderErrorMessage(ex), retryable: true, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = LlmParser.ErrorPayload(ex) };
+            throw new LlmCompletionException("rate_limited", ErrorMessage(ex), retryable: true, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = ErrorPayload(ex) };
         }
         catch (AnthropicApiException ex)
         {
             var retryable = (int)ex.StatusCode >= 500 || ex.StatusCode == HttpStatusCode.RequestTimeout;
-            throw new LlmCompletionException("provider_error", LlmParser.ProviderErrorMessage(ex), retryable, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = LlmParser.ErrorPayload(ex) };
+            throw new LlmCompletionException("provider_error", ErrorMessage(ex), retryable, ex.StatusCode, ex) { RequestPayload = requestPayload, ResponsePayload = ErrorPayload(ex) };
         }
         catch (OperationCanceledException ex) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
         {
@@ -81,4 +80,47 @@ public sealed class AnthropicCompletion(LlmParser parser, IOptionsMonitor<LlmOpt
             throw new LlmCompletionException("provider_error", ex.Message, retryable: true, inner: ex) { RequestPayload = requestPayload };
         }
     }
+
+    /// <summary>The request shape: cached system prompt, low effort, structured JSON output per <see cref="LlmParser.OutputSchema"/>.</summary>
+    internal static MessageCreateParams CreateParams(string model, int maxTokens, string systemPrompt, string text) => new()
+    {
+        Model = model,
+        MaxTokens = maxTokens,
+        System = new List<TextBlockParam> { new() { Text = systemPrompt, CacheControl = new CacheControlEphemeral() } },
+        OutputConfig = new OutputConfig
+        {
+            Effort = Effort.Low,
+            Format = new JsonOutputFormat { Schema = LlmParser.OutputSchema() },
+        },
+        Messages = [new() { Role = Role.User, Content = text }],
+    };
+
+    /// <summary>The API's error message out of the response body ({"type":"error","error":{"type":..,"message":..}}), else the exception's.</summary>
+    private static string ErrorMessage(AnthropicApiException ex)
+    {
+        if (string.IsNullOrEmpty(ex.ResponseBody))
+        {
+            return ex.Message;
+        }
+        try
+        {
+            using var doc = JsonDocument.Parse(ex.ResponseBody);
+            if (doc.RootElement.TryGetProperty("error", out var error))
+            {
+                var type = error.TryGetProperty("type", out var t) ? t.GetString() : null;
+                var message = error.TryGetProperty("message", out var m) ? m.GetString() : null;
+                if (message is not null)
+                {
+                    return type is null ? message : $"{type}: {message}";
+                }
+            }
+        }
+        catch (JsonException)
+        {
+        }
+        return ex.Message;
+    }
+
+    /// <summary>The error body of a failed call, as JSON when the API returned JSON, else the text wrapped in a JSON string.</summary>
+    private static string? ErrorPayload(AnthropicApiException ex) => LlmParser.BodyAsJson(ex.ResponseBody);
 }

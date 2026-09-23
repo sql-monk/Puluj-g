@@ -31,8 +31,11 @@ class Settings(BaseSettings):
     max_output_bytes: int = Field(default=256_000, ge=1_024, le=10_000_000)
     max_memory_mb: int = Field(default=256, ge=32, le=2_048)
     llm_enabled: bool = Field(default=False, validation_alias="Llm__Enabled")
+    llm_provider: str = Field(default="Anthropic", validation_alias="Llm__Provider")
     llm_model: str = Field(default="claude-opus-5", validation_alias="Llm__Model")
+    llm_base_url: str | None = Field(default=None, validation_alias="Llm__BaseUrl")
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     anthropic_base_url: str = "https://api.anthropic.com"
 
     @property

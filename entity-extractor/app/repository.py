@@ -656,7 +656,9 @@ def build_llm_settings(
             else fallback_enabled
         ),
         model=str(values["Llm:Model"]) if "Llm:Model" in values else fallback_model,
+        provider=str(values["Llm:Provider"]) if values.get("Llm:Provider") else None,
         api_key=values.get("Llm:ApiKey"),
+        base_url=str(values["Llm:BaseUrl"]) if values.get("Llm:BaseUrl") else None,
         timeout_seconds=_int(values.get("Llm:TimeoutSeconds"), 20),
         max_output_tokens=_int(values.get("Llm:MaxOutputTokens"), 1024),
         max_calls_per_minute=_int(values.get("Llm:MaxCallsPerMinute"), 20),

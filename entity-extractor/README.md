@@ -44,10 +44,15 @@ When `ADMIN_TOKEN` is set, admin endpoints require it in `X-Admin-Token`.
 - `DATABASE_URL` accepts a PostgreSQL URI as a fallback.
 - `ENTITY_EXTRACTOR_TOKEN` (or `EntityExtractor__Token`) protects `/extract`. If omitted, `/extract` remains open for
   backward-compatible local deployments; production deployments should always set it.
-- `Llm__Enabled` and `Llm__Model` provide Compose/environment fallbacks when the matching `Llm:Enabled` or
-  `Llm:Model` key is absent from `app_settings`; database values take precedence.
+- `Llm__Enabled`, `Llm__Provider`, `Llm__Model` and `Llm__BaseUrl` provide Compose/environment fallbacks when the
+  matching `Llm:*` key is absent from `app_settings`; database values take precedence.
+- `Llm:Provider` is `Anthropic` (Messages API), `OpenAI` or `Ollama` (both over the OpenAI chat-completions API in
+  JSON mode). `Llm:BaseUrl` overrides the endpoint of the last two: `https://api.openai.com/v1` and
+  `http://localhost:11434/v1` by default; from a container, Ollama on the host is `http://host.docker.internal:11434/v1`.
+  Ollama needs no key and its calls are costed at zero.
 - `ENTITY_EXTRACTOR_CONCURRENCY` bounds concurrently processed messages.
-- `ANTHROPIC_API_KEY` is only a fallback when `Llm:ApiKey` is absent from `app_settings`.
+- `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (per provider) are only fallbacks when `Llm:ApiKey` is absent from
+  `app_settings`.
 
 The LLM fallback reads the existing `Llm:*` settings and writes its full sanitized request/response and usage to the
 existing `llm_requests` table.

@@ -2,8 +2,9 @@ using System.Net;
 
 namespace Puluj.Processing.Llm;
 
-/// <summary>What the llm-worker sends to the provider: the normalized text and the budget of the `llm.requested` command.</summary>
-public sealed record LlmCompletionRequest(string Text, string Model, string PromptVersion, int MaxOutputTokens, TimeSpan Timeout);
+/// <summary>What is sent to the provider: the normalized text, the system prompt (taxonomy included, see
+/// <see cref="LlmParser.SystemPrompt"/>) and the budget of the call.</summary>
+public sealed record LlmCompletionRequest(string Text, string SystemPrompt, string Model, string PromptVersion, int MaxOutputTokens, TimeSpan Timeout);
 
 /// <summary>The provider's answer: the JSON of the extraction schema (null when the model refused), usage and its own request id.</summary>
 /// <param name="RequestPayload">The request body as sent (JSON) — audited verbatim.</param>
@@ -13,7 +14,8 @@ public sealed record LlmCompletionResult(string? ResponseJson, bool Refused, lon
 
 /// <summary>
 /// One call to the model, provider-neutral (plan §6.2: the call is never part of a database transaction). The real
-/// implementation is <see cref="AnthropicCompletion"/>; tests use a fake. Failures are <see cref="LlmCompletionException"/>
+/// implementations are <see cref="AnthropicCompletion"/> and <see cref="OpenAiCompatibleCompletion"/> (OpenAI, Ollama),
+/// chosen per call by <see cref="LlmCompletionRouter"/> from Llm:Provider; tests use a fake. Failures are <see cref="LlmCompletionException"/>
 /// with the same taxonomy for every provider, so the worker's retry/terminal decision is testable without a key.
 /// </summary>
 public interface ILlmCompletion
@@ -24,7 +26,7 @@ public interface ILlmCompletion
 /// <summary>A provider failure: status code when the provider answered, `Retryable` decides between another attempt and a terminal `llm.failed`.</summary>
 public sealed class LlmCompletionException(string code, string message, bool retryable, HttpStatusCode? statusCode = null, Exception? inner = null) : Exception(message, inner)
 {
-    /// <summary>provider_timeout | rate_limited | provider_error | invalid_response | no_api_key (the worker adds its own terminal codes: budget_unavailable, deadline_exceeded, normalization_drift, attempts_exhausted)</summary>
+    /// <summary>provider_timeout | rate_limited | provider_error | invalid_response | no_api_key | unknown_provider (the worker adds its own terminal codes: budget_unavailable, deadline_exceeded, normalization_drift, attempts_exhausted)</summary>
     public string Code { get; } = code;
     public bool Retryable { get; } = retryable;
     /// <summary>What was sent / what came back (the error body), so a failed call is audited as fully as a successful one.</summary>

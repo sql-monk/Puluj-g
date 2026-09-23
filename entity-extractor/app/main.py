@@ -5,7 +5,7 @@ from typing import AsyncIterator
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 
 from .config import Settings, get_settings
-from .llm import AnthropicEntityExtractor
+from .llm import EntityLlmExtractor
 from .models import ExtractRequest, TestRequest, TestResponse, ValidateRequest, ValidateResponse
 from .repository import (
     PostgresRepository,
@@ -34,7 +34,10 @@ def create_app(repository: Repository | None = None, settings: Settings | None =
                 await app_repository.close()  # type: ignore[attr-defined]
 
     application = FastAPI(title="Puluj Entity Extractor", version="0.1.0", lifespan=lifespan)
-    llm = AnthropicEntityExtractor(app_settings.anthropic_base_url, app_settings.anthropic_api_key)
+    llm = EntityLlmExtractor(
+        app_settings.anthropic_base_url,
+        {"anthropic": app_settings.anthropic_api_key, "openai": app_settings.openai_api_key},
+    )
     service = EntityExtractorService(app_repository, app_settings, llm)
     application.state.repository = app_repository
     application.state.extractor_service = service

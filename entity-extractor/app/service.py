@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 
 from .config import Settings
-from .llm import AnthropicEntityExtractor, LlmError
+from .llm import EntityLlmExtractor, LlmError
 from .models import ExtractRequest
 from .repository import Repository, index_entity_definitions, resolve_entity_definition, validate_write
 from .runtime import execute_extractor
@@ -21,7 +21,7 @@ class ExtractionFailed(RuntimeError):
 
 
 class EntityExtractorService:
-    def __init__(self, repository: Repository, settings: Settings, llm: AnthropicEntityExtractor) -> None:
+    def __init__(self, repository: Repository, settings: Settings, llm: EntityLlmExtractor) -> None:
         self.repository = repository
         self.settings = settings
         self.llm = llm
@@ -118,6 +118,13 @@ class EntityExtractorService:
             self.settings.llm_enabled,
             self.settings.llm_model,
         )
+        # app_settings wins; the Compose environment fills in what the admin UI never set.
+        llm_settings = llm_settings.model_copy(
+            update={
+                "provider": llm_settings.provider or self.settings.llm_provider,
+                "base_url": llm_settings.base_url or self.settings.llm_base_url,
+            }
+        )
         if not llm_settings.enabled:
             await self.repository.complete_processing(claim.run_id, 0)
             return 0
@@ -142,7 +149,7 @@ class EntityExtractorService:
                 break
             except LlmError as exc:
                 await self.repository.audit_llm_failure(audit_id, exc.audit)
-                retryable = exc.audit.status_code is None or exc.audit.status_code >= 500
+                retryable = exc.retryable and (exc.audit.status_code is None or exc.audit.status_code >= 500)
                 if retryable and attempt < max(1, llm_settings.max_attempts) and await self._reserve_retry_call(llm_settings):
                     await asyncio.sleep(min(2 ** (attempt - 1), 5))
                     continue

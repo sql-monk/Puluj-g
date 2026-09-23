@@ -31,6 +31,7 @@ class FakeLlm:
 
     async def extract(self, request, definitions, settings):
         self.calls += 1
+        self.settings = settings
         return self.result
 
 
@@ -142,7 +143,7 @@ async def test_true_zero_runs_llm_and_commits_its_write(monkeypatch) -> None:
     )
     service = EntityExtractorService(
         repository,
-        Settings(llm_enabled=True, llm_model="compose-model"),
+        Settings(llm_enabled=True, llm_model="compose-model", llm_provider="Ollama", llm_base_url="http://ollama:11434/v1"),
         llm,
     )  # type: ignore[arg-type]
 
@@ -150,6 +151,7 @@ async def test_true_zero_runs_llm_and_commits_its_write(monkeypatch) -> None:
     assert repository.completed == 1
     assert repository.llm_audits[0].outcome == "success"
     assert repository.llm_fallback == (True, "compose-model")
+    assert (llm.settings.provider, llm.settings.base_url) == ("Ollama", "http://ollama:11434/v1")
 
 
 async def test_old_message_is_not_sent_to_llm(monkeypatch) -> None:
