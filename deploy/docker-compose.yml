@@ -54,6 +54,10 @@ services:
       - checkpoint_timeout=15min
       - -c
       - checkpoint_completion_target=0.9
+      # JIT costs ~160 ms of compilation per target in the puluj_link_target trigger (cost ~215k > jit_above_cost) and
+      # runs under the Store lock, so it caps processing throughput. Short OLTP queries never earn it back.
+      - -c
+      - jit=off
       # Cumulative per-query statistics (pg_stat_statements): the extension is created by a migration but only
       # works when the library is preloaded here. Restart-only setting.
       - -c
