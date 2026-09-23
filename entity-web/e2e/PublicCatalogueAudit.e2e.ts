@@ -5,11 +5,11 @@ import { expect, test, type Page } from '@playwright/test'
 async function mount(page: Page, hash = '#/entities') {
   page.on('pageerror', error => console.error(error.message))
   await page.route('**/api/**', (route) => new URL(route.request().url()).pathname.startsWith('/api/') ? route.abort() : route.continue())
-  await page.route('**/catalogue-audit', (route) => route.fulfill({ contentType: 'text/html', body: `<html><div id="root"></div><script type="module">
+  await page.route('**/catalogue-audit', (route) => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body><div id="root"></div><script type="module">
     import RefreshRuntime from '/@react-refresh';
     RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$ = () => {}; window.$RefreshSig$ = () => (type) => type; window.__vite_plugin_react_preamble_installed__ = true;
     await import('/src/entities/EntityCatalogue.audit.tsx');
-  </script></html>` }))
+  </script></body></html>` }))
   await page.goto(`/catalogue-audit${hash}`)
   await expect.poll(() => page.evaluate(() => (window as any).pending?.length ?? 0)).toBeGreaterThan(0)
 }
@@ -82,17 +82,37 @@ test('detail identity changes discard old data and failures; successful retry re
   await expect(page.getByRole('heading', { name: 'Record 3' })).toHaveCount(0)
 })
 
-test('mobile content clears the real TopBar, long titles wrap, and list scroll survives detail navigation', async ({ page }) => {
+test('mobile content clears TopBar, wraps titles, and restores scroll even without a delivered scroll event', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 })
   await mount(page)
   await settle(page, 0, { items: Array.from({ length: 30 }, (_, i) => row(String(i), i === 0 ? 'Long'.repeat(100) : `Record ${i}`)), totalCount: 30 })
+  await expect(page.getByText('Показано 30 із 30')).toBeVisible()
   const heading = await page.getByRole('heading', { name: 'Сутності Entity Extractor' }).boundingBox()
   const header = await page.locator('header').boundingBox()
   expect(heading!.y).toBeGreaterThanOrEqual(header!.y + header!.height)
   expect(await page.locator('main').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
-  await page.locator('main').evaluate(el => { el.scrollTop = 600 })
-  await expect.poll(() => page.locator('main').evaluate(el => el.scrollTop)).toBe(600)
-  await go(page, '#/entities/explosion/5'); await count(page, 3)
+  const departureScroll = await page.locator('main').evaluate(el => {
+    // Deterministically reproduce navigation before React handles scroll:
+    // suppress delivery for this element until it is removed, regardless of
+    // whether the browser schedules scroll or hashchange first.
+    const suppressScroll = (event: Event) => {
+      if (event.target === el) event.stopImmediatePropagation()
+    }
+    document.addEventListener('scroll', suppressScroll, true)
+    const observer = new MutationObserver(() => {
+      if (!el.isConnected) {
+        document.removeEventListener('scroll', suppressScroll, true)
+        observer.disconnect()
+      }
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    el.scrollTop = 600
+    const actual = el.scrollTop
+    location.hash = '#/entities/explosion/5'
+    return actual
+  })
+  expect(departureScroll).toBe(600)
+  await count(page, 3)
   await settle(page, 1, row('5')); await settle(page, 2, [])
   await page.getByRole('link', { name: '← До каталогу' }).click()
   await expect.poll(() => page.locator('main').evaluate(el => el.scrollTop)).toBe(600)

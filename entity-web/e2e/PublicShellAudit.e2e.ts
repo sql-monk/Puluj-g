@@ -116,7 +116,7 @@ for (const [hash, heading] of [['#/analytics', 'Аналітика'], ['#/entiti
     const title = page.getByRole('heading', { name: heading, exact: true })
     await expect(title).toBeVisible()
     const titleBox = await title.boundingBox()
-    const headerBox = await page.locator('header').boundingBox()
+    const headerBox = await page.locator('header').filter({ has: page.getByRole('navigation', { name: 'Основна навігація' }) }).boundingBox()
     expect(titleBox!.y).toBeGreaterThanOrEqual(headerBox!.y + headerBox!.height)
     await toggle(page).click()
     await expect(panel(page)).toBeVisible()

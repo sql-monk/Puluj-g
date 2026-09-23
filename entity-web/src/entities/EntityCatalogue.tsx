@@ -75,7 +75,18 @@ function List({ route, query, refreshKey, onLoadState, cacheKey }: Props & { cac
     cache.set(cacheKey, { ...next, scroll: scroll.current?.scrollTop ?? 0, lastSuccess: new Date().toISOString() })
     if (cache.size > 20) cache.delete(cache.keys().next().value!)
   })
-  useLayoutEffect(() => { if (scroll.current) scroll.current.scrollTop = saved?.scroll ?? 0 }, [saved])
+  useLayoutEffect(() => {
+    const element = scroll.current
+    if (!element) return
+    element.scrollTop = saved?.scroll ?? 0
+    return () => {
+      // Navigation can unmount the list before its queued scroll event fires.
+      // Read the captured node during layout cleanup, before DOM removal; a
+      // passive cleanup or ref lookup can instead see a detached node or null.
+      const entry = cache.get(cacheKey)
+      if (entry) entry.scroll = element.scrollTop
+    }
+  }, [cacheKey, saved])
   const rememberScroll = () => { const entry = cache.get(cacheKey); if (entry) entry.scroll = scroll.current?.scrollTop ?? 0 }
   return <Page scroll={scroll} onScroll={rememberScroll}>
     <div className="flex flex-wrap items-start gap-3"><div className="min-w-0 flex-1"><h1 className="text-xl font-semibold">Сутності Entity Extractor</h1><p className="text-sm text-slate-500">Конкретні цілі, тривоги, влучання, вибухи, робота ППО та інші налаштовані типи.</p></div><button disabled={request.loading} className={buttonClass} onClick={() => void request.load()}>Оновити</button></div>
