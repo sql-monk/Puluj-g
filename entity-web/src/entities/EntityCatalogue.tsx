@@ -1,46 +1,106 @@
 /* oxlint-disable react/set-state-in-effect -- route/poll changes synchronize this view with the EE HTTP read model. */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { entityApi, type EntityItem } from '../api/entityExtractor'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { entityApi, type EntityItem, type EntityPage } from '../api/entityExtractor'
 import type { DataQuery } from '../public/query'
 import { publicHash, type PublicRoute } from '../public/routes'
 
-const cache = new Map<string, { items: EntityItem[]; next?: string; scroll: number }>()
+export interface CatalogueLoadState { loading: boolean; error?: string; lastSuccess?: string }
+type OnLoadState = (state: CatalogueLoadState) => void
+interface Props { route: PublicRoute; query: DataQuery; refreshKey?: string; onLoadState?: OnLoadState }
+interface CachedPage extends EntityPage { scroll: number; lastSuccess: string }
+const cache = new Map<string, CachedPage>()
+const buttonClass = 'rounded bg-slate-200 px-3 py-1 disabled:opacity-50 dark:bg-slate-700'
 function display(value: unknown): string { return value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value) }
 function title(item: EntityItem): string { const preferred = ['label', 'name', 'title', 'place', 'status']; for (const key of preferred) if (item.values[key]) return String(item.values[key]); return `${item.entity} #${item.id}` }
-function when(item: EntityItem): string { return item.occurredAt ? new Date(item.occurredAt).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short' }) : 'час не задано' }
+function when(item: EntityItem): string { return item.occurredAt ? new Date(item.occurredAt).toLocaleString('uk-UA', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Kyiv' }) : 'час не задано' }
 
-export default function EntityCatalogue({ route, query, refreshKey }: { route: PublicRoute; query: DataQuery; refreshKey?: string }) {
-  return route.detail?.kind ? <Detail route={route} kind={route.detail.kind} id={route.detail.id} refreshKey={refreshKey} /> : <List route={route} query={query} refreshKey={refreshKey} />
+/** One synchronous request slot covers manual refresh, polling and pagination. Identity
+ * checks also protect against transports that settle after ignoring cancellation. */
+function useRequest(refreshKey: string | undefined, initial: string | undefined, onLoadState: OnLoadState | undefined, fetchData: (signal: AbortSignal, more: boolean, current: () => boolean) => Promise<void>) {
+  const [state, setState] = useState<CatalogueLoadState>({ loading: !initial, lastSuccess: initial })
+  const active = useRef<AbortController | null>(null)
+  const callback = useRef(onLoadState)
+  const fetchRef = useRef(fetchData)
+  useLayoutEffect(() => { callback.current = onLoadState; fetchRef.current = fetchData })
+  useEffect(() => { callback.current?.(state) }, [state])
+  const load = useCallback(async (more = false) => {
+    if (active.current) return
+    const controller = new AbortController()
+    active.current = controller
+    const current = () => active.current === controller && !controller.signal.aborted
+    setState((old) => ({ ...old, loading: true, error: undefined }))
+    try {
+      await fetchRef.current(controller.signal, more, current)
+      if (current()) setState({ loading: false, lastSuccess: new Date().toISOString() })
+    } catch (reason) {
+      if (current()) setState((old) => ({ ...old, loading: false, error: reason instanceof Error ? reason.message : String(reason) }))
+    } finally {
+      controller.abort()
+      if (active.current === controller) active.current = null
+    }
+  }, [])
+  const previousRefresh = useRef(refreshKey)
+  useEffect(() => {
+    // Cached navigation is not a new success; only a changed refresh token fetches again.
+    if (!initial || previousRefresh.current !== refreshKey) void load()
+    previousRefresh.current = refreshKey
+  }, [initial, refreshKey, load])
+  useEffect(() => () => { active.current?.abort(); active.current = null }, [])
+  return { ...state, load }
 }
 
-function List({ route, query, refreshKey }: { route: PublicRoute; query: DataQuery; refreshKey?: string }) {
-  const key = route.query.toString(); const saved = cache.get(key)
-  const [items, setItems] = useState(saved?.items ?? []); const [next, setNext] = useState(saved?.next); const [loading, setLoading] = useState(!saved); const [error, setError] = useState<string>(); const scroll = useRef<HTMLElement>(null)
-  const itemsRef = useRef(items); const nextRef = useRef(next)
-  useEffect(() => { itemsRef.current = items }, [items])
-  useEffect(() => { nextRef.current = next }, [next])
-  const load = useCallback(async (more = false) => {
-    setLoading(true); setError(undefined)
-    try {
-      const current = itemsRef.current
-      const page = await entityApi.catalogueMany({ kinds: query.entityKinds, q: query.q, sourceIds: query.sourceIds, from: query.from, to: query.to, limit: query.pageSize ?? 100, cursor: more ? nextRef.current : undefined })
-      const merged = more ? [...current, ...page.items.filter((item) => !current.some((old) => old.entity === item.entity && old.id === item.id))] : page.items
-      setItems(merged); setNext(page.nextCursor); cache.set(key, { items: merged, next: page.nextCursor, scroll: scroll.current?.scrollTop ?? 0 })
-    } catch (reason) { setError((reason as Error).message) } finally { setLoading(false) }
-  }, [key, query.entityKinds, query.from, query.pageSize, query.q, query.sourceIds, query.to])
-  useEffect(() => { const entry = cache.get(key); if (entry) { setItems(entry.items); setNext(entry.next); requestAnimationFrame(() => { if (scroll.current) scroll.current.scrollTop = entry.scroll }) } else void load() }, [key, load])
-  useEffect(() => { if (refreshKey) void load() }, [refreshKey, load])
-  return <Page scroll={scroll}><div className="flex items-center"><div><h1 className="text-xl font-semibold">Сутності Entity Extractor</h1><p className="text-sm text-slate-500">Конкретні цілі, тривоги, влучання, вибухи, робота ППО та інші налаштовані типи.</p></div><button className="ml-auto rounded bg-slate-200 px-3 py-1 dark:bg-slate-700" onClick={() => void load()}>Оновити</button></div>
-    {error && <p className="mt-3 text-red-600" role="alert">Не вдалося завантажити каталог: {error}</p>}
-    {loading && items.length === 0 ? <p className="mt-3">Завантаження…</p> : items.length === 0 ? <p className="mt-3">Сутностей не знайдено.</p> : <div className="mt-3 space-y-2">{items.map((item) => <a key={`${item.entity}:${item.id}`} href={publicHash({ section: 'entities', detail: { kind: item.entity, id: item.id }, query: route.query })} className="block rounded border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><div className="flex gap-2"><b>{item.entity}</b><span>{title(item)}</span><time className="ml-auto text-xs">{when(item)}</time></div><div className="text-xs text-slate-500">ID {item.id}{item.rawMessageId ? ` · raw_message ${item.rawMessageId}` : ''}{item.geometry ? ' · є геометрія' : ' · без геометрії'}</div></a>)}</div>}
-    {next && <button disabled={loading} className="mt-3 rounded bg-slate-200 px-3 py-1 dark:bg-slate-700" onClick={() => void load(true)}>Показати ще</button>}
+export default function EntityCatalogue({ route, query, refreshKey, onLoadState }: Props) {
+  // Remount immediately on identity changes so an old record/error is never painted
+  // under a new URL. Primitive keys avoid refetches from recreated query arrays.
+  const key = JSON.stringify([route.query.toString(), query.entityKinds, query.q, query.sourceIds, query.from, query.to, query.pageSize])
+  return route.detail?.kind
+    ? <Detail key={`${route.detail.kind}:${route.detail.id}`} route={route} kind={route.detail.kind} id={route.detail.id} refreshKey={refreshKey} onLoadState={onLoadState} />
+    : <List key={key} cacheKey={key} route={route} query={query} refreshKey={refreshKey} onLoadState={onLoadState} />
+}
+
+function List({ route, query, refreshKey, onLoadState, cacheKey }: Props & { cacheKey: string }) {
+  const [saved] = useState(() => cache.get(cacheKey))
+  const [page, setPage] = useState<EntityPage | undefined>(saved)
+  const scroll = useRef<HTMLElement>(null)
+  const failedMore = useRef(false)
+  const request = useRequest(refreshKey, saved?.lastSuccess, onLoadState, async (signal, more, current) => {
+    failedMore.current = more
+    const result = await entityApi.catalogueMany({ kinds: query.entityKinds, q: query.q, sourceIds: query.sourceIds, from: query.from, to: query.to, limit: query.pageSize ?? 100, cursor: more ? page?.nextCursor : undefined }, signal)
+    if (!current()) return
+    const seen = new Set((more ? page?.items ?? [] : []).map((item) => `${item.entity}:${item.id}`))
+    const items = [...(more ? page?.items ?? [] : []), ...result.items.filter((item) => { const id = `${item.entity}:${item.id}`; if (seen.has(id)) return false; seen.add(id); return true })]
+    const next = { ...result, items }
+    setPage(next)
+    cache.delete(cacheKey)
+    cache.set(cacheKey, { ...next, scroll: scroll.current?.scrollTop ?? 0, lastSuccess: new Date().toISOString() })
+    if (cache.size > 20) cache.delete(cache.keys().next().value!)
+  })
+  useLayoutEffect(() => { if (scroll.current) scroll.current.scrollTop = saved?.scroll ?? 0 }, [saved])
+  const rememberScroll = () => { const entry = cache.get(cacheKey); if (entry) entry.scroll = scroll.current?.scrollTop ?? 0 }
+  return <Page scroll={scroll} onScroll={rememberScroll}>
+    <div className="flex flex-wrap items-start gap-3"><div className="min-w-0 flex-1"><h1 className="text-xl font-semibold">Сутності Entity Extractor</h1><p className="text-sm text-slate-500">Конкретні цілі, тривоги, влучання, вибухи, робота ППО та інші налаштовані типи.</p></div><button disabled={request.loading} className={buttonClass} onClick={() => void request.load()}>Оновити</button></div>
+    <RequestStatus state={request} hasData={!!page} retry={() => void request.load(failedMore.current)} />
+    {page && <p className="mt-3 text-sm">Показано {page.items.length} із {page.totalCount}</p>}
+    {page?.items.length === 0 && !request.loading && !request.error && <p className="mt-3">Сутностей не знайдено.</p>}
+    {!!page?.items.length && <div className="mt-3 space-y-2">{page.items.map((item) => <a key={`${item.entity}:${item.id}`} href={publicHash({ section: 'entities', detail: { kind: item.entity, id: item.id }, query: route.query })} className="block min-w-0 rounded border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><div className="flex min-w-0 flex-wrap gap-2"><b className="break-all">{item.entity}</b><span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{title(item)}</span><time className="ml-auto text-xs">{when(item)}</time></div><div className="break-all text-xs text-slate-500">ID {item.id}{item.rawMessageId ? ` · raw_message ${item.rawMessageId}` : ''}{item.geometry ? ' · є геометрія' : ' · без геометрії'}</div></a>)}</div>}
+    {page?.nextCursor && <button disabled={request.loading} className={`mt-3 ${buttonClass}`} onClick={() => void request.load(true)}>Показати ще</button>}
   </Page>
 }
 
-function Detail({ route, kind, id, refreshKey }: { route: PublicRoute; kind: string; id: string; refreshKey?: string }) {
-  const [item, setItem] = useState<EntityItem>(); const [history, setHistory] = useState<EntityItem[]>([]); const [error, setError] = useState<string>()
-  useEffect(() => { const controller = new AbortController(); Promise.all([entityApi.detail(kind, id, controller.signal), entityApi.history(kind, id, controller.signal)]).then(([current, related]) => { setItem(current); setHistory(related) }).catch((reason: Error) => reason.name !== 'AbortError' && setError(reason.message)); return () => controller.abort() }, [kind, id, refreshKey])
-  return <Page><a className="underline" href={publicHash({ section: 'entities', query: route.query })}>← До каталогу</a>{error ? <p className="mt-3 text-red-600" role="alert">{error}</p> : !item ? <p className="mt-3">Завантаження…</p> : <><h1 className="mt-3 text-xl font-semibold">{title(item)}</h1><p className="text-sm text-slate-500">{item.entity} · ID {item.id} · {when(item)}</p><dl className="mt-4 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-2">{Object.entries(item.values).map(([field, value]) => <div className="contents" key={field}><dt className="font-medium">{field}</dt><dd className="break-all font-mono text-sm">{display(value)}</dd></div>)}</dl>{history.length > 0 && <section className="mt-5"><h2 className="font-semibold">Пов’язані записи цього повідомлення</h2><ul className="mt-2 space-y-1">{history.map((row) => <li key={`${row.entity}:${row.id}`}>{row.entity} #{row.id} · {when(row)}</li>)}</ul></section>}</>}</Page>
+function Detail({ route, kind, id, refreshKey, onLoadState }: { route: PublicRoute; kind: string; id: string; refreshKey?: string; onLoadState?: OnLoadState }) {
+  const [data, setData] = useState<{ item: EntityItem; history: EntityItem[] }>()
+  const request = useRequest(refreshKey, undefined, onLoadState, async (signal, _more, current) => {
+    const [item, history] = await Promise.all([entityApi.detail(kind, id, signal), entityApi.history(kind, id, signal)])
+    if (current()) setData({ item, history: history.filter((row) => row.entity !== item.entity || row.id !== item.id) })
+  })
+  return <Page><div className="flex flex-wrap items-center gap-3"><a className="underline" href={publicHash({ section: 'entities', query: route.query })}>← До каталогу</a><button disabled={request.loading} className={`ml-auto ${buttonClass}`} onClick={() => void request.load()}>Оновити</button></div>
+    <RequestStatus state={request} hasData={!!data} retry={() => void request.load()} />
+    {data && <><h1 className="mt-3 break-words text-xl font-semibold [overflow-wrap:anywhere]">{title(data.item)}</h1><p className="break-all text-sm text-slate-500">{data.item.entity} · ID {data.item.id} · {when(data.item)}</p><dl className="mt-4 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 gap-y-2">{Object.entries(data.item.values).map(([field, value]) => <div className="contents" key={field}><dt className="break-all font-medium">{field}</dt><dd className="break-all font-mono text-sm">{display(value)}</dd></div>)}</dl>{data.history.length > 0 && <section className="mt-5"><h2 className="font-semibold">Пов’язані записи цього повідомлення</h2><ul className="mt-2 space-y-1">{data.history.map((row) => <li className="break-all" key={`${row.entity}:${row.id}`}><a className="underline" href={publicHash({ section: 'entities', detail: { kind: row.entity, id: row.id }, query: route.query })}>{row.entity} #{row.id} · {when(row)}</a></li>)}</ul></section>}</>}
+  </Page>
 }
 
-function Page({ children, scroll }: { children: React.ReactNode; scroll?: React.RefObject<HTMLElement | null> }) { return <main ref={scroll} className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-8 pt-16 text-slate-900 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900">{children}</div></main> }
+function RequestStatus({ state, hasData, retry }: { state: CatalogueLoadState; hasData: boolean; retry: () => void }) {
+  return <>{state.loading && <p className="mt-3" role="status">{hasData ? 'Оновлення… Показано попередні дані.' : 'Завантаження…'}</p>}
+    {state.error && <div className="mt-3"><p className="break-words text-red-600" role="alert">Не вдалося завантажити дані: {state.error}</p>{hasData && <p>Показано попередні дані; вони можуть бути застарілими.</p>}<button className={`mt-2 ${buttonClass}`} onClick={retry}>Спробувати ще раз</button></div>}</>
+}
+function Page({ children, scroll, onScroll }: { children: React.ReactNode; scroll?: React.RefObject<HTMLElement | null>; onScroll?: () => void }) { return <main ref={scroll} onScroll={onScroll} className="absolute inset-0 z-10 overflow-y-auto bg-slate-100 px-3 pb-28 pt-24 text-slate-900 sm:pt-16 dark:bg-slate-950 dark:text-slate-100"><div className="mx-auto min-w-0 max-w-5xl rounded-xl bg-white p-5 shadow-sm dark:bg-slate-900">{children}</div></main> }

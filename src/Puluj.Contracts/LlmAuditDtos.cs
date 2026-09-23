@@ -19,4 +19,9 @@ public sealed record LlmRequestDto(
     long? InputTokens, long? CacheWriteTokens, long? CacheReadTokens, long? OutputTokens,
     decimal? EstimatedCostUsd, int FactsCount, string? Error);
 
+/// <summary>One page of the LLM request history, newest first.</summary>
+/// <param name="Total">Requests in the period that match the filter (not only this page).</param>
+/// <param name="NextBeforeId">Pass as `beforeId` for the next (older) page; null on the last page.</param>
+public sealed record LlmRequestPageDto(IReadOnlyList<LlmRequestDto> Requests, long Total, long? NextBeforeId);
+
 public sealed record LlmRequestDetailDto(LlmRequestDto Request, string RequestText, string SystemPrompt, string? ResponseText);

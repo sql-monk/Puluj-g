@@ -354,6 +354,43 @@ export interface DbQueryResultDto {
   rows: (string | null)[][]
   truncated: boolean
   elapsedMs: number
+  /** Rows skipped before this page (table browser). */
+  offset?: number
+  /** Primary-key columns the table browser ordered by; absent when the table has none. */
+  orderBy?: string[]
+}
+/** Why PostgreSQL refused a console query (400): its message, SQLSTATE and 1-based character position. */
+export interface DbQueryErrorDto {
+  error: string
+  sqlState?: string
+  position?: number
+  hint?: string
+}
+export interface AdminMessageDto {
+  id: number
+  sourceId: number
+  sourceCode: string
+  sourceName: string
+  sourceMessageId: string
+  publishedAt: string
+  receivedAt: string
+  processingStatus: 'Pending' | 'Processed' | 'Failed' | 'Skipped' | 'InProgress' | string
+  processedAt?: string
+  attempts: number
+  text?: string
+  textTruncated: boolean
+  url?: string
+  targets: number
+}
+export interface AdminMessagePageDto {
+  messages: AdminMessageDto[]
+  nextCursor?: string
+}
+export type LlmOutcomeFilter = 'all' | 'failures' | 'facts' | 'empty' | 'refusal' | 'success'
+export interface LlmRequestPageDto {
+  requests: LlmRequestDto[]
+  total: number
+  nextBeforeId?: number
 }
 export interface LogFileDto {
   name: string
@@ -445,9 +482,22 @@ export const admin = {
     containerAction: (id: string, verb: 'restart' | 'stop' | 'start') => call<ContainerActionResultDto>('POST', `/api/admin/ops/containers/${encodeURIComponent(id)}/${verb}`, {}),
     pipeline: (hours: 24 | 168 | 720) => call<PipelineReportDto>('GET', `/api/admin/ops/pipeline?hours=${hours}`),
     llm: (hours: 24 | 168 | 720 = 168) => call<LlmUsageReportDto>('GET', `/api/admin/ops/llm?hours=${hours}`),
+    llmRequests: (hours: 24 | 168 | 720, outcome: LlmOutcomeFilter, q: string, beforeId?: number, limit = 100) => {
+      const query = new URLSearchParams({ hours: String(hours), outcome, limit: String(limit) })
+      if (q.trim()) query.set('q', q.trim())
+      if (beforeId !== undefined) query.set('beforeId', String(beforeId))
+      return call<LlmRequestPageDto>('GET', `/api/admin/ops/llm/requests?${query}`)
+    },
+    messages: (filter: { sourceId?: number; rawMessageId?: number }, cursor?: string, limit = 50) => {
+      const query = new URLSearchParams({ limit: String(limit) })
+      if (filter.sourceId !== undefined) query.set('sourceId', String(filter.sourceId))
+      if (filter.rawMessageId !== undefined) query.set('rawMessageId', String(filter.rawMessageId))
+      if (cursor) query.set('cursor', cursor)
+      return call<AdminMessagePageDto>('GET', `/api/admin/ops/messages?${query}`)
+    },
     llmRequest: (id: number) => call<LlmRequestDetailDto>('GET', `/api/admin/ops/llm/requests/${id}`),
     db: () => call<DbReportDto>('GET', '/api/admin/ops/db'),
-    dbTableRows: (name: string, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}`),
+    dbTableRows: (name: string, offset = 0, limit = 50) => call<DbQueryResultDto>('GET', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/rows?limit=${limit}&offset=${offset}`),
     maintainTable: (name: string, action: 'analyze' | 'vacuum' | 'reindex') => call<{ name: string; operation: string; elapsedMs: number }>('POST', `/api/admin/ops/db/tables/${encodeURIComponent(name)}/${action}`, {}),
     dbQuery: (sql: string) => call<DbQueryResultDto>('POST', '/api/admin/ops/db/query', { sql }),
     reprocess: () => call<{ pending: number; analyticsReset: boolean }>('POST', '/api/admin/ops/reprocess', { confirmation: 'REPROCESS_DERIVED_DATA' }),

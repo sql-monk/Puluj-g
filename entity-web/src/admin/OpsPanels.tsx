@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { admin, type CollectorStatusDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
+import { admin, AdminError, type CollectorStatusDto, type DbQueryErrorDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { telegramTitle, telegramUsername } from '../components/settings/sources'
 import { sortCollectors, type CollectorSortKey } from './collectors'
-import { Bars, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
+import { sqlErrorLocation } from './format'
+import { messagesHash } from './messages'
+import { Bars, Loading, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 
 const SERVICE_LABEL: Record<string, string> = {
   worker: 'Worker (збір і обробка)',
@@ -17,6 +19,7 @@ const SERVICE_LABEL: Record<string, string> = {
   collectors: 'Колектори джерел',
   telegram: 'Telegram-сесія',
   postgres: 'PostgreSQL / PostGIS',
+  'entity-extractor': 'Entity Extractor (сутності)',
 }
 
 type TableMaintenance = 'ANALYZE' | 'VACUUM' | 'REINDEX'
@@ -118,9 +121,9 @@ export function CollectorsPanel() {
     return { key, asc: key === 'name' || key === 'type' || key === 'status' || key === 'lastError' }
   })
   return (
-    <Section title="Колектори" badge={<Badge ok={list.length ? list.filter((c) => c.enabled).every((c) => c.consecutiveFailures === 0) : null} text={`${list.filter((c) => c.enabled).length} увімкнених`} />}>
+    <Section title="Колектори" badge={data ? <Badge ok={list.length ? list.filter((c) => c.enabled).every((c) => c.consecutiveFailures === 0) : null} text={`${list.filter((c) => c.enabled).length} увімкнених`} /> : <Badge ok={null} text="завантаження…" />}>
       <p className="text-xs text-slate-500">Кожне джерело окремо: коли опитано, коли останній успіх і повідомлення, помилки поспіль, і скільки повідомлень прийшло за кожну з останніх 24 годин.</p>
-      {error && <div className="text-xs text-red-600">{error}</div>}
+      <Loading error={error} empty={!data} />
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="text-left text-slate-500">
@@ -163,7 +166,7 @@ export function CollectorsPanel() {
                 <td className="max-w-xs truncate pr-2 text-red-600" title={c.lastError}>
                   {c.lastError ?? ''}
                 </td>
-                <td className="whitespace-nowrap">{c.type === 'Telegram' && <a className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceIds=${c.sourceId}`}>Дивитись повідомлення</a>}</td>
+                <td className="whitespace-nowrap">{c.type === 'Telegram' && <a className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={messagesHash({ sourceId: c.sourceId })}>Дивитись повідомлення</a>}</td>
               </tr>
             ))}
           </tbody>
@@ -184,7 +187,7 @@ export function DbPanel() {
   const [maintenanceMessage, setMaintenanceMessage] = useState<string | null>(null)
   const [sql, setSql] = useState('')
   const [queryResult, setQueryResult] = useState<DbQueryResultDto | null>(null)
-  const [queryError, setQueryError] = useState<string | null>(null)
+  const [queryError, setQueryError] = useState<DbQueryErrorDto | null>(null)
   const [querying, setQuerying] = useState(false)
   const [confirmation, setConfirmation] = useState('')
   const [reprocessing, setReprocessing] = useState(false)
@@ -192,31 +195,38 @@ export function DbPanel() {
   const [clearing, setClearing] = useState(false)
   const [actionMessage, setActionMessage] = useState<string | null>(null)
 
-  const openTable = async (name: string) => {
+  const openTable = async (name: string, offset = 0) => {
     setSelectedTable(name)
-    setTableRows(null)
     setTableError(null)
     setLoadingTable(true)
     try {
-      setTableRows(await admin.ops.dbTableRows(name))
+      setTableRows(await admin.ops.dbTableRows(name, offset, TABLE_PAGE))
     } catch (e) {
+      setTableRows(null)
       setTableError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoadingTable(false)
     }
   }
 
-  const runQuery = async () => {
+  const runQuery = async (text = sql) => {
     setQueryError(null)
     setQueryResult(null)
     setQuerying(true)
     try {
-      setQueryResult(await admin.ops.dbQuery(sql))
+      setQueryResult(await admin.ops.dbQuery(text))
     } catch (e) {
-      setQueryError(e instanceof Error ? e.message : String(e))
+      setQueryError(e instanceof AdminError && e.body && typeof e.body === 'object' && 'error' in e.body ? (e.body as DbQueryErrorDto) : { error: e instanceof Error ? e.message : String(e) })
     } finally {
       setQuerying(false)
     }
+  }
+
+  /** The table browser's query in the console, where the operator can add WHERE / ORDER BY. */
+  const openInConsole = (name: string, orderBy?: string[]) => {
+    const text = `SELECT * FROM ${name}${orderBy?.length ? ` ORDER BY ${orderBy.join(', ')} DESC` : ''} LIMIT 50`
+    setSql(text)
+    document.getElementById('sql-console')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const maintainTable = async (name: string, operation: TableMaintenance) => {
@@ -339,20 +349,33 @@ export function DbPanel() {
       </Section>
       {maintenanceMessage && <div className={maintenanceMessage.startsWith('Помилка') ? 'text-xs text-red-600' : 'text-xs text-emerald-700 dark:text-emerald-400'}>{maintenanceMessage}</div>}
       {selectedTable && (
-        <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={`${fmtNum(tableRows.rows.length)} рядків`} />}>
-          <p className="text-xs text-slate-500">Перші 50 рядків. Значення секретних полів приховано.</p>
-          {loadingTable && <div className="text-xs text-slate-500">Завантаження…</div>}
+        <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={tableRows.rows.length ? `рядки ${fmtNum((tableRows.offset ?? 0) + 1)}–${fmtNum((tableRows.offset ?? 0) + tableRows.rows.length)}` : 'рядків немає'} />}>
+          <p className="text-xs text-slate-500">
+            По {TABLE_PAGE} рядків{tableRows?.orderBy ? `, упорядковано за первинним ключем (${tableRows.orderBy.join(', ')})` : ', без первинного ключа — порядок не гарантовано'}. Значення секретних полів приховано. Для пошуку й фільтра — SQL-консоль нижче.
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50 dark:border-slate-600" disabled={loadingTable || !tableRows || (tableRows.offset ?? 0) === 0} onClick={() => void openTable(selectedTable, Math.max(0, (tableRows?.offset ?? 0) - TABLE_PAGE))}>
+              ← Попередні
+            </button>
+            <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50 dark:border-slate-600" disabled={loadingTable || !tableRows?.truncated} onClick={() => void openTable(selectedTable, (tableRows?.offset ?? 0) + TABLE_PAGE)}>
+              Наступні →
+            </button>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" onClick={() => openInConsole(selectedTable, tableRows?.orderBy)}>
+              Відкрити в SQL-консолі
+            </button>
+            {loadingTable && <span className="text-slate-500">Завантаження…</span>}
+          </div>
           {tableError && <div className="text-xs text-red-600">{tableError}</div>}
           {tableRows && <QueryResult result={tableRows} />}
         </Section>
       )}
       <Section title="SQL-консоль (лише читання)" badge={<Badge ok={null} text="SELECT / WITH" />}>
         <p className="text-xs text-slate-500">Виконує один <code>SELECT</code> або <code>WITH … SELECT</code> у read-only транзакції, максимум 200 рядків і 10 секунд. Коментарі, системні pg_* функції та секретні поля заблоковані.</p>
-        <textarea className="min-h-28 w-full rounded border border-slate-300 p-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800" spellCheck={false} placeholder="SELECT raw_message_id, source_id, published_at, processing_status FROM raw_messages ORDER BY raw_message_id DESC LIMIT 50" value={sql} onChange={(e) => setSql(e.target.value)} />
+        <textarea id="sql-console" aria-label="SQL-запит" className="min-h-28 w-full rounded border border-slate-300 p-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-800" spellCheck={false} placeholder="SELECT raw_message_id, source_id, published_at, processing_status FROM raw_messages ORDER BY raw_message_id DESC LIMIT 50" value={sql} onChange={(e) => setSql(e.target.value)} />
         <div className="flex items-center gap-2">
           <button className="rounded bg-slate-800 px-3 py-1 text-xs text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900" onClick={() => void runQuery()} disabled={querying || !sql.trim()}>{querying ? 'Виконую…' : 'Виконати SELECT'}</button>
-          {queryError && <span className="text-xs text-red-600">{queryError}</span>}
         </div>
+        {queryError && <QueryErrorBox error={queryError} sql={sql} />}
         {queryResult && <QueryResult result={queryResult} />}
       </Section>
       <Section title="Повторна обробка повідомлень" badge={<Badge ok={null} text="не запускається автоматично" />}>
@@ -387,6 +410,29 @@ export function DbPanel() {
         </Section>
       )}
     </>
+  )
+}
+
+const TABLE_PAGE = 50
+
+/** PostgreSQL's reason, and the line of the query it points at with a caret under the position. */
+function QueryErrorBox({ error, sql }: { error: DbQueryErrorDto; sql: string }) {
+  const where = error.position ? sqlErrorLocation(sql, error.position) : null
+  return (
+    <div className="rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800 dark:border-red-900 dark:bg-red-900/20 dark:text-red-200" role="alert">
+      <div>{error.error}</div>
+      {where && (
+        <>
+          <div className="mt-1 text-red-700 dark:text-red-300">
+            Рядок {where.line}, позиція {where.column}
+            {error.sqlState ? ` · SQLSTATE ${error.sqlState}` : ''}
+          </div>
+          <pre className="mt-1 overflow-x-auto font-mono text-[11px]">{`${where.text}\n${' '.repeat(Math.max(0, where.column - 1))}^`}</pre>
+        </>
+      )}
+      {!where && error.sqlState && <div className="mt-1 text-red-700 dark:text-red-300">SQLSTATE {error.sqlState}</div>}
+      {error.hint && <div className="mt-1">Підказка: {error.hint}</div>}
+    </div>
   )
 }
 

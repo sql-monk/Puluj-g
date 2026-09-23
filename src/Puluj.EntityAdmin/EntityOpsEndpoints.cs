@@ -68,7 +68,9 @@ public static partial class EntityOpsEndpoints
         ops.MapGet("/ops/collectors", CollectorsAsync);
         ops.MapGet("/ops/pipeline", PipelineAsync);
         ops.MapGet("/ops/llm", LlmAsync);
+        ops.MapGet("/ops/llm/requests", LlmRequestsAsync);
         ops.MapGet("/ops/llm/requests/{id:long}", LlmRequestAsync);
+        ops.MapGet("/ops/messages", MessagesAsync);
         ops.MapGet("/ops/db", DbAsync);
         ops.MapGet("/ops/db/tables/{name}/rows", DbTableRowsAsync);
         ops.MapPost("/ops/db/tables/{name}/analyze", AnalyzeTableAsync);
@@ -227,7 +229,7 @@ public static partial class EntityOpsEndpoints
             WithFacts = g.LongCount(x => x.Outcome == "facts"),
             Empty = g.LongCount(x => x.Outcome == "empty"),
             Refusals = g.LongCount(x => x.Outcome == "refusal"),
-            Failures = g.LongCount(x => x.Outcome == "429" || x.Outcome == "api_error" || x.Outcome == "error"),
+            Failures = g.LongCount(x => !AdminReadQueries.LlmOkOutcomes.Contains(x.Outcome)),
             Input = g.Sum(x => x.InputTokens ?? 0),
             CacheWrite = g.Sum(x => x.CacheCreationInputTokens ?? 0),
             CacheRead = g.Sum(x => x.CacheReadInputTokens ?? 0),
@@ -257,6 +259,33 @@ public static partial class EntityOpsEndpoints
                 x.Outcome, x.StatusCode, x.DurationMs, x.InputTokens, x.CacheCreationInputTokens, x.CacheReadInputTokens, x.OutputTokens, x.EstimatedCostUsd, x.FactsCount, x.Error)).ToList()));
     }
 
+    private static async Task<IResult> LlmRequestsAsync(int? hours, string? outcome, string? q, long? beforeId, int? limit, IDbContextFactory<PulujDbContext> factory, TimeProvider clock, CancellationToken ct)
+    {
+        var span = hours ?? 168;
+        if (!PipelineBuckets.AllowedHours.Contains(span))
+        {
+            return Results.BadRequest(new { error = "Період має бути 24, 168 або 720 годин." });
+        }
+        if (outcome is not (null or "" or "all" or "failures" or "facts" or "empty" or "refusal" or "success"))
+        {
+            return Results.BadRequest(new { error = "Невідомий фільтр результату." });
+        }
+        var to = clock.GetUtcNow();
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return Results.Ok(await AdminReadQueries.LlmRequestsAsync(db, to - TimeSpan.FromHours(span), to, outcome, q, beforeId, limit ?? 100, ct));
+    }
+
+    /// <summary>Messages of one source (the collectors' and sources' "view messages" link), or one message by id.</summary>
+    private static async Task<IResult> MessagesAsync(int? sourceId, long? rawMessageId, string? cursor, int? limit, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    {
+        if (sourceId is null && rawMessageId is null)
+        {
+            return Results.BadRequest(new { error = "Виберіть джерело або вкажіть ID повідомлення." });
+        }
+        await using var db = await factory.CreateDbContextAsync(ct);
+        return Results.Ok(await AdminReadQueries.MessagesAsync(db, sourceId, rawMessageId, cursor, limit ?? 50, ct));
+    }
+
     private static async Task<IResult> LlmRequestAsync(long id, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
@@ -277,7 +306,7 @@ public static partial class EntityOpsEndpoints
     }
 
     private static async Task<IResult> OverviewAsync(
-        SettingsStore settings, IDbContextFactory<PulujDbContext> factory, IHttpClientFactory http, IConfiguration config, TimeProvider clock, CancellationToken ct)
+        SettingsStore settings, EntityAdminStore entityStore, IDbContextFactory<PulujDbContext> factory, IHttpClientFactory http, IConfiguration config, TimeProvider clock, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
         var services = new List<ServiceStatusDto>();
@@ -327,6 +356,11 @@ public static partial class EntityOpsEndpoints
         // Telegram session (the worker keeps its status in app_settings).
         var tgStatus = all.TryGetValue("Runtime:Telegram:Status", out var ts) ? ts.Value : null;
         services.Add(new ServiceStatusDto("telegram", tgStatus is null ? "unknown" : tgStatus.Contains("ok", StringComparison.OrdinalIgnoreCase) || tgStatus.Contains("connected", StringComparison.OrdinalIgnoreCase) || tgStatus.StartsWith("listening", StringComparison.OrdinalIgnoreCase) ? "ok" : "warn", tgStatus, null));
+
+        // Entity Extractor: its health endpoint plus what its delivery queue says (a 200 alone does not mean it processes).
+        var probe = await EntityAdminEndpoints.ProbeAsync(http, ct);
+        var queue = await entityStore.QueueSnapshotAsync(ct);
+        services.Add(EntityExtractorStatus.Describe(probe, queue, EntityAdminEndpoints.LlmEnabled(all, config), now));
 
         // Database.
         var version = (await db.Database.SqlQueryRaw<string>("SELECT version() AS \"Value\"").ToListAsync(ct)).FirstOrDefault() ?? "?";
@@ -485,13 +519,17 @@ public static partial class EntityOpsEndpoints
                 monitoring.TransactionsRolledBack, monitoring.CacheHitRatio, monitoring.DeadRows)));
     }
 
-    private static async Task<IResult> DbTableRowsAsync(string name, int? limit, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
+    /// <summary>A bounded OFFSET page ordered by primary key. Concurrent mutations can still shift rows between pages.</summary>
+    private static async Task<IResult> DbTableRowsAsync(string name, int? limit, int? offset, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
     {
         if (!TableName().IsMatch(name))
         {
             return Results.BadRequest(new { error = "Некоректна назва таблиці." });
         }
         var take = Math.Clamp(limit ?? 50, 1, 200);
+        if (offset is < 0 or > MaxTableOffset)
+            return Results.BadRequest(new { error = $"Зсув має бути від 0 до {MaxTableOffset}. Для глибшого пошуку використайте SQL-консоль." });
+        var skip = offset ?? 0;
         await using var db = await factory.CreateDbContextAsync(ct);
         var exists = await db.Database.SqlQueryRaw<string>("""
             SELECT relname AS "Value" FROM pg_stat_user_tables
@@ -501,8 +539,26 @@ public static partial class EntityOpsEndpoints
         {
             return Results.NotFound(new { error = "Таблицю не знайдено." });
         }
-        return Results.Ok(await ReadQueryAsync(db, $"SELECT * FROM public.\"{name}\" LIMIT {take + 1}", take, redactSensitiveColumns: true, ct));
+        var keys = await db.Database.SqlQueryRaw<string>("""
+            SELECT a.attname::text AS "Value"
+            FROM pg_index i
+            JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+            WHERE i.indrelid = format('public.%I', {0})::regclass AND i.indisprimary
+            ORDER BY array_position(i.indkey::int2[], a.attnum)
+            """, name).ToListAsync(ct);
+        var order = keys.Count > 0 ? $" ORDER BY {string.Join(", ", keys.Select(QuoteIdentifier))}" : string.Empty;
+        try
+        {
+            var page = await ReadQueryAsync(db, $"SELECT * FROM public.{QuoteIdentifier(name)}{order} LIMIT {take + 1} OFFSET {skip}", take, redactSensitiveColumns: true, ct);
+            return Results.Ok(page with { Offset = skip, OrderBy = keys.Count > 0 ? keys : null });
+        }
+        catch (Exception e) when (DatabaseQueryErrors.Describe(e) is { } error)
+        {
+            return Results.BadRequest(error);
+        }
     }
+
+    private const int MaxTableOffset = 1_000_000;
 
     private static Task<IResult> AnalyzeTableAsync(string name, IDbContextFactory<PulujDbContext> factory, CancellationToken ct)
         => MaintainTableAsync(name, TableMaintenance.Analyze, factory, ct);
@@ -556,7 +612,15 @@ public static partial class EntityOpsEndpoints
             return Results.BadRequest(new { error });
         }
         await using var db = await factory.CreateDbContextAsync(ct);
-        return Results.Ok(await ReadQueryAsync(db, request.Sql, 200, redactSensitiveColumns: false, ct));
+        try
+        {
+            return Results.Ok(await ReadQueryAsync(db, request.Sql, 200, redactSensitiveColumns: false, ct));
+        }
+        catch (Exception e) when (DatabaseQueryErrors.Describe(e) is { } queryError)
+        {
+            // The operator's own SQL is wrong (syntax, unknown column, timeout): say why and where, as a 400, not a 500.
+            return Results.BadRequest(queryError);
+        }
     }
 
     private static async Task<DbQueryResultDto> ReadQueryAsync(PulujDbContext db, string sql, int maxRows, bool redactSensitiveColumns, CancellationToken ct)

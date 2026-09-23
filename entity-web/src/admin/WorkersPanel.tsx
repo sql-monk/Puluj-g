@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { admin, AdminError, type ContainerActionResultDto, type ContainerDto, type ContainersDto, type WorkerInstanceDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { ConfirmButton, Loading, Stat, ago, fmtBytes, fmtDuration, fmtMs, fmtNum, fmtPercent, fmtTime, secondsSince, usePolled } from './shared'
-import { KIND_LABEL, SERVICE_NOTE, STAGES, instanceHealth, processorSummary, timingBars } from './workers'
+import { KIND_LABEL, SERVICE_NOTE, STAGES, instanceHealth, processorBadge, processorSummary, timingBars } from './workers'
 
 const CONTAINER_STATE_LABEL: Record<string, string> = {
   running: 'працює',
@@ -38,7 +38,7 @@ export function WorkersPanel() {
   const list = workers.data ?? []
   return (
     <>
-      <ProcessorsBlock workers={list} containers={containers.data} onDone={refresh} />
+      <ProcessorsBlock workers={workers.data} workersError={workers.error} containers={containers.data} containersError={containers.error} />
       <Section title="Інстанси" badge={workers.data && <Badge ok={list.length === 0 ? null : list.every((w) => w.alive)} text={`${list.filter((w) => w.alive).length} з ${list.length} живі`} />}>
         <p className="text-xs text-slate-500">Кожен процес Worker / Analytics пише heartbeat (30 с) і статус про себе (10 с) у app_settings. Оброблено за 24 год — з бази за claimed_by; таймінги — за останні 5 хв самого інстансу.</p>
         <Loading error={workers.error} empty={!workers.data} />
@@ -81,19 +81,25 @@ function ActionResult({ result, onClose }: { result: ContainerActionResultDto; o
   )
 }
 
-/** The single processor container and its bounded internal workers. */
-function ProcessorsBlock({ workers, containers }: { workers: WorkerInstanceDto[]; containers: ContainersDto | null; onDone: () => void }) {
-  const summary = processorSummary(workers)
-  const available = containers?.available ?? false
+/**
+ * The single processor container and its bounded internal workers. Every value is shown only from a received answer:
+ * while a request is pending the cards say "…", never "ні" / 0 / "Docker недоступний".
+ */
+function ProcessorsBlock({ workers, workersError, containers, containersError }: { workers: WorkerInstanceDto[] | null; workersError: string | null; containers: ContainersDto | null; containersError: string | null }) {
+  const badge = processorBadge(workers, workersError)
+  const summary = workers ? processorSummary(workers) : null
+  const pending = workersError ? 'невідомо' : '…'
+  const containersPending = containersError ? 'невідомо' : '…'
   return (
-    <Section title="Процесор повідомлень" badge={<Badge ok={summary.alive === 1} text={summary.alive === 1 ? 'працює' : 'не працює'} />}>
-      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-        <Stat label="Живий" value={summary.alive === 1 ? 'так' : 'ні'} />
-        <Stat label="Внутрішніх workers" value={summary.concurrency ? String(summary.concurrency) : '—'} hint="Processing:Concurrency" />
-        <Stat label="Повідомлень/хв" value={fmtNum(Math.round(summary.perMinute * 10) / 10)} hint="за останні 5 хв" />
-        <Stat label="Контейнерів processor" value={available ? String(containers!.processorReplicas) : '—'} hint={available ? 'запущених у compose' : 'Docker недоступний'} />
+    <Section title="Процесор повідомлень" badge={<Badge ok={badge.ok} text={badge.text} />}>
+      <div className="grid grid-cols-1 gap-2 text-xs min-[420px]:grid-cols-2 sm:grid-cols-4">
+        <Stat label="Живий" value={summary ? (summary.alive > 0 ? 'так' : 'ні') : pending} />
+        <Stat label="Внутрішніх workers" value={summary ? (summary.concurrency ? String(summary.concurrency) : '—') : pending} hint="Processing:Concurrency" />
+        <Stat label="Повідомлень/хв" value={summary ? fmtNum(Math.round(summary.perMinute * 10) / 10) : pending} hint="за останні 5 хв" />
+        <Stat label="Контейнерів processor" value={containers ? (containers.available ? String(containers.processorReplicas) : '—') : containersPending} hint={!containers ? 'завантаження…' : containers.available ? 'запущених у compose' : 'Docker недоступний'} />
       </div>
-      {!available && <div className="text-xs text-slate-500">{containers?.unavailable ?? 'Керування контейнерами недоступне.'}</div>}
+      {workersError && <div className="text-xs text-red-600">{workersError}</div>}
+      {containers && !containers.available && <div className="text-xs text-slate-500">{containers.unavailable ?? 'Керування контейнерами недоступне.'}</div>}
     </Section>
   )
 }
@@ -138,7 +144,7 @@ function InstanceCard({ w, container, docker, onAct }: { w: WorkerInstanceDto; c
       )}
       {p && (
         <>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2 sm:grid-cols-4">
             <Stat label="Воркерів" value={String(p.concurrency)} />
             <Stat label="Оброблено / 24 год" value={fmtNum(w.processed24h)} hint={`з запуску: ${fmtNum(p.processed)}`} />
             <Stat label="за хв (1 / 5)" value={`${p.perMinute1.toLocaleString('uk-UA', { maximumFractionDigits: 1 })} / ${p.perMinute5.toLocaleString('uk-UA', { maximumFractionDigits: 1 })}`} />

@@ -26,3 +26,4 @@ dist-ssr
 # Playwright (P12)
 e2e-report
 test-results
+.*audit*results*/

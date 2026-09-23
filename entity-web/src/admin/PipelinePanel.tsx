@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { admin, type PipelineReportDto, type ProcessingErrorDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
-import { Bars, Loading, Stat, ago, bucketLabel, fmtMs, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
+import { Bars, Freshness, Loading, Stat, ago, bucketLabel, fmtMs, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 import { share, sortSources, type SourceSortKey } from './workers'
 
 const PERIODS: { hours: 24 | 168 | 720; label: string }[] = [
@@ -16,7 +16,8 @@ const PERIODS: { hours: 24 | 168 | 720; label: string }[] = [
  */
 export function PipelinePanel() {
   const [hours, setHours] = useState<24 | 168 | 720>(24)
-  const { data, error } = usePolled(() => admin.ops.pipeline(hours), 15_000, [hours])
+  const { data, error, stale, loadedAt } = usePolled(() => admin.ops.pipeline(hours), 15_000, [hours])
+  const shownPeriod = PERIODS.find((p) => data && Math.round((new Date(data.to).getTime() - new Date(data.from).getTime()) / 3_600_000) === p.hours)?.label
   const t = data?.totals
   const withTargets = data ? data.sources.reduce((s, x) => s + x.withTargets, 0) : 0
   return (
@@ -26,7 +27,7 @@ export function PipelinePanel() {
         badge={
           <span className="flex gap-1">
             {PERIODS.map((p) => (
-              <button key={p.hours} className={`rounded px-2 py-0.5 text-xs ${hours === p.hours ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'}`} onClick={() => setHours(p.hours)}>
+              <button key={p.hours} aria-pressed={hours === p.hours} className={`rounded px-2 py-0.5 text-xs ${hours === p.hours ? 'bg-slate-800 text-white dark:bg-slate-100 dark:text-slate-900' : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700'}`} onClick={() => setHours(p.hours)}>
                 {p.label}
               </button>
             ))}
@@ -35,8 +36,13 @@ export function PipelinePanel() {
       >
         <p className="text-xs text-slate-500">Скільки прийшло, скільки й за який час оброблено, що з цього вийшло. Час — Europe/Kyiv; p50/p90 — з raw_messages.processing_ms (лише успішні обробки).</p>
         <Loading error={error} empty={!data && !error} />
+        {data && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Freshness stale={stale} loadedAt={loadedAt} label={shownPeriod ? `період ${shownPeriod}` : undefined} />
+          </div>
+        )}
         {data && t && (
-          <>
+          <div className={stale ? 'space-y-3 opacity-50 transition-opacity' : 'space-y-3'} aria-busy={stale}>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-5">
               <Stat label="Прийнято" value={fmtNum(t.received)} />
               <Stat label="Оброблено" value={fmtNum(t.processed)} hint={`пропущено ${fmtNum(t.skipped)}, помилок ${fmtNum(t.failed)}`} />
@@ -50,9 +56,10 @@ export function PipelinePanel() {
               <Stat label="Середнє" value={fmtMs(t.meanMs)} />
             </div>
             <TimelineChart report={data} />
-          </>
+          </div>
         )}
       </Section>
+      <div className={stale ? 'space-y-4 opacity-50' : 'space-y-4'}>
       {data && <SourcesTable report={data} />}
       {data && data.instances.length > 0 && <InstancesTable report={data} />}
       {data && (
@@ -76,6 +83,7 @@ export function PipelinePanel() {
           <ErrorList errors={data.recentErrors} />
         </Section>
       )}
+      </div>
     </>
   )
 }

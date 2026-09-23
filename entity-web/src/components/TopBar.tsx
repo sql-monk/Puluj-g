@@ -9,11 +9,11 @@ interface Props {
   panelOpen: boolean
   onTogglePanel: () => void
   panelButtonRef: RefObject<HTMLButtonElement | null>
+  dataStatus: { loading: boolean; error?: string; lastSuccess?: string }
 }
 
 /** Public navigation is hash links, so browser history remains the source of truth. */
-export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePanel, panelButtonRef }: Props) {
-  const connection = useStore((s) => s.connection)
+export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePanel, panelButtonRef, dataStatus }: Props) {
   const mode = useStore((s) => s.mode)
   const at = useStore((s) => s.at)
   const theme = useStore((s) => s.theme)
@@ -72,8 +72,8 @@ export default function TopBar({ route, rememberedRoutes, panelOpen, onTogglePan
     }
   }, [mapOpen])
 
-  const dot = connection === 'connected' ? 'bg-emerald-500' : connection === 'reconnecting' ? 'animate-pulse bg-amber-500' : 'bg-red-500'
-  const status = connection === 'connected' ? 'онлайн' : connection === 'reconnecting' ? 'перепідключення…' : 'офлайн'
+  const dot = dataStatus.error ? 'bg-red-500' : dataStatus.loading ? 'animate-pulse bg-amber-500' : dataStatus.lastSuccess ? 'bg-emerald-500' : 'bg-slate-400'
+  const status = dataStatus.error ? 'помилка оновлення' : dataStatus.loading ? 'оновлення…' : dataStatus.lastSuccess ? 'дані отримано' : 'очікуємо дані'
   const routeFor = (section: PublicSection): PublicRoute => {
     const remembered = rememberedRoutes[section]
     return { section, mapMode: section === 'map' ? remembered?.mapMode ?? 'live' : undefined, preset: section === 'map' ? remembered?.preset : undefined, query: new URLSearchParams(remembered?.query), detail: undefined }

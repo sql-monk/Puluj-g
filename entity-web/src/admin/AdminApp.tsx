@@ -5,6 +5,7 @@ import LlmUsagePanel from './LlmUsagePanel'
 import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
 import { WorkersPanel } from './WorkersPanel'
+import { MessagesPanel } from './MessagesPanel'
 import { PipelinePanel } from './PipelinePanel'
 import { CatalogPanel } from './CatalogPanel'
 import { EeDefinitionsPanel, EeExtractorsPanel, EeOperationsPanel } from './EntityExtractorPanels'
@@ -15,12 +16,13 @@ import { EeDefinitionsPanel, EeExtractorsPanel, EeOperationsPanel } from './Enti
 const defaultMapPort = window.location.port === '8091' ? '8090' : '5267'
 const MAP_URL: string = (import.meta.env.VITE_MAP_URL as string | undefined) ?? `${window.location.protocol}//${window.location.hostname}:${defaultMapPort}/`
 
-type SectionId = 'overview' | 'workers' | 'collectors' | 'pipeline' | 'db' | 'logs' | 'ee-operations' | 'ee-extractors' | 'ee-definitions' | 'catalog' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
+type SectionId = 'overview' | 'workers' | 'collectors' | 'messages' | 'pipeline' | 'db' | 'logs' | 'ee-operations' | 'ee-extractors' | 'ee-definitions' | 'catalog' | 'sources' | 'alerts' | 'telegram' | 'llm' | 'system'
 
 const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'overview', label: 'Стан', group: 'Моніторинг' },
   { id: 'workers', label: 'Воркери', group: 'Моніторинг' },
   { id: 'collectors', label: 'Колектори', group: 'Моніторинг' },
+  { id: 'messages', label: 'Повідомлення', group: 'Моніторинг' },
   { id: 'pipeline', label: 'Конвеєр', group: 'Моніторинг' },
   { id: 'db', label: 'База даних', group: 'Моніторинг' },
   { id: 'logs', label: 'Логи', group: 'Моніторинг' },
@@ -35,9 +37,16 @@ const NAV: { id: SectionId; label: string; group: string }[] = [
   { id: 'system', label: 'Система', group: 'Налаштування' },
 ]
 
+const GROUPS = ['Моніторинг', 'Entity Extractor', 'Дані', 'Налаштування']
+
 function sectionFromHash(): SectionId {
-  const id = window.location.hash.replace(/^#\/?/, '').replace(/\?.*$/, '') // `#/messages?raw=123` opens the explorer on a card
+  const id = window.location.hash.replace(/^#\/?/, '').replace(/\?.*$/, '') // `#/messages?sourceId=86` opens the messages of one source
   return NAV.some((n) => n.id === id) ? (id as SectionId) : 'overview'
+}
+
+function queryFromHash(): string {
+  const at = window.location.hash.indexOf('?')
+  return at < 0 ? '' : window.location.hash.slice(at + 1)
 }
 
 /**
@@ -47,12 +56,17 @@ function sectionFromHash(): SectionId {
  */
 export default function AdminApp() {
   const [section, setSectionState] = useState<SectionId>(sectionFromHash)
+  const [query, setQuery] = useState(queryFromHash)
   const setSection = (id: SectionId) => {
     window.location.assign(`#/${id}`)
     setSectionState(id)
+    setQuery('')
   }
   useEffect(() => {
-    const onHash = () => setSectionState(sectionFromHash())
+    const onHash = () => {
+      setSectionState(sectionFromHash())
+      setQuery(queryFromHash())
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -111,12 +125,12 @@ export default function AdminApp() {
 
   return (
     <div className="absolute inset-0 flex flex-col bg-slate-100 dark:bg-slate-950 dark:text-slate-100">
-      <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <a className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700" href={MAP_URL}>
           ← Карта
         </a>
         <span className="font-semibold">Puluj · Адміністрування</span>
-        <span className="ml-auto flex items-center gap-2 text-xs">
+        <span className="ml-auto flex flex-wrap items-center gap-2 text-xs">
           {status && <Badge ok={status.workerAlive} text={status.workerAlive ? 'Worker працює' : 'Worker не відповідає'} />}
           {status && <Badge ok={status.alertsConfigured} text={status.alertsConfigured ? 'alerts.in.ua ✓' : 'alerts.in.ua —'} />}
           {status && <Badge ok={telegramBadge(status).ok} text={telegramBadge(status).text} />}
@@ -140,9 +154,23 @@ export default function AdminApp() {
           </button>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <nav className="w-44 shrink-0 border-r border-slate-200 bg-white p-2 text-sm dark:border-slate-700 dark:bg-slate-900">
-            {['Моніторинг', 'Entity Extractor', 'Дані', 'Налаштування'].map((group) => (
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          {/* Narrow screens: the section list collapses into one select, so the content gets the whole width. */}
+          <div className="border-b border-slate-200 bg-white px-3 py-2 md:hidden dark:border-slate-700 dark:bg-slate-900">
+            <select className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-800" aria-label="Розділ" value={section} onChange={(e) => setSection(e.target.value as SectionId)}>
+              {GROUPS.map((group) => (
+                <optgroup key={group} label={group}>
+                  {NAV.filter((n) => n.group === group).map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <nav className="hidden w-44 shrink-0 border-r border-slate-200 bg-white p-2 text-sm md:block dark:border-slate-700 dark:bg-slate-900">
+            {GROUPS.map((group) => (
               <div key={group} className="mb-2">
                 <div className="px-3 pb-1 pt-2 text-[10px] uppercase tracking-wide text-slate-400">{group}</div>
                 {NAV.filter((n) => n.group === group).map((n) => (
@@ -155,11 +183,12 @@ export default function AdminApp() {
           </nav>
 
           <main className="flex min-w-0 flex-1 flex-col">
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            <div className="flex-1 space-y-4 overflow-y-auto p-2 sm:p-4">
               <div className="mx-auto max-w-5xl space-y-4">
                 {section === 'overview' && <OverviewPanel />}
                 {section === 'workers' && <WorkersPanel />}
                 {section === 'collectors' && <CollectorsPanel />}
+                {section === 'messages' && <MessagesPanel query={query} sources={sources} />}
                 {section === 'pipeline' && <PipelinePanel />}
                 {section === 'db' && <DbPanel />}
                 {section === 'logs' && <LogsPanel />}

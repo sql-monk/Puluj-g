@@ -4,7 +4,7 @@ import { expect, test, type Page, type Route } from '@playwright/test'
  * The admin catalog editor over a mocked /api/admin/*: every change needs actor + reason, validation problems are shown,
  * and a legacy-mapped kind refuses `enabled=false` without force.
  */
-const ADMIN = 'http://localhost:5184'
+const ADMIN = process.env.ADMIN_E2E_BASE_URL ?? 'http://localhost:5184'
 
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 

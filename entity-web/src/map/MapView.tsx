@@ -3,10 +3,11 @@ import type { MapLayerMouseEvent } from 'maplibre-gl'
 // maplibre-gl v6 resolves its worker with a dynamic `new URL(...)` that bundlers cannot follow; Vite bundles the
 // worker entry explicitly here and MapLibre is pointed at it.
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { RegionDto } from '../api/types'
 import type { MapPalette } from './palette'
-import RegionPopup from '../components/RegionPopup'
+import { snapshotReferenceTime, useEntitySelection } from './selection'
+import { RegionSelectionNote } from './RegionSelectionNote'
 import { useStore, type Theme } from '../store/useStore'
 import { getPalette } from './palette'
 import { emptyCollection } from './geojson'
@@ -32,30 +33,26 @@ interface Props {
   entityDefinitions: EntityDefinition[]
   entityItems: EntityItem[]
   entityKinds?: string[]
+  searchQuery?: string
+  snapshotAt?: string
   from?: Date
   to?: Date
   kyiv?: boolean
 }
 
 /** Country-wide MapLibre map with all Puluj layers. Data flows one way: store -> GeoJSON sources. */
-export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefinitions, entityItems, entityKinds = [], from, to, kyiv = false }: Props) {
+export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefinitions, entityItems, entityKinds = [], searchQuery = '', snapshotAt, from, to, kyiv = false }: Props) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null)
-  const [selectedEntity, setSelectedEntity] = useState<EntityItem | null>(null)
   // Name of the raion / oblast under the cursor, moved by the hover handler directly (no render per mouse move).
   const tip = useRef<HTMLDivElement>(null)
   const styleLoaded = useRef(false)
   const applyDataRef = useRef<(() => void) | null>(null)
   const pickRef = useRef(onPickHome)
   pickRef.current = onPickHome
-  const entityItemsRef = useRef(entityItems)
-  entityItemsRef.current = entityItems
   const palette = getPalette(theme)
   const paletteRef = useRef(palette)
   paletteRef.current = palette
-  // Where the viewer clicked to select a region: the region window opens there.
-  const [regionClickAt, setRegionClickAt] = useState<[number, number] | null>(null)
 
   const regions = useStore((s) => s.regions)
   const filters = useStore((s) => s.filters)
@@ -65,6 +62,16 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
   const now = useStore((s) => s.now)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
   const selectRegion = useStore((s) => s.selectRegion)
+
+  const visibleItems = useMemo(() => {
+    const referenceTime = snapshotReferenceTime(mode === 'history', now, at, snapshotAt)
+    const filtered = filterEntityItems(entityItems, filters, entityDefinitions, referenceTime, entityKinds, from, to, searchQuery)
+    return filtered.filter((item) => item.geometry && entityDefinitions.some((definition) => definition.entityName === item.entity && definition.map.visible)
+      && (!kyiv || boundsIntersect(geometryBounds(item.geometry), KYIV_DATA_BOUNDS)))
+  }, [entityItems, filters, entityDefinitions, mode, at, snapshotAt, now, entityKinds, from, to, searchQuery, kyiv])
+  const { selected: selectedEntity, select: setSelectedEntity } = useEntitySelection(visibleItems)
+  const entityItemsRef = useRef(visibleItems)
+  entityItemsRef.current = visibleItems
 
   const regionsById = useMemo(() => new Map<number, RegionDto>(regions.map((r) => [r.id, r])), [regions])
   const regionsRef = useRef(regionsById)
@@ -97,8 +104,7 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
       const entityId = entityHit?.properties?.id == null ? undefined : String(entityHit.properties.id)
       const entity = entityName && entityId ? entityItemsRef.current.find((item) => item.entity === entityName && item.id === entityId) : undefined
       setSelectedEntity(entity ?? null)
-      if (entity) { selectRegion(null); setRegionClickAt(null); return }
-      setRegionClickAt([e.lngLat.lng, e.lngLat.lat])
+      if (entity) { selectRegion(null); return }
       const ob = map.queryRenderedFeatures(e.point, { layers: ['raions-fill', 'oblasts-fill'] })[0]
       const regionId = ob?.properties?.id
       selectRegion(regionId === undefined ? null : Number(regionId))
@@ -116,12 +122,10 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
     map.on('error', (e) => console.error('[map]', e.error?.message ?? e))
     if (import.meta.env.DEV) Object.assign(window, { __map: map, __maplibre: maplibregl })
     mapRef.current = map
-    setMapInstance(map)
     return () => {
       stopHover()
       map.remove()
       mapRef.current = null
-      setMapInstance(null)
       styleLoaded.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,13 +164,12 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
       const selected = regionsById.get(selectedRegionId ?? -1)
       setData(map, 'selected-region', selected ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: selected.geometry, properties: {} }] } : emptyCollection())
       setData(map, 'home', home ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [home.lon, home.lat] }, properties: {} }] } : emptyCollection())
-      const filtered = filterEntityItems(entityItems, filters, entityDefinitions, mode === 'history' && at ? at : now, entityKinds, from, to)
-      setEntityData(map, entityDefinitions, kyiv ? filtered.filter((item) => item.geometry && boundsIntersect(geometryBounds(item.geometry), KYIV_DATA_BOUNDS)) : filtered)
+      setEntityData(map, entityDefinitions, visibleItems)
     }
     applyDataRef.current = apply
     if (styleLoaded.current) apply()
     return () => { if (applyDataRef.current === apply) applyDataRef.current = null }
-  }, [regions, regionsById, home, selectedRegionId, entityDefinitions, entityItems, entityKinds, from, to, filters, mode, at, now, kyiv])
+  }, [regions, regionsById, home, selectedRegionId, entityDefinitions, visibleItems, kyiv])
 
   useEffect(() => { mapRef.current?.resize() }, [layoutKey])
 
@@ -176,8 +179,8 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
     <div className="absolute inset-0">
       <div ref={container} className="h-full w-full" />
       <div ref={tip} hidden className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-white/95 px-2 py-1 text-xs shadow dark:bg-slate-900/95 dark:text-slate-100" />
-      {selectedEntity && <aside className="pointer-events-auto absolute bottom-14 left-3 z-20 max-h-[45vh] w-80 overflow-auto rounded-xl bg-white/95 p-4 shadow-xl dark:bg-slate-900/95 dark:text-slate-100"><button className="float-right rounded px-2" aria-label="Закрити" onClick={() => setSelectedEntity(null)}>×</button><h2 className="font-semibold">{selectedEntity.entity} #{selectedEntity.id}</h2><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">{Object.entries(selectedEntity.values).map(([key, value]) => <div className="contents" key={key}><dt className="font-medium">{key}</dt><dd className="break-all">{value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl><a className="mt-3 inline-block underline" href={publicHash({ section: 'entities', detail: { kind: selectedEntity.entity, id: selectedEntity.id }, query: new URLSearchParams() })}>Повні деталі та пов’язані записи</a></aside>}
-      {mapInstance && !selectedEntity && selectedRegionId !== null && regionClickAt && <RegionPopup map={mapInstance} placeId={selectedRegionId} anchor={regionClickAt} onClose={() => selectRegion(null)} />}
+      {selectedEntity && <aside className="pointer-events-auto absolute bottom-14 left-3 z-20 max-h-[45vh] w-80 max-w-[calc(100%-1.5rem)] overflow-auto rounded-xl bg-white/95 p-4 shadow-xl dark:bg-slate-900/95 dark:text-slate-100"><button className="float-right rounded px-2" aria-label="Закрити" onClick={() => setSelectedEntity(null)}>×</button><h2 className="font-semibold">{selectedEntity.entity} #{selectedEntity.id}</h2><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">{Object.entries(selectedEntity.values).map(([key, value]) => <div className="contents" key={key}><dt className="font-medium">{key}</dt><dd className="break-all">{value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl><a className="mt-3 inline-block underline" href={publicHash({ section: 'entities', detail: { kind: selectedEntity.entity, id: selectedEntity.id }, query: new URLSearchParams() })}>Повні деталі та пов’язані записи</a></aside>}
+      {!selectedEntity && selectedRegionId !== null && <RegionSelectionNote name={regionsById.get(selectedRegionId)?.name ?? `Регіон #${selectedRegionId}`} onClose={() => selectRegion(null)} />}
     </div>
   )
 }

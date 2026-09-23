@@ -74,6 +74,20 @@ export function secondsSince(iso: string, now: number = Date.now()): number {
   return Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000))
 }
 
+/**
+ * Where PostgreSQL's 1-based error position falls in the query: line and column (both 1-based) and that line's text.
+ * A position just past the end (an incomplete query) points after the last character.
+ */
+export function sqlErrorLocation(sql: string, position: number): { line: number; column: number; text: string } | null {
+  if (!Number.isInteger(position) || position < 1 || position > sql.length + 1) return null
+  const before = sql.slice(0, position - 1)
+  const lines = before.split('\n')
+  const line = lines.length
+  const start = before.length - lines[lines.length - 1].length
+  const end = sql.indexOf('\n', start)
+  return { line, column: position - start, text: sql.slice(start, end < 0 ? undefined : end) }
+}
+
 /** Bucket label for the pipeline chart: hour of day for hour buckets, day.month for day buckets. */
 export function bucketLabel(iso: string, unit: 'hour' | 'day'): string {
   const d = new Date(iso)

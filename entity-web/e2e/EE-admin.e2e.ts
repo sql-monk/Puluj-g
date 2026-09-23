@@ -1,6 +1,6 @@
 import { expect, test, type Route } from '@playwright/test'
 
-const ADMIN = 'http://localhost:5184'
+const ADMIN = process.env.ADMIN_E2E_BASE_URL ?? 'http://localhost:5184'
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 
 test('EE Python editor highlights code, validates it, and saves without rebuilding', async ({ page }) => {

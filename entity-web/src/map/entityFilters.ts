@@ -1,12 +1,16 @@
 import type { EntityDefinition, EntityItem } from '../api/entityExtractor'
 import type { Filters } from '../store/useStore'
 
-export function filterEntityItems(items: EntityItem[], filters: Filters, definitions: EntityDefinition[] = [], referenceTime = new Date(), kinds: string[] = [], from?: Date, to?: Date) {
+export function filterEntityItems(items: EntityItem[], filters: Filters, definitions: EntityDefinition[] = [], referenceTime = new Date(), kinds: string[] = [], from?: Date, to?: Date, searchQuery = '') {
   const byName = new Map(definitions.map((definition) => [definition.entityName, definition]))
+  const search = searchQuery.trim().toLocaleLowerCase('uk-UA')
   return items.filter((item) => {
     if (kinds.length && !kinds.some((kind) => kind.toLowerCase() === item.entity.toLowerCase() || kind.toLowerCase() === item.table.toLowerCase())) return false
-    if (from && (!item.occurredAt || new Date(item.occurredAt) < from)) return false
-    if (to && (!item.occurredAt || new Date(item.occurredAt) > to)) return false
+    const occurredAt = item.occurredAt ? new Date(item.occurredAt).getTime() : undefined
+    if (occurredAt !== undefined && (!Number.isFinite(occurredAt) || occurredAt > referenceTime.getTime())) return false
+    if (from && (occurredAt === undefined || occurredAt < from.getTime())) return false
+    if (to && (occurredAt === undefined || occurredAt >= to.getTime())) return false
+    if (search && !JSON.stringify([item.entity, item.table, item.id, item.rawMessageId, item.values]).toLocaleLowerCase('uk-UA').includes(search)) return false
     if (filters.sources?.length && (item.sourceId === undefined || !filters.sources.includes(item.sourceId))) return false
     const kind = item.entity.toLowerCase()
     if ((kind === 'alert' || kind === 'alerts') && !filters.alerts) return false
@@ -22,7 +26,7 @@ export function filterEntityItems(items: EntityItem[], filters: Filters, definit
       const normalized = String(status).toLowerCase()
       if (!(status === true || ['active', 'open', 'ongoing', 'true'].includes(normalized))) return false
     }
-    if (item.occurredAt && referenceTime.getTime() - new Date(item.occurredAt).getTime() > filters.lifetimeMinutes * 60_000) return false
+    if (occurredAt !== undefined && referenceTime.getTime() - occurredAt > filters.lifetimeMinutes * 60_000) return false
     return true
   })
 }
