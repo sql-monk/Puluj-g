@@ -63,6 +63,17 @@ export function processorSummary(workers: WorkerInstanceDto[]): { replicas: numb
   return { replicas: processors.length, alive: alive.length, concurrency, perMinute }
 }
 
+/**
+ * The processor block's badge. Until the instances are loaded the state is unknown — not "не працює": an ordinary wait
+ * for the answer must not look like an outage.
+ */
+export function processorBadge(workers: WorkerInstanceDto[] | null, error?: string | null): Health {
+  if (!workers) return error ? { ok: null, text: 'стан невідомий' } : { ok: null, text: 'завантаження…' }
+  const { alive } = processorSummary(workers)
+  if (alive === 0) return { ok: false, text: 'не працює' }
+  return { ok: true, text: alive === 1 ? 'працює' : `працює (${alive})` }
+}
+
 export type SourceSortKey = keyof Pick<PipelineSourceDto, 'name' | 'received' | 'processed' | 'skipped' | 'failed' | 'pending' | 'withTargets' | 'targets' | 'tracks' | 'medianLagSeconds' | 'p50Ms' | 'p90Ms'> | 'withTargetsShare'
 
 /** Sort sources by a column; strings ascending, numbers descending by default, nulls last either way. */

@@ -59,8 +59,23 @@ public sealed record DbReportDto(
     IReadOnlyList<DbRoleConnectionsDto> Connections, DbMonitoringDto Monitoring);
 
 /// <summary>A bounded, display-safe result of the database browser or read-only SQL console.</summary>
+/// <param name="Offset">Rows skipped before this page (the table browser pages through a table; the console is always 0).</param>
+/// <param name="OrderBy">Primary-key columns used for ordering; null when unordered. Concurrent mutations can shift OFFSET pages.</param>
 public sealed record DbQueryResultDto(
-    IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string?>> Rows, bool Truncated, long ElapsedMs);
+    IReadOnlyList<string> Columns, IReadOnlyList<IReadOnlyList<string?>> Rows, bool Truncated, long ElapsedMs,
+    int Offset = 0, IReadOnlyList<string>? OrderBy = null);
+
+/// <summary>Why PostgreSQL refused a console query: its own message text, SQLSTATE and 1-based character position. Never a stack trace.</summary>
+public sealed record DbQueryErrorDto(string Error, string? SqlState, int? Position, string? Hint);
+
+/// <summary>One collected message as the admin message browser lists it; the text is cut to a display-safe length.</summary>
+public sealed record AdminMessageDto(
+    long Id, int SourceId, string SourceCode, string SourceName, string SourceMessageId,
+    DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string ProcessingStatus, DateTimeOffset? ProcessedAt, int Attempts,
+    string? Text, bool TextTruncated, string? Url, int Targets);
+
+/// <param name="NextCursor">Opaque keyset cursor for the next (older) page; null on the last page.</param>
+public sealed record AdminMessagePageDto(IReadOnlyList<AdminMessageDto> Messages, string? NextCursor);
 
 /// <summary>Result of a manually invoked PostgreSQL maintenance operation for one application table.</summary>
 public sealed record DbTableMaintenanceResultDto(string Name, string Operation, long ElapsedMs);

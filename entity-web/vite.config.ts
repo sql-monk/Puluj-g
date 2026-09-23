@@ -12,8 +12,10 @@ export default defineConfig({
   optimizeDeps: { exclude: ['maplibre-gl'] },
   server: {
     port: 5193,
+    // Playwright writes traces and screenshots under the project while tests run; watching them crashes the dev server (EBUSY on Windows).
+    watch: { ignored: ['**/test-results/**', '**/e2e-report/**', '**/.*audit*results*/**', '**/.public-*/**'] },
     proxy: {
-      '/api': { target: 'http://localhost:5277', changeOrigin: true },
+      '/api': { target: process.env.PULUJ_PUBLIC_API_PROXY ?? 'http://localhost:5277', changeOrigin: true },
       '/hubs': { target: 'http://localhost:5277', changeOrigin: true, ws: true },
     },
   },

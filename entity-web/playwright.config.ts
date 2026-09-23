@@ -27,6 +27,6 @@ export default defineConfig({
   ],
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /E(?:0[169]|10).*\.e2e\.ts/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 415, height: 900 } }, testMatch: /(?:Public.*|A13-admin-audit)\.e2e\.ts/ },
   ],
 })

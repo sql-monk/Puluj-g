@@ -21,9 +21,9 @@ export default function StatsPage({ filter }: { filter: DataQuery }) {
   const dark = themeIsDark(useStore((s) => s.theme))
   const openFilters = useStore((s) => s.setPanelOpenFor)
   return (
-    <div className="pointer-events-auto absolute inset-0 z-10 overflow-y-auto bg-slate-100 pt-12 text-slate-900 md:pt-14 dark:bg-slate-950 dark:text-slate-100" style={chartVars(dark)}>
+    <div className="pointer-events-auto absolute inset-0 z-10 overflow-y-auto overflow-x-hidden bg-slate-100 pt-24 text-slate-900 sm:pt-16 dark:bg-slate-950 dark:text-slate-100" style={chartVars(dark)}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-8">
-        <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-1.5 bg-slate-100/95 px-3 py-2 backdrop-blur dark:bg-slate-950/95">
+        <div className="sticky top-24 z-20 -mx-3 flex flex-col gap-1.5 bg-slate-100/95 px-3 py-2 backdrop-blur sm:top-16 dark:bg-slate-950/95">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <h2 className="mr-1 font-semibold">Аналітика</h2>
             <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-200 dark:border-slate-600 dark:hover:bg-slate-700" onClick={() => openFilters('analytics', true)}>Фільтри та період</button>

@@ -3,6 +3,7 @@ namespace Puluj.Infrastructure.EntityExtraction;
 public sealed class EntityDeliveryOptions
 {
     public const string Section = "EntityExtractor";
+    public const int MaxConcurrency = 64;
 
     public string Url { get; set; } = "http://entity-extractor:8080";
     public string? Token { get; set; }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { admin, type AdminSourceDto, type SourcePatch } from '../../api/admin'
 import { Badge, Section } from './fields'
-import { filterSources, sortSources, telegramTitle, telegramUsername, type SourceSortKey } from './sources'
+import { filterSources, selectionScope, sortSources, telegramTitle, telegramUsername, type SourceSortKey } from './sources'
 
 interface Props {
   sources: AdminSourceDto[]
@@ -54,7 +54,8 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
   const saveEdit = () => run(() => admin.updateSource(editing!, tokenDraft ? { ...form, token: tokenDraft } : form), 'Джерело оновлено').then(() => setEditing(null))
 
   const rows = useMemo(() => sortSources(filterSources(sources, query), sort.key, sort.asc), [sources, query, sort])
-  const selectedIds = [...selected]
+  const scope = selectionScope(selected, rows, sources)
+  const selectedIds = scope.sources.map((source) => source.id)
   const allVisibleSelected = rows.length > 0 && rows.every((source) => selected.has(source.id))
   const toggleSort = (key: SourceSortKey) => setSort((current) => (current.key === key ? { key, asc: !current.asc } : { key, asc: key === 'name' || key === 'type' || key === 'status' }))
   const toggleSelected = (id: number) => setSelected((current) => {
@@ -71,6 +72,11 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
   })
   const updateSelected = async (patch: SourcePatch, action: string) => {
     if (selectedIds.length === 0 || bulkSaving) return
+    // The selection survives a search change: say exactly which sources the action touches before doing it.
+    const names = scope.sources.slice(0, 10).map((source) => telegramTitle(source.name, source.channelTitle)).join(', ')
+    const more = scope.sources.length > 10 ? ` і ще ${scope.sources.length - 10}` : ''
+    const hidden = scope.hidden.length > 0 ? `\n\nУвага: ${scope.hidden.length} з них не видно в поточному пошуку.` : ''
+    if (!window.confirm(`${action}: ${selectedIds.length} джерел — ${names}${more}.${hidden}\n\nПродовжити?`)) return
     setBulkSaving(true)
     const results = await Promise.allSettled(selectedIds.map((id) => admin.updateSource(id, patch)))
     const updated = results.filter((result) => result.status === 'fulfilled').length
@@ -135,8 +141,27 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
           <input className={input} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Назва каналу" aria-label="Пошук джерел за назвою" />
         </label>
         {selectedIds.length > 0 && (
-          <div className="flex flex-wrap items-end gap-2 rounded border border-slate-300 p-2 dark:border-slate-600">
-            <span className="pb-1 text-slate-500">Вибрано: {selectedIds.length}</span>
+          <div className="flex flex-wrap items-end gap-2 rounded border border-slate-300 p-2 dark:border-slate-600" aria-label="Групові дії">
+            <div className="pb-1">
+              <span className="text-slate-500" data-testid="selection-count">
+                Вибрано: {selectedIds.length}
+                {scope.hidden.length > 0 && <b className="text-amber-700 dark:text-amber-300"> · {scope.hidden.length} поза поточним пошуком</b>}
+              </span>
+              <details className="text-[11px] text-slate-500">
+                <summary className="cursor-pointer">які саме</summary>
+                <ul className="max-h-32 overflow-y-auto">
+                  {scope.sources.map((source) => (
+                    <li key={source.id}>
+                      {telegramTitle(source.name, source.channelTitle)} <span className="text-slate-400">{source.code}</span>
+                      {scope.hidden.includes(source) && <span className="text-amber-700 dark:text-amber-300"> (приховано пошуком)</span>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </div>
+            <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving} onClick={() => setSelected(new Set())}>
+              Скинути вибір
+            </button>
             <button className="rounded border border-slate-300 px-2 py-1 dark:border-slate-600" disabled={bulkSaving} onClick={() => void updateSelected({ enabled: true }, 'Увімкнення')}>
               Увімкнути
             </button>
@@ -206,6 +231,15 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
         </div>
       )}
 
+      {query.trim() && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500" role="status">
+          Знайдено {rows.length} із {sources.length}
+          <button className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" onClick={() => setQuery('')}>
+            Очистити пошук
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="text-left text-slate-500">
@@ -220,6 +254,18 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
             </tr>
           </thead>
           <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-4 text-center text-slate-500">
+                  {query.trim() ? `Нічого не знайдено за «${query.trim()}».` : 'Джерел ще немає.'}
+                  {query.trim() && (
+                    <button className="ml-2 underline" onClick={() => setQuery('')}>
+                      Очистити пошук
+                    </button>
+                  )}
+                </td>
+              </tr>
+            )}
             {rows.map((s) =>
               editing === s.id ? (
                 <tr key={s.id} className="border-t border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/50">
@@ -309,7 +355,7 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                   </td>
                   <td className="pr-2">{s.rawMessageCount}</td>
                   <td className="whitespace-nowrap text-right">
-                    {s.type === 'Telegram' && <a className="mr-1 inline-block rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceIds=${s.id}`}>Дивитись повідомлення</a>}
+                    {s.type === 'Telegram' && <a className="mr-1 inline-block rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceId=${s.id}`}>Дивитись повідомлення</a>}
                     <button className="mr-1 rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" onClick={() => startEdit(s)}>
                       Редагувати
                     </button>

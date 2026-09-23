@@ -27,6 +27,12 @@ export function useEntityPolling(active: boolean, at?: Date, loadSnapshot = true
   const [catalogueTick, setCatalogueTick] = useState<string>()
   const inFlight = useRef<AbortController | undefined>(undefined)
   const lastRequest = useRef(0)
+  const historical = at !== undefined
+  const atMs = at?.getTime()
+  const desiredAt = useRef(atMs)
+  desiredAt.current = atMs
+  const [snapshotAt, setSnapshotAt] = useState<string>()
+  const refreshLatest = useRef<() => Promise<void>>(async () => {})
 
   const setSeconds = useCallback((value: PollSeconds) => {
     localStorage.setItem(STORAGE_KEY, String(value))
@@ -35,30 +41,39 @@ export function useEntityPolling(active: boolean, at?: Date, loadSnapshot = true
 
   const refresh = useCallback(async () => {
     if (!refreshIsDue(active, document.visibilityState === 'visible', !!inFlight.current, 0, Date.now(), seconds)) return
+    const requestedAt = desiredAt.current
     const controller = new AbortController()
     inFlight.current = controller
     lastRequest.current = Date.now()
-    setLoading(true)
+    if (loadSnapshot) setLoading(true)
     try {
       if (loadSnapshot) {
-        const [nextDefinitions, snapshot] = await Promise.all([entityApi.definitions(controller.signal), entityApi.snapshot(at, controller.signal)])
+        const [nextDefinitions, snapshot] = await Promise.all([entityApi.definitions(controller.signal), entityApi.snapshot(requestedAt === undefined ? undefined : new Date(requestedAt), controller.signal)])
+        if (controller.signal.aborted || inFlight.current !== controller) return
         setDefinitions(nextDefinitions)
         setItems(snapshot.items)
         setTruncated(snapshot.truncated)
         setLastSuccess(snapshot.generatedAt)
+        setSnapshotAt(snapshot.at ?? (requestedAt === undefined ? snapshot.generatedAt : new Date(requestedAt).toISOString()))
       } else {
         const refreshedAt = new Date().toISOString()
         setCatalogueTick(refreshedAt)
-        setLastSuccess(refreshedAt)
       }
       setError(undefined)
     } catch (reason) {
-      if ((reason as Error).name !== 'AbortError') setError((reason as Error).message)
+      if (!controller.signal.aborted && inFlight.current === controller && (reason as Error).name !== 'AbortError') setError((reason as Error).message)
     } finally {
-      if (inFlight.current === controller) inFlight.current = undefined
-      setLoading(false)
+      if (inFlight.current === controller) {
+        inFlight.current = undefined
+        setLoading(false)
+        // Playback may advance while a slow frame is in flight. Finish it, label
+        // its real timestamp, then request the newest desired frame (no starvation).
+        if (!controller.signal.aborted && loadSnapshot && requestedAt !== desiredAt.current) void refreshLatest.current()
+      }
     }
-  }, [active, at, loadSnapshot, seconds])
+  }, [active, loadSnapshot, seconds, historical])
+  refreshLatest.current = refresh
+  useEffect(() => { if (active && loadSnapshot) void refresh() }, [atMs, active, loadSnapshot, refresh])
 
   useEffect(() => {
     if (!active) { inFlight.current?.abort(); inFlight.current = undefined; return }
@@ -71,5 +86,5 @@ export function useEntityPolling(active: boolean, at?: Date, loadSnapshot = true
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); inFlight.current?.abort(); inFlight.current = undefined }
   }, [active, loadSnapshot, refresh, seconds])
 
-  return { seconds, setSeconds, definitions, items, lastSuccess, error, loading, truncated, catalogueTick, refresh }
+  return { seconds, setSeconds, definitions, items, lastSuccess, error, loading, truncated, catalogueTick, snapshotAt, refresh }
 }

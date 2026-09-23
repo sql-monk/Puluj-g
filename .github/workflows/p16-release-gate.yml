@@ -2,6 +2,8 @@ name: P16 release gate
 
 on:
   pull_request:
+    # Legacy messaging/web gate belongs to master; main uses entity-ui.yml.
+    branches: [master]
   push:
     branches: [master]
   workflow_dispatch:

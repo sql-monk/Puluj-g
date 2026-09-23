@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using System.Xml;
 using Npgsql;
+using Puluj.Admin;
 
 namespace Puluj.EntityAdmin;
 
@@ -13,37 +14,140 @@ public sealed partial class EntityAdminStore(IConfiguration configuration, Puluj
     private static readonly HashSet<string> Types = ["text", "integer", "decimal", "boolean", "datetime", "json", "point", "line", "polygon"];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public Task<JsonElement> OverviewAsync(CancellationToken ct) => QueryObjectAsync("""
-        SELECT jsonb_build_object(
-          'queued', (SELECT count(*) FROM ee_delivery_queue WHERE status = 'pending'),
-          'failed', (SELECT count(*) FROM ee_delivery_queue WHERE status = 'failed'),
-          'extractors', (SELECT count(*) FROM ee_extractors WHERE enabled),
-          'definitions', (SELECT count(*) FROM ee_entity_definitions WHERE enabled),
-          'activeRuns', (SELECT count(*) FROM ee_processing_runs WHERE status = 'processing'),
-          'oldestQueuedAt', (SELECT min(enqueued_at) FROM ee_delivery_queue WHERE status = 'pending'),
-          'oldestQueueAgeSeconds', (SELECT extract(epoch FROM now() - min(enqueued_at))::bigint FROM ee_delivery_queue WHERE status = 'pending'),
-          'lastError', (SELECT error FROM ee_delivery_attempts WHERE error IS NOT NULL ORDER BY started_at DESC LIMIT 1)
-        )
-        """, ct);
+    /// <summary>
+    /// Queue counters scan the matching statuses. Latest success uses the partial completion-time index;
+    /// enqueue order is not completion order when deliveries run concurrently or a lease is recovered.
+    /// </summary>
+    public async Task<EeQueueSnapshot> QueueSnapshotAsync(CancellationToken ct)
+    {
+        await using var connection = await OpenAsync(ct);
+        await using var command = new NpgsqlCommand("""
+            SELECT
+              (SELECT count(*) FROM ee_delivery_queue WHERE status = 'pending'),
+              (SELECT count(*) FROM ee_delivery_queue WHERE status = 'in_progress'),
+              (SELECT count(*) FROM ee_delivery_queue WHERE status = 'failed'),
+              (SELECT count(*) FROM ee_delivery_queue WHERE status = 'failed' AND completed_at >= now() - interval '1 hour'),
+              (SELECT count(*) FROM ee_delivery_queue WHERE status = 'failed' AND completed_at >= now() - interval '24 hours'),
+              (SELECT max(completed_at) FROM ee_delivery_queue WHERE status = 'failed'),
+              (SELECT last_error FROM ee_delivery_queue WHERE status = 'failed' ORDER BY completed_at DESC NULLS LAST LIMIT 1),
+              (SELECT min(enqueued_at) FROM ee_delivery_queue WHERE status = 'pending'),
+              (SELECT completed_at FROM ee_delivery_queue WHERE status = 'succeeded' AND completed_at IS NOT NULL ORDER BY completed_at DESC LIMIT 1)
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        await reader.ReadAsync(ct);
+        DateTimeOffset? At(int i) => reader.IsDBNull(i) ? null : reader.GetFieldValue<DateTimeOffset>(i);
+        return new EeQueueSnapshot(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2), reader.GetInt64(3), reader.GetInt64(4),
+            At(5), reader.IsDBNull(6) ? null : reader.GetString(6), At(7), At(8));
+    }
 
-    private static readonly string[] SettingKeys = ["EntityExtractor:Url", "EntityExtractor:DeliveryTimeout", "EntityExtractor:PollingInterval", "EntityExtractor:ClaimLease", "EntityExtractor:Concurrency"];
-    public async Task<IReadOnlyDictionary<string, string?>> SettingsAsync(CancellationToken ct)
+    public async Task<(long Extractors, long Definitions, long ActiveRuns)> CountsAsync(CancellationToken ct)
+    {
+        await using var connection = await OpenAsync(ct);
+        await using var command = new NpgsqlCommand("""
+            SELECT (SELECT count(*) FROM ee_extractors WHERE enabled),
+                   (SELECT count(*) FROM ee_entity_definitions WHERE enabled),
+                   (SELECT count(*) FROM ee_delivery_queue WHERE status = 'in_progress')
+            """, connection);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        await reader.ReadAsync(ct);
+        return (reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2));
+    }
+
+    public async Task<IReadOnlyList<EeSettingDto>> SettingsAsync(CancellationToken ct)
     {
         var stored = await settings.GetAllAsync(ct);
-        return SettingKeys.ToDictionary(key => key, key => stored.TryGetValue(key, out var row) ? row.Value : configuration[key], StringComparer.OrdinalIgnoreCase);
+        return EntityExtractorSettings.Describe(
+            EntityExtractorSettings.Keys.Where(stored.ContainsKey).ToDictionary(key => key, key => stored[key].Value),
+            // IConfiguration includes a cached DB provider: after deleting an override it can still return the deleted value.
+            key => EntityExtractorSettings.ConfigurationFallback(configuration, key));
     }
-    public async Task SaveSettingsAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct)
-    {
-        if (values.Keys.Any(key => !SettingKeys.Contains(key, StringComparer.OrdinalIgnoreCase))) throw new ArgumentException("Only EntityExtractor settings can be changed here.");
-        if (values.TryGetValue("EntityExtractor:Url", out var url) && !string.IsNullOrWhiteSpace(url) && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))) throw new ArgumentException("EntityExtractor:Url must be an absolute HTTP(S) URL.");
-        if (values.TryGetValue("EntityExtractor:Concurrency", out var concurrency) && !string.IsNullOrWhiteSpace(concurrency) && (!int.TryParse(concurrency, out var workers) || workers is < 1 or > 128)) throw new ArgumentException("EntityExtractor:Concurrency must be between 1 and 128.");
-        await settings.SetAsync(values, ct);
-    }
+
+    public Task SaveSettingsAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct) =>
+        settings.SetAsync(values.ToDictionary(x => x.Key, x => string.IsNullOrWhiteSpace(x.Value) ? null : x.Value.Trim()), ct);
 
     public Task<IReadOnlyList<JsonElement>> ExtractorsAsync(CancellationToken ct) => QueryRowsAsync("SELECT * FROM ee_extractors ORDER BY execution_order, extractor_id", ct);
     public Task<IReadOnlyList<JsonElement>> DefinitionsAsync(CancellationToken ct) => QueryRowsAsync("SELECT * FROM ee_entity_definitions ORDER BY entity_name", ct);
-    public Task<IReadOnlyList<JsonElement>> DeliveriesAsync(int limit, CancellationToken ct) => QueryRowsAsync("SELECT * FROM ee_delivery_queue ORDER BY enqueued_at DESC LIMIT @limit", ct, new NpgsqlParameter("limit", limit));
-    public Task<IReadOnlyList<JsonElement>> RunsAsync(int limit, CancellationToken ct) => QueryRowsAsync("SELECT * FROM ee_processing_runs ORDER BY started_at DESC LIMIT @limit", ct, new NpgsqlParameter("limit", limit));
+
+    private const string DeliveryColumns = """
+        q.delivery_id, q.raw_message_id, r.source_id, s.code AS source_code, q.origin, q.status, q.enqueued_at, q.claimed_at,
+        q.completed_at, q.claimed_by, q.result, q.attempts, q.last_error, pr.error AS run_error
+        """;
+
+    /// <summary>
+    /// Deliveries newest first, optionally of one status, as keyset pages (cursor = enqueued_at ticks + delivery id). Each status
+    /// is read over its (status, enqueued_at) index; "all statuses" merges the four index reads instead of sorting the table.
+    /// </summary>
+    public async Task<EeDeliveryPageDto> DeliveriesAsync(string? status, string? cursor, int limit, CancellationToken ct)
+    {
+        var hasCursor = TryParseDeliveryCursor(cursor, out var beforeAt, out var beforeId);
+        // `status` is one of the four known values (checked by the endpoint), so it is safe to inline as a literal.
+        string Branch(string s) => $"""
+            (SELECT q.* FROM ee_delivery_queue q
+             WHERE q.status = '{s}'{(hasCursor ? " AND q.enqueued_at <= @before_at AND (q.enqueued_at < @before_at OR q.delivery_id < @before_id)" : "")}
+             ORDER BY q.enqueued_at DESC, q.delivery_id DESC
+             LIMIT @take)
+            """;
+        var statuses = status is null ? ["pending", "in_progress", "succeeded", "failed"] : new[] { status };
+        var union = string.Join("\nUNION ALL\n", statuses.Select(Branch));
+        var sql = $"""
+            SELECT {DeliveryColumns}
+            FROM ({union}) q
+            JOIN raw_messages r ON r.raw_message_id = q.raw_message_id
+            JOIN sources s ON s.source_id = r.source_id
+            LEFT JOIN ee_processing_runs pr ON pr.delivery_id = q.delivery_id
+            ORDER BY q.enqueued_at DESC, q.delivery_id DESC
+            LIMIT @take
+            """;
+        var parameters = new List<NpgsqlParameter> { new("take", limit + 1) };
+        if (hasCursor)
+        {
+            parameters.Add(new NpgsqlParameter("before_at", beforeAt));
+            parameters.Add(new NpgsqlParameter("before_id", beforeId));
+        }
+        var rows = await QueryRowsAsync(sql, ct, [.. parameters]);
+        var page = rows.Take(limit).ToList();
+        string? next = null;
+        if (rows.Count > limit)
+        {
+            var last = page[^1];
+            next = $"{last.GetProperty("enqueued_at").GetDateTimeOffset().UtcTicks}_{last.GetProperty("delivery_id").GetGuid():N}";
+        }
+        return new EeDeliveryPageDto(page, next);
+    }
+
+    /// <summary>Processing runs of the extractor, newest first, over the primary key (the table has millions of rows and no time index).</summary>
+    public async Task<EeRunPageDto> RunsAsync(long? beforeId, int limit, CancellationToken ct)
+    {
+        var sql = $"""
+            SELECT pr.processing_run_id, pr.delivery_id, pr.raw_message_id, r.source_id, s.code AS source_code, pr.status, pr.result,
+                   pr.started_at, pr.completed_at, pr.error
+            FROM ee_processing_runs pr
+            JOIN raw_messages r ON r.raw_message_id = pr.raw_message_id
+            JOIN sources s ON s.source_id = r.source_id
+            {(beforeId is null ? "" : "WHERE pr.processing_run_id < @before_id")}
+            ORDER BY pr.processing_run_id DESC
+            LIMIT @take
+            """;
+        var parameters = new List<NpgsqlParameter> { new("take", limit + 1) };
+        if (beforeId is { } before) parameters.Add(new NpgsqlParameter("before_id", before));
+        var rows = await QueryRowsAsync(sql, ct, [.. parameters]);
+        var page = rows.Take(limit).ToList();
+        return new EeRunPageDto(page, rows.Count > limit ? page[^1].GetProperty("processing_run_id").GetInt64() : null);
+    }
+
+    private static bool TryParseDeliveryCursor(string? cursor, out DateTimeOffset at, out Guid id)
+    {
+        at = default;
+        id = default;
+        var parts = cursor?.Split('_');
+        if (parts is not { Length: 2 } || !long.TryParse(parts[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var ticks)
+            || ticks > DateTimeOffset.MaxValue.UtcTicks || !Guid.TryParseExact(parts[1], "N", out id))
+        {
+            return false;
+        }
+        at = new DateTimeOffset(ticks, TimeSpan.Zero);
+        return true;
+    }
 
     public async Task<JsonElement> SaveExtractorAsync(ExtractorSaveRequest request, CancellationToken ct)
     {
@@ -119,10 +223,6 @@ public sealed partial class EntityAdminStore(IConfiguration configuration, Puluj
         await using var connection = await OpenAsync(ct); await using var command = new NpgsqlCommand($"SELECT row_to_json(q)::text FROM ({sql}) q", connection); command.Parameters.AddRange(parameters);
         var rows = new List<JsonElement>(); await using var reader = await command.ExecuteReaderAsync(ct); while (await reader.ReadAsync(ct)) rows.Add(JsonSerializer.Deserialize<JsonElement>(reader.GetString(0))); return rows;
     }
-    private async Task<JsonElement> QueryObjectAsync(string sql, CancellationToken ct)
-    {
-        await using var connection = await OpenAsync(ct); await using var command = new NpgsqlCommand($"SELECT ({sql})::text", connection); var json = (string?)await command.ExecuteScalarAsync(ct) ?? "{}"; return JsonSerializer.Deserialize<JsonElement>(json);
-    }
     private static void ValidateMap(MapConfigRequest map, IReadOnlyList<EntityFieldRequest> fields)
     {
         var byName = fields.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
@@ -164,3 +264,6 @@ public sealed partial class EntityAdminStore(IConfiguration configuration, Puluj
     private static void ValidateIdentifier(string value) { if (!Identifier().IsMatch(value)) throw new ArgumentException($"Invalid identifier '{value}'."); }
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9_]{0,62}$", RegexOptions.CultureInvariant)] private static partial Regex Identifier();
 }
+
+public sealed record EeDeliveryPageDto(IReadOnlyList<JsonElement> Items, string? NextCursor);
+public sealed record EeRunPageDto(IReadOnlyList<JsonElement> Items, long? NextBeforeId);

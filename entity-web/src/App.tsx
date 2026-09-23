@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api/client'
-import FeedPanel from './components/FeedPanel'
+import EntityFeedPanel from './entities/EntityFeedPanel'
+import { filterEntityItems } from './map/entityFilters'
 import DataFilterControls from './components/DataFilterControls'
 import FilterPanel from './components/FilterPanel'
-import KyivPanel from './components/KyivPanel'
 import ReplayBar from './components/ReplayBar'
 import StatsPage from './stats/StatsPage'
 import TopBar from './components/TopBar'
@@ -22,13 +22,14 @@ export default function App() {
   const mode = useStore((s) => s.mode)
   const at = useStore((s) => s.at)
   const selectedRegionId = useStore((s) => s.selectedRegionId)
-  const setHome = useStore((s) => s.setHome)
+  const now = useStore((s) => s.now)
+  const filters = useStore((s) => s.filters)
+  const [catalogueState, setCatalogueState] = useState<{loading:boolean; error?:string; lastSuccess?:string}>({loading:true})
   const legacyPanelOpen = useStore((s) => s.panelOpen)
   const panelOpenBySection = useStore((s) => s.panelOpenBySection)
   const setPanelOpenFor = useStore((s) => s.setPanelOpenFor)
   // The feed opens folded too: a "Повідомлення (N)" button in the top-right corner unfolds it.
   const [feedOpen, setFeedOpen] = useState(false)
-  const [picking, setPicking] = useState(false)
   // The details panel (left) shows whichever track is selected on the map, as long as it is open.
   const panelButton = useRef<HTMLButtonElement>(null)
   const [rememberedRoutes, setRememberedRoutes] = useState<Partial<Record<PublicSection, PublicRoute>>>({})
@@ -46,6 +47,8 @@ export default function App() {
   const dataQuery = useMemo(() => parseDataQuery(route.query).value, [route.query])
   const activeMap = mapRoute
   const entityPolling = useEntityPolling(activeMap || route.section === 'entities', mode === 'history' && at ? at : undefined, activeMap)
+
+  const visibleItems = useMemo(() => filterEntityItems(entityPolling.items, filters, entityPolling.definitions, replay && entityPolling.snapshotAt ? new Date(entityPolling.snapshotAt) : replay && at ? at : now, dataQuery.entityKinds, dataQuery.from, dataQuery.to, dataQuery.q), [entityPolling.items, entityPolling.definitions, entityPolling.snapshotAt, filters, replay, at, now, dataQuery])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -111,6 +114,17 @@ export default function App() {
   useEffect(() => {
     if (!activeMap) useStore.getState().setError(null)
   }, [activeMap])
+  useEffect(() => {
+    if (!replay) return
+    const bar = document.querySelector<HTMLElement>('[aria-label="Відтворення історії"]')
+    const root = document.getElementById('root')
+    if (!bar || !root) return
+    const update = () => root.style.setProperty('--replay-height', `${bar.getBoundingClientRect().height}px`)
+    const observer = new ResizeObserver(update)
+    observer.observe(bar)
+    update()
+    return () => { observer.disconnect(); root.style.removeProperty('--replay-height') }
+  }, [replay, replayWindow?.from.getTime(), replayWindow?.to.getTime()])
   const closePanel = useCallback(() => {
     setPanelOpenFor(route.section, false)
     window.setTimeout(() => panelButton.current?.focus(), 0)
@@ -124,7 +138,7 @@ export default function App() {
       if (event.key === 'Escape') {
         event.preventDefault()
         closePanel()
-      } else if (event.key === 'Tab') {
+      } else if (event.key === 'Tab' && window.matchMedia('(max-width: 767px)').matches) {
         const items = focusable()
         if (items.length === 0) return
         const index = items.indexOf(document.activeElement as HTMLElement)
@@ -184,26 +198,16 @@ export default function App() {
     store.setConnection('disconnected')
   }, [activeMap])
 
-  const pickHome = picking
-    ? (lon: number, lat: number) => {
-        setHome({ lon, lat })
-        setPicking(false)
-      }
-    : null
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
-      {activeMap && <MapView dark={mapDark} theme={theme} kyiv={kyivPreset} onPickHome={pickHome} layoutKey={`${panelOpen}-${feedOpen}-${replay}`} entityDefinitions={entityPolling.definitions} entityItems={entityPolling.items} entityKinds={dataQuery.entityKinds} from={dataQuery.from} to={dataQuery.to} />}
-      <TopBar route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
+      {activeMap && <MapView dark={mapDark} theme={theme} kyiv={kyivPreset} onPickHome={null} layoutKey={`${panelOpen}-${feedOpen}-${replay}`} snapshotAt={entityPolling.snapshotAt} entityDefinitions={entityPolling.definitions} entityItems={entityPolling.items} searchQuery={dataQuery.q} entityKinds={dataQuery.entityKinds} from={dataQuery.from} to={dataQuery.to} />}
+      <TopBar dataStatus={entityPolling} route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filter={dataQuery} />}
-      {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} refreshKey={entityPolling.catalogueTick} />}
-      {mapRoute && (kyivPreset ? (
-        <KyivPanel route={route} open={panelOpen} onClose={closePanel} />
-      ) : (
-        <FilterPanel route={route} open={panelOpen} onClose={closePanel} picking={picking} onPickingChange={setPicking} onReplay={() => !replay && toggleReplay()} />
-      ))}
+      {route.section === 'entities' && <EntityCatalogue route={route} query={dataQuery} refreshKey={entityPolling.catalogueTick} onLoadState={setCatalogueState} />}
+      {mapRoute && <FilterPanel route={route} open={panelOpen} onClose={closePanel} count={visibleItems.length} loading={entityPolling.loading} error={entityPolling.error} truncated={entityPolling.truncated} onReplay={() => !replay && toggleReplay()} />}
       {!mapRoute && <SectionPanel route={route} open={panelOpen} onClose={closePanel} section={route.section as Exclude<PublicRoute['section'], 'map'>} />}
-      {panelOpen && <button type="button" className="pointer-events-auto absolute inset-0 z-[9] bg-slate-950/35 md:hidden" onClick={closePanel} aria-label="Закрити панель" />}
+      {panelOpen && <button type="button" className="pointer-events-auto absolute inset-0 z-30 bg-slate-950/35 md:hidden" onClick={closePanel} aria-label="Закрити панель" />}
       {mapRoute && !panelOpen && (
         <button
           className="pointer-events-auto absolute left-3 top-14 z-10 hidden rounded-lg bg-white/95 px-3 py-1.5 text-sm shadow md:block dark:bg-slate-900/95 dark:text-slate-100"
@@ -213,14 +217,14 @@ export default function App() {
           ☰ Фільтри
         </button>
       )}
-      {replay && replayWindow && <ReplayBar key={`${replayWindow.from.toISOString()}-${replayWindow.to.toISOString()}`} initialWindow={replayWindow} onHistoryChange={setHistoryWindow} onClose={toggleReplay} />}
-      {mapRoute && <FeedPanel open={feedOpen} onToggle={() => setFeedOpen((o) => !o)} />}
-      {(mapRoute || route.section === 'entities') && <EntityRefreshControl {...entityPolling} />}
+      {replay && replayWindow && <ReplayBar keyboardEnabled={!panelOpen} key={`${replayWindow.from.toISOString()}-${replayWindow.to.toISOString()}`} initialWindow={replayWindow} onHistoryChange={setHistoryWindow} onClose={toggleReplay} />}
+      {mapRoute && <EntityFeedPanel history={replay} open={feedOpen} onToggle={() => setFeedOpen((o) => !o)} items={visibleItems} route={route} loading={entityPolling.loading} error={entityPolling.error} />}
+      {(mapRoute || route.section === 'entities') && <EntityRefreshControl {...entityPolling} {...(route.section === 'entities' ? catalogueState : {})} catalogue={route.section === 'entities'} history={replay} />}
     </div>
   )
 }
 
 function SectionPanel({ route, open, onClose, section }: { route: PublicRoute; open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {
   const label = section === 'analytics' ? 'Фільтри аналітики' : section === 'entities' ? 'Фільтри каталогу' : 'Фільтри повідомлень'
-  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-20 max-h-[60vh] w-full overflow-y-auto rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:max-h-[calc(100vh-5rem)] md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="mb-3 flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><DataFilterControls route={route} /></aside>
+  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-40 max-h-[60vh] w-full overflow-y-auto rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:max-h-[calc(100vh-5rem)] md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="mb-3 flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><DataFilterControls route={route} /></aside>
 }

@@ -21,7 +21,7 @@ public sealed class EntityDeliveryLoop(
         while (!stoppingToken.IsCancellationRequested)
         {
             var current = options.CurrentValue;
-            var concurrency = Math.Clamp(current.Concurrency, 1, 64);
+            var concurrency = Math.Clamp(current.Concurrency, 1, EntityDeliveryOptions.MaxConcurrency);
             var work = Enumerable.Range(0, concurrency).Select(_ => DeliverOneAsync(current, stoppingToken)).ToArray();
             var handled = await Task.WhenAll(work);
             if (!handled.Any(x => x))
