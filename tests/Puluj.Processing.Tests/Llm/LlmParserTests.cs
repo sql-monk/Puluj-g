@@ -75,7 +75,7 @@ public class LlmParserTests
               "places":[{"name":"Полтавська область","role":"current"}],"directionDeg":270,"launch":false,"segment":0,"quote":null}]}
             """;
         var completion = new FakeCompletion(_ => new LlmCompletionResult(json, false, 100, 0, 0, 20, "req-1"));
-        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = "Ollama", Model = "qwen3:8b", TimeoutSeconds = 90 }, completion);
+        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = "Ollama", Ollama = new() { Model = "qwen3:8b" }, TimeoutSeconds = 90 }, completion);
         var facts = await parser.ParseAsync(new Normalizer().Normalize(UnparsedReport), new ParseContext(1, "uk", null), CancellationToken.None);
         Assert.Equal(IdentificationMethod.Llm, Assert.Single(facts).Method);
         var request = Assert.Single(completion.Requests);
@@ -89,7 +89,7 @@ public class LlmParserTests
     {
         var breaker = new LlmBreaker(TimeSpan.FromMinutes(15));
         var completion = new FakeCompletion(_ => throw new LlmCompletionException("provider_error", "invalid_api_key", retryable: false, HttpStatusCode.Unauthorized));
-        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = "OpenAI", ApiKey = "sk-bad" }, completion, breaker);
+        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = "OpenAI", OpenAI = new() { Model = "gpt-test", ApiKey = "sk-bad" } }, completion, breaker);
         var facts = await parser.ParseAsync(new Normalizer().Normalize(UnparsedReport), new ParseContext(1, "uk", null), CancellationToken.None);
         Assert.Empty(facts);
         Assert.True(breaker.IsOpen(DateTimeOffset.UtcNow, out var reason));
@@ -117,7 +117,7 @@ public class LlmParserTests
             return;
         }
         var completion = new FakeCompletion(_ => throw new InvalidOperationException("must not be called"));
-        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = provider, ApiKey = key }, completion);
+        var parser = CreateWith(new LlmOptions { Enabled = true, Provider = provider, Anthropic = new() { Model = "claude-opus-5", ApiKey = key } }, completion);
         Assert.Empty(await parser.ParseAsync(new Normalizer().Normalize(UnparsedReport), new ParseContext(1, "uk", null), CancellationToken.None));
         Assert.Empty(completion.Requests);
     }

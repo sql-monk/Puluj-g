@@ -141,17 +141,17 @@ async def test_true_zero_runs_llm_and_commits_its_write(monkeypatch) -> None:
             audit=audit(),
         )
     )
-    service = EntityExtractorService(
-        repository,
-        Settings(llm_enabled=True, llm_model="compose-model", llm_provider="Ollama", llm_base_url="http://ollama:11434/v1"),
-        llm,
-    )  # type: ignore[arg-type]
+    monkeypatch.setenv("Llm__Provider", "Ollama")
+    monkeypatch.setenv("Llm__Ollama__BaseUrl", "http://ollama:11434/v1")
+    service = EntityExtractorService(repository, Settings(), llm)  # type: ignore[arg-type]
 
     assert await service.process(request()) == 1
     assert repository.completed == 1
     assert repository.llm_audits[0].outcome == "success"
-    assert repository.llm_fallback == (True, "compose-model")
-    assert (llm.settings.provider, llm.settings.base_url) == ("Ollama", "http://ollama:11434/v1")
+    assert repository.llm_fallback is not None
+    fallback = {key.lower(): value for key, value in repository.llm_fallback.items()}  # Windows upper-cases env names
+    assert fallback["llm:provider"] == "Ollama"
+    assert fallback["llm:ollama:baseurl"] == "http://ollama:11434/v1"
 
 
 async def test_old_message_is_not_sent_to_llm(monkeypatch) -> None:

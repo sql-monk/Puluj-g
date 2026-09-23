@@ -79,7 +79,7 @@ class EntityDefinition(BaseModel):
 
 class LlmSettings(BaseModel):
     enabled: bool = False
-    provider: str | None = None  # Anthropic | OpenAI | Ollama; None = the Llm__Provider environment fallback
+    provider: str | None = None  # Anthropic | OpenAI | Ollama: the active provider; the fields below are its own
     model: str = "claude-opus-5"
     api_key: str | None = None
     base_url: str | None = None  # OpenAI-compatible endpoint (OpenAI, Ollama); None = the provider default

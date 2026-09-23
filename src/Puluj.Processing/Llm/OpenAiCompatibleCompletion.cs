@@ -26,12 +26,13 @@ public sealed class OpenAiCompatibleCompletion(IOptionsMonitor<LlmOptions> optio
     {
         var o = options.CurrentValue;
         var provider = o.TryGetProvider(out var p) && p != LlmProvider.Anthropic ? p : LlmProvider.OpenAI;
-        var key = LlmOptions.ResolveApiKey(provider, o.ApiKey);
+        var key = o.ApiKeyFor(provider);
         if (LlmOptions.RequiresApiKey(provider) && string.IsNullOrEmpty(key))
         {
-            throw new LlmCompletionException("no_api_key", $"Llm:ApiKey / {LlmOptions.ApiKeyVariable(provider)} is not configured", retryable: false);
+            throw new LlmCompletionException("no_api_key", $"Llm:{provider}:ApiKey / {LlmOptions.ApiKeyVariable(provider)} is not configured", retryable: false);
         }
-        var baseUrl = (string.IsNullOrWhiteSpace(o.BaseUrl) ? LlmOptions.DefaultBaseUrl(provider) : o.BaseUrl.Trim()).TrimEnd('/');
+        var configured = o.For(provider).BaseUrl;
+        var baseUrl = (string.IsNullOrWhiteSpace(configured) ? LlmOptions.DefaultBaseUrl(provider) : configured.Trim()).TrimEnd('/');
         var requestPayload = CreateBody(provider, request).ToJsonString();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(request.Timeout);

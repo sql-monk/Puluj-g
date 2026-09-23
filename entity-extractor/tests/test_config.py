@@ -20,11 +20,11 @@ def test_dotnet_connection_string_preserves_special_characters() -> None:
     assert parsed["password"] == "p@ss word/with?chars;and"
 
 
-def test_llm_compose_environment_aliases(monkeypatch) -> None:
+def test_llm_environment_maps_to_configuration_keys(monkeypatch) -> None:
     monkeypatch.setenv("Llm__Enabled", "true")
-    monkeypatch.setenv("Llm__Model", "compose-model")
+    monkeypatch.setenv("Llm__OpenAI__Model", "compose-model")
 
-    settings = Settings(_env_file=None)
+    environment = {key.lower(): value for key, value in Settings(_env_file=None).llm_environment.items()}
 
-    assert settings.llm_enabled is True
-    assert settings.llm_model == "compose-model"
+    assert environment["llm:enabled"] == "true"
+    assert environment["llm:openai:model"] == "compose-model"

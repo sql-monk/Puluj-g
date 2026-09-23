@@ -48,7 +48,7 @@ public class OpenAiCompatibleCompletionTests
             {"id":"chatcmpl-1","choices":[{"message":{"role":"assistant","content":"{\"facts\":[]}","refusal":null},"finish_reason":"stop"}],
              "usage":{"prompt_tokens":1200,"completion_tokens":30,"prompt_tokens_details":{"cached_tokens":1000}}}
             """;
-        var (completion, handler) = Create(new LlmOptions { Provider = "OpenAI", ApiKey = "sk-test" }, HttpStatusCode.OK, response);
+        var (completion, handler) = Create(new LlmOptions { Provider = "OpenAI", OpenAI = new() { ApiKey = "sk-test" } }, HttpStatusCode.OK, response);
         var result = await completion.CompleteAsync(Request, CancellationToken.None);
         Assert.Equal("""{"facts":[]}""", result.ResponseJson);
         Assert.False(result.Refused);
@@ -66,7 +66,7 @@ public class OpenAiCompatibleCompletionTests
     public async Task Ollama_is_called_without_a_key_at_its_base_url()
     {
         const string response = """{"id":"chatcmpl-2","choices":[{"message":{"role":"assistant","content":"{\"facts\":[]}"}}],"usage":{"prompt_tokens":10,"completion_tokens":5}}""";
-        var (completion, handler) = Create(new LlmOptions { Provider = "ollama", BaseUrl = "http://host.docker.internal:11434/v1/" }, HttpStatusCode.OK, response);
+        var (completion, handler) = Create(new LlmOptions { Provider = "ollama", Ollama = new() { BaseUrl = "http://host.docker.internal:11434/v1/" } }, HttpStatusCode.OK, response);
         var result = await completion.CompleteAsync(Request, CancellationToken.None);
         Assert.Equal(10, result.InputTokens);
         Assert.Equal("http://host.docker.internal:11434/v1/chat/completions", handler.Uri!.ToString());
@@ -77,7 +77,7 @@ public class OpenAiCompatibleCompletionTests
     public async Task Reports_a_refusal()
     {
         const string response = """{"id":"x","choices":[{"message":{"role":"assistant","content":null,"refusal":"I can't help with that."}}],"usage":{"prompt_tokens":10,"completion_tokens":5}}""";
-        var (completion, _) = Create(new LlmOptions { Provider = "OpenAI", ApiKey = "sk-test" }, HttpStatusCode.OK, response);
+        var (completion, _) = Create(new LlmOptions { Provider = "OpenAI", OpenAI = new() { ApiKey = "sk-test" } }, HttpStatusCode.OK, response);
         var result = await completion.CompleteAsync(Request, CancellationToken.None);
         Assert.True(result.Refused);
         Assert.Null(result.ResponseJson);
@@ -90,7 +90,7 @@ public class OpenAiCompatibleCompletionTests
     public async Task Maps_http_failures_to_the_shared_taxonomy(HttpStatusCode status, string code, bool retryable)
     {
         const string response = """{"error":{"type":"invalid_request_error","message":"Incorrect API key provided"}}""";
-        var (completion, _) = Create(new LlmOptions { Provider = "OpenAI", ApiKey = "sk-test" }, status, response);
+        var (completion, _) = Create(new LlmOptions { Provider = "OpenAI", OpenAI = new() { ApiKey = "sk-test" } }, status, response);
         var ex = await Assert.ThrowsAsync<LlmCompletionException>(() => completion.CompleteAsync(Request, CancellationToken.None));
         Assert.Equal(code, ex.Code);
         Assert.Equal(retryable, ex.Retryable);

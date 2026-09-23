@@ -24,7 +24,7 @@ class FakeRepository:
         self.processing_error: str | None = None
         self.llm_audits: list[LlmAudit] = []
         self.completed_steps: dict[int, int] = {}
-        self.llm_fallback: tuple[bool, str] | None = None
+        self.llm_fallback: dict[str, str] | None = None
 
     async def health(self) -> bool:
         return True
@@ -59,8 +59,8 @@ class FakeRepository:
     ) -> None:
         self.failures.append(f"{extractor.name}: {error}")
 
-    async def get_llm_settings(self, fallback_enabled: bool, fallback_model: str) -> LlmSettings:
-        self.llm_fallback = (fallback_enabled, fallback_model)
+    async def get_llm_settings(self, fallback) -> LlmSettings:
+        self.llm_fallback = dict(fallback)
         return self.llm_settings
 
     async def begin_llm_audit(self, run_id: int, request: ExtractRequest, audit: LlmAudit) -> int:

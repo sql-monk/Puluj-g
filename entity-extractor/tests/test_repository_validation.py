@@ -78,14 +78,37 @@ def test_unregistered_entity_alias_is_rejected() -> None:
 
 
 def test_llm_database_settings_override_environment_fallbacks() -> None:
-    fallback = build_llm_settings({}, True, "compose-model")
-    overridden = build_llm_settings(
-        {"Llm:Enabled": "false", "Llm:Model": "database-model"},
-        True,
-        "compose-model",
-    )
+    environment = {"Llm:Enabled": "true", "Llm:Anthropic:Model": "compose-model"}
+    fallback = build_llm_settings({}, environment)
+    overridden = build_llm_settings({"Llm:Enabled": "false", "Llm:Anthropic:Model": "database-model"}, environment)
 
     assert fallback.enabled is True
     assert fallback.model == "compose-model"
     assert overridden.enabled is False
     assert overridden.model == "database-model"
+
+
+def test_every_provider_keeps_its_own_key_and_the_switch_picks_one() -> None:
+    rows = {
+        "Llm:Enabled": "true",
+        "Llm:Anthropic:ApiKey": "sk-ant",
+        "Llm:Anthropic:Model": "claude-opus-5",
+        "Llm:OpenAI:ApiKey": "sk-openai",
+        "Llm:OpenAI:Model": "gpt-test",
+        "Llm:OpenAI:InputUsdPerMillionTokens": "1.5",
+        "Llm:Ollama:Model": "qwen3:8b",
+        "Llm:Ollama:BaseUrl": "http://ollama:11434/v1",
+    }
+
+    anthropic = build_llm_settings({**rows, "Llm:Provider": "Anthropic"})
+    openai = build_llm_settings({**rows, "Llm:Provider": "openai"})
+    ollama = build_llm_settings({**rows, "Llm:Provider": "Ollama"})
+
+    assert (anthropic.provider, anthropic.api_key, anthropic.model, anthropic.input_price) == ("Anthropic", "sk-ant", "claude-opus-5", 5)
+    assert (openai.provider, openai.api_key, openai.model, openai.input_price) == ("OpenAI", "sk-openai", "gpt-test", 1.5)
+    assert (ollama.provider, ollama.api_key, ollama.model, ollama.base_url) == ("Ollama", None, "qwen3:8b", "http://ollama:11434/v1")
+
+
+def test_an_unknown_provider_is_kept_for_the_extractor_to_report() -> None:
+    assert build_llm_settings({"Llm:Provider": "Gemini"}).provider == "Gemini"
+    assert build_llm_settings({}).provider == "Anthropic"

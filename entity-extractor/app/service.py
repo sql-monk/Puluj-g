@@ -114,17 +114,8 @@ class EntityExtractorService:
             raise ExtractionFailed(error)
 
         definitions = await self.repository.list_entity_definitions()
-        llm_settings = await self.repository.get_llm_settings(
-            self.settings.llm_enabled,
-            self.settings.llm_model,
-        )
-        # app_settings wins; the Compose environment fills in what the admin UI never set.
-        llm_settings = llm_settings.model_copy(
-            update={
-                "provider": llm_settings.provider or self.settings.llm_provider,
-                "base_url": llm_settings.base_url or self.settings.llm_base_url,
-            }
-        )
+        # The LLM section of the admin UI (app_settings Llm:*) wins; the Compose environment fills in what it never set.
+        llm_settings = await self.repository.get_llm_settings(self.settings.llm_environment)
         if not llm_settings.enabled:
             await self.repository.complete_processing(claim.run_id, 0)
             return 0

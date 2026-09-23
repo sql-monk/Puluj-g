@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -76,7 +77,7 @@ class Repository(Protocol):
         self, run_id: int, extractor: ExtractorDefinition, duration_ms: int, error: str, stdout: str, stderr: str
     ) -> None: ...
 
-    async def get_llm_settings(self, fallback_enabled: bool, fallback_model: str) -> LlmSettings: ...
+    async def get_llm_settings(self, fallback: Mapping[str, str]) -> LlmSettings: ...
 
     async def begin_llm_audit(self, run_id: int, request: ExtractRequest, audit: LlmAudit) -> int: ...
 
@@ -266,13 +267,13 @@ class PostgresRepository:
                 (run_id, extractor.extractor_id, duration_ms, stdout, stderr, error),
             )
 
-    async def get_llm_settings(self, fallback_enabled: bool, fallback_model: str) -> LlmSettings:
+    async def get_llm_settings(self, fallback: Mapping[str, str]) -> LlmSettings:
         async with self.pool.connection() as connection:
             rows = await (
                 await connection.execute("SELECT key, value FROM ee_get_llm_settings()")
             ).fetchall()
         values = {str(row["key"]): row["value"] for row in rows}
-        return build_llm_settings(values, fallback_enabled, fallback_model)
+        return build_llm_settings(values, fallback)
 
     async def begin_llm_audit(self, run_id: int, request: ExtractRequest, audit: LlmAudit) -> int:
         async with self.pool.connection() as connection, connection.transaction():
@@ -646,27 +647,49 @@ def _duration_seconds(value: Any, default: float) -> float:
         return default
 
 
-def build_llm_settings(
-    values: dict[str, Any], fallback_enabled: bool, fallback_model: str
-) -> LlmSettings:
+# Per-provider defaults, as in the processor's LlmOptions: Claude Opus 5 list prices; OpenAI prices must be set in the
+# admin UI; Ollama is local and costs nothing.
+LLM_PROVIDER_DEFAULTS: dict[str, dict[str, Any]] = {
+    "Anthropic": {"Model": "claude-opus-5", "InputUsdPerMillionTokens": 5, "OutputUsdPerMillionTokens": 25,
+                  "CacheWriteUsdPerMillionTokens": 6.25, "CacheReadUsdPerMillionTokens": 0.5},
+    "OpenAI": {"Model": "gpt-5-mini"},
+    "Ollama": {"Model": "qwen3:8b"},
+}
+
+
+def build_llm_settings(values: Mapping[str, Any], fallback: Mapping[str, Any] | None = None) -> LlmSettings:
+    """The one LLM configuration shared with the processor: Llm:Enabled, Llm:Provider and a section per provider
+    (Llm:Anthropic:*, Llm:OpenAI:*, Llm:Ollama:*). `values` are the app_settings rows (the admin UI), `fallback` the same
+    keys from the environment; the database wins. Keys compare case-insensitively, as .NET configuration does."""
+    merged = {key.lower(): value for key, value in (fallback or {}).items() if value not in (None, "")}
+    merged.update({key.lower(): value for key, value in values.items() if value not in (None, "")})
+
+    def get(key: str) -> Any:
+        return merged.get(key.lower())
+
+    raw_provider = str(get("Llm:Provider") or "Anthropic").strip()
+    provider = next((name for name in LLM_PROVIDER_DEFAULTS if name.lower() == raw_provider.lower()), None)
+    section = provider or "Anthropic"
+    defaults = LLM_PROVIDER_DEFAULTS[section]
+
+    def own(name: str) -> Any:
+        value = get(f"Llm:{section}:{name}")
+        return value if value is not None else defaults.get(name)
+
     return LlmSettings(
-        enabled=(
-            str(values["Llm:Enabled"]).lower() == "true"
-            if "Llm:Enabled" in values
-            else fallback_enabled
-        ),
-        model=str(values["Llm:Model"]) if "Llm:Model" in values else fallback_model,
-        provider=str(values["Llm:Provider"]) if values.get("Llm:Provider") else None,
-        api_key=values.get("Llm:ApiKey"),
-        base_url=str(values["Llm:BaseUrl"]) if values.get("Llm:BaseUrl") else None,
-        timeout_seconds=_int(values.get("Llm:TimeoutSeconds"), 20),
-        max_output_tokens=_int(values.get("Llm:MaxOutputTokens"), 1024),
-        max_calls_per_minute=_int(values.get("Llm:MaxCallsPerMinute"), 20),
-        max_message_age_hours=_float(values.get("Llm:MaxMessageAgeHours"), 72),
-        failure_pause_seconds=_duration_seconds(values.get("Llm:FailurePause"), 900),
-        max_attempts=_int(values.get("Llm:MaxAttempts"), 3),
-        input_price=_float(values.get("Llm:InputUsdPerMillionTokens"), 5),
-        output_price=_float(values.get("Llm:OutputUsdPerMillionTokens"), 25),
-        cache_write_price=_float(values.get("Llm:CacheWriteUsdPerMillionTokens"), 6.25),
-        cache_read_price=_float(values.get("Llm:CacheReadUsdPerMillionTokens"), 0.5),
+        enabled=str(get("Llm:Enabled")).lower() == "true" if get("Llm:Enabled") is not None else False,
+        provider=provider or raw_provider,  # an unknown name is kept so the extractor can report it
+        model=str(own("Model")),
+        api_key=str(own("ApiKey")) if own("ApiKey") else None,
+        base_url=str(own("BaseUrl")) if own("BaseUrl") else None,
+        timeout_seconds=_int(get("Llm:TimeoutSeconds"), 20),
+        max_output_tokens=_int(get("Llm:MaxOutputTokens"), 1024),
+        max_calls_per_minute=_int(get("Llm:MaxCallsPerMinute"), 20),
+        max_message_age_hours=_float(get("Llm:MaxMessageAgeHours"), 72),
+        failure_pause_seconds=_duration_seconds(get("Llm:FailurePause"), 900),
+        max_attempts=_int(get("Llm:MaxAttempts"), 3),
+        input_price=_float(own("InputUsdPerMillionTokens"), 0),
+        output_price=_float(own("OutputUsdPerMillionTokens"), 0),
+        cache_write_price=_float(own("CacheWriteUsdPerMillionTokens"), 0),
+        cache_read_price=_float(own("CacheReadUsdPerMillionTokens"), 0),
     )

@@ -323,41 +323,61 @@ function TelegramSection({ status, draft, change, s, notify, reload }: TabProps)
 }
 
 const LLM_PROVIDERS = [
-  { value: 'Anthropic', label: 'Anthropic (Claude)', model: 'claude-opus-5' },
-  { value: 'OpenAI', label: 'OpenAI', model: 'gpt-5-mini' },
-  { value: 'Ollama', label: 'Ollama (локально)', model: 'qwen3:8b' },
-]
+  { value: 'Anthropic', label: 'Anthropic (Claude)', model: 'claude-opus-5', keyVariable: 'ANTHROPIC_API_KEY', baseUrl: null, priced: true },
+  { value: 'OpenAI', label: 'OpenAI', model: 'gpt-5-mini', keyVariable: 'OPENAI_API_KEY', baseUrl: 'https://api.openai.com/v1', priced: true },
+  { value: 'Ollama', label: 'Ollama (локально)', model: 'qwen3:8b', keyVariable: null, baseUrl: 'http://localhost:11434/v1', priced: false },
+] as const
 
+/**
+ * One LLM configuration for everything that calls a model (the processor's fallback parser and the entity extractor):
+ * every provider keeps its own key, model, endpoint and prices, all saved at once; "Активний провайдер" only switches.
+ */
 function LlmSection({ status, draft, change, s }: TabProps) {
   const selected = (draft['Llm:Provider'] ?? s('Llm:Provider')?.value ?? 'Anthropic').toLowerCase()
-  const provider = LLM_PROVIDERS.find((p) => p.value.toLowerCase() === selected) ?? LLM_PROVIDERS[0]
-  const providerLabel = provider.label
+  const active = LLM_PROVIDERS.find((p) => p.value.toLowerCase() === selected) ?? LLM_PROVIDERS[0]
   return (
     <>
-      <Section title={`LLM fallback (${providerLabel})`} badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? 'увімкнено' : 'вимкнено'} />}>
-        <p className="text-xs text-slate-500">Викликається лише коли правила не знайшли нічого в тексті, схожому на повідомлення про загрозу. Модель може повертати лише коди з таксономії; невідомі місця відкидаються.</p>
+      <Section title="LLM" badge={<Badge ok={status?.llmConfigured ?? null} text={status?.llmConfigured ? `увімкнено · ${active.value}` : 'вимкнено'} />}>
+        <p className="text-xs text-slate-500">
+          Одне налаштування для всього, що використовує LLM: fallback-парсер процесора та entity extractor. Ключі й моделі кожного провайдера зберігаються одночасно; перемикання — лише вибір активного, без перезапуску.
+        </p>
         <Toggle label="Увімкнути" setting={s('Llm:Enabled')} draft={draft} onChange={change} />
-        <Select label="Провайдер" setting={s('Llm:Provider')} draft={draft} onChange={change} options={LLM_PROVIDERS} hint="Перемикається без перезапуску; модель і ключ мають відповідати провайдеру." />
-        <Field label="Модель" setting={s('Llm:Model')} draft={draft} onChange={change} placeholder={provider.model} />
-        {provider.value !== 'Ollama' && (
-          <Field label="API key" setting={s('Llm:ApiKey')} draft={draft} onChange={change} type="password" hint={`або змінна середовища ${provider.value === 'OpenAI' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY'}`} />
-        )}
-        {provider.value !== 'Anthropic' && (
-          <Field
-            label="Base URL"
-            setting={s('Llm:BaseUrl')}
-            draft={draft}
-            onChange={change}
-            placeholder={provider.value === 'Ollama' ? 'http://localhost:11434/v1' : 'https://api.openai.com/v1'}
-            hint={provider.value === 'Ollama' ? 'OpenAI-сумісний endpoint Ollama. З Docker: http://host.docker.internal:11434/v1' : 'порожньо = api.openai.com; або будь-який OpenAI-сумісний сервер'}
-          />
-        )}
-        <Field label="Таймаут, с" setting={s('Llm:TimeoutSeconds')} draft={draft} onChange={change} type="number" hint={provider.value === 'Ollama' ? 'локальна модель відповідає повільніше — варто 60+' : undefined} />
-        <Field label="Input, $ / млн токенів" setting={s('Llm:InputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
-        <Field label="Output, $ / млн токенів" setting={s('Llm:OutputUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
-        <Field label="Cache write, $ / млн" setting={s('Llm:CacheWriteUsdPerMillionTokens')} draft={draft} onChange={change} type="number" />
-        <Field label="Cache read, $ / млн" setting={s('Llm:CacheReadUsdPerMillionTokens')} draft={draft} onChange={change} type="number" hint="Зміна ціни впливає лише на наступні виклики." />
+        <Select label="Активний провайдер" setting={s('Llm:Provider')} draft={draft} onChange={change} options={LLM_PROVIDERS.map((p) => ({ value: p.value, label: p.label }))} />
+        <Field label="Таймаут, с" setting={s('Llm:TimeoutSeconds')} draft={draft} onChange={change} type="number" hint={active.value === 'Ollama' ? 'локальна модель відповідає повільніше — варто 60+' : undefined} />
       </Section>
+      {LLM_PROVIDERS.map((p) => {
+        const prefix = `Llm:${p.value}:`
+        const key = p.keyVariable ? s(`${prefix}ApiKey`) : undefined
+        const isActive = p.value === active.value
+        const badge = isActive ? <Badge ok text="активний" /> : p.keyVariable ? <Badge ok={key?.hasValue ?? null} text={key?.hasValue ? 'ключ збережено' : 'без ключа'} /> : undefined
+        return (
+          <Section key={p.value} title={p.label} badge={badge}>
+            {p.keyVariable && <Field label="API key" setting={key} draft={draft} onChange={change} type="password" hint={`або змінна середовища ${p.keyVariable}`} />}
+            <Field label="Модель" setting={s(`${prefix}Model`)} draft={draft} onChange={change} placeholder={p.model} />
+            {p.baseUrl && (
+              <Field
+                label="Base URL"
+                setting={s(`${prefix}BaseUrl`)}
+                draft={draft}
+                onChange={change}
+                placeholder={p.baseUrl}
+                hint={p.value === 'Ollama' ? 'OpenAI-сумісний endpoint Ollama. З Docker: http://host.docker.internal:11434/v1' : 'або будь-який OpenAI-сумісний сервер'}
+              />
+            )}
+            {p.priced ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Input, $ / млн" setting={s(`${prefix}InputUsdPerMillionTokens`)} draft={draft} onChange={change} type="number" />
+                <Field label="Output, $ / млн" setting={s(`${prefix}OutputUsdPerMillionTokens`)} draft={draft} onChange={change} type="number" />
+                <Field label="Cache write, $ / млн" setting={s(`${prefix}CacheWriteUsdPerMillionTokens`)} draft={draft} onChange={change} type="number" />
+                <Field label="Cache read, $ / млн" setting={s(`${prefix}CacheReadUsdPerMillionTokens`)} draft={draft} onChange={change} type="number" />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500">Локальна модель: ключ не потрібен, вартість викликів — $0.</p>
+            )}
+          </Section>
+        )
+      })}
+      <p className="text-[11px] text-slate-500">Зміна ціни впливає лише на наступні виклики.</p>
       <LlmUsagePanel />
     </>
   )

@@ -97,7 +97,7 @@ public sealed class WorkerStatusReporter(
             _stats?.Snapshot(Math.Max(1, processing.Value.Concurrency)),
             _breaker is null ? null : new LlmStatusDto(
                 llmOptions.Enabled,
-                llmOptions.Model,
+                llmOptions.AuditModel,
                 _breaker.PausedUntil is { } until && until > now ? until : null,
                 _breaker.PauseReason,
                 _breaker.Calls,

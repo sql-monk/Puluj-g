@@ -7,7 +7,7 @@ public class LlmCostTests
     [Fact]
     public void Uses_each_billed_token_bucket_from_the_price_card()
     {
-        var options = new LlmOptions
+        var options = new LlmProviderOptions
         {
             InputUsdPerMillionTokens = 5m,
             CacheWriteUsdPerMillionTokens = 6.25m,

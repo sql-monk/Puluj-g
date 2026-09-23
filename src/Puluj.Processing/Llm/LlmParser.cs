@@ -65,7 +65,7 @@ public sealed class LlmParser : IParser
 
     private LlmOptions _options => _monitor.CurrentValue;
 
-    public string Version => $"llm-{_options.Model}-p{_options.PromptVersion}";
+    public string Version => $"llm-{_options.AuditModel}-p{_options.PromptVersion}";
 
     /// <summary>Enabled, a known provider and its key (Ollama needs none). Read per message — the admin UI can switch the
     /// fallback and the provider at runtime; each distinct misconfiguration is logged once.</summary>
@@ -83,9 +83,13 @@ public sealed class LlmParser : IParser
             {
                 problem = $"Llm:Provider '{o.Provider}' is not one of Anthropic, OpenAI, Ollama";
             }
-            else if (LlmOptions.RequiresApiKey(provider) && string.IsNullOrEmpty(LlmOptions.ResolveApiKey(provider, o.ApiKey)))
+            else if (LlmOptions.RequiresApiKey(provider) && string.IsNullOrEmpty(o.ApiKeyFor(provider)))
             {
-                problem = $"no API key for {provider} (Llm:ApiKey / {LlmOptions.ApiKeyVariable(provider)})";
+                problem = $"no API key for {provider} (Llm:{provider}:ApiKey / {LlmOptions.ApiKeyVariable(provider)})";
+            }
+            else if (string.IsNullOrWhiteSpace(o.For(provider).Model))
+            {
+                problem = $"no model for {provider} (Llm:{provider}:Model)";
             }
             if (problem is not null && problem != _warnedConfig)
             {
@@ -197,7 +201,7 @@ public sealed class LlmParser : IParser
     private async Task<LlmAnswer> AskAsync(string text, WirePayloads wire, CancellationToken ct)
     {
         var o = _options;
-        var request = new LlmCompletionRequest(text, _systemPrompt.Value, o.Model, o.PromptVersion, 2048, TimeSpan.FromSeconds(o.TimeoutSeconds));
+        var request = new LlmCompletionRequest(text, _systemPrompt.Value, o.Current.Model, o.PromptVersion, 2048, TimeSpan.FromSeconds(o.TimeoutSeconds));
         LlmCompletionResult result;
         try
         {
@@ -245,7 +249,7 @@ public sealed class LlmParser : IParser
             var provider = o.TryGetProvider(out var p) ? p : (LlmProvider?)null;
             decimal? cost = input is null ? null
                 : provider == LlmProvider.Ollama ? 0m // a local model: nothing billed, whatever the price card says
-                : LlmCost.Calculate(o, input.Value, cacheWrite!.Value, cacheRead!.Value, output!.Value);
+                : LlmCost.Calculate(o.Current, input.Value, cacheWrite!.Value, cacheRead!.Value, output!.Value);
             await using var db = await _auditFactory.CreateDbContextAsync(ct);
             db.LlmRequests.Add(new LlmRequest
             {
@@ -253,7 +257,7 @@ public sealed class LlmParser : IParser
                 SourceId = ctx.SourceId,
                 OccurredAt = _clock.GetUtcNow(),
                 Worker = _workerName,
-                Model = provider is null or LlmProvider.Anthropic ? o.Model : $"{provider.Value.ToString().ToLowerInvariant()}/{o.Model}",
+                Model = o.AuditModel,
                 PromptVersion = o.PromptVersion,
                 Outcome = outcome,
                 StatusCode = statusCode,

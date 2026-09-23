@@ -14,23 +14,39 @@ public sealed class SettingsStore(IDbContextFactory<PulujDbContext> factory, Tim
         "Collectors:Telegram:ApiHash",
         "Collectors:Telegram:Password",
         "Collectors:Telegram:VerificationCode",
-        "Llm:ApiKey",
+        "Llm:Anthropic:ApiKey",
+        "Llm:OpenAI:ApiKey",
         "Admin:Token",
     };
 
+    /// <summary>
+    /// The one LLM configuration, shared by everything that calls a model (the processor's fallback parser and the Python
+    /// entity extractor, which reads the same rows through ee_get_llm_settings()): the active provider and, per provider,
+    /// its own key, model, endpoint and price card — all kept at once, so switching is a single Llm:Provider change.
+    /// </summary>
+    public static readonly string[] LlmKeys =
+    [
+        "Llm:Enabled", "Llm:Provider", "Llm:TimeoutSeconds",
+        "Llm:Anthropic:ApiKey", "Llm:Anthropic:Model",
+        "Llm:Anthropic:InputUsdPerMillionTokens", "Llm:Anthropic:OutputUsdPerMillionTokens", "Llm:Anthropic:CacheWriteUsdPerMillionTokens", "Llm:Anthropic:CacheReadUsdPerMillionTokens",
+        "Llm:OpenAI:ApiKey", "Llm:OpenAI:Model", "Llm:OpenAI:BaseUrl",
+        "Llm:OpenAI:InputUsdPerMillionTokens", "Llm:OpenAI:OutputUsdPerMillionTokens", "Llm:OpenAI:CacheWriteUsdPerMillionTokens", "Llm:OpenAI:CacheReadUsdPerMillionTokens",
+        "Llm:Ollama:Model", "Llm:Ollama:BaseUrl",
+    ];
+
     /// <summary>Keys the admin UI may write. Anything else is rejected so the UI cannot rewrite arbitrary configuration.</summary>
-    public static readonly HashSet<string> EditableKeys = new(StringComparer.OrdinalIgnoreCase)
-    {
+    public static readonly HashSet<string> EditableKeys = new(
+    [
         "Collectors:AlertsInUa:Enabled", "Collectors:AlertsInUa:Token", "Collectors:AlertsInUa:BackfillPeriod",
         "Collectors:Telegram:Enabled", "Collectors:Telegram:ApiId", "Collectors:Telegram:ApiHash", "Collectors:Telegram:Phone",
         "Collectors:Telegram:Password", "Collectors:Telegram:VerificationCode", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit",
         "Collectors:Telegram:BackfillSince", "Collectors:Telegram:HistoryWorkers", "Collectors:Telegram:RpcTimeout",
         "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval",
-        "Llm:Enabled", "Llm:Provider", "Llm:Model", "Llm:ApiKey", "Llm:BaseUrl", "Llm:TimeoutSeconds", "Llm:MaxMessageAgeHours", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens",
+        .. LlmKeys, "Llm:MaxMessageAgeHours",
         "EntityExtractor:Url", "EntityExtractor:DeliveryTimeout", "EntityExtractor:PollingInterval", "EntityExtractor:ClaimLease", "EntityExtractor:Concurrency",
         "Correlation:AttachThreshold", "Correlation:CandidateWindowMinutes", "Correlation:AmbiguityMargin", "Correlation:SlackKm", "Correlation:CoarseLocationAccuracyKm",
         "Admin:Token",
-    };
+    ], StringComparer.OrdinalIgnoreCase);
 
     public async Task<Dictionary<string, AppSetting>> GetAllAsync(CancellationToken ct)
     {

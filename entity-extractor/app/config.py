@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from psycopg.conninfo import make_conninfo
@@ -30,13 +31,15 @@ class Settings(BaseSettings):
     default_timeout_ms: int = Field(default=5_000, ge=100, le=60_000)
     max_output_bytes: int = Field(default=256_000, ge=1_024, le=10_000_000)
     max_memory_mb: int = Field(default=256, ge=32, le=2_048)
-    llm_enabled: bool = Field(default=False, validation_alias="Llm__Enabled")
-    llm_provider: str = Field(default="Anthropic", validation_alias="Llm__Provider")
-    llm_model: str = Field(default="claude-opus-5", validation_alias="Llm__Model")
-    llm_base_url: str | None = Field(default=None, validation_alias="Llm__BaseUrl")
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     openai_api_key: str | None = Field(default=None, validation_alias="OPENAI_API_KEY")
     anthropic_base_url: str = "https://api.anthropic.com"
+
+    @property
+    def llm_environment(self) -> dict[str, str]:
+        """Llm__* environment variables as Llm:* keys (Llm__OpenAI__Model -> Llm:OpenAI:Model): the fallback under the
+        app_settings rows, the same layering the processor's .NET configuration applies."""
+        return {key.replace("__", ":"): value for key, value in os.environ.items() if key.lower().startswith("llm__")}
 
     @property
     def postgres_dsn(self) -> str:

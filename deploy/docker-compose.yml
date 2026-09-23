@@ -145,10 +145,14 @@ services:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-ADMIN_TOKEN}
       ENTITY_EXTRACTOR_TOKEN: "${ENTITY_EXTRACTOR_TOKEN:-entity-extractor-local-only}"
       ENTITY_EXTRACTOR_CONCURRENCY: ${ENTITY_EXTRACTOR_CONCURRENCY:-4}
+      # Fallbacks only: the LLM section of the admin UI (app_settings Llm:*) is the one configuration, shared with the processor.
       Llm__Enabled: ${Llm__Enabled:-false}
       Llm__Provider: ${Llm__Provider:-Anthropic}
-      Llm__Model: ${Llm__Model:-claude-opus-5}
-      Llm__BaseUrl: ${Llm__BaseUrl:-}
+      Llm__Anthropic__Model: ${Llm__Anthropic__Model:-}
+      Llm__OpenAI__Model: ${Llm__OpenAI__Model:-}
+      Llm__OpenAI__BaseUrl: ${Llm__OpenAI__BaseUrl:-}
+      Llm__Ollama__Model: ${Llm__Ollama__Model:-}
+      Llm__Ollama__BaseUrl: ${Llm__Ollama__BaseUrl:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     init: true

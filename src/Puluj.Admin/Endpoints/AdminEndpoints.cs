@@ -28,9 +28,7 @@ public static class AdminEndpoints
         "Collectors:Telegram:Password", "Collectors:Telegram:AutoJoin", "Collectors:Telegram:BackfillLimit", "Collectors:Telegram:BackfillSince",
         "Collectors:Telegram:HistoryWorkers", "Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval",
     ];
-    private static readonly string[] LlmKeys = ["Llm:Enabled", "Llm:Provider", "Llm:Model", "Llm:ApiKey", "Llm:BaseUrl", "Llm:TimeoutSeconds", "Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly string[] TelegramIntervalKeys = ["Collectors:Telegram:RpcTimeout", "Collectors:Telegram:HistoryRequestInterval", "Collectors:Telegram:HistoryMinimumInterval", "Collectors:Telegram:HistoryMaximumInterval"];
-    private static readonly HashSet<string> LlmPriceKeys = ["Llm:InputUsdPerMillionTokens", "Llm:OutputUsdPerMillionTokens", "Llm:CacheWriteUsdPerMillionTokens", "Llm:CacheReadUsdPerMillionTokens"];
     private static readonly IReadOnlyDictionary<string, (double Min, double Max)> CorrelationRanges = new Dictionary<string, (double, double)>
     {
         ["Correlation:AttachThreshold"] = (0, 1),
@@ -55,12 +53,20 @@ public static class AdminEndpoints
         ["Collectors:Telegram:HistoryMaximumInterval"] = "00:00:08",
         ["Llm:Enabled"] = "false",
         ["Llm:Provider"] = "Anthropic",
-        ["Llm:Model"] = "claude-opus-5",
         ["Llm:TimeoutSeconds"] = "20",
-        ["Llm:InputUsdPerMillionTokens"] = "5",
-        ["Llm:OutputUsdPerMillionTokens"] = "25",
-        ["Llm:CacheWriteUsdPerMillionTokens"] = "6.25",
-        ["Llm:CacheReadUsdPerMillionTokens"] = "0.5",
+        ["Llm:Anthropic:Model"] = "claude-opus-5",
+        ["Llm:Anthropic:InputUsdPerMillionTokens"] = "5",
+        ["Llm:Anthropic:OutputUsdPerMillionTokens"] = "25",
+        ["Llm:Anthropic:CacheWriteUsdPerMillionTokens"] = "6.25",
+        ["Llm:Anthropic:CacheReadUsdPerMillionTokens"] = "0.5",
+        ["Llm:OpenAI:Model"] = "gpt-5-mini",
+        ["Llm:OpenAI:BaseUrl"] = "https://api.openai.com/v1",
+        ["Llm:OpenAI:InputUsdPerMillionTokens"] = "0",
+        ["Llm:OpenAI:OutputUsdPerMillionTokens"] = "0",
+        ["Llm:OpenAI:CacheWriteUsdPerMillionTokens"] = "0",
+        ["Llm:OpenAI:CacheReadUsdPerMillionTokens"] = "0",
+        ["Llm:Ollama:Model"] = "qwen3:8b",
+        ["Llm:Ollama:BaseUrl"] = "http://localhost:11434/v1",
         ["Correlation:AttachThreshold"] = "0.6",
         ["Correlation:CandidateWindowMinutes"] = "120",
         ["Correlation:AmbiguityMargin"] = "0.05",
@@ -68,9 +74,11 @@ public static class AdminEndpoints
         ["Correlation:CoarseLocationAccuracyKm"] = "80",
     };
 
-    /// <summary>The configured provider (Anthropic when unset or unknown), for the API-key environment fallback.</summary>
-    private static LlmProvider LlmProviderOf(IConfiguration config) =>
-        new LlmOptions { Provider = config["Llm:Provider"] ?? "" }.TryGetProvider(out var provider) ? provider : LlmProvider.Anthropic;
+    /// <summary>Llm:Anthropic:ApiKey → ANTHROPIC_API_KEY, Llm:OpenAI:ApiKey → OPENAI_API_KEY: what the key falls back to.</summary>
+    private static string? ApiKeyVariable(string key) =>
+        key.EndsWith(":ApiKey", StringComparison.OrdinalIgnoreCase) && Enum.TryParse<LlmProvider>(key.Split(':')[1], true, out var provider)
+            ? LlmOptions.ApiKeyVariable(provider)
+            : null;
 
     public static IEndpointRouteBuilder MapAdminEndpoints(this IEndpointRouteBuilder app)
     {
@@ -79,12 +87,12 @@ public static class AdminEndpoints
         admin.MapGet("/settings", async (IConfiguration config, SettingsStore store, CancellationToken ct) =>
         {
             var db = await store.GetAllAsync(ct);
-            return AlertsKeys.Concat(TelegramKeys).Concat(LlmKeys).Concat(OtherKeys).Select(key =>
+            return AlertsKeys.Concat(TelegramKeys).Concat(SettingsStore.LlmKeys).Concat(OtherKeys).Select(key =>
             {
                 var effective = config[key];
-                if (key == "Llm:ApiKey" && string.IsNullOrEmpty(effective))
+                if (string.IsNullOrEmpty(effective) && ApiKeyVariable(key) is { } variable)
                 {
-                    effective = LlmOptions.ResolveApiKey(LlmProviderOf(config), null);
+                    effective = Environment.GetEnvironmentVariable(variable);
                 }
                 var secret = SettingsStore.SecretKeys.Contains(key);
                 var source = db.ContainsKey(key) ? "db" : !string.IsNullOrEmpty(effective) ? "config" : Defaults.ContainsKey(key) ? "default" : "none";
@@ -138,16 +146,18 @@ public static class AdminEndpoints
             {
                 return Results.BadRequest(new { error = "Llm:Provider має бути одним із: Anthropic, OpenAI, Ollama." });
             }
-            if (req.Values.TryGetValue("Llm:BaseUrl", out var baseUrl) && !string.IsNullOrWhiteSpace(baseUrl)
-                && !(Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"))
+            foreach (var (key, value) in req.Values.Where(x => x.Key.StartsWith("Llm:", StringComparison.OrdinalIgnoreCase) && x.Key.EndsWith(":BaseUrl", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(x.Value)))
             {
-                return Results.BadRequest(new { error = "Llm:BaseUrl має бути абсолютною http(s)-адресою, наприклад http://host.docker.internal:11434/v1." });
+                if (!(Uri.TryCreate(value!.Trim(), UriKind.Absolute, out var baseUri) && baseUri.Scheme is "http" or "https"))
+                {
+                    return Results.BadRequest(new { error = $"{key} має бути абсолютною http(s)-адресою, наприклад http://host.docker.internal:11434/v1." });
+                }
             }
             if (req.Values.TryGetValue("Llm:TimeoutSeconds", out var llmTimeout) && !string.IsNullOrWhiteSpace(llmTimeout) && (!int.TryParse(llmTimeout, out var seconds) || seconds is < 1 or > 600))
             {
                 return Results.BadRequest(new { error = "Llm:TimeoutSeconds має бути числом від 1 до 600." });
             }
-            foreach (var (key, value) in req.Values.Where(x => LlmPriceKeys.Contains(x.Key) && !string.IsNullOrWhiteSpace(x.Value)))
+            foreach (var (key, value) in req.Values.Where(x => x.Key.StartsWith("Llm:", StringComparison.OrdinalIgnoreCase) && x.Key.EndsWith("UsdPerMillionTokens", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(x.Value)))
             {
                 if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var price) || price < 0)
                 {
@@ -175,9 +185,10 @@ public static class AdminEndpoints
             var now = clock.GetUtcNow();
             var workers = OpsEndpoints.WorkerHeartbeats(db, now);
             var heartbeat = workers.Count > 0 ? workers[0].At : (DateTimeOffset?)null;
-            var llmProvider = LlmProviderOf(config);
-            var llmReady = new LlmOptions { Provider = config["Llm:Provider"] ?? "" }.TryGetProvider(out _)
-                           && (!LlmOptions.RequiresApiKey(llmProvider) || !string.IsNullOrEmpty(LlmOptions.ResolveApiKey(llmProvider, config["Llm:ApiKey"])));
+            var llm = config.GetSection(LlmOptions.Section).Get<LlmOptions>() ?? new LlmOptions();
+            var llmReady = llm.TryGetProvider(out var llmProvider)
+                           && (!LlmOptions.RequiresApiKey(llmProvider) || !string.IsNullOrEmpty(llm.ApiKeyFor(llmProvider)))
+                           && !string.IsNullOrWhiteSpace(llm.Current.Model);
             return new AdminStatusDto(
                 AlertsConfigured: config.GetValue<bool>("Collectors:AlertsInUa:Enabled") && !string.IsNullOrEmpty(alertsToken),
                 TelegramConfigured: config.GetValue<bool>("Collectors:Telegram:Enabled") && config.GetValue<int>("Collectors:Telegram:ApiId") != 0

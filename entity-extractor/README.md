@@ -44,15 +44,18 @@ When `ADMIN_TOKEN` is set, admin endpoints require it in `X-Admin-Token`.
 - `DATABASE_URL` accepts a PostgreSQL URI as a fallback.
 - `ENTITY_EXTRACTOR_TOKEN` (or `EntityExtractor__Token`) protects `/extract`. If omitted, `/extract` remains open for
   backward-compatible local deployments; production deployments should always set it.
-- `Llm__Enabled`, `Llm__Provider`, `Llm__Model` and `Llm__BaseUrl` provide Compose/environment fallbacks when the
-  matching `Llm:*` key is absent from `app_settings`; database values take precedence.
-- `Llm:Provider` is `Anthropic` (Messages API), `OpenAI` or `Ollama` (both over the OpenAI chat-completions API in
-  JSON mode). `Llm:BaseUrl` overrides the endpoint of the last two: `https://api.openai.com/v1` and
-  `http://localhost:11434/v1` by default; from a container, Ollama on the host is `http://host.docker.internal:11434/v1`.
-  Ollama needs no key and its calls are costed at zero.
+- The LLM configuration is the one the processor uses, edited in the LLM section of the admin UI (`app_settings`
+  `Llm:*`, read through `ee_get_llm_settings()`): `Llm:Enabled`, `Llm:Provider` (the active one: `Anthropic`, `OpenAI`
+  or `Ollama`) and a section per provider — `Llm:Anthropic:*`, `Llm:OpenAI:*`, `Llm:Ollama:*` with its own `ApiKey`,
+  `Model`, `BaseUrl` and `*UsdPerMillionTokens`. All providers can be configured at once; switching is a single
+  `Llm:Provider` change and needs no restart.
+- Anthropic goes over the Messages API; OpenAI and Ollama over the OpenAI chat-completions API in JSON mode, at
+  `https://api.openai.com/v1` and `http://localhost:11434/v1` unless `BaseUrl` says otherwise (from a container,
+  Ollama on the host is `http://host.docker.internal:11434/v1`). Ollama needs no key and is costed at zero.
+- `Llm__*` environment variables (`Llm__Provider`, `Llm__Ollama__BaseUrl`, ...) are fallbacks for keys absent from
+  `app_settings`; database values take precedence. `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` stand in for a missing
+  `Llm:Anthropic:ApiKey` / `Llm:OpenAI:ApiKey`.
 - `ENTITY_EXTRACTOR_CONCURRENCY` bounds concurrently processed messages.
-- `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (per provider) are only fallbacks when `Llm:ApiKey` is absent from
-  `app_settings`.
 
 The LLM fallback reads the existing `Llm:*` settings and writes its full sanitized request/response and usage to the
 existing `llm_requests` table.

@@ -22,10 +22,10 @@ public sealed class AnthropicCompletion(IOptionsMonitor<LlmOptions> options, ILo
 
     public async Task<LlmCompletionResult> CompleteAsync(LlmCompletionRequest request, CancellationToken ct)
     {
-        var key = LlmOptions.ResolveApiKey(LlmProvider.Anthropic, options.CurrentValue.ApiKey);
+        var key = options.CurrentValue.ApiKeyFor(LlmProvider.Anthropic);
         if (string.IsNullOrEmpty(key))
         {
-            throw new LlmCompletionException("no_api_key", "Llm:ApiKey / ANTHROPIC_API_KEY is not configured", retryable: false);
+            throw new LlmCompletionException("no_api_key", "Llm:Anthropic:ApiKey / ANTHROPIC_API_KEY is not configured", retryable: false);
         }
         AnthropicClient client;
         lock (_clientLock)
