@@ -1,3 +1,4 @@
+import { quietLabel } from '../../admin/collectors'
 import { useMemo, useState } from 'react'
 import { admin, type AdminSourceDto, type SourcePatch } from '../../api/admin'
 import { Badge, Section } from './fields'
@@ -9,7 +10,8 @@ interface Props {
   notify: (m: { ok: boolean; text: string }) => void
 }
 
-const statusLabel: Record<AdminSourceDto['status'], string> = { ok: 'працює', stale: 'немає даних', idle: 'очікує', disabled: 'вимкнено' }
+// The state is the collector's polling, not the freshness of the content: "останнє" below it says how old the newest message is.
+const statusLabel: Record<AdminSourceDto['status'], string> = { ok: 'опитування працює', stale: 'опитування застаріло', idle: 'очікує', disabled: 'вимкнено' }
 const typeLabel: Record<string, string> = { Telegram: 'Telegram', RestApi: 'REST API', Rss: 'RSS', Web: 'Web' }
 const columns: { key: SourceSortKey; label: string }[] = [
   { key: 'name', label: 'Джерело' },
@@ -347,6 +349,7 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                   <td className="pr-2">
                     <Badge ok={s.status === 'ok' ? true : s.status === 'stale' ? false : null} text={statusLabel[s.status]} />
                     {s.lastMessageAt && <div className="text-slate-400">останнє {new Date(s.lastMessageAt).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>}
+                    {s.enabled && quietLabel(s.lastMessageAt) && <div className="text-amber-700 dark:text-amber-300">{quietLabel(s.lastMessageAt)}</div>}
                     {s.lastError && (
                       <div className="max-w-40 truncate text-red-500" title={s.lastError}>
                         {s.lastError}
@@ -355,7 +358,7 @@ export default function SourcesEditor({ sources, reload, notify }: Props) {
                   </td>
                   <td className="pr-2">{s.rawMessageCount}</td>
                   <td className="whitespace-nowrap text-right">
-                    {s.type === 'Telegram' && <a className="mr-1 inline-block rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceId=${s.id}`}>Дивитись повідомлення</a>}
+                    <a className="mr-1 inline-block rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={`#/messages?sourceId=${s.id}`}>Дивитись повідомлення</a>
                     <button className="mr-1 rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" onClick={() => startEdit(s)}>
                       Редагувати
                     </button>

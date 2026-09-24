@@ -14,6 +14,9 @@ namespace Puluj.Infrastructure.Ingestion;
 /// the content hash is only a similarity index since P04), records source latency and wakes the processors through
 /// NOTIFY, so collectors and the processors may live in different processes (a processor's poll for Pending rows covers
 /// a lost notification). A repeat of an already stored identity returns the existing raw id with IsNew = false.
+/// An edit revision whose text equals the latest stored revision of the same message is not stored at all: Telegram
+/// bumps edit_date for formatting, buttons or media captions, and each such no-op revision used to become another
+/// message with the same text, processed again into the same targets (admin re-audit R02).
 /// </summary>
 public sealed class RawMessageIngestor(
     IDbContextFactory<PulujDbContext> factory,
@@ -43,7 +46,13 @@ public sealed class RawMessageIngestor(
         await using var cmd = new NpgsqlCommand(
             """
             INSERT INTO raw_messages (source_id, source_message_id, source_message_key, source_revision, published_at, received_at, raw_text, raw_payload, url, hash, processing_status, attempts)
-            VALUES (@source_id, @source_message_id, @key, @revision, @published_at, @received_at, @raw_text, @raw_payload, @url, @hash, 0, 0)
+            SELECT @source_id, @source_message_id, @key, @revision, @published_at, @received_at, @raw_text, @raw_payload, @url, @hash, 0, 0
+            WHERE @revision = '0' OR NOT EXISTS (
+                SELECT 1 FROM (
+                    SELECT r.raw_text FROM raw_messages r
+                    WHERE r.source_id = @source_id AND r.source_message_key = @key
+                    ORDER BY r.raw_message_id DESC LIMIT 1) latest
+                WHERE latest.raw_text IS NOT DISTINCT FROM @raw_text)
             ON CONFLICT DO NOTHING
             RETURNING raw_message_id
             """, conn) { CommandTimeout = CommandTimeoutSeconds };
@@ -53,12 +62,12 @@ public sealed class RawMessageIngestor(
         cmd.Parameters.AddWithValue("revision", identity.SourceRevision);
         cmd.Parameters.AddWithValue("published_at", msg.PublishedAt.ToUniversalTime());
         cmd.Parameters.AddWithValue("received_at", receivedAt);
-        cmd.Parameters.AddWithValue("raw_text", (object?)msg.RawText ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("raw_text", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)msg.RawText ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("raw_payload", NpgsqlTypes.NpgsqlDbType.Jsonb)
         {
             Value = msg.RawPayload is null ? DBNull.Value : msg.RawPayload.RootElement.GetRawText(),
         });
-        cmd.Parameters.AddWithValue("url", (object?)msg.Url ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("url", NpgsqlTypes.NpgsqlDbType.Varchar) { Value = (object?)msg.Url ?? DBNull.Value });
         cmd.Parameters.AddWithValue("hash", hash);
 
         var result = await cmd.ExecuteScalarAsync(ct);
@@ -73,6 +82,7 @@ public sealed class RawMessageIngestor(
             return new IngestResult(id, true);
         }
         // Already stored (redelivery, re-read after a restart): the caller gets the existing id, nothing is published.
+        // A skipped no-op edit has no row of its own, so its id stays null.
         var existing = await ExistingIdAsync(conn, null, msg.SourceId, identity, ct);
         return new IngestResult(existing, false);
     }
@@ -89,35 +99,44 @@ public sealed class RawMessageIngestor(
         var receivedAt = clock.GetUtcNow();
         var n = msgs.Count;
         var identities = new SourceIdentity[n];
-        var sourceIds = new int[n];
-        var messageIds = new string[n];
-        var keys = new string[n];
-        var revisions = new string[n];
-        var publishedAt = new DateTime[n];
-        var texts = new string?[n];
-        var payloads = new string?[n];
-        var urls = new string?[n];
-        var hashes = new string[n];
+        var sourceIds = new List<int>(n);
+        var messageIds = new List<string>(n);
+        var keys = new List<string>(n);
+        var revisions = new List<string>(n);
+        var publishedAt = new List<DateTime>(n);
+        var texts = new List<string?>(n);
+        var payloads = new List<string?>(n);
+        var urls = new List<string?>(n);
+        var hashes = new List<string>(n);
+        var pageTexts = new Dictionary<(int, string), string?>();
         for (var i = 0; i < n; i++)
         {
             var msg = msgs[i];
             identities[i] = Identity(msg);
-            sourceIds[i] = msg.SourceId;
-            messageIds[i] = msg.SourceMessageId;
-            keys[i] = identities[i].SourceMessageKey;
-            revisions[i] = identities[i].SourceRevision;
-            publishedAt[i] = msg.PublishedAt.UtcDateTime;
-            texts[i] = msg.RawText;
-            payloads[i] = msg.RawPayload?.RootElement.GetRawText();
-            urls[i] = msg.Url;
-            hashes[i] = ComputeHash(sourceCode, msg.RawText, payloads[i]);
+            // The SQL guard cannot see rows of the same statement: drop a no-op edit of a message earlier in this page.
+            var pageKey = (msg.SourceId, identities[i].SourceMessageKey);
+            if (identities[i].SourceRevision != "0" && pageTexts.TryGetValue(pageKey, out var pageText) && pageText == msg.RawText)
+            {
+                continue;
+            }
+            pageTexts[pageKey] = msg.RawText;
+            var payload = msg.RawPayload?.RootElement.GetRawText();
+            sourceIds.Add(msg.SourceId);
+            messageIds.Add(msg.SourceMessageId);
+            keys.Add(identities[i].SourceMessageKey);
+            revisions.Add(identities[i].SourceRevision);
+            publishedAt.Add(msg.PublishedAt.UtcDateTime);
+            texts.Add(msg.RawText);
+            payloads.Add(payload);
+            urls.Add(msg.Url);
+            hashes.Add(ComputeHash(sourceCode, msg.RawText, payload));
         }
 
         await using var db = await factory.CreateDbContextAsync(ct);
         await using var tx = await db.Database.BeginTransactionAsync(ct);
         var conn = (NpgsqlConnection)db.Database.GetDbConnection();
         var newIds = new Dictionary<SourceIdentity, long>(n);
-        if (n > 0)
+        if (sourceIds.Count > 0)
         {
             // ORDER BY the array position so raw_message_id stays monotonic within the page, like one insert per message.
             await using var cmd = new NpgsqlCommand(
@@ -126,20 +145,26 @@ public sealed class RawMessageIngestor(
                 SELECT m.source_id, m.source_message_id, m.key, m.revision, m.published_at, @received_at, m.raw_text, m.raw_payload::jsonb, m.url, m.hash, 0, 0
                 FROM unnest(@source_ids, @source_message_ids, @keys, @revisions, @published_at, @raw_texts, @raw_payloads, @urls, @hashes)
                     WITH ORDINALITY AS m(source_id, source_message_id, key, revision, published_at, raw_text, raw_payload, url, hash, ord)
+                WHERE m.revision = '0' OR NOT EXISTS (
+                    SELECT 1 FROM (
+                        SELECT r.raw_text FROM raw_messages r
+                        WHERE r.source_id = m.source_id AND r.source_message_key = m.key
+                        ORDER BY r.raw_message_id DESC LIMIT 1) latest
+                    WHERE latest.raw_text IS NOT DISTINCT FROM m.raw_text)
                 ORDER BY m.ord
                 ON CONFLICT DO NOTHING
                 RETURNING source_message_key, source_revision, raw_message_id
                 """, conn, (NpgsqlTransaction)tx.GetDbTransaction()) { CommandTimeout = CommandTimeoutSeconds };
             cmd.Parameters.AddWithValue("received_at", receivedAt);
-            cmd.Parameters.AddWithValue("source_ids", sourceIds);
-            cmd.Parameters.AddWithValue("source_message_ids", messageIds);
-            cmd.Parameters.AddWithValue("keys", keys);
-            cmd.Parameters.AddWithValue("revisions", revisions);
-            cmd.Parameters.Add(new NpgsqlParameter("published_at", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = publishedAt });
-            cmd.Parameters.Add(new NpgsqlParameter("raw_texts", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = texts });
-            cmd.Parameters.Add(new NpgsqlParameter("raw_payloads", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = payloads });
-            cmd.Parameters.Add(new NpgsqlParameter("urls", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = urls });
-            cmd.Parameters.AddWithValue("hashes", hashes);
+            cmd.Parameters.AddWithValue("source_ids", sourceIds.ToArray());
+            cmd.Parameters.AddWithValue("source_message_ids", messageIds.ToArray());
+            cmd.Parameters.AddWithValue("keys", keys.ToArray());
+            cmd.Parameters.AddWithValue("revisions", revisions.ToArray());
+            cmd.Parameters.Add(new NpgsqlParameter("published_at", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.TimestampTz) { Value = publishedAt.ToArray() });
+            cmd.Parameters.Add(new NpgsqlParameter("raw_texts", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = texts.ToArray() });
+            cmd.Parameters.Add(new NpgsqlParameter("raw_payloads", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = payloads.ToArray() });
+            cmd.Parameters.Add(new NpgsqlParameter("urls", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text) { Value = urls.ToArray() });
+            cmd.Parameters.AddWithValue("hashes", hashes.ToArray());
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
             {

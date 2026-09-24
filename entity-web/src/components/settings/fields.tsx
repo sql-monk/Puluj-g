@@ -7,6 +7,25 @@ export function findSetting(all: SettingDto[], key: string): SettingDto | undefi
   return all.find((s) => s.key === key)
 }
 
+/**
+ * The part of the draft that really changes something: a value equal to the loaded one (typed and reverted, a toggle
+ * clicked twice, a browser autofilling a field) is not a change. For a secret an empty value means "remove", which only
+ * changes something when a value is stored.
+ */
+export function pendingChanges(all: SettingDto[], draft: Draft): Draft {
+  const out: Draft = {}
+  for (const [key, value] of Object.entries(draft)) {
+    const setting = findSetting(all, key)
+    if (setting?.isSecret) {
+      if ((value ?? '') === '' && !setting.hasValue) continue
+    } else if (setting && (value ?? '') === (setting.value ?? '')) {
+      continue
+    }
+    out[key] = value
+  }
+  return out
+}
+
 /** Text / number / password input bound to a settings key. Secrets never show their value; an empty draft means "keep". */
 export function Field({
   label,
@@ -45,7 +64,7 @@ export function Field({
           value={value}
           placeholder={isSecret && setting.hasValue ? '•••••• (залишити як є)' : placeholder}
           onChange={(e) => onChange(setting.key, e.target.value)}
-          autoComplete="off"
+          autoComplete={isSecret ? 'new-password' : 'off'}
         />
         {isSecret && setting.hasValue && current !== '' && (
           <button type="button" className="rounded border border-slate-300 px-2 text-xs text-slate-500 dark:border-slate-600" title="Прибрати збережене значення" onClick={() => onChange(setting.key, '')}>

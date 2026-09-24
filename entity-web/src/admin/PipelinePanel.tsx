@@ -35,7 +35,12 @@ export function PipelinePanel() {
         }
       >
         <p className="text-xs text-slate-500">Скільки прийшло, скільки й за який час оброблено, що з цього вийшло. Час — Europe/Kyiv; p50/p90 — з raw_messages.processing_ms (лише успішні обробки).</p>
-        <Loading error={error} empty={!data && !error} />
+        <p className="text-xs text-slate-500">
+          Кожна група рахується за своїм часом: «Прийнято» — за часом отримання; «Оброблено» і «З фактами» — за часом обробки, тож під час
+          завантаження історії сюди входять і старі повідомлення, отримані раніше; «Цілей» і «Треків» — за часом події в повідомленні.
+          «У черзі» — увесь поточний backlog, незалежно від періоду.
+        </p>
+        <Loading error={error} empty={!data && !error} slow="сервер агрегує raw_messages і targets за весь період; 7 і 30 днів рахуються довше" />
         {data && (
           <div className="flex flex-wrap items-center gap-2">
             <Freshness stale={stale} loadedAt={loadedAt} label={shownPeriod ? `період ${shownPeriod}` : undefined} />
@@ -44,12 +49,12 @@ export function PipelinePanel() {
         {data && t && (
           <div className={stale ? 'space-y-3 opacity-50 transition-opacity' : 'space-y-3'} aria-busy={stale}>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:grid-cols-5">
-              <Stat label="Прийнято" value={fmtNum(t.received)} />
-              <Stat label="Оброблено" value={fmtNum(t.processed)} hint={`пропущено ${fmtNum(t.skipped)}, помилок ${fmtNum(t.failed)}`} />
+              <Stat label="Прийнято" value={fmtNum(t.received)} hint="за часом отримання" />
+              <Stat label="Оброблено" value={fmtNum(t.processed)} hint={`за часом обробки · пропущено ${fmtNum(t.skipped)}, помилок ${fmtNum(t.failed)}`} />
               <Stat label="З фактами" value={fmtPercent(share(withTargets, t.processed))} hint={`${fmtNum(withTargets)} повідомлень`} />
-              <Stat label="Цілей" value={fmtNum(t.targets)} hint={`з них дублікатів ${fmtNum(t.duplicates)}`} />
+              <Stat label="Цілей" value={fmtNum(t.targets)} hint={`за часом події · з них дублікатів ${fmtNum(t.duplicates)}`} />
               <Stat label="Треків" value={fmtNum(t.tracks)} />
-              <Stat label="У черзі" value={fmtNum(t.pending + t.inProgress)} hint={`очікує ${fmtNum(t.pending)}, у роботі ${fmtNum(t.inProgress)}`} tone={t.pending > 100 ? 'warn' : undefined} />
+              <Stat label="У черзі" value={fmtNum(t.pending + t.inProgress)} hint={`увесь backlog · очікує ${fmtNum(t.pending)}, у роботі ${fmtNum(t.inProgress)}`} tone={t.pending > 100 ? 'warn' : undefined} />
               <Stat label="Помилок" value={fmtNum(t.errors)} tone={t.errors === 0 ? undefined : t.errors < 20 ? 'warn' : 'bad'} />
               <Stat label="p50 обробки" value={fmtMs(t.p50Ms)} />
               <Stat label="p90 обробки" value={fmtMs(t.p90Ms)} />

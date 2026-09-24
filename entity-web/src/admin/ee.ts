@@ -46,3 +46,12 @@ export function changedSettings(settings: EeSetting[], draft: Record<string, str
   }
   return out
 }
+
+/**
+ * A reachable service with nothing to extract with: no enabled Python extractor and the LLM off. The status badge speaks of
+ * availability, so this sentence says that deliveries now end "без сутностей" by configuration (admin re-audit O01).
+ */
+export function extractionOffNote(o: { extractors: number; llmEnabled: boolean; extractor: { available: boolean } }): string | null {
+  if (!o.extractor.available || o.extractors > 0 || o.llmEnabled) return null
+  return 'Сервіс доступний, але вилучення сутностей фактично вимкнене: немає жодного увімкненого Python-екстрактора, LLM вимкнено. Доставки завершуються «без сутностей», доки не ввімкнути одне з двох.'
+}

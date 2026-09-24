@@ -84,6 +84,22 @@ public sealed class AdminReadQueriesTests(PipelineFixture fixture) : IAsyncLifet
     }
 
     [Fact]
+    public async Task A02_messages_name_the_post_revision_and_how_many_revisions_are_stored()
+    {
+        var original = await Message("tg_kpszsu", "79815", "КАБи на Дніпропетровщину");
+        var edit = await Message("tg_kpszsu", "79815:e1790208504", "КАБи на Дніпропетровщину та Запоріжжя");
+        var alone = await Message("tg_kpszsu", "79816", "Інший пост");
+        await using var db = await Factory.CreateDbContextAsync();
+        var sourceId = await db.Sources.Where(s => s.Code == "tg_kpszsu").Select(s => s.SourceId).SingleAsync();
+
+        var rows = (await AdminReadQueries.MessagesAsync(db, sourceId, null, null, 50, CancellationToken.None)).Messages.ToDictionary(m => m.Id);
+
+        Assert.Equal(("79815", "0", 2), (rows[original].SourceMessageKey, rows[original].SourceRevision, rows[original].Revisions));
+        Assert.Equal(("79815", "e1790208504", 2), (rows[edit].SourceMessageKey, rows[edit].SourceRevision, rows[edit].Revisions));
+        Assert.Equal(("79816", "0", 1), (rows[alone].SourceMessageKey, rows[alone].SourceRevision, rows[alone].Revisions));
+    }
+
+    [Fact]
     public async Task A10_llm_history_pages_past_the_first_hundred_and_filters_failures()
     {
         var message = await Message("tg_kpszsu", "llm-page", "Текст");

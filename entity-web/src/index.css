@@ -139,3 +139,16 @@ html[data-theme="olive"] {
     right: calc(24rem + 1.25rem);
   }
 }
+
+/* Admin: secondary text carries diagnostics (heartbeat, host/CPU/RSS, how a number is counted), not decoration, so it is
+   lifted one step from the grey the public map uses for captions (admin re-audit R09). Unlayered, so it wins over the
+   utilities; an explicit dark: or hover: colour on the same element is left alone. */
+.admin-root .text-slate-400:not([class*="dark:text-"]):not([class*="hover:text-"]) {
+  color: var(--color-slate-500);
+}
+.dark .admin-root .text-slate-400:not([class*="dark:text-"]):not([class*="hover:text-"]) {
+  color: var(--color-slate-300);
+}
+.dark .admin-root .text-slate-500:not([class*="dark:text-"]):not([class*="hover:text-"]) {
+  color: var(--color-slate-400);
+}

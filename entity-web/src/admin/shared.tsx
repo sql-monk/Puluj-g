@@ -149,7 +149,7 @@ export function Stat({ label, value, hint, tone }: { label: string; value: strin
       <div className={`break-words font-mono ${color}`} title={hint ?? value}>
         {value}
       </div>
-      {hint && <div className="break-words text-[10px] text-slate-400">{hint}</div>}
+      {hint && <div className="break-words text-[11px] text-slate-500">{hint}</div>}
     </div>
   )
 }
@@ -174,8 +174,26 @@ export function ConfirmButton({ label, confirm, onClick, danger, disabled, class
   )
 }
 
-export function Loading({ error, empty }: { error: string | null; empty?: boolean }) {
+/** `slow`: what the wait is for, shown with the elapsed seconds once loading takes longer than a few seconds. */
+export function Loading({ error, empty, slow }: { error: string | null; empty?: boolean; slow?: string }) {
+  const [seconds, setSeconds] = useState(0)
+  const waiting = !error && !!empty && !!slow
+  useEffect(() => {
+    if (!waiting) return
+    const start = Date.now()
+    const id = window.setInterval(() => setSeconds(Math.floor((Date.now() - start) / 1_000)), 1_000)
+    return () => {
+      window.clearInterval(id)
+      setSeconds(0)
+    }
+  }, [waiting])
   if (error) return <div className="text-xs text-red-600">{error}</div>
-  if (empty) return <div className="text-xs text-slate-500">Завантаження…</div>
-  return null
+  if (!empty) return null
+  return (
+    <div className="text-xs text-slate-500" role="status">
+      Завантаження…{slow && seconds >= SLOW_LOADING_SECONDS && ` ${seconds} с — ${slow}`}
+    </div>
+  )
 }
+
+const SLOW_LOADING_SECONDS = 3

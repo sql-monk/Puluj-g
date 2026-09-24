@@ -46,3 +46,16 @@ export function sortCollectors(list: CollectorStatusDto[], key: CollectorSortKey
     return asc ? comparison : -comparison
   })
 }
+
+const QUIET_AFTER_MS = 24 * 3_600_000
+
+/**
+ * "Тиша N дн" when the source's newest message is older than a day: the state badge speaks only of polling, so a quiet
+ * channel with a healthy collector must not read as fresh content. Null while fresh or never received.
+ */
+export function quietLabel(lastMessageAt?: string | null, now: number = Date.now()): string | null {
+  if (!lastMessageAt) return null
+  const at = Date.parse(lastMessageAt)
+  if (Number.isNaN(at) || now - at < QUIET_AFTER_MS) return null
+  return `тиша ${Math.floor((now - at) / 86_400_000)} дн`
+}

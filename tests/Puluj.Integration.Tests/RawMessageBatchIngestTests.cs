@@ -57,6 +57,46 @@ public sealed class RawMessageBatchIngestTests(PipelineFixture fixture) : IAsync
     }
 
     [Fact]
+    public async Task Edit_with_unchanged_text_is_not_stored_but_a_real_edit_is()
+    {
+        var sourceId = await SourceIdAsync();
+        var original = await Ingestor.IngestAsync(Message(sourceId, "30", "КАБи на Дніпропетровщину"), "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+        var noOp = await Ingestor.IngestAsync(Message(sourceId, "30", "КАБи на Дніпропетровщину", edit: 1790208504), "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+        var real = await Ingestor.IngestAsync(Message(sourceId, "30", "КАБи на Дніпропетровщину та Запоріжжя", edit: 1790208600), "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+        var back = await Ingestor.IngestAsync(Message(sourceId, "30", "КАБи на Дніпропетровщину", edit: 1790208700), "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+
+        Assert.True(original.IsNew);
+        Assert.Equal(new IngestResult(null, false), noOp);
+        Assert.True(real.IsNew);
+        Assert.True(back.IsNew); // compared with the latest revision, not with any earlier one
+
+        await using var check = await Factory.CreateDbContextAsync();
+        var revisions = await check.RawMessages.Where(m => m.SourceId == sourceId && m.SourceMessageKey == "30")
+            .OrderBy(m => m.RawMessageId).Select(m => m.SourceRevision).ToListAsync();
+        Assert.Equal(["0", "e1790208600", "e1790208700"], revisions);
+    }
+
+    [Fact]
+    public async Task Batch_skips_edits_with_unchanged_text_against_the_database_and_the_page()
+    {
+        var sourceId = await SourceIdAsync();
+        await Ingestor.IngestAsync(Message(sourceId, "40", "forty"), "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+
+        var results = await Ingestor.IngestBatchAsync(
+        [
+            Message(sourceId, "40", "forty", edit: 1700000100),
+            Message(sourceId, "41", "forty-one"),
+            Message(sourceId, "41", "forty-one", edit: 1700000200),
+            Message(sourceId, "42", null, edit: 1700000300),
+        ], "tg_kpszsu", CancellationToken.None, announceProcessor: false);
+
+        Assert.Equal([false, true, false, true], results.Select(r => r.IsNew));
+        await using var check = await Factory.CreateDbContextAsync();
+        var rows = await check.RawMessages.Where(m => m.SourceId == sourceId).OrderBy(m => m.RawMessageId).Select(m => m.SourceMessageId).ToListAsync();
+        Assert.Equal(["40", "41", "42:e1700000300"], rows);
+    }
+
+    [Fact]
     public async Task Batch_rolls_back_messages_when_the_checkpoint_fails()
     {
         var sourceId = await SourceIdAsync();
@@ -99,7 +139,7 @@ public sealed class RawMessageBatchIngestTests(PipelineFixture fixture) : IAsync
         return await db.Sources.Where(s => s.Code == "tg_kpszsu").Select(s => s.SourceId).SingleAsync();
     }
 
-    private static IncomingMessage Message(int sourceId, string id, string text, long? edit = null) => new()
+    private static IncomingMessage Message(int sourceId, string id, string? text, long? edit = null) => new()
     {
         SourceId = sourceId,
         SourceMessageId = edit is null ? id : $"{id}:e{edit}",

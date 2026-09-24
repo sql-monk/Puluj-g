@@ -2,7 +2,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { entityAdmin, type EeDefinition, type EeDelivery, type EeDeliveryStatus, type EeExtractor, type EeField, type EeMapConfig, type EeRun, type EeSetting } from '../api/entityAdmin'
 import { Badge, Section } from '../components/settings/fields'
-import { changedSettings, deliveryState, resultLabel, runState, SETTING_SOURCE } from './ee'
+import { changedSettings, deliveryState, extractionOffNote, resultLabel, runState, SETTING_SOURCE } from './ee'
 import PythonEditor, { type PythonDiagnostic } from './PythonEditor'
 import { Freshness, Loading, PagerButtons, Stat, ago, fmtNum, fmtTime, usePaged, usePolled } from './shared'
 
@@ -40,6 +40,7 @@ export function EeOperationsPanel() {
               <Stat label="Активні" value={`${fmtNum(o.extractors)} екстр. · ${fmtNum(o.definitions)} сут.`} hint="увімкнені екстрактори та сутності" />
             </div>
             <p className="text-xs text-slate-500">{o.status.detail}</p>
+            {extractionOffNote(o) && <div className="rounded bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-900/30 dark:text-amber-100" role="note">{extractionOffNote(o)}</div>}
             {q.lastError && (
               <div className={`rounded p-2 text-xs ${q.failedLastHour > 0 ? 'bg-red-50 text-red-800 dark:bg-red-900/30 dark:text-red-200' : 'bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
                 <div className="font-medium">

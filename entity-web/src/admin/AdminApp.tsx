@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { admin, AdminError, getAdminToken, setAdminToken, type AdminSourceDto, type AdminStatusDto, type SettingDto } from '../api/admin'
-import { Badge, Field, findSetting, Section, Select, Toggle, type Draft } from '../components/settings/fields'
+import { Badge, Field, findSetting, pendingChanges, Section, Select, Toggle, type Draft } from '../components/settings/fields'
 import LlmUsagePanel from './LlmUsagePanel'
 import SourcesEditor from '../components/settings/SourcesEditor'
 import { CollectorsPanel, DbPanel, LogsPanel, OverviewPanel } from './OpsPanels'
@@ -103,14 +103,16 @@ export default function AdminApp() {
 
   const change = (key: string, value: string | null) => setDraft((d) => ({ ...d, [key]: value }))
   const s = (key: string) => findSetting(settings, key)
-  const dirty = Object.keys(draft).length > 0
+  const pending = pendingChanges(settings, draft)
+  const pendingLabels = Object.keys(pending)
+  const dirty = pendingLabels.length > 0
 
   const save = async () => {
     if (!dirty) return
     setBusy(true)
     try {
-      await admin.saveSettings(draft)
-      if (draft['Admin:Token']) setAdminToken(draft['Admin:Token'])
+      await admin.saveSettings(pending)
+      if (pending['Admin:Token']) setAdminToken(pending['Admin:Token'])
       setDraft({})
       setMessage({ ok: true, text: 'Збережено. Worker застосує зміни протягом кількох секунд.' })
       await load()
@@ -124,7 +126,7 @@ export default function AdminApp() {
   const props: TabProps = { status, draft, change, s, notify: setMessage, reload: load, sources }
 
   return (
-    <div className="absolute inset-0 flex flex-col bg-slate-100 dark:bg-slate-950 dark:text-slate-100">
+    <div className="admin-root absolute inset-0 flex flex-col bg-slate-100 dark:bg-slate-950 dark:text-slate-100">
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900">
         <a className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700" href={MAP_URL}>
           ← Карта
@@ -205,7 +207,7 @@ export default function AdminApp() {
             </div>
             {NAV.find((n) => n.id === section)?.group === 'Налаштування' && (
             <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-4 py-3 text-sm dark:border-slate-700 dark:bg-slate-900">
-              <span className={`min-h-5 text-xs ${message ? (message.ok ? 'text-emerald-600' : 'text-red-600') : 'text-slate-400'}`}>{message?.text ?? (dirty ? 'Є незбережені зміни' : '')}</span>
+              <span className={`min-h-5 text-xs ${message ? (message.ok ? 'text-emerald-600' : 'text-red-600') : 'text-slate-400'}`}>{message?.text ?? (dirty ? `Є незбережені зміни: ${pendingLabels.join(', ')}` : '')}</span>
               <div className="flex gap-2">
                 <button className="rounded border border-slate-300 px-3 py-1.5 dark:border-slate-600" onClick={() => setDraft({})} disabled={!dirty}>
                   Скасувати

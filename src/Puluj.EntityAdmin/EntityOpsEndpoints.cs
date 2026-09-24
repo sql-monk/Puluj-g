@@ -673,9 +673,7 @@ public static partial class EntityOpsEndpoints
         {
             return null;
         }
-        var value = Convert.ToString(record.GetValue(ordinal), CultureInfo.InvariantCulture) ?? string.Empty;
-        // Browsing a JSON payload or long message must not turn an admin request into a multi-megabyte response.
-        return value.Length <= 4_000 ? value : $"{value[..4_000]}…";
+        return DatabaseCellFormat.Format(record.GetValue(ordinal));
     }
 
     private static string QuoteIdentifier(string value) => $"\"{value.Replace("\"", "\"\"")}\"";

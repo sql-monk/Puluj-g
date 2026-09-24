@@ -46,13 +46,15 @@ public static class AdminReadQueries
                 x.PublishedAt, x.ReceivedAt, x.ProcessingStatus, x.ProcessedAt, x.Attempts,
                 Text = x.RawText == null ? null : x.RawText.Substring(0, MessageTextLimit + 1),
                 x.Url, Targets = x.Targets.Count(),
+                x.SourceMessageKey, x.SourceRevision,
+                Revisions = db.RawMessages.Count(r => r.SourceId == x.SourceId && r.SourceMessageKey == x.SourceMessageKey),
             })
             .ToListAsync(ct);
         var page = rows.Take(take).Select(x => new AdminMessageDto(
             x.RawMessageId, x.SourceId, x.SourceCode, x.SourceName, x.SourceMessageId, x.PublishedAt, x.ReceivedAt,
             x.ProcessingStatus.ToString(), x.ProcessedAt, x.Attempts,
             x.Text is { Length: > MessageTextLimit } ? x.Text[..MessageTextLimit] : x.Text, x.Text is { Length: > MessageTextLimit },
-            x.Url, x.Targets)).ToList();
+            x.Url, x.Targets, x.SourceMessageKey, x.SourceRevision, x.Revisions)).ToList();
         var next = rows.Count > take ? Cursor(page[^1].ReceivedAt, page[^1].Id) : null;
         return new AdminMessagePageDto(page, next);
     }

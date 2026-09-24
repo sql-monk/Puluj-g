@@ -381,6 +381,11 @@ export interface AdminMessageDto {
   textTruncated: boolean
   url?: string
   targets: number
+  sourceMessageKey: string
+  /** "0" — the original post; "e{unix}" — a stored Telegram edit, publishedAt is then the edit time. */
+  sourceRevision: string
+  /** Stored revisions of the same post, this one included. */
+  revisions: number
 }
 export interface AdminMessagePageDto {
   messages: AdminMessageDto[]

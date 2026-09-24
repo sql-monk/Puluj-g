@@ -32,7 +32,10 @@ source-specific config і secrets. `CollectorSupervisor` бере лише enabl
 
 Telegram collector працює для Telegram sources з username у config. Він
 зберігає нові й відредаговані channel posts: edit має ту саму key, але окрему
-revision, тому оригінал не втрачається. alerts.in.ua полить active alerts і
+revision, тому оригінал не втрачається. Edit, текст якого збігається з останньою
+збереженою revision того самого поста, не зберігається: Telegram змінює
+`edit_date` і без зміни тексту (форматування, кнопки), а процесор читає лише
+текст, тож така revision була б повторною обробкою того самого. alerts.in.ua полить active alerts і
 формує start/end повідомлення зі стабільними ключами `{id}:start` та
 `{id}:end`. Для обох шляхів `RawMessageIngestor` зберігає наявні оригінальні
 text/payload і URL, рахує latency та будить processor через PostgreSQL `NOTIFY`;

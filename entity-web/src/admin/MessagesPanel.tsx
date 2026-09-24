@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { admin, type AdminMessageDto, type AdminSourceDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { telegramTitle } from '../components/settings/sources'
-import { messageFilterFromQuery, messagesHash, PROCESSING_STATUS } from './messages'
+import { messageFilterFromQuery, messagesHash, PROCESSING_STATUS, revisionNote } from './messages'
 import { Loading, PagerButtons, fmtTime, usePaged } from './shared'
 
 /**
@@ -80,7 +80,7 @@ function MessagesTable({ messages, showSource }: { messages: AdminMessageDto[]; 
           <tr>
             <th className="py-1 pr-2">ID</th>
             {showSource && <th className="pr-2">Джерело</th>}
-            <th className="pr-2">Опубліковано</th>
+            <th className="pr-2" title="Час публікації поста; для редакції — час редагування">Опубліковано</th>
             <th className="pr-2">Отримано</th>
             <th className="pr-2">Обробка</th>
             <th className="pr-2">Цілей</th>
@@ -91,6 +91,7 @@ function MessagesTable({ messages, showSource }: { messages: AdminMessageDto[]; 
           {messages.map((m) => {
             const status = PROCESSING_STATUS[m.processingStatus] ?? { text: m.processingStatus, ok: null }
             const expanded = open === m.id
+            const revision = revisionNote(m)
             return (
               <tr key={m.id} className="border-t border-slate-100 align-top dark:border-slate-800" data-testid="admin-message">
                 <td className="whitespace-nowrap py-1.5 pr-2 font-mono">
@@ -100,6 +101,11 @@ function MessagesTable({ messages, showSource }: { messages: AdminMessageDto[]; 
                     </a>
                   ) : (
                     `#${m.id}`
+                  )}
+                  {revision && (
+                    <span className="ml-1 rounded bg-amber-100 px-1 font-sans text-[10px] text-amber-800 dark:bg-amber-900/40 dark:text-amber-200" title={revision.title} data-testid="message-revision">
+                      {revision.label}
+                    </span>
                   )}
                 </td>
                 {showSource && <td className="pr-2 font-mono">{m.sourceCode}</td>}

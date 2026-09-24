@@ -33,3 +33,20 @@ export const PROCESSING_STATUS: Record<string, { text: string; ok: boolean | nul
   Skipped: { text: 'пропущено', ok: null },
   Failed: { text: 'помилка', ok: false },
 }
+
+/**
+ * How a row relates to its Telegram post: a stored edit is its own row whose "published" time is the edit time, and the
+ * original post says that later edits exist — otherwise two rows with the same link look like one post stored twice.
+ */
+export function revisionNote(m: { sourceMessageKey: string; sourceRevision: string; revisions: number }): { label: string; title: string } | null {
+  if (m.sourceRevision && m.sourceRevision !== '0') {
+    return {
+      label: 'редакція',
+      title: `Редагування поста ${m.sourceMessageKey}: «Опубліковано» — час редагування, не першої публікації. Версій цього поста в базі: ${m.revisions}.`,
+    }
+  }
+  if (m.revisions > 1) {
+    return { label: `версій: ${m.revisions}`, title: `Оригінал поста ${m.sourceMessageKey}; його редагування збережені окремими рядками з тим самим посиланням.` }
+  }
+  return null
+}

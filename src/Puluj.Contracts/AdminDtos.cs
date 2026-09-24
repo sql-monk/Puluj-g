@@ -69,10 +69,13 @@ public sealed record DbQueryResultDto(
 public sealed record DbQueryErrorDto(string Error, string? SqlState, int? Position, string? Hint);
 
 /// <summary>One collected message as the admin message browser lists it; the text is cut to a display-safe length.</summary>
+/// <param name="SourceRevision">"0" for the original post, "e{unix}" for a stored Telegram edit (its PublishedAt is the edit time).</param>
+/// <param name="Revisions">How many stored revisions the post (<paramref name="SourceMessageKey"/>) has, this one included.</param>
 public sealed record AdminMessageDto(
     long Id, int SourceId, string SourceCode, string SourceName, string SourceMessageId,
     DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string ProcessingStatus, DateTimeOffset? ProcessedAt, int Attempts,
-    string? Text, bool TextTruncated, string? Url, int Targets);
+    string? Text, bool TextTruncated, string? Url, int Targets,
+    string SourceMessageKey, string SourceRevision, int Revisions);
 
 /// <param name="NextCursor">Opaque keyset cursor for the next (older) page; null on the last page.</param>
 public sealed record AdminMessagePageDto(IReadOnlyList<AdminMessageDto> Messages, string? NextCursor);

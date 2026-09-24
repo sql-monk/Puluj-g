@@ -3,6 +3,7 @@ import { admin, type LlmOutcomeFilter, type LlmRequestDetailDto, type LlmRequest
 import { Badge, Section } from '../components/settings/fields'
 import { messagesHash } from './messages'
 import { Bars, Freshness, Loading, PagerButtons, Stat, fmtMs, fmtNum, fmtTime, fmtUsd, usePaged, usePolled } from './shared'
+import { callsHint, inputTokens } from './llmUsage'
 
 const PERIODS: { hours: 24 | 168 | 720; label: string }[] = [
   { hours: 24, label: '24 год' },
@@ -48,8 +49,8 @@ export default function LlmUsagePanel() {
         <div className={stale ? 'opacity-50' : undefined} aria-busy={stale}>
           <div className="grid grid-cols-1 gap-2 text-xs min-[420px]:grid-cols-2 sm:grid-cols-4">
             <Stat label="Вартість" value={fmtUsd(data.estimatedCostUsd)} hint="USD, без податків і кредитів" />
-            <Stat label="Виклики" value={fmtNum(data.calls)} hint={`фактів ${fmtNum(data.withFacts)} · порожньо ${fmtNum(data.empty)} · помилок ${fmtNum(data.failures)}`} />
-            <Stat label="Токени input" value={fmtNum(data.inputTokens + data.cacheWriteTokens + data.cacheReadTokens)} hint={`звичайні ${fmtNum(data.inputTokens)} · cache read ${fmtNum(data.cacheReadTokens)}`} />
+            <Stat label="Виклики" value={fmtNum(data.calls)} hint={callsHint(data)} />
+            <Stat label="Токени input" value={fmtNum(inputTokens(data).total)} hint={inputTokens(data).hint} />
             <Stat label="Токени output" value={fmtNum(data.outputTokens)} hint={`середня тривалість ${fmtMs(data.meanDurationMs)}`} />
           </div>
           {data.timeline.length > 0 && (

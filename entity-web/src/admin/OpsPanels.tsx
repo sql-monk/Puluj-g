@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { admin, AdminError, type CollectorStatusDto, type DbQueryErrorDto, type DbQueryResultDto, type DbReportDto, type LogFileDto, type LogTailDto, type OpsOverviewDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { telegramTitle, telegramUsername } from '../components/settings/sources'
-import { sortCollectors, type CollectorSortKey } from './collectors'
+import { quietLabel, sortCollectors, type CollectorSortKey } from './collectors'
 import { sqlErrorLocation } from './format'
 import { messagesHash } from './messages'
 import { Bars, Loading, Stat, ago, fmtBytes, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
@@ -152,7 +152,10 @@ export function CollectorsPanel() {
                 </td>
                 <td className="pr-2">{c.type}</td>
                 <td className="pr-2">
-                  <Badge ok={!c.enabled ? null : c.consecutiveFailures > 0 ? false : c.lastSuccessAt ? true : null} text={!c.enabled ? 'вимкнено' : c.consecutiveFailures > 0 ? `${c.consecutiveFailures} помилок поспіль` : c.lastSuccessAt ? 'ok' : 'ще не опитано'} />
+                  <span title="Стан опитування джерела; свіжість контенту — у колонці «Повідомлення»">
+                    <Badge ok={!c.enabled ? null : c.consecutiveFailures > 0 ? false : c.lastSuccessAt ? true : null} text={!c.enabled ? 'вимкнено' : c.consecutiveFailures > 0 ? `${c.consecutiveFailures} помилок поспіль` : c.lastSuccessAt ? 'опитування ok' : 'ще не опитано'} />
+                  </span>
+                  {c.enabled && quietLabel(c.lastMessageAt) && <div className="text-[11px] text-amber-700 dark:text-amber-300">{quietLabel(c.lastMessageAt)}</div>}
                 </td>
                 <td className="pr-2 text-slate-500">{ago(c.lastPolledAt)}</td>
                 <td className="pr-2 text-slate-500">{ago(c.lastSuccessAt)}</td>
@@ -166,7 +169,7 @@ export function CollectorsPanel() {
                 <td className="max-w-xs truncate pr-2 text-red-600" title={c.lastError}>
                   {c.lastError ?? ''}
                 </td>
-                <td className="whitespace-nowrap">{c.type === 'Telegram' && <a className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={messagesHash({ sourceId: c.sourceId })}>Дивитись повідомлення</a>}</td>
+                <td className="whitespace-nowrap"><a className="rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600" href={messagesHash({ sourceId: c.sourceId })}>Дивитись повідомлення</a></td>
               </tr>
             ))}
           </tbody>
@@ -351,7 +354,7 @@ export function DbPanel() {
       {selectedTable && (
         <Section title={`Дані: ${selectedTable}`} badge={tableRows && <Badge ok={true} text={tableRows.rows.length ? `рядки ${fmtNum((tableRows.offset ?? 0) + 1)}–${fmtNum((tableRows.offset ?? 0) + tableRows.rows.length)}` : 'рядків немає'} />}>
           <p className="text-xs text-slate-500">
-            По {TABLE_PAGE} рядків{tableRows?.orderBy ? `, упорядковано за первинним ключем (${tableRows.orderBy.join(', ')})` : ', без первинного ключа — порядок не гарантовано'}. Значення секретних полів приховано. Для пошуку й фільтра — SQL-консоль нижче.
+            По {TABLE_PAGE} рядків{tableRows?.orderBy ? `, упорядковано за первинним ключем (${tableRows.orderBy.join(', ')})` : ', без первинного ключа — порядок не гарантовано'}. Значення секретних полів приховано. Час — як у базі: timestamptz у UTC (ISO 8601 із «Z»), не за Києвом. Для пошуку й фільтра — SQL-консоль нижче.
           </p>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <button className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50 dark:border-slate-600" disabled={loadingTable || !tableRows || (tableRows.offset ?? 0) === 0} onClick={() => void openTable(selectedTable, Math.max(0, (tableRows?.offset ?? 0) - TABLE_PAGE))}>
@@ -510,7 +513,7 @@ export function LogsPanel() {
     <Section title="Логи" badge={tail && <Badge ok={null} text={`${tail.lines.length} рядків · ${fmtBytes(tail.bytes)}`} />}>
       <p className="text-xs text-slate-500">Кожен сервіс пише свій файл на день у спільну теку logs/. Тут — хвіст файлу; фільтр шукає підрядок у записі, рівень — за позначкою [WRN] / [ERR].</p>
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" value={file} onChange={(e) => setFile(e.target.value)}>
+        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" aria-label="Файл журналу" title="Файл журналу" value={file} onChange={(e) => setFile(e.target.value)}>
           {[...byService.entries()].map(([svc, fs]) => (
             <optgroup key={svc} label={svc}>
               {fs.map((f) => (
@@ -522,15 +525,15 @@ export function LogsPanel() {
           ))}
           {files.length === 0 && <option value="">(файлів немає)</option>}
         </select>
-        <input className="w-48 rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800" placeholder="фільтр…" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" value={level} onChange={(e) => setLevel(e.target.value)}>
+        <input className="w-48 rounded border border-slate-300 px-2 py-0.5 dark:border-slate-600 dark:bg-slate-800" placeholder="фільтр…" aria-label="Фільтр рядків" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" aria-label="Рівень" title="Рівень" value={level} onChange={(e) => setLevel(e.target.value)}>
           {LEVELS.map((l) => (
             <option key={l} value={l}>
               {l || 'усі рівні'}
             </option>
           ))}
         </select>
-        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
+        <select className="rounded border border-slate-300 bg-white px-1 py-0.5 dark:border-slate-600 dark:bg-slate-800" aria-label="Кількість рядків" title="Кількість рядків" value={lines} onChange={(e) => setLines(Number(e.target.value))}>
           {[100, 200, 500, 1000, 2000].map((n) => (
             <option key={n} value={n}>
               {n} рядків
