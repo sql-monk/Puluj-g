@@ -45,7 +45,7 @@ test('default icon, invalid SVG fallback and custom lines survive a style reload
     return [...new Set(map.queryRenderedFeatures({ layers: ['ee-entity-icons', 'ee-entity-points', 'ee-entity-lines'] }).map(feature => feature.properties.entity))].sort()
   })).toEqual(['custom', 'explosion', 'route'])
   await page.getByLabel('Кольорова тема').selectOption('light')
-  await expect.poll(() => rendered(page).find(item => item.entity === 'explosion')?.renderer).toBe('icon')
+  await expect.poll(async () => (await rendered(page)).find(item => item.entity === 'explosion')?.renderer).toBe('icon')
   await page.getByLabel('Кольорова тема').selectOption('dark')
   await expect.poll(() => page.evaluate(() => (window as unknown as { __map: MapLibreMap }).__map.isStyleLoaded())).toBe(true)
   await page.evaluate(() => {

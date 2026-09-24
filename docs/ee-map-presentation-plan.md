@@ -48,5 +48,6 @@
 - Python: **101 passed, 1 skipped** (Windows не підтримує POSIX process-group сценарій); Ruff пройшов.
 - Frontend lint: завершився з кодом 0, існуючі warnings залишено без нерелевантного рефакторингу.
 - Початковий frontend suite: 148 passed, 4 тайм-аути Intl formatting на навантаженому Windows host. Повторний запуск обмежує кількість workers; це ще не фінальний passing evidence.
-- .NET integration, final frontend та браузерні перевірки виконуються. Результати CI/скріншоти буде додано перед merge.
+- Повторний frontend suite: **160/160 passed** (`--maxWorkers=2 --testTimeout=30000`); TypeScript build пройшов після виправлення missing await у новому E2E. Остаточне незалежне post-review: схвалено, відкритих зауважень немає.
+- .NET integration та браузерні перевірки виконуються. Результати CI/скріншоти буде додано перед merge. PR: https://github.com/sql-monk/Puluj-g/pull/79.
 - Live Docker containers/БД не змінювались; runtime retirement потребує описаного в README rollout.
