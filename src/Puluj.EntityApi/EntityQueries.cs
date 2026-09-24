@@ -21,6 +21,8 @@ public sealed partial class EntityQueries(IConfiguration configuration)
             SELECT entity_name, table_name, fields::text, coalesce(map_settings, '{}'::jsonb)::text, enabled
             FROM ee_entity_definitions
             WHERE enabled
+              AND lower(entity_name) NOT IN ('track', 'tracks', 'ee_track', 'ee_tracks')
+              AND lower(table_name) <> 'ee_tracks'
             ORDER BY entity_name
             """;
         var rows = new List<EntityDefinitionDto>();
@@ -300,4 +302,8 @@ public sealed record MapSettings(bool Visible, string Renderer, string? LabelFie
 }
 public sealed record EntityItemDto(string Entity, string Table, string Id, string? RawMessageId, int? SourceId, DateTimeOffset? OccurredAt, JsonElement Values, JsonElement? Geometry);
 public sealed record EntitySnapshotDto(DateTimeOffset GeneratedAt, DateTimeOffset? At, IReadOnlyList<EntityItemDto> Items, bool Truncated, int LimitPerEntity);
-public sealed record EntityPageDto(IReadOnlyList<EntityItemDto> Items, string? NextCursor, int TotalCount);
+public sealed record EntityPageDto(IReadOnlyList<EntityItemDto> Items, string? NextCursor, int TotalCount)
+{
+    // Old clients ignore this; new clients do not mistake an old server's track-inclusive count for a filtered total.
+    public bool ExcludesRetiredTracks => true;
+}

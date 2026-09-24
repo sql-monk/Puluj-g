@@ -78,7 +78,7 @@ test('map exposes EE kinds without unsupported taxonomy or forecast controls', a
   const audit = await mockApp(page)
   await page.goto('/#/map/live')
   await toggle(page).click()
-  await expect(panel(page).getByLabel('Тип сутності')).toContainText('explosion')
+  await expect(panel(page).getByRole('group', { name: 'Тип сутності', exact: true }).getByRole('checkbox')).toHaveCount(1)
   for (const name of ['Вид події', 'Категорія події', 'Категорія', 'Клас', 'Сімейство', 'Модель', 'Область']) {
     await expect(panel(page).getByLabel(name, { exact: true })).toHaveCount(0)
   }
@@ -287,4 +287,68 @@ test('415px expanded history feed stays above replay controls after window remou
   }
   expect(audit.errors).toEqual([])
   expect(audit.unexpected).toEqual([])
+})
+
+test('filter panel keeps checkbox selection, URL history, retired kinds and separate reset semantics', async ({ page }) => {
+  const audit = await mockApp(page)
+  await page.goto('/#/map/live?entityKinds=track&sourceIds=999')
+  await toggle(page).click()
+  await expect(panel(page)).toContainText('Треки вимкнено')
+  await expect(panel(page)).toContainText('0 записів після фільтрів')
+  await panel(page).getByRole('checkbox', { name: 'Треки вимкнено' }).uncheck()
+  await expect(page).not.toHaveURL(/entityKinds=/)
+  await panel(page).locator('summary').filter({ hasText: /^Джерела/ }).click()
+  await expect(panel(page).getByRole('checkbox', { name: 'Недоступне джерело #999' })).toBeChecked()
+  await panel(page).getByRole('checkbox', { name: 'Audit source', exact: true }).check()
+  await expect(page).toHaveURL(/sourceIds=1%2C999/)
+  await page.goBack()
+  await expect(panel(page).getByRole('checkbox', { name: 'Audit source', exact: true })).not.toBeChecked()
+  await panel(page).locator('summary').filter({ hasText: /^Відображення/ }).click()
+  await panel(page).getByRole('checkbox', { name: 'Події', exact: true }).uncheck()
+  await panel(page).getByRole('button', { name: 'Скинути фільтри даних', exact: true }).click()
+  await expect(page).not.toHaveURL(/sourceIds=/)
+  await expect(panel(page).getByRole('checkbox', { name: 'Події', exact: true })).not.toBeChecked()
+  await panel(page).getByRole('button', { name: 'Скинути відображення', exact: true }).click()
+  await expect(panel(page).getByRole('checkbox', { name: 'Події', exact: true })).toBeChecked()
+  await expect(panel(page)).toContainText('3 записів після фільтрів')
+  expect(audit.errors).toEqual([])
+})
+
+test('320px panel keyboard loop skips collapsed controls and Escape restores focus', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  const audit = await mockApp(page)
+  await page.goto('/#/map/live')
+  await toggle(page).click()
+  const close = panel(page).getByRole('button', { name: 'Згорнути панель', exact: true })
+  await expect(close).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  await expect(panel(page).getByRole('button', { name: 'Відтворення історії', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(close).toBeFocused()
+  await expect(panel(page).getByLabel('Час життя позначки')).not.toBeVisible()
+  const box = await panel(page).boundingBox()
+  expect(box!.x).toBeGreaterThanOrEqual(0)
+  expect(box!.x + box!.width).toBeLessThanOrEqual(320)
+  expect(await panel(page).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(toggle(page)).toBeFocused()
+  await expect(panel(page)).toHaveCount(0)
+  expect(audit.errors).toEqual([])
+})
+
+test('panel visual review: desktop and mobile in light and dark', async ({ page }, testInfo) => {
+  await mockApp(page)
+  await page.goto('/#/map/live')
+  await toggle(page).click()
+  await expect(panel(page).getByRole('checkbox')).toHaveCount(1)
+  for (const width of [1280, 415, 320]) {
+    await page.setViewportSize({ width, height: 900 })
+    for (const dark of [false, true]) {
+      await page.evaluate(value => document.documentElement.classList.toggle('dark', value), dark)
+      const path = testInfo.outputPath(`panel-${width}-${dark ? 'dark' : 'light'}.png`)
+      await page.screenshot({ path, fullPage: true })
+      await testInfo.attach(`panel-${width}-${dark ? 'dark' : 'light'}`, { path, contentType: 'image/png' })
+      expect(await panel(page).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)
+    }
+  }
 })

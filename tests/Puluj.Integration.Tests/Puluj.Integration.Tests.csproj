@@ -8,6 +8,7 @@
     <ProjectReference Include="..\..\src\Puluj.Api\Puluj.Api.csproj" />
     <ProjectReference Include="..\..\src\Puluj.Admin\Puluj.Admin.csproj" />
     <ProjectReference Include="..\..\src\Puluj.EntityAdmin\Puluj.EntityAdmin.csproj" />
+    <ProjectReference Include="..\..\src\Puluj.EntityApi\Puluj.EntityApi.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />

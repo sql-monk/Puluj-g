@@ -18,7 +18,6 @@ HERE = Path(__file__).resolve().parent
 EXTRACTORS = {
     "alert": 10,
     "target": 20,
-    "track": 30,
     "explosion": 40,
     "impact": 50,
     "airDefenseAction": 60,
@@ -39,7 +38,15 @@ def _literal(value: str) -> str:
 
 
 def sql(enabled: bool = True) -> str:
-    statements = ["BEGIN;"]
+    statements = [
+        "BEGIN;",
+        # Retirement is repeated on every installation, including --disable, so an older
+        # database or an accidentally re-enabled extractor cannot restore public tracks.
+        "UPDATE ee_extractors SET enabled = false WHERE name = 'track';",
+        "UPDATE ee_entity_definitions SET enabled = false, "
+        "map_settings = coalesce(map_settings, '{}'::jsonb) || '{\"enabled\":false}'::jsonb "
+        "WHERE entity_name = 'track' OR table_name = 'ee_tracks';",
+    ]
     for name, order in EXTRACTORS.items():
         code = _literal(build(name))
         statements.append(

@@ -4,6 +4,18 @@ The service receives one queued raw message at `POST /extract`, runs the current
 `ee_extractors`, and writes captured entities into registered `ee_*` tables. It shares PostgreSQL with Puluj but never
 updates the legacy `raw_messages` processing fields or legacy entity tables.
 
+EE tracks are retired: `RetireEntityTracks` disables their extractor, entity definition and map visibility.
+The installer repeats this retirement and never enables the archived `extractors/track.py` code, including on
+reinstallation. Existing `ee_tracks` rows and extraction evidence are retained. Disabled definitions are excluded
+from extraction/LLM schemas and public definitions, catalogue, snapshots and related history; old public track
+detail links return not found. Generic line entities and the legacy track pipeline are unaffected.
+
+For a running installation, stop admission of EE jobs and drain active extraction requests before applying the
+migration or installer; then verify both track flags are disabled and resume processing. An already-running
+transaction may have read the old registry, so the migration alone is not an in-flight write barrier. Do not
+clear historical tables or reprocess messages for this rollout. Rolling back the migration does not automatically
+re-enable tracks because the previous operator-managed enabled state is unknown.
+
 An extractor defines either:
 
 ```python
@@ -31,7 +43,6 @@ against the `places` gazetteer on insert (`ee_place_geometry`, migration `Entity
 ```python
 write("targets", {"geometry": {"place": "Носівку", "hint": ["Чернігівська обл."], "required": True}, ...})
 write("alerts", {"geometry": {"place": "Чугуївський район", "region": "Харківська обл."}, ...})
-write("tracks", {"geometry": {"from": {"place": "Узина"}, "to": {"place": "Васильків"}}, ...})
 ```
 
 Names may be inflected ("на Носівку", "до Славутича"). `region` restricts the match to one oblast, `hint` (one name or a
@@ -42,7 +53,7 @@ instead of storing it without geometry.
 
 ## Shipped extractors
 
-`extractors/` holds the extractors for the eight seeded entities (alert, target, track, explosion, impact,
+`extractors/` installs seven active seeded entities (alert, target, explosion, impact,
 airDefenseAction, launch, takeoff), written against the messages of the collected channels; `tests/test_extractors.py`
 runs them on real message texts. The sandbox imports only the standard-library allowlist, so each stored extractor is
 `common.py` followed by its own file. Store and enable them (idempotent; `--disable` stores them switched off):
