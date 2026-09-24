@@ -9,7 +9,7 @@ from .config import Settings
 from .llm import EntityLlmExtractor, LlmError
 from .models import CapturedWrite, EntityDefinition, ExtractRequest
 from .repository import Repository, index_entity_definitions, resolve_entity_definition, validate_write
-from .runtime import execute_extractor
+from .runtime import execute_extractors
 
 
 class ExtractionInProgress(RuntimeError):
@@ -62,16 +62,19 @@ class EntityExtractorService:
         failures: list[str] = []
         extractors = await self.repository.list_extractors()
         definitions = await self.repository.list_entity_definitions()
-        for extractor in extractors:
-            if extractor.extractor_id in completed_steps:
-                continue
-            result = await execute_extractor(
-                extractor.code,
-                request.extractor_message(),
-                extractor.timeout_ms or self.settings.default_timeout_ms,
-                self.settings.max_output_bytes,
-                self.settings.max_memory_mb,
-            )
+        pending = [extractor for extractor in extractors if extractor.extractor_id not in completed_steps]
+        # One sandbox child runs every pending extractor; each still commits or fails on its own below.
+        results = await execute_extractors(
+            [
+                (extractor.extractor_id, extractor.code, extractor.timeout_ms or self.settings.default_timeout_ms)
+                for extractor in pending
+            ],
+            request.extractor_message(),
+            self.settings.max_output_bytes,
+            self.settings.max_memory_mb,
+        )
+        for extractor in pending:
+            result = results[extractor.extractor_id]
             if result.error:
                 await self.repository.record_extractor_failure(
                     claim.run_id,
@@ -88,7 +91,7 @@ class EntityExtractorService:
                     claim.run_id,
                     request.raw_message_id,
                     extractor,
-                    with_event_time(result.writes, definitions, request),
+                    with_event_time(result.writes, definitions, event_time(request)),
                     result.duration_ms,
                     result.stdout,
                     result.stderr,
@@ -161,7 +164,7 @@ class EntityExtractorService:
 
         try:
             by_alias = index_entity_definitions(definitions)
-            llm_result.writes = with_event_time(llm_result.writes, definitions, request)
+            llm_result.writes = with_event_time(llm_result.writes, definitions, event_time(request))
             for captured in llm_result.writes:
                 definition = resolve_entity_definition(by_alias, captured.table)
                 validate_write(definition, captured.values)
@@ -218,16 +221,20 @@ class EntityExtractorService:
             return True
 
 
+def event_time(request: ExtractRequest) -> datetime:
+    """When a message's events happened, unless they say otherwise: published, else received, else now."""
+    return request.published_at or request.received_at or datetime.now(timezone.utc)
+
+
 def with_event_time(
-    writes: list[CapturedWrite], definitions: list[EntityDefinition], request: ExtractRequest
+    writes: list[CapturedWrite], definitions: list[EntityDefinition], fallback: datetime
 ) -> list[CapturedWrite]:
-    """No event without a time: an entity with an ``occurredAt`` field the extractor left empty gets the moment
-    the message was published (received, if the source gave no time)."""
+    """No event without a time: an entity with an ``occurredAt`` field the extractor left empty gets ``fallback``,
+    the moment its message was published."""
     try:
         by_alias = index_entity_definitions(definitions)
     except ValueError:
         return writes
-    fallback = request.published_at or request.received_at or datetime.now(timezone.utc)
     completed: list[CapturedWrite] = []
     for captured in writes:
         definition = by_alias.get(captured.table)

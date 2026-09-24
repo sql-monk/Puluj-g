@@ -51,6 +51,26 @@ runs them on real message texts. The sandbox imports only the standard-library a
 python entity-extractor/extractors/install.py | docker exec -i puluj-g-postgis-1 psql -U puluj -d puluj
 ```
 
+## History
+
+The live path audits every message and every extractor call, which does not scale to the collected history. For
+history, `python -m app.backfill` runs the extractors over `raw_messages` by id: one sandbox child per batch of
+messages, place references resolved once per distinct place, one transaction per batch that replaces the entity rows of
+its messages and moves the checkpoint (`app_settings` `EntityExtractor:Backfill:NextRawMessageId`). It can be stopped
+and restarted at any time, and re-running a range writes the same rows rather than duplicates. It connects as the
+database owner:
+
+```sh
+cd entity-extractor
+DATABASE_URL=postgresql://puluj:<password>@localhost:5442/puluj python -m app.backfill --workers 4
+```
+
+Without `--to-id` it stops at the newest message the live path has already seen; run it again after a deployment to
+cover the messages in between. `--include-disabled` runs extractors that are stored but switched off.
+
+The live path also runs all extractors of a message in one sandbox child (falling back to one child per extractor
+when that child dies or times out).
+
 Alerts are states: `ee_alerts.state_key` names the area and `map_settings.keyField` makes the map show only the latest
 row per key, so an ended alert leaves the map.
 

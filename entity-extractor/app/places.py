@@ -38,7 +38,7 @@ _POINT_KEYS = {"lon", "lat"}
 
 
 def is_place_reference(kind: str, value: Any) -> bool:
-    if not isinstance(value, dict) or "type" in value:
+    if kind not in ("point", "line", "polygon") or not isinstance(value, dict) or "type" in value:
         return False
     if kind == "line":
         return "from" in value and "to" in value

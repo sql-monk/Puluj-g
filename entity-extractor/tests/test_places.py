@@ -65,3 +65,12 @@ def test_a_line_reference_takes_places_or_coordinates() -> None:
 def test_malformed_references_are_rejected(value: dict) -> None:
     with pytest.raises(ValueError):
         validate_write(definition(), {"geometry": value})
+
+
+def test_only_geometry_fields_take_place_references() -> None:
+    json_definition = definition().model_copy(
+        update={"fields": [*definition().fields, EntityField(name="attributes", type="json")]}
+    )
+    columns, values, _ = validate_write(json_definition, {"attributes": {"place": "Київ", "role": "heading"}})
+    assert columns == ["attributes"] and '"role"' in values[0]
+    assert required_columns(json_definition, {"attributes": {"place": "Київ", "required": True}}) == []

@@ -46,6 +46,15 @@ class RetryLlm(FakeLlm):
         return self.result
 
 
+def patch_runtime(monkeypatch, execute) -> None:
+    """The service runs all extractors in one child; the fake answers one call per extractor, in order."""
+
+    async def execute_all(extractors, message, max_output_bytes, max_memory_mb):
+        return {extractor_id: await execute(code, message, timeout) for extractor_id, code, timeout in extractors}
+
+    monkeypatch.setattr("app.service.execute_extractors", execute_all)
+
+
 def request() -> ExtractRequest:
     return ExtractRequest(deliveryId="11111111-1111-1111-1111-111111111111", rawMessageId=42, sourceId=2, text="Вибух у Києві")
 
@@ -92,7 +101,7 @@ async def test_one_committed_extractor_write_wins_over_another_failure(monkeypat
     async def execute(*args, **kwargs):
         return next(results)
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     llm = FakeLlm()
     service = EntityExtractorService(repository, Settings(), llm)  # type: ignore[arg-type]
 
@@ -109,7 +118,7 @@ async def test_rule_failure_without_write_is_technical_error(monkeypatch) -> Non
     async def execute(*args, **kwargs):
         return RuntimeResult(error="boom")
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     service = EntityExtractorService(repository, Settings(), FakeLlm())  # type: ignore[arg-type]
 
     with pytest.raises(ExtractionFailed, match="boom"):
@@ -134,7 +143,7 @@ async def test_true_zero_runs_llm_and_commits_its_write(monkeypatch) -> None:
     async def execute(*args, **kwargs):
         return RuntimeResult()
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     llm = FakeLlm(
         LlmResult(
             writes=[CapturedWrite(table="ee_explosions", values={"place": "Київ"})],
@@ -216,7 +225,7 @@ async def test_completed_delivery_returns_stored_scalar_without_execution(monkey
     async def execute(*args, **kwargs):
         raise AssertionError("extractor should not execute")
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     service = EntityExtractorService(repository, Settings(), FakeLlm())  # type: ignore[arg-type]
 
     assert await service.process(request()) == 1
@@ -234,7 +243,7 @@ async def test_recovery_skips_committed_extractor_steps(monkeypatch) -> None:
         calls += 1
         return RuntimeResult()
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     service = EntityExtractorService(repository, Settings(), FakeLlm())  # type: ignore[arg-type]
 
     assert await service.process(request()) == 1
@@ -260,7 +269,7 @@ async def test_an_entity_without_its_own_time_takes_the_publication_time(monkeyp
             CapturedWrite(table="explosions", values={"place": "Суми", "occurredAt": stated.isoformat()}),
         ])
 
-    monkeypatch.setattr("app.service.execute_extractor", execute)
+    patch_runtime(monkeypatch, execute)
     published = datetime(2026, 9, 24, 3, 0, tzinfo=timezone.utc)
     service = EntityExtractorService(repository, Settings(), FakeLlm())  # type: ignore[arg-type]
 

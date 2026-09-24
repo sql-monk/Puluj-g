@@ -265,6 +265,91 @@ def run_user_code(
     return payload
 
 
+def run_user_batch(
+    extractors: list[dict[str, Any]],
+    messages: list[dict[str, Any]],
+    max_output_bytes: int,
+    max_memory_mb: int,
+    timeout_ms: int,
+    sparse: bool = False,
+) -> dict[str, Any]:
+    """Every extractor over every message in one child: the process start, the policy check and the compilation of
+    each extractor are paid once per batch instead of once per call. A call that raises fails alone; its writes are
+    discarded like in the single-call runner. ``sparse`` leaves out the calls that neither wrote nor failed."""
+    results: list[dict[str, Any]] = []
+    try:
+        os.environ.clear()
+        os.environ["PYTHONIOENCODING"] = "utf-8"
+        _apply_limits(max_memory_mb, timeout_ms)
+        targets: list[tuple[int, Any, str | None]] = []
+        for extractor in extractors:
+            try:
+                targets.append((int(extractor["id"]), _load_extractor(str(extractor["code"])), None))
+            except BaseException as exc:  # a broken extractor fails its own calls, not the batch
+                targets.append((int(extractor["id"]), None, _exception_text(exc)))
+        for index, message in enumerate(messages):
+            for extractor_id, target, load_error in targets:
+                started = time.monotonic()
+                writes: list[dict[str, Any]] = []
+                stdout = io.StringIO()
+                stderr = io.StringIO()
+                error = load_error
+                if target is not None:
+                    try:
+                        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                            target(message, _writer(writes, max_output_bytes))
+                    except BaseException as exc:
+                        writes = []
+                        error = _exception_text(exc)
+                if sparse and not writes and error is None:
+                    continue
+                results.append({
+                    "message": index,
+                    "extractor": extractor_id,
+                    "writes": writes,
+                    "stdout": stdout.getvalue()[-max_output_bytes:],
+                    "stderr": stderr.getvalue()[-max_output_bytes:],
+                    "duration_ms": int((time.monotonic() - started) * 1000),
+                    "error": error,
+                })
+        return {"results": results, "error": None}
+    except BaseException as exc:
+        return {"results": [], "error": _exception_text(exc)}
+
+
+def _load_extractor(code: str) -> Any:
+    validation = validate_code(code)
+    if not validation.valid:
+        diagnostic = validation.diagnostics[0]
+        raise ValueError(f"line {diagnostic.line}:{diagnostic.column}: {diagnostic.message}")
+    namespace: dict[str, Any] = {"__name__": "puluj_dynamic_extractor", "__builtins__": _safe_builtins()}
+    exec(compile(code, "<extractor>", "exec"), namespace, namespace)
+    target = namespace.get("extract")
+    if target is None:
+        extractor_type = namespace.get("Extractor")
+        if not isinstance(extractor_type, type):
+            raise TypeError("Define extract(message, write) or Extractor.extract(message, write)")
+        target = extractor_type().extract
+    return target
+
+
+def _writer(writes: list[dict[str, Any]], max_output_bytes: int) -> Any:
+    def write(table_name: str, values: dict[str, Any]) -> None:
+        if not isinstance(table_name, str) or not table_name:
+            raise TypeError("write table_name must be a non-empty string")
+        if not isinstance(values, dict):
+            raise TypeError("write values must be a dictionary")
+        writes.append({"table": table_name, "values": values})
+        if len(json.dumps(writes, ensure_ascii=False, default=_json_default).encode("utf-8")) > max_output_bytes:
+            raise ValueError("captured writes exceed the configured output limit")
+
+    return write
+
+
+def _exception_text(exc: BaseException) -> str:
+    return "".join(traceback.format_exception_only(type(exc), exc)).strip()
+
+
 def _safe_builtins() -> dict[str, Any]:
     names = {
         "ArithmeticError",
@@ -357,29 +442,10 @@ def _json_default(value: Any) -> Any:
     raise TypeError(f"{type(value).__name__} is not JSON serializable")
 
 
-def _execute_blocking(
-    code: str,
-    message: dict[str, Any],
-    timeout_ms: int,
-    max_output_bytes: int,
-    max_memory_mb: int,
-) -> RuntimeResult:
-    validation = validate_code(code)
-    if not validation.valid:
-        diagnostic = validation.diagnostics[0]
-        return RuntimeResult(error=f"line {diagnostic.line}:{diagnostic.column}: {diagnostic.message}")
+def _run_child(request: dict[str, Any], timeout_ms: int) -> tuple[str, str, int | None, int]:
+    """(stdout, stderr, return code or None on timeout, duration ms) of one sandbox child."""
     started = time.monotonic()
-    child_input = json.dumps(
-        {
-            "code": code,
-            "message": message,
-            "maxOutputBytes": max_output_bytes,
-            "maxMemoryMb": max_memory_mb,
-            "timeoutMs": timeout_ms,
-        },
-        ensure_ascii=False,
-        default=_json_default,
-    )
+    child_input = json.dumps(request, ensure_ascii=False, default=_json_default)
     popen_options: dict[str, Any] = {"start_new_session": True} if os.name == "posix" else {}
     if os.name == "nt":
         popen_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
@@ -403,22 +469,44 @@ def _execute_blocking(
             process_stdout, process_stderr = process.communicate(child_input, timeout=timeout_ms / 1000)
         except subprocess.TimeoutExpired:
             _terminate_process_tree(process)
-            return RuntimeResult(
-                duration_ms=int((time.monotonic() - started) * 1000),
-                error=f"extractor exceeded {timeout_ms} ms timeout",
-                timed_out=True,
-            )
-    if process.returncode != 0:
+            return "", "", None, int((time.monotonic() - started) * 1000)
+    return process_stdout, process_stderr, process.returncode, int((time.monotonic() - started) * 1000)
+
+
+def _execute_blocking(
+    code: str,
+    message: dict[str, Any],
+    timeout_ms: int,
+    max_output_bytes: int,
+    max_memory_mb: int,
+) -> RuntimeResult:
+    validation = validate_code(code)
+    if not validation.valid:
+        diagnostic = validation.diagnostics[0]
+        return RuntimeResult(error=f"line {diagnostic.line}:{diagnostic.column}: {diagnostic.message}")
+    process_stdout, process_stderr, returncode, duration_ms = _run_child(
+        {
+            "code": code,
+            "message": message,
+            "maxOutputBytes": max_output_bytes,
+            "maxMemoryMb": max_memory_mb,
+            "timeoutMs": timeout_ms,
+        },
+        timeout_ms,
+    )
+    if returncode is None:
+        return RuntimeResult(duration_ms=duration_ms, error=f"extractor exceeded {timeout_ms} ms timeout", timed_out=True)
+    if returncode != 0:
         return RuntimeResult(
-            duration_ms=int((time.monotonic() - started) * 1000),
+            duration_ms=duration_ms,
             stderr=process_stderr[-max_output_bytes:],
-            error=f"extractor process exited with code {process.returncode}",
+            error=f"extractor process exited with code {returncode}",
         )
     try:
         payload = json.loads(process_stdout)
     except json.JSONDecodeError:
         return RuntimeResult(
-            duration_ms=int((time.monotonic() - started) * 1000),
+            duration_ms=duration_ms,
             stderr=process_stderr[-max_output_bytes:],
             error="extractor process returned an invalid result",
         )
@@ -429,6 +517,57 @@ def _execute_blocking(
         duration_ms=payload["duration_ms"],
         error=payload["error"],
     )
+
+
+@dataclass(slots=True)
+class BatchResult:
+    """(message index, extractor id) -> the call's result; ``error`` when the batch as a whole failed."""
+
+    results: dict[tuple[int, int], RuntimeResult] = field(default_factory=dict)
+    error: str | None = None
+    timed_out: bool = False
+
+
+def execute_batch_blocking(
+    extractors: list[tuple[int, str]],
+    messages: list[dict[str, Any]],
+    timeout_ms: int,
+    max_output_bytes: int,
+    max_memory_mb: int,
+    sparse: bool = False,
+) -> BatchResult:
+    process_stdout, process_stderr, returncode, _ = _run_child(
+        {
+            "mode": "batch",
+            "extractors": [{"id": extractor_id, "code": code} for extractor_id, code in extractors],
+            "messages": messages,
+            "maxOutputBytes": max_output_bytes,
+            "maxMemoryMb": max_memory_mb,
+            "timeoutMs": timeout_ms,
+            "sparse": sparse,
+        },
+        timeout_ms,
+    )
+    if returncode is None:
+        return BatchResult(error=f"extractor batch exceeded {timeout_ms} ms timeout", timed_out=True)
+    if returncode != 0:
+        return BatchResult(error=f"extractor process exited with code {returncode}: {process_stderr[-2000:]}")
+    try:
+        payload = json.loads(process_stdout)
+    except json.JSONDecodeError:
+        return BatchResult(error="extractor process returned an invalid result")
+    if payload.get("error"):
+        return BatchResult(error=str(payload["error"]))
+    batch = BatchResult()
+    for item in payload["results"]:
+        batch.results[(int(item["message"]), int(item["extractor"]))] = RuntimeResult(
+            writes=[CapturedWrite.model_validate(write) for write in item["writes"]],
+            stdout=item["stdout"],
+            stderr=item["stderr"],
+            duration_ms=item["duration_ms"],
+            error=item["error"],
+        )
+    return batch
 
 
 def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
@@ -474,3 +613,34 @@ async def execute_extractor(
         max_output_bytes,
         max_memory_mb,
     )
+
+
+async def execute_extractors(
+    extractors: list[tuple[int, str, int]],
+    message: dict[str, Any],
+    max_output_bytes: int,
+    max_memory_mb: int,
+) -> dict[int, RuntimeResult]:
+    """All extractors ``(id, code, timeout_ms)`` over one message in one child. When the child as a whole times out or
+    dies, each extractor runs alone under its own timeout, so the culprit fails and the others still count."""
+    import asyncio
+
+    if not extractors:
+        return {}
+    batch = await asyncio.to_thread(
+        execute_batch_blocking,
+        [(extractor_id, code) for extractor_id, code, _ in extractors],
+        [message],
+        sum(timeout for _, _, timeout in extractors),
+        max_output_bytes,
+        max_memory_mb,
+    )
+    if batch.error is None:
+        return {
+            extractor_id: batch.results.get((0, extractor_id), RuntimeResult())
+            for extractor_id, _, _ in extractors
+        }
+    return {
+        extractor_id: await execute_extractor(code, message, timeout, max_output_bytes, max_memory_mb)
+        for extractor_id, code, timeout in extractors
+    }

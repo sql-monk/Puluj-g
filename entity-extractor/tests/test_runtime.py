@@ -179,3 +179,26 @@ def test_terminate_process_tree_prevents_descendant_from_surviving(tmp_path) -> 
 
     assert process.poll() is not None
     assert not marker.exists()
+
+
+def test_a_batch_runs_every_extractor_over_every_message_and_isolates_failures() -> None:
+    from app.runtime import execute_batch_blocking
+
+    good = 'def extract(message, write):\n    write("explosions", {"label": message["text"]})\n'
+    bad = 'def extract(message, write):\n    write("explosions", {"label": "lost"})\n    raise ValueError("boom")\n'
+    batch = execute_batch_blocking([(1, good), (2, bad)], [{"text": "Київ"}, {"text": "Суми"}], 15_000, 64_000, 2_048)
+
+    assert batch.error is None
+    assert [batch.results[(index, 1)].writes[0].values["label"] for index in (0, 1)] == ["Київ", "Суми"]
+    assert batch.results[(0, 2)].writes == [] and "boom" in (batch.results[(0, 2)].error or "")
+
+
+async def test_a_dead_batch_falls_back_to_one_child_per_extractor() -> None:
+    from app.runtime import execute_extractors
+
+    slow = "def extract(message, write):\n    while True:\n        pass\n"
+    good = 'def extract(message, write):\n    write("explosions", {"label": "ok"})\n'
+    results = await execute_extractors([(1, slow, 1_000), (2, good, 10_000)], {}, 64_000, 2_048)
+
+    assert results[1].timed_out
+    assert results[2].writes[0].values == {"label": "ok"}
