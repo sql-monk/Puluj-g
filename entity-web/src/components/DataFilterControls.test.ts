@@ -9,6 +9,15 @@ function render(section: PublicRoute['section'], query = '') {
 }
 
 describe('section-specific public filter controls', () => {
+  it('keeps retired URL selection visible with an explicit clearable checkbox', () => {
+    const html = render('map', 'entityKinds=track&sourceIds=999')
+    expect(html).toContain('Треки вимкнено')
+    expect(html).toContain('Збережений фільтр треків')
+    expect(html).toContain('Недоступне джерело #999')
+    expect(html).toContain('type="checkbox"')
+    expect(html).not.toContain('<select multiple')
+    expect(html).toContain('Скинути фільтри даних')
+  })
   it.each(['map', 'entities'] as const)('exposes only supported EE controls for %s', (section) => {
     const html = render(section)
     for (const label of ['Пошук', 'Тип сутності', 'Джерела', 'Період']) expect(html).toContain(label)

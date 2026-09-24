@@ -105,12 +105,24 @@ def test_capitalised_prepositions_and_lower_case_second_words() -> None:
     assert city["geometry"]["place"] == "Кривий ріг"
 
 
-def test_track_from_origin_to_destination() -> None:
-    [(table, values)] = run("track", "🛵 Від Узина курсом на Васильків", source="eradarrua")
-    assert table == "tracks"
-    assert values["geometry"]["from"]["place"] == "Узина"
-    assert values["geometry"]["to"]["place"] == "Васильків"
-    assert values["geometry"]["required"] is True
+def test_active_extractors_keep_target_but_never_generate_retired_tracks() -> None:
+    writes = [write for name in install.EXTRACTORS
+              for write in run(name, "🛵 Від Узина курсом на Васильків", source="eradarrua")]
+    assert "track" not in install.EXTRACTORS
+    assert any(table == "targets" for table, _ in writes)
+    assert not any(table in {"track", "tracks", "ee_tracks"} for table, _ in writes)
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_repeated_installation_always_retires_tracks(enabled: bool) -> None:
+    first = install.sql(enabled)
+    second = install.sql(enabled)
+    assert first == second
+    assert "UPDATE ee_extractors SET enabled = false WHERE name = 'track';" in first
+    assert "WHERE entity_name = 'track' OR table_name = 'ee_tracks';" in first
+    assert "VALUES ('track'," not in first
+    assert "DELETE " not in first and "DROP " not in first
+    assert f", {str(enabled).lower()}, 20, 5000)" in first
 
 
 def test_media_reported_explosions() -> None:

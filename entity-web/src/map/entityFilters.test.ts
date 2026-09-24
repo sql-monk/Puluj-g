@@ -8,6 +8,13 @@ const filters: Filters = { uav: true, cruise: true, ballistic: true, aircraft: t
 const row = (id: string, occurredAt?: string): EntityItem => ({ entity: 'target', table: 'ee_targets', id, sourceId: 2, occurredAt, values: { place: 'Київ', detail: { label: 'Shahed' } } })
 
 describe('EE map search and time boundaries', () => {
+  it('suppresses retired track aliases from data, count and track-only selections', () => {
+    const other = row('other', now.toISOString())
+    const track = { ...other, entity: 'track', table: 'ee_tracks' }
+    const renamed = { ...other, entity: 'custom', table: 'ee_tracks' }
+    expect(filterEntityItems([other, track, renamed], filters, [], now)).toEqual([other])
+    expect(filterEntityItems([other, track], filters, [], now, ['track'])).toEqual([])
+  })
   it('uses a half-open interval including from and excluding to', () => {
     const from = new Date('2026-09-24T11:00:00Z')
     const to = new Date('2026-09-24T11:30:00Z')

@@ -1,4 +1,5 @@
 import type { Geometry } from 'geojson'
+import { isRetiredEntity } from '../entities/presentation'
 
 export interface EntityMapSettings {
   visible: boolean
@@ -39,7 +40,7 @@ export interface EntityItem {
 }
 
 export interface EntitySnapshot { generatedAt: string; at?: string; items: EntityItem[]; truncated: boolean; limitPerEntity: number }
-export interface EntityPage { items: EntityItem[]; nextCursor?: string; totalCount: number }
+export interface EntityPage { items: EntityItem[]; nextCursor?: string; totalCount: number; excludesRetiredTracks?: boolean; totalCountExact?: boolean }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, { headers: { Accept: 'application/json' }, signal })
@@ -48,26 +49,38 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 export const entityApi = {
-  definitions: (signal?: AbortSignal) => get<EntityDefinition[]>('/api/ee/definitions', signal),
-  snapshot: (at?: Date, signal?: AbortSignal) => get<EntitySnapshot>(`/api/ee/snapshot${at ? `?at=${encodeURIComponent(at.toISOString())}` : ''}`, signal),
-  catalogue: (params: { kind?: string; kinds?: string[]; q?: string; sourceIds?: number[]; from?: Date; to?: Date; limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
+  definitions: async (signal?: AbortSignal) => (await get<EntityDefinition[]>('/api/ee/definitions', signal)).filter(definition => !isRetiredEntity(definition.entityName, definition.tableName)),
+  snapshot: async (at?: Date, signal?: AbortSignal) => {
+    const snapshot = await get<EntitySnapshot>(`/api/ee/snapshot${at ? `?at=${encodeURIComponent(at.toISOString())}` : ''}`, signal)
+    return { ...snapshot, items: snapshot.items.filter(item => !isRetiredEntity(item.entity, item.table)) }
+  },
+  catalogue: async (params: { kind?: string; kinds?: string[]; q?: string; sourceIds?: number[]; from?: Date; to?: Date; limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
+    if (params.kind && isRetiredEntity(params.kind) || params.kinds?.length && params.kinds.every(kind => isRetiredEntity(kind))) return { items: [], totalCount: 0, totalCountExact: true }
     const query = new URLSearchParams()
     if (params.kind) query.set('kind', params.kind)
-    if (params.kinds?.length) query.set('kinds', [...new Set(params.kinds)].join(','))
+    if (params.kinds?.length) query.set('kinds', [...new Set(params.kinds)].filter(kind => !isRetiredEntity(kind)).join(','))
     if (params.q) query.set('q', params.q)
     if (params.sourceIds?.length) query.set('sourceIds', params.sourceIds.join(','))
     if (params.from) query.set('from', params.from.toISOString())
     if (params.to) query.set('to', params.to.toISOString())
     if (params.limit !== undefined) query.set('limit', String(params.limit))
     if (params.cursor) query.set('cursor', params.cursor)
-    return get<EntityPage>(`/api/ee/entities?${query}`, signal)
+    const page = await get<EntityPage>(`/api/ee/entities?${query}`, signal)
+    const items = page.items.filter(item => !isRetiredEntity(item.entity, item.table))
+    // An old backend's total includes retired rows outside this page; never invent a corrected total.
+    return { ...page, items, totalCountExact: page.excludesRetiredTracks === true && items.length === page.items.length }
   },
   catalogueMany: async (params: { kinds?: string[]; q?: string; sourceIds?: number[]; from?: Date; to?: Date; limit?: number; cursor?: string } = {}, signal?: AbortSignal) => {
     const kinds = [...new Set(params.kinds?.filter(Boolean) ?? [])]
     return entityApi.catalogue({ kinds, q: params.q, sourceIds: params.sourceIds, from: params.from, to: params.to, limit: params.limit, cursor: params.cursor }, signal)
   },
-  detail: (kind: string, id: string, signal?: AbortSignal) => get<EntityItem>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, signal),
-  history: (kind: string, id: string, signal?: AbortSignal) => get<EntityItem[]>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/history`, signal),
+  detail: async (kind: string, id: string, signal?: AbortSignal) => {
+    if (isRetiredEntity(kind)) throw new Error('Треки вимкнено. Історичні записи збережено, але їх більше не показано.')
+    const item = await get<EntityItem>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, signal)
+    if (isRetiredEntity(item.entity, item.table)) throw new Error('Треки вимкнено.')
+    return item
+  },
+  history: async (kind: string, id: string, signal?: AbortSignal) => isRetiredEntity(kind) ? [] : (await get<EntityItem[]>(`/api/ee/entities/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/history`, signal)).filter(item => !isRetiredEntity(item.entity, item.table)),
 }
 
 export function mergeEntityPages(kinds: string[], pages: EntityPage[]): EntityPage {

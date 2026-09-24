@@ -14,7 +14,9 @@ import { emptyCollection } from './geojson'
 import { ATTRIBUTION, STYLE_DARK, STYLE_LIGHT, addIcons, pointerCursor, regionHover, setData } from './layers'
 import type { EntityDefinition, EntityItem } from '../api/entityExtractor'
 import type { Geometry } from 'geojson'
-import { addEntityLayers, ENTITY_HIT_LAYERS, setEntityData } from './entityLayers'
+import { addEntityLayers, disposeEntityIcons, ENTITY_HIT_LAYERS, setEntityData } from './entityLayers'
+import EntityIcon from '../components/EntityIcon'
+import { entityLabel } from '../entities/presentation'
 import { publicHash } from '../public/routes'
 import { filterEntityItems } from './entityFilters'
 
@@ -124,6 +126,7 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
     mapRef.current = map
     return () => {
       stopHover()
+      disposeEntityIcons(map)
       map.remove()
       mapRef.current = null
       styleLoaded.current = false
@@ -138,6 +141,7 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
     if (!map || appliedTheme.current === theme) return
     appliedTheme.current = theme
     styleLoaded.current = false
+    disposeEntityIcons(map)
     map.setStyle(dark ? STYLE_DARK : STYLE_LIGHT)
   }, [theme, dark])
 
@@ -179,7 +183,7 @@ export default function MapView({ dark, theme, onPickHome, layoutKey, entityDefi
     <div className="absolute inset-0">
       <div ref={container} className="h-full w-full" />
       <div ref={tip} hidden className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-white/95 px-2 py-1 text-xs shadow dark:bg-slate-900/95 dark:text-slate-100" />
-      {selectedEntity && <aside className="pointer-events-auto absolute bottom-14 left-3 z-20 max-h-[45vh] w-80 max-w-[calc(100%-1.5rem)] overflow-auto rounded-xl bg-white/95 p-4 shadow-xl dark:bg-slate-900/95 dark:text-slate-100"><button className="float-right rounded px-2" aria-label="Закрити" onClick={() => setSelectedEntity(null)}>×</button><h2 className="font-semibold">{selectedEntity.entity} #{selectedEntity.id}</h2><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">{Object.entries(selectedEntity.values).map(([key, value]) => <div className="contents" key={key}><dt className="font-medium">{key}</dt><dd className="break-all">{value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl><a className="mt-3 inline-block underline" href={publicHash({ section: 'entities', detail: { kind: selectedEntity.entity, id: selectedEntity.id }, query: new URLSearchParams() })}>Повні деталі та пов’язані записи</a></aside>}
+      {selectedEntity && <aside className="pointer-events-auto absolute bottom-14 left-3 z-20 max-h-[45vh] w-80 max-w-[calc(100%-1.5rem)] overflow-auto rounded-xl bg-white/95 p-4 shadow-xl dark:bg-slate-900/95 dark:text-slate-100"><button className="float-right rounded px-2" aria-label="Закрити" onClick={() => setSelectedEntity(null)}>×</button><h2 className="flex items-center gap-2 font-semibold"><EntityIcon entity={selectedEntity.entity} />{entityLabel(selectedEntity.entity)} #{selectedEntity.id}</h2><dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">{Object.entries(selectedEntity.values).map(([key, value]) => <div className="contents" key={key}><dt className="font-medium">{key}</dt><dd className="break-all">{value == null ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)}</dd></div>)}</dl><a className="mt-3 inline-block underline" href={publicHash({ section: 'entities', detail: { kind: selectedEntity.entity, id: selectedEntity.id }, query: new URLSearchParams() })}>Повні деталі та пов’язані записи</a></aside>}
       {!selectedEntity && selectedRegionId !== null && <RegionSelectionNote name={regionsById.get(selectedRegionId)?.name ?? `Регіон #${selectedRegionId}`} onClose={() => selectRegion(null)} />}
     </div>
   )

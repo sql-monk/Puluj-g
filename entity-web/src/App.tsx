@@ -4,6 +4,7 @@ import EntityFeedPanel from './entities/EntityFeedPanel'
 import { filterEntityItems } from './map/entityFilters'
 import DataFilterControls from './components/DataFilterControls'
 import FilterPanel from './components/FilterPanel'
+import FilterPanelShell from './components/FilterPanelShell'
 import ReplayBar from './components/ReplayBar'
 import StatsPage from './stats/StatsPage'
 import TopBar from './components/TopBar'
@@ -132,7 +133,7 @@ export default function App() {
   useEffect(() => {
     if (!panelOpen) return
     const panel = document.querySelector<HTMLElement>('[data-section-panel="open"]')
-    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])') ?? []).filter((element) => element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden')
     window.setTimeout(() => focusable()[0]?.focus(), 0)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -200,7 +201,7 @@ export default function App() {
 
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
+    <div className="relative h-full w-full overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100" data-feed={feedOpen ? 'open' : 'closed'}>
       {activeMap && <MapView dark={mapDark} theme={theme} kyiv={kyivPreset} onPickHome={null} layoutKey={`${panelOpen}-${feedOpen}-${replay}`} snapshotAt={entityPolling.snapshotAt} entityDefinitions={entityPolling.definitions} entityItems={entityPolling.items} searchQuery={dataQuery.q} entityKinds={dataQuery.entityKinds} from={dataQuery.from} to={dataQuery.to} />}
       <TopBar dataStatus={entityPolling} route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filter={dataQuery} />}
@@ -226,5 +227,5 @@ export default function App() {
 
 function SectionPanel({ route, open, onClose, section }: { route: PublicRoute; open: boolean; onClose: () => void; section: Exclude<PublicRoute['section'], 'map'> }) {
   const label = section === 'analytics' ? 'Фільтри аналітики' : section === 'entities' ? 'Фільтри каталогу' : 'Фільтри повідомлень'
-  return <aside data-section-panel={open ? 'open' : 'closed'} inert={!open} className={`pointer-events-auto absolute bottom-0 z-40 max-h-[60vh] w-full overflow-y-auto rounded-t-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-transform md:bottom-auto md:left-3 md:top-14 md:max-h-[calc(100vh-5rem)] md:w-72 md:rounded-xl dark:bg-slate-900/95 dark:text-slate-100 ${open ? 'translate-y-0' : 'pointer-events-none translate-y-full md:-translate-x-[120%] md:translate-y-0'}`} aria-hidden={!open}><div className="mb-3 flex items-center justify-between"><strong>{label}</strong><button onClick={onClose} aria-label="Згорнути панель" className="rounded px-2 py-1 hover:bg-slate-200 dark:hover:bg-slate-700">‹</button></div><DataFilterControls route={route} /></aside>
+  return <FilterPanelShell title={label} open={open} onClose={onClose}><DataFilterControls route={route} /></FilterPanelShell>
 }

@@ -70,3 +70,35 @@ test('EE entity editor creates a concrete table definition with map fields', asy
   expect(creates).toHaveLength(1)
   expect(creates[0]).toMatchObject({ entityName: 'explosion', enabled: true, map: { enabled: true, renderer: 'point', latitudeField: 'latitude', longitudeField: 'longitude', timeField: 'occurredAt' } })
 })
+
+test('EE icon picker previews defaults and preserves a custom SVG on save', async ({ page }, testInfo) => {
+  let map: Record<string, unknown> = { enabled: true, renderer: 'icon', svg: '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><circle cx="24" cy="24" r="20" fill="teal"/></svg>' }
+  const saves: Record<string, unknown>[] = []
+  await page.route(url => url.pathname.startsWith('/api/'), route => json(route, {}))
+  await page.route('**/api/admin/settings', route => json(route, []))
+  await page.route('**/api/admin/status', route => json(route, { adminTokenSet: false, workerAlive: true }))
+  await page.route('**/api/admin/sources', route => json(route, []))
+  await page.route('**/api/admin/ee/definitions', route => json(route, [{ entity_definition_id: 9, entity_name: 'explosion', table_name: 'ee_explosions', fields: [], map_settings: map, enabled: true }]))
+  await page.route('**/api/admin/ee/definitions/9/map', async route => {
+    map = route.request().postDataJSON() as Record<string, unknown>
+    saves.push(map)
+    return json(route, {})
+  })
+  await page.goto(`${ADMIN}/#/ee-definitions`)
+  await page.getByRole('button', { name: 'Налаштувати мапу' }).click()
+  const original = map.svg
+  await expect(page.getByLabel('SVG-піктограма', { exact: true })).toHaveValue(String(original))
+  await page.getByRole('button', { name: 'Зберегти мапу' }).click()
+  await expect.poll(() => saves.length).toBe(1)
+  expect(saves[0].svg).toBe(original)
+  await page.getByRole('button', { name: 'Налаштувати мапу' }).click()
+  await page.getByRole('button', { name: 'Піктограма: Вибух', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Піктограма: Вибух', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.screenshot({ path: testInfo.outputPath('entity-icon-picker.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Типова піктограма', exact: true }).click()
+  await expect(page.getByLabel('SVG-піктограма', { exact: true })).toHaveValue('')
+  await page.getByRole('button', { name: 'Зберегти мапу' }).click()
+  await expect.poll(() => saves.length).toBe(2)
+  expect(saves[1]).toMatchObject({ renderer: 'icon', enabled: true })
+  expect(saves[1].svg).toBeUndefined()
+})

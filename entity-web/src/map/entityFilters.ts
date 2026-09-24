@@ -1,10 +1,12 @@
 import type { EntityDefinition, EntityItem } from '../api/entityExtractor'
 import type { Filters } from '../store/useStore'
+import { isRetiredEntity } from '../entities/presentation'
 
 export function filterEntityItems(items: EntityItem[], filters: Filters, definitions: EntityDefinition[] = [], referenceTime = new Date(), kinds: string[] = [], from?: Date, to?: Date, searchQuery = '') {
   const byName = new Map(definitions.map((definition) => [definition.entityName, definition]))
   const search = searchQuery.trim().toLocaleLowerCase('uk-UA')
   return items.filter((item) => {
+    if (isRetiredEntity(item.entity, item.table)) return false
     if (kinds.length && !kinds.some((kind) => kind.toLowerCase() === item.entity.toLowerCase() || kind.toLowerCase() === item.table.toLowerCase())) return false
     // An event without a time can never leave a time window: it has no place on the map.
     if (!item.occurredAt) return false

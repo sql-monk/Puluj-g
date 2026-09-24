@@ -4,6 +4,8 @@ import { entityAdmin, type EeDefinition, type EeDelivery, type EeDeliveryStatus,
 import { Badge, Section } from '../components/settings/fields'
 import { changedSettings, deliveryState, extractionOffNote, resultLabel, runState, SETTING_SOURCE } from './ee'
 import PythonEditor, { type PythonDiagnostic } from './PythonEditor'
+import EntityIcon from '../components/EntityIcon'
+import { entityIconChoices, entityIconSvg, entityLabel, isRetiredEntity } from '../entities/presentation'
 import { Freshness, Loading, PagerButtons, Stat, ago, fmtNum, fmtTime, usePaged, usePolled } from './shared'
 
 const defaultCode = `def extract(message, write):\n    text = message.get("text", "")\n    # write("explosions", {"occurredAt": message.get("publishedAt"), "place": "Київ"})\n`
@@ -527,9 +529,20 @@ export function EeDefinitionsPanel() {
             </select>
           </label>
         </div>
+        <fieldset className="mt-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+          <legend className="px-1 text-sm font-medium">Піктограма сутності</legend>
+          <div className="flex items-center gap-3">
+            <EntityIcon entity={editing?.entity_name ?? entityName} svg={map.svg} className="h-10 w-10 shrink-0" />
+            <p className="text-xs text-slate-500">Типова піктограма визначається назвою сутності. Для показу на мапі виберіть вигляд «icon»; власний SVG має пріоритет.</p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" className="rounded-lg border px-3 py-2 text-xs focus-visible:outline-2 focus-visible:outline-sky-500" onClick={() => setMap({ ...map, renderer: 'icon', svg: undefined })}>Типова піктограма</button>
+            {entityIconChoices.map(name => <button key={name} type="button" aria-label={`Піктограма: ${entityLabel(name)}`} aria-pressed={map.renderer === 'icon' && map.svg === entityIconSvg(name)} className="flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:bg-slate-800" onClick={() => setMap({ ...map, renderer: 'icon', svg: entityIconSvg(name) })}><EntityIcon entity={name} />{entityLabel(name)}</button>)}
+          </div>
+        </fieldset>
         <label className="mt-2 block">
           SVG-піктограма
-          <textarea className="block min-h-28 w-full rounded border p-2 font-mono text-xs dark:bg-slate-800" value={map.svg ?? ''} onChange={(event) => setMap({ ...map, svg: event.target.value || undefined })} />
+          <textarea aria-label="SVG-піктограма" className="block min-h-28 w-full rounded border p-2 font-mono text-xs dark:bg-slate-800" value={map.svg ?? ''} onChange={(event) => setMap({ ...map, svg: event.target.value || undefined })} />
         </label>
         {editing ? (
           <div className="mt-3 flex gap-2">
@@ -557,8 +570,10 @@ export function EeDefinitionsPanel() {
         <div className="mt-2 space-y-2">
           {definitions.map((definition) => (
             <div key={definition.entity_definition_id} className={`flex flex-wrap items-center gap-2 rounded border p-2 ${editing?.entity_definition_id === definition.entity_definition_id ? 'border-sky-400 bg-sky-50 dark:bg-sky-950' : 'border-slate-200 dark:border-slate-700'}`}>
+              <EntityIcon entity={definition.entity_name} svg={definition.map_settings?.svg} />
               <span>
                 <b>{definition.entity_name}</b> · <code>{definition.table_name}</code>
+                {isRetiredEntity(definition.entity_name, definition.table_name) && <span className="ml-2 text-xs text-slate-500">Треки вимкнено · історію збережено</span>}
               </span>
               <button className="ml-auto underline" onClick={() => editMap(definition)}>
                 Налаштувати мапу

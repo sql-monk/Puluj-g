@@ -69,7 +69,7 @@ function List({ route, query, refreshKey, onLoadState, cacheKey }: Props & { cac
     if (!current()) return
     const seen = new Set((more ? page?.items ?? [] : []).map((item) => `${item.entity}:${item.id}`))
     const items = [...(more ? page?.items ?? [] : []), ...result.items.filter((item) => { const id = `${item.entity}:${item.id}`; if (seen.has(id)) return false; seen.add(id); return true })]
-    const next = { ...result, items }
+    const next = { ...result, items, totalCountExact: result.totalCountExact !== false && (!more || page?.totalCountExact !== false) }
     setPage(next)
     cache.delete(cacheKey)
     cache.set(cacheKey, { ...next, scroll: scroll.current?.scrollTop ?? 0, lastSuccess: new Date().toISOString() })
@@ -91,7 +91,7 @@ function List({ route, query, refreshKey, onLoadState, cacheKey }: Props & { cac
   return <Page scroll={scroll} onScroll={rememberScroll}>
     <div className="flex flex-wrap items-start gap-3"><div className="min-w-0 flex-1"><h1 className="text-xl font-semibold">Сутності Entity Extractor</h1><p className="text-sm text-slate-500">Конкретні цілі, тривоги, влучання, вибухи, робота ППО та інші налаштовані типи.</p></div><button disabled={request.loading} className={buttonClass} onClick={() => void request.load()}>Оновити</button></div>
     <RequestStatus state={request} hasData={!!page} retry={() => void request.load(failedMore.current)} />
-    {page && <p className="mt-3 text-sm">Показано {page.items.length} із {page.totalCount}</p>}
+    {page && <p className="mt-3 text-sm">{page.totalCountExact === false ? `Показано ${page.items.length} записів. Сервер ще не підтверджує загальну кількість без вимкнених треків.` : `Показано ${page.items.length} із ${page.totalCount}`}</p>}
     {page?.items.length === 0 && !request.loading && !request.error && <p className="mt-3">Сутностей не знайдено.</p>}
     {!!page?.items.length && <div className="mt-3 space-y-2">{page.items.map((item) => <a key={`${item.entity}:${item.id}`} href={publicHash({ section: 'entities', detail: { kind: item.entity, id: item.id }, query: route.query })} className="block min-w-0 rounded border border-slate-200 p-3 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><div className="flex min-w-0 flex-wrap gap-2"><b className="break-all">{item.entity}</b><span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">{title(item)}</span><time className="ml-auto text-xs">{when(item)}</time></div><div className="break-all text-xs text-slate-500">ID {item.id}{item.rawMessageId ? ` · raw_message ${item.rawMessageId}` : ''}{item.geometry ? ' · є геометрія' : ' · без геометрії'}</div></a>)}</div>}
     {page?.nextCursor && <button disabled={request.loading} className={`mt-3 ${buttonClass}`} onClick={() => void request.load(true)}>Показати ще</button>}
