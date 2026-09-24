@@ -34,22 +34,22 @@ x-worker: &worker
 services:
   postgis:
     image: postgis/postgis:17-3.5
-    # Tuned for the local 32 GiB Docker host during large history ingestion. Keep this configuration in Compose,
+    # Tuned for the local 16 GiB Docker host during large history ingestion. Keep this configuration in Compose,
     # rather than altering the external pgdata volume, so deployments stay reproducible.
     command:
       - postgres
       - -c
-      - shared_buffers=8GB
+      - shared_buffers=4GB
       - -c
-      - effective_cache_size=16GB
+      - effective_cache_size=8GB
       - -c
-      - work_mem=128MB
+      - work_mem=64MB
       - -c
-      - maintenance_work_mem=1024MB
+      - maintenance_work_mem=512MB
       - -c
-      - max_wal_size=8GB
+      - max_wal_size=4GB
       - -c
-      - min_wal_size=500MB
+      - min_wal_size=250MB
       - -c
       - checkpoint_timeout=15min
       - -c
@@ -63,8 +63,8 @@ services:
       - -c
       - shared_preload_libraries=pg_stat_statements
     # PostgreSQL dynamic shared-memory segments use /dev/shm. The Docker default (64 MiB)
-    # is insufficient for concurrent workers and the 4 GiB shared buffer cache.
-    shm_size: 4g
+    # is insufficient for concurrent workers and the 2 GiB shared-memory workload allowance.
+    shm_size: 2g
     environment:
       POSTGRES_DB: puluj
       POSTGRES_USER: puluj
