@@ -68,3 +68,36 @@ test('old track detail link has an explicit unavailable state and a way back', a
   await expect(page.getByRole('main').getByRole('alert')).toContainText('Треки вимкнено')
   await expect(page.getByRole('link', { name: '← До каталогу' })).toBeVisible()
 })
+
+
+test('weapon silhouettes remain distinct on the map and in both theme previews', async ({ page }, testInfo) => {
+  test.setTimeout(120_000)
+  await fixture(page)
+  const types = ['shahed_drone', 'geran_drone', 'jet_drone', 'cruise_missile', 'ballistic_missile']
+  await page.route('**/api/ee/definitions', route => route.fulfill({ json: [{ entityName: 'target', tableName: 'ee_targets', enabled: true, fields: [], map: { visible: true, renderer: 'icon' } }] }))
+  await page.route('**/api/ee/snapshot', route => route.fulfill({ json: { generatedAt: now, items: types.map((targetType, i) => ({ entity: 'target', table: 'ee_targets', id: String(i), occurredAt: now, values: { targetType }, geometry: { type: 'Point', coordinates: [30 + i * .5, 49] } })), truncated: false, limitPerEntity: 1000 } }))
+  await page.goto('/#/map/live')
+  await expect.poll(async () => (await rendered(page)).filter(item => item.renderer === 'icon').length).toBe(5)
+  expect(new Set((await rendered(page)).map(item => item.icon)).size).toBe(5)
+  await page.evaluate(async () => {
+    const path = '/src/entities/presentation.ts'
+    const { entityIconChoices, entityIconSvg, entityLabel } = await import(/* @vite-ignore */ path)
+    ;(window as unknown as { __map?: MapLibreMap }).__map?.remove()
+    document.body.innerHTML = ''
+    for (const dark of [false, true]) {
+      const section = document.createElement('section')
+      section.style.cssText = `display:flex;flex-wrap:wrap;gap:16px;padding:24px;background:${dark ? '#162032' : '#f1f5f9'};color:${dark ? '#fff' : '#172033'}`
+      for (const name of entityIconChoices) {
+        const figure = document.createElement('div')
+        figure.style.cssText = 'width:110px;text-align:center;font:13px system-ui'
+        const img = new Image(48, 48)
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(entityIconSvg(name))
+        figure.append(img, document.createElement('br'), entityLabel(name))
+        section.append(figure)
+      }
+      document.body.append(section)
+    }
+    await Promise.all(Array.from(document.images).map(image => image.decode()))
+  })
+  await page.screenshot({ path: testInfo.outputPath('weapon-silhouettes.png'), fullPage: true })
+})

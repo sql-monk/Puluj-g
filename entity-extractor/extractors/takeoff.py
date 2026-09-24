@@ -40,7 +40,7 @@ def extract(message, write):
             continue
         aircraft = aircraft_in(line) or aircraft_in(text)
         # A drone "вилітає на Київщину" is no takeoff: only an aircraft named in the message makes one.
-        if aircraft is None or (target_type(line) or ("", ""))[0] in ("jet_drone", "shahed_drone", "uav", "fpv_drone"):
+        if aircraft is None or (target_type(line) or ("", ""))[0] in ("jet_drone", "shahed_drone", "geran_drone", "gerbera_drone", "recon_drone", "uav", "fpv_drone"):
             continue
         site = site_in(line)
         values = {

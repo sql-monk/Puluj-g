@@ -533,10 +533,10 @@ export function EeDefinitionsPanel() {
           <legend className="px-1 text-sm font-medium">Піктограма сутності</legend>
           <div className="flex items-center gap-3">
             <EntityIcon entity={editing?.entity_name ?? entityName} svg={map.svg} className="h-10 w-10 shrink-0" />
-            <p className="text-xs text-slate-500">Типова піктограма визначається назвою сутності. Для показу на мапі виберіть вигляд «icon»; власний SVG має пріоритет.</p>
+            <p className="text-xs text-slate-500">Автоматична піктограма враховує тип ракети, дрона або літака в записі. Для показу на мапі виберіть вигляд «icon»; власний SVG має пріоритет.</p>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" className="rounded-lg border px-3 py-2 text-xs focus-visible:outline-2 focus-visible:outline-sky-500" onClick={() => setMap({ ...map, renderer: 'icon', svg: undefined })}>Типова піктограма</button>
+            <button type="button" className="rounded-lg border px-3 py-2 text-xs focus-visible:outline-2 focus-visible:outline-sky-500" onClick={() => setMap({ ...map, renderer: 'icon', svg: undefined })}>Автоматично за типом об’єкта</button>
             {entityIconChoices.map(name => <button key={name} type="button" aria-label={`Піктограма: ${entityLabel(name)}`} aria-pressed={map.renderer === 'icon' && map.svg === entityIconSvg(name)} className="flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:bg-slate-800" onClick={() => setMap({ ...map, renderer: 'icon', svg: entityIconSvg(name) })}><EntityIcon entity={name} />{entityLabel(name)}</button>)}
           </div>
         </fieldset>

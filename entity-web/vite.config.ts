@@ -6,6 +6,8 @@ import { defineConfig } from 'vite'
 // The user app (map). Dev server proxies API + SignalR to the .NET Api (see src/Puluj.Api/Properties/launchSettings.json).
 // The admin panel is a second entry with its own config: vite.admin.config.ts → Puluj.Admin.
 export default defineConfig({
+  // Public and admin dev servers run together; their dependency graphs must not overwrite each other.
+  cacheDir: 'node_modules/.vite-public',
   plugins: [react(), tailwindcss()],
   // maplibre-gl v6 loads its worker via new URL('./maplibre-gl-worker.mjs', import.meta.url);
   // pre-bundling would strip that file, so the package is served as-is.

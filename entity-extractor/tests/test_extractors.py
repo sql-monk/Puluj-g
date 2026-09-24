@@ -159,3 +159,8 @@ def test_takeoff_needs_an_aircraft() -> None:
     assert values["aircraftType"] == "Ту-95МС"
     assert values["geometry"]["coordinates"] == [46.21, 51.48]
     assert run("takeoff", "дрон вилетів з Києва до Василькова.", source="northern_sich_ukr") == []
+
+@pytest.mark.parametrize(("name", "code"), [("Герань-2", "geran_drone"), ("Гербера", "gerbera_drone"), ("Шахед", "shahed_drone"), ("Герань-3", "jet_drone")])
+def test_distinct_drone_families(name: str, code: str) -> None:
+    writes = run("target", name + " курсом на Київ")
+    assert writes and all(values["targetType"] == code for _, values in writes)

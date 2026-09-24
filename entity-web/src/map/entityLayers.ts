@@ -34,9 +34,10 @@ export function setEntityData(map: maplibregl.Map, definitions: EntityDefinition
   state.refresh = () => setEntityData(map, definitions, items)
   const byName = new Map(definitions.map((definition) => [definition.entityName, definition]))
   const usedIcons = new Set<string>()
-  for (const definition of definitions) {
-    if (!definition.map.visible || isRetiredEntity(definition.entityName, definition.tableName) || definition.map.renderer !== 'icon') continue
-    const svg = definition.map.svgIcon || entityIconSvg(definition.entityName)
+  for (const item of items) {
+    const definition = byName.get(item.entity)
+    if (!item.geometry || !definition || !definition.map.visible || isRetiredEntity(definition.entityName, definition.tableName) || definition.map.renderer !== 'icon') continue
+    const svg = definition.map.svgIcon || entityIconSvg(definition.entityName, item.values)
     const name = iconName(definition.entityName, svg)
     usedIcons.add(name)
     ensureSvgIcon(map, state, name, svg)
@@ -55,7 +56,7 @@ export function setEntityData(map: maplibregl.Map, definitions: EntityDefinition
     const labelValue = definition.map.labelField ? item.values[definition.map.labelField] : undefined
     const status = definition.map.statusField ? item.values[definition.map.statusField] : undefined
     const inactive = typeof status === 'string' && ['inactive', 'closed', 'ended', 'cancelled'].includes(status.toLowerCase())
-    const requestedIcon = iconForRenderer(definition.map.renderer, definition.entityName, definition.map.svgIcon)
+    const requestedIcon = iconForRenderer(definition.map.renderer, definition.entityName, definition.map.svgIcon || entityIconSvg(definition.entityName, item.values))
     const icon = requestedIcon && map.hasImage(requestedIcon) ? requestedIcon : undefined
     // A pending or invalid SVG leaves a visible, clickable point instead of an invisible entity.
     const renderer = definition.map.renderer === 'icon' && !icon ? 'point' : definition.map.renderer

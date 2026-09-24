@@ -91,3 +91,15 @@ describe('icon lifecycle and retired tracks', () => {
     expect(FakeImage.all).toHaveLength(0)
   })
 })
+
+it('loads separate silhouettes per target and releases variants no longer displayed', () => {
+  const f = fixture()
+  const definition = { ...f.definition, entityName: 'target' }
+  const items = ['shahed_drone', 'jet_drone', 'ballistic_missile'].map((targetType, index) => ({ ...f.item, entity: 'target', id: String(index), values: { targetType } }))
+  setEntityData(f.map, [definition], items)
+  expect(FakeImage.all).toHaveLength(3)
+  for (const image of FakeImage.all) image.onload?.()
+  expect(new Set(f.data().features.map(feature => feature.properties?.icon)).size).toBe(3)
+  setEntityData(f.map, [definition], [items[0]])
+  expect(f.images.size).toBe(1)
+})

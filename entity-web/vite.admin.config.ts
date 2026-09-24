@@ -18,6 +18,8 @@ function adminRoot(): Plugin {
 // Second entry of the same code base: the admin panel. Served by Puluj.Admin (port 5268), talks only to /api/admin/*.
 // Shares components, styles and the api/ clients with the user app (vite.config.ts).
 export default defineConfig({
+  // Public and admin dev servers run together; their dependency graphs must not overwrite each other.
+  cacheDir: 'node_modules/.vite-admin',
   plugins: [react(), tailwindcss(), adminRoot()],
   optimizeDeps: { exclude: ['maplibre-gl'] },
   server: {
