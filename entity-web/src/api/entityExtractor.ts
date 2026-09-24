@@ -37,10 +37,21 @@ export interface EntityItem {
   occurredAt?: string
   values: Record<string, unknown>
   geometry?: Geometry
+  message?: {
+    rawMessageId: string
+    sourceId: number
+    sourceCode: string
+    sourceName: string
+    publishedAt: string
+    receivedAt: string
+    text?: string
+    url?: string
+    sourceUrl?: string
+  }
 }
 
 export interface EntitySnapshot { generatedAt: string; at?: string; items: EntityItem[]; truncated: boolean; limitPerEntity: number }
-export interface EntityPage { items: EntityItem[]; nextCursor?: string; totalCount: number; excludesRetiredTracks?: boolean; totalCountExact?: boolean }
+export interface EntityPage { items: EntityItem[]; nextCursor?: string; totalCount: number; excludesRetiredTracks?: boolean; searchCandidateLimit?: number; totalCountExact?: boolean }
 
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, { headers: { Accept: 'application/json' }, signal })

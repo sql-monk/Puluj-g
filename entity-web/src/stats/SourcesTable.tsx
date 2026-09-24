@@ -9,10 +9,10 @@ export default function SourcesTable({ sources }: { sources: StatsSourceDto[] })
         <thead className="text-left text-slate-500 dark:text-slate-400">
           <tr>
             <th className="py-1 pr-2 font-medium">Джерело</th>
-            <th className="py-1 pr-2 text-right font-medium">Повідомлень</th>
+            <th className="py-1 pr-2 text-right font-medium">Версій повідомлень</th>
             <th className="py-1 pr-2 text-right font-medium">Оброблено</th>
             <th className="py-1 pr-2 text-right font-medium">З фактами</th>
-            <th className="py-1 pr-2 text-right font-medium" title="Канонічні факти за observedAt; це окрема від raw-ревізій популяція">Фактів (observedAt)</th>
+            <th className="py-1 pr-2 text-right font-medium" title="Канонічні факти за часом події; це окрема від версій повідомлень сукупність">Канонічних фактів</th>
             <th className="py-1 pr-2 text-right font-medium" title="Медіана затримки між публікацією і отриманням">
               Затримка
             </th>
@@ -37,7 +37,7 @@ export default function SourcesTable({ sources }: { sources: StatsSourceDto[] })
           ))}
         </tbody>
       </table>
-      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Колонка фактів має окрему observedAt-популяцію.</p>
+      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Кількість версій включає редагування одного повідомлення. Канонічні факти рахуються окремо за часом події.</p>
     </div>
   )
 }

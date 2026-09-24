@@ -8,6 +8,7 @@ namespace Puluj.EntityApi;
 public sealed partial class EntityQueries(IConfiguration configuration)
 {
     public const int MaxCatalogueOffset = 10_000;
+    public const int CatalogueSearchCandidateLimit = 2_000;
 
     private readonly string connectionString = configuration.GetConnectionString(Puluj.Infrastructure.DependencyInjection.ConnectionStringName)
         ?? throw new InvalidOperationException("ConnectionStrings:Puluj is required.");
@@ -74,14 +75,16 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         var page = ordered.Skip(offset).Take(limit).ToArray();
         var nextOffset = offset + page.Length;
         var nextCursor = nextOffset < total && nextOffset <= MaxCatalogueOffset ? nextOffset.ToString() : null;
-        return new EntityPageDto(page, nextCursor, total);
+        return new EntityPageDto(page, nextCursor, total, string.IsNullOrWhiteSpace(query) ? null : CatalogueSearchCandidateLimit);
     }
 
     public async Task<EntityItemDto?> DetailAsync(string kind, string id, CancellationToken ct)
     {
         var definition = (await DefinitionsAsync(ct)).SingleOrDefault(x => SameKind(x, kind));
         if (definition is null || !long.TryParse(id, out var numericId)) return null;
-        return await ReadOneAsync(definition, numericId, ct);
+        var item = await ReadOneAsync(definition, numericId, ct);
+        if (item?.RawMessageId is null || !long.TryParse(item.RawMessageId, out var rawMessageId)) return item;
+        return item with { Message = await ReadMessageAsync(rawMessageId, ct) };
     }
 
     public async Task<IReadOnlyList<EntityItemDto>> HistoryAsync(string kind, string id, int limit, CancellationToken ct)
@@ -110,22 +113,28 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         if (applyLifetime && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} IS NOT NULL");
         if (at is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} <= @at");
         if (applyLifetime && definition.Map.LifetimeMinutes is > 0 && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} >= @cutoff");
-        if (!string.IsNullOrWhiteSpace(search)) clauses.Add("to_jsonb(t)::text ILIKE @search");
         if (sourceIds is { Length: > 0 }) clauses.Add("t.raw_message_id IN (SELECT r.raw_message_id FROM raw_messages r WHERE r.source_id = ANY(@sourceIds))");
         if (from is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} >= @from");
         if (to is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} <= @to");
         var where = clauses.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", clauses);
         var order = timeColumn is not null ? $"{Quote(timeColumn)} DESC NULLS LAST, {Quote(idColumn)} DESC" : $"{Quote(idColumn)} DESC";
+        var candidateOrder = $"{Quote(idColumn)} DESC";
         var json = JsonProjection(geometryColumn);
         // A keyed entity is a state (an alert over an area): only the latest row of each key, as of @at, is current.
         var rows = keyColumn is null || timeColumn is null
-            ? $"SELECT * FROM {Quote(definition.TableName)} t {where}"
+            ? !string.IsNullOrWhiteSpace(search) && !applyLifetime
+                ? $"SELECT * FROM (SELECT * FROM {Quote(definition.TableName)} t {where} ORDER BY {candidateOrder} LIMIT @candidateLimit) t WHERE to_jsonb(t)::text ILIKE @search"
+                : $"SELECT * FROM {Quote(definition.TableName)} t {where}"
             : $"SELECT DISTINCT ON (coalesce(t.{Quote(keyColumn)}, t.{Quote(idColumn)}::text)) * FROM {Quote(definition.TableName)} t {where} ORDER BY coalesce(t.{Quote(keyColumn)}, t.{Quote(idColumn)}::text), {Quote(timeColumn)} DESC, {Quote(idColumn)} DESC";
         command.CommandText = $"SELECT ({json})::text FROM (SELECT * FROM ({rows}) t ORDER BY {order} LIMIT @limit) t";
         command.Parameters.AddWithValue("limit", limit);
         if (at is not null && timeColumn is not null) command.Parameters.AddWithValue("at", at.Value);
         if (applyLifetime && definition.Map.LifetimeMinutes is > 0 && timeColumn is not null) command.Parameters.AddWithValue("cutoff", (at ?? DateTimeOffset.UtcNow).AddMinutes(-definition.Map.LifetimeMinutes.Value));
-        if (!string.IsNullOrWhiteSpace(search)) command.Parameters.AddWithValue("search", $"%{EscapeLike(search.Trim())}%");
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            command.Parameters.AddWithValue("search", $"%{EscapeLike(search.Trim())}%");
+            command.Parameters.AddWithValue("candidateLimit", CatalogueSearchCandidateLimit);
+        }
         if (sourceIds is { Length: > 0 }) command.Parameters.AddWithValue("sourceIds", sourceIds);
         if (from is not null && timeColumn is not null) command.Parameters.AddWithValue("from", from.Value);
         if (to is not null && timeColumn is not null) command.Parameters.AddWithValue("to", to.Value);
@@ -150,13 +159,19 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         await connection.OpenAsync(ct);
         await using var command = connection.CreateCommand();
         var timeColumn = OptionalConfiguredColumn(definition, EffectiveTimeField(definition));
+        var idColumn = IdColumn(definition);
         var clauses = new List<string>();
-        if (!string.IsNullOrWhiteSpace(search)) clauses.Add("to_jsonb(t)::text ILIKE @search");
         if (sourceIds.Length > 0) clauses.Add("t.raw_message_id IN (SELECT r.raw_message_id FROM raw_messages r WHERE r.source_id = ANY(@sourceIds))");
         if (from is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} >= @from");
         if (to is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} <= @to");
-        command.CommandText = $"SELECT count(*)::int FROM {Quote(definition.TableName)} t" + (clauses.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", clauses));
-        if (!string.IsNullOrWhiteSpace(search)) command.Parameters.AddWithValue("search", $"%{EscapeLike(search.Trim())}%");
+        var where = clauses.Count == 0 ? string.Empty : " WHERE " + string.Join(" AND ", clauses);
+        if (string.IsNullOrWhiteSpace(search)) command.CommandText = $"SELECT count(*)::int FROM {Quote(definition.TableName)} t{where}";
+        else
+        {
+            command.CommandText = $"SELECT count(*)::int FROM (SELECT * FROM {Quote(definition.TableName)} t{where} ORDER BY {Quote(idColumn)} DESC LIMIT @candidateLimit) t WHERE to_jsonb(t)::text ILIKE @search";
+            command.Parameters.AddWithValue("search", $"%{EscapeLike(search.Trim())}%");
+            command.Parameters.AddWithValue("candidateLimit", CatalogueSearchCandidateLimit);
+        }
         if (sourceIds.Length > 0) command.Parameters.AddWithValue("sourceIds", sourceIds);
         if (from is not null && timeColumn is not null) command.Parameters.AddWithValue("from", from.Value);
         if (to is not null && timeColumn is not null) command.Parameters.AddWithValue("to", to.Value);
@@ -198,6 +213,27 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         command.Parameters.AddWithValue("id", id);
         var json = (string?)await command.ExecuteScalarAsync(ct);
         return json is null ? null : ToItem(definition, json);
+    }
+
+    private async Task<EntityMessageDto?> ReadMessageAsync(long rawMessageId, CancellationToken ct)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT r.raw_message_id, r.source_id, s.code, s.name, r.published_at, r.received_at,
+                   r.raw_text, r.url, s.url
+            FROM raw_messages r
+            JOIN sources s ON s.source_id = r.source_id
+            WHERE r.raw_message_id = @id
+            """;
+        command.Parameters.AddWithValue("id", rawMessageId);
+        await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SingleRow, ct);
+        if (!await reader.ReadAsync(ct)) return null;
+        return new EntityMessageDto(
+            reader.GetInt64(0).ToString(System.Globalization.CultureInfo.InvariantCulture), reader.GetInt32(1), reader.GetString(2), reader.GetString(3),
+            reader.GetFieldValue<DateTimeOffset>(4), reader.GetFieldValue<DateTimeOffset>(5), reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7), reader.IsDBNull(8) ? null : reader.GetString(8));
     }
 
     private static EntityDefinitionDto ReadDefinition(NpgsqlDataReader reader)
@@ -300,9 +336,10 @@ public sealed record MapSettings(bool Visible, string Renderer, string? LabelFie
     private static int? Int(JsonElement value, string name) => Property(value, name) is { ValueKind: JsonValueKind.Number } p && p.TryGetInt32(out var result) ? result : null;
     private static double? Double(JsonElement value, string name) => Property(value, name) is { ValueKind: JsonValueKind.Number } p && p.TryGetDouble(out var result) ? result : null;
 }
-public sealed record EntityItemDto(string Entity, string Table, string Id, string? RawMessageId, int? SourceId, DateTimeOffset? OccurredAt, JsonElement Values, JsonElement? Geometry);
+public sealed record EntityMessageDto(string RawMessageId, int SourceId, string SourceCode, string SourceName, DateTimeOffset PublishedAt, DateTimeOffset ReceivedAt, string? Text, string? Url, string? SourceUrl);
+public sealed record EntityItemDto(string Entity, string Table, string Id, string? RawMessageId, int? SourceId, DateTimeOffset? OccurredAt, JsonElement Values, JsonElement? Geometry, EntityMessageDto? Message = null);
 public sealed record EntitySnapshotDto(DateTimeOffset GeneratedAt, DateTimeOffset? At, IReadOnlyList<EntityItemDto> Items, bool Truncated, int LimitPerEntity);
-public sealed record EntityPageDto(IReadOnlyList<EntityItemDto> Items, string? NextCursor, int TotalCount)
+public sealed record EntityPageDto(IReadOnlyList<EntityItemDto> Items, string? NextCursor, int TotalCount, int? SearchCandidateLimit = null)
 {
     // Old clients ignore this; new clients do not mistake an old server's track-inclusive count for a filtered total.
     public bool ExcludesRetiredTracks => true;

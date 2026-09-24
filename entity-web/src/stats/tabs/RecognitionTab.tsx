@@ -5,7 +5,7 @@ import ChartCard, { StatTile } from '../charts/ChartCard'
 import Columns from '../charts/Columns'
 import HBars from '../charts/HBars'
 import { ACCENT } from '../palette'
-import { bucketLabel, bucketTitle, compact, num, pct, perBucket, type Period } from '../period'
+import { bucketLabel, bucketTitle, compact, num, pct, percentValue, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
 import type { DataQuery } from '../../public/query'
 import FilterMeta from '../FilterMeta'
@@ -16,7 +16,7 @@ export default function RecognitionTab({ period, filter }: { period: Period; fil
   return <SectionShell {...state}>{(data) => <Recognition data={data} />}</SectionShell>
 }
 
-const percent = (v: number) => `${Math.round(v)}%`
+const percent = percentValue
 
 function Recognition({ data }: { data: StatsRecognitionDto }) {
   const p = data.period

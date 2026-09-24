@@ -170,7 +170,13 @@ export function lagText(s?: number): string {
 }
 
 export function pct(part: number, whole: number): string {
-  return whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—'
+  return whole > 0 ? percentValue((part / whole) * 100) : '—'
+}
+
+export function percentValue(value: number): string {
+  if (value > 0 && value < 1) return '<1%'
+  if (value < 100 && value > 99) return '>99%'
+  return `${Math.round(value)}%`
 }
 
 export function num(n: number): string {

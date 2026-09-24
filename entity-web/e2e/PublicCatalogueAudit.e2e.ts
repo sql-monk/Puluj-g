@@ -87,7 +87,7 @@ test('mobile content clears TopBar, wraps titles, and restores scroll even witho
   await mount(page)
   await settle(page, 0, { items: Array.from({ length: 30 }, (_, i) => row(String(i), i === 0 ? 'Long'.repeat(100) : `Record ${i}`)), totalCount: 30 })
   await expect(page.getByText('Показано 30 із 30')).toBeVisible()
-  const heading = await page.getByRole('heading', { name: 'Сутності Entity Extractor' }).boundingBox()
+  const heading = await page.getByRole('heading', { name: 'Цілі та події' }).boundingBox()
   const header = await page.locator('header').boundingBox()
   expect(heading!.y).toBeGreaterThanOrEqual(header!.y + header!.height)
   expect(await page.locator('main').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true)

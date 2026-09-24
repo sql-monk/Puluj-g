@@ -108,7 +108,7 @@ test('failed EE refresh keeps the previous feed and retry restores success', asy
   expect(requests).toBeGreaterThan(beforeRetry)
 })
 
-for (const [hash, heading] of [['#/analytics', 'Аналітика'], ['#/entities', 'Сутності Entity Extractor']]) {
+for (const [hash, heading] of [['#/analytics', 'Аналітика'], ['#/entities', 'Цілі та події']]) {
   test(`415px ${hash}: heading clears header and backdrop closes the panel`, async ({ page }) => {
     await page.setViewportSize({ width: 415, height: 900 })
     const audit = await mockApp(page)
@@ -175,7 +175,7 @@ test('leaving history cancels its pending snapshot and late data cannot replace 
   const cancelled = page.waitForEvent('requestfailed', request => request === pending!.request())
   await page.getByRole('link', { name: 'Цілі і події', exact: true }).click()
   await cancelled
-  await expect(page.getByRole('heading', { name: 'Сутності Entity Extractor' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Цілі та події' })).toBeVisible()
   // Playwright may discard fulfillment of an already-aborted browser request.
   await json(pending!, snapshot([item('obsolete', 'Застарілий історичний кадр')], '2026-09-24T11:30:00.000Z'))
   await page.evaluate(() => { window.location.hash = '#/map/live' })

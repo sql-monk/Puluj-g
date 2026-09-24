@@ -1,6 +1,7 @@
 import { Tooltip } from './ChartCard'
 import { barPath, textWidth } from './geometry'
 import { useTooltip, useWidth, type TipLine } from './hooks'
+import { pct } from '../period'
 
 export interface BarRow {
   key: string
@@ -48,7 +49,7 @@ export default function HBars({
   const sum = total ?? rows.reduce((n, x) => n + x.value, 0)
   const plotW = Math.max(0, width - labelWidth - padR)
   const height = rows.length * rowH + 4
-  const share = (v: number) => (sum > 0 ? `${Math.round((v / sum) * 100)}%` : '')
+  const share = (v: number) => sum > 0 ? pct(v, sum) : ''
   return (
     <div ref={ref} className="relative" data-chart>
       {width > 0 && (

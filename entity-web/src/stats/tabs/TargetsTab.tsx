@@ -7,7 +7,7 @@ import { routeMatrix } from '../charts/geometry'
 import HBars from '../charts/HBars'
 import Heatmap from '../charts/Heatmap'
 import { ACCENT, MUTED, categoryColor } from '../palette'
-import { HOURS, WEEKDAYS, bucketLabel, bucketTitle, compact, num, perBucket, type Period } from '../period'
+import { HOURS, WEEKDAYS, bucketLabel, bucketTitle, compact, num, pct, perBucket, type Period } from '../period'
 import { SectionShell, useSection } from '../section'
 import type { DataQuery } from '../../public/query'
 import FilterMeta from '../FilterMeta'
@@ -40,7 +40,7 @@ function Targets({ data }: { data: StatsTargetsDto }) {
         <StatTile label="Фактів про цілі" value={compact(data.targets)} exactValue={data.targets.toLocaleString('uk-UA')} note="без повторів між джерелами" />
         <StatTile label="Окремих обʼєктів (треків)" value={compact(data.tracks)} exactValue={data.tracks.toLocaleString('uk-UA')} note="відкрито за період" />
         <StatTile label="Заявлено обʼєктів" value={compact(data.objectsDeclared)} exactValue={data.objectsDeclared.toLocaleString('uk-UA')} note="сума кількостей у повідомленнях" />
-        <StatTile label="З прив’язкою до області" value={data.targets > 0 ? `${Math.round((located / data.targets) * 100)}%` : '—'} exactValue={`${located.toLocaleString('uk-UA')} з ${data.targets.toLocaleString('uk-UA')} фактів`} note={`${compact(located)} фактів`} />
+        <StatTile label="З прив’язкою до області" value={pct(located, data.targets)} exactValue={`${located.toLocaleString('uk-UA')} з ${data.targets.toLocaleString('uk-UA')} фактів`} note={`${compact(located)} фактів`} />
       </div>
 
       <ChartCard

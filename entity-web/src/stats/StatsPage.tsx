@@ -10,6 +10,7 @@ import SourcesTab from './tabs/SourcesTab'
 import TargetsTab from './tabs/TargetsTab'
 import { useStatsRoute } from './useStatsRoute'
 import type { DataQuery } from '../public/query'
+import ActiveFilterSummary from '../components/ActiveFilterSummary'
 
 /**
  * The statistics page: four tabs, each answering one question with its own payload, one period for all of them,
@@ -18,18 +19,20 @@ import type { DataQuery } from '../public/query'
  */
 export default function StatsPage({ filter }: { filter: DataQuery }) {
   const { route, setTab, setPeriod } = useStatsRoute()
+  const publicRoute = { section: 'analytics' as const, query: new URLSearchParams(window.location.hash.split('?', 2)[1] ?? '') }
   const dark = themeIsDark(useStore((s) => s.theme))
   const openFilters = useStore((s) => s.setPanelOpenFor)
   return (
-    <div className="pointer-events-auto absolute inset-0 z-10 overflow-y-auto overflow-x-hidden bg-slate-100 pt-24 text-slate-900 sm:pt-16 dark:bg-slate-950 dark:text-slate-100" style={chartVars(dark)}>
+    <div className="pointer-events-auto absolute inset-0 z-10 overflow-y-auto overflow-x-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100" style={chartVars(dark)}>
       <div className="mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-8">
-        <div className="sticky top-24 z-20 -mx-3 flex flex-col gap-1.5 bg-slate-100/95 px-3 py-2 backdrop-blur sm:top-16 dark:bg-slate-950/95">
+        <div className="sticky top-20 z-20 -mx-3 flex flex-col gap-1.5 bg-slate-100/95 px-3 py-2 backdrop-blur sm:top-16 dark:bg-slate-950/95">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <h2 className="mr-1 font-semibold">Аналітика</h2>
             <button type="button" className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-200 dark:border-slate-600 dark:hover:bg-slate-700" onClick={() => openFilters('analytics', true)}>Фільтри та період</button>
             <Tabs tab={route.tab} onChange={setTab} />
             <PeriodBar period={route.period} onChange={setPeriod} />
           </div>
+          <ActiveFilterSummary route={publicRoute} filters={filter} targetAnalytics={route.tab !== 'alerts'} />
           <LiveLine />
         </div>
         <TabPanel tab={route.tab} period={route.period} filter={filter} />
@@ -63,13 +66,15 @@ function TabPanel({ tab, period, filter }: { tab: Tab; period: Period; filter: D
 
 /** Presets and, for a custom range, two local date-time inputs applied with a button (not on every keystroke). */
 function PeriodBar({ period, onChange }: { period: Period; onChange: (p: Period) => void }) {
-  const [from, setFrom] = useState(toLocalInput(period.from))
-  const [to, setTo] = useState(toLocalInput(period.to))
+  const canonicalFrom = toLocalInput(period.from)
+  const canonicalTo = toLocalInput(period.to)
+  const [from, setFrom] = useState(canonicalFrom)
+  const [to, setTo] = useState(canonicalTo)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    setFrom(toLocalInput(period.from))
-    setTo(toLocalInput(period.to))
-  }, [period])
+    setFrom(canonicalFrom)
+    setTo(canonicalTo)
+  }, [canonicalFrom, canonicalTo])
   const pick = (id: Preset) => {
     if (id === 'custom') onChange({ preset: 'custom', from: period.from, to: period.to })
     else onChange(presetPeriod(id))
@@ -77,8 +82,12 @@ function PeriodBar({ period, onChange }: { period: Period; onChange: (p: Period)
   const apply = () => {
     const f = parseKyivInput(from)
     const t = parseKyivInput(to)
-    if (!f || !t || t <= f) {
-      setError('Вкажіть коректний інтервал Europe/Kyiv; неіснуюча DST-година не приймається.')
+    if (!f || !t) {
+      setError('Вкажіть коректні дату й час за Києвом.')
+      return
+    }
+    if (t <= f) {
+      setError('Початок періоду має бути раніше за кінець.')
       return
     }
     setError(null)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compact, dayTitle, hoursText, lagText, parseStatsHash, pct, presetPeriod, roundedNow, statsHash } from './period'
+import { compact, dayTitle, hoursText, lagText, parseStatsHash, pct, percentValue, presetPeriod, roundedNow, statsHash } from './period'
 
 const NOW = new Date('2026-09-15T10:07:42Z')
 
@@ -72,6 +72,9 @@ describe('formatting', () => {
     expect(lagText(45)).toBe('45 с')
     expect(lagText(300)).toBe('5 хв')
     expect(pct(1, 4)).toBe('25%')
+    expect(pct(57, 11_585)).toBe('<1%')
+    expect(pct(1468, 1475)).toBe('>99%')
+    expect(percentValue(99.8)).toBe('>99%')
     expect(pct(1, 0)).toBe('—')
     expect(dayTitle('2026-09-14')).toBe('пн 14.09.2026')
   })
