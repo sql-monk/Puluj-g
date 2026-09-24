@@ -309,6 +309,32 @@ public sealed class EntityDeliveryTests(PipelineFixture fixture) : IAsyncLifetim
         Assert.Equal(2, delivery.Attempts);
     }
 
+    [Fact]
+    public async Task Concurrent_claims_split_the_queue_and_empty_polls_do_not_throw()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            await InsertRawAsync($"ee-concurrent-{i}");
+        }
+        var store = new EntityDeliveryStore(Factory, TimeProvider.System);
+
+        // Eight claimers over three rows: three win a delivery, the rest poll an empty queue, all at once.
+        for (var round = 0; round < 3; round++)
+        {
+            var claims = await Task.WhenAll(Enumerable.Range(0, 8).Select(i =>
+                store.ClaimNextAsync($"worker-{i}", TimeSpan.FromMinutes(1), CancellationToken.None)));
+            var won = claims.Select((claim, i) => (claim, owner: $"worker-{i}")).Where(x => x.claim is not null).ToArray();
+            Assert.Equal(round == 0 ? 3 : 0, won.Length);
+            Assert.Equal(won.Length, won.Select(x => x.claim!.Request.DeliveryId).Distinct().Count());
+            await Task.WhenAll(won.Select(x => store.CompleteAsync(
+                x.claim!, x.owner, "succeeded", 200, 1, null, TimeSpan.FromMilliseconds(1), CancellationToken.None)));
+        }
+
+        await using var db = await Factory.CreateDbContextAsync();
+        Assert.Equal(3, await db.EntityDeliveries.CountAsync(x => x.Status == "succeeded" && x.Attempts == 1));
+        Assert.Equal(3, await db.EntityDeliveryAttempts.CountAsync(x => x.Outcome == "succeeded"));
+    }
+
     private async Task InsertRawAsync(string key)
     {
         await using var db = await Factory.CreateDbContextAsync();

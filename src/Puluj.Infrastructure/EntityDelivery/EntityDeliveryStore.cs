@@ -46,30 +46,31 @@ public sealed class EntityDeliveryStore(
         claim.Parameters.AddWithValue("lease_expires", now + lease);
         claim.Parameters.AddWithValue("claimant", claimant);
 
-        Guid deliveryId;
-        DateTimeOffset claimedAt;
-        EntityExtractionRequest request;
+        ClaimedEntityDelivery? claimed = null;
+        // Close the reader before anything else runs on this connection, the commit included:
+        // committing while it is open throws NpgsqlOperationInProgressException on every empty poll.
         await using (var reader = await claim.ExecuteReaderAsync(ct))
         {
-            if (!await reader.ReadAsync(ct))
+            if (await reader.ReadAsync(ct))
             {
-                await transaction.CommitAsync(ct);
-                return null;
+                var payloadText = reader.IsDBNull(7) ? null : reader.GetString(7);
+                claimed = new ClaimedEntityDelivery(0, reader.GetFieldValue<DateTimeOffset>(9), new EntityExtractionRequest(
+                    reader.GetGuid(0),
+                    reader.GetInt64(1),
+                    reader.GetInt32(2),
+                    reader.GetString(3),
+                    reader.GetFieldValue<DateTimeOffset>(4),
+                    reader.GetFieldValue<DateTimeOffset>(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
+                    ParsePayload(payloadText),
+                    reader.IsDBNull(8) ? null : reader.GetString(8)));
             }
+        }
 
-            deliveryId = reader.GetGuid(0);
-            claimedAt = reader.GetFieldValue<DateTimeOffset>(9);
-            var payloadText = reader.IsDBNull(7) ? null : reader.GetString(7);
-            request = new EntityExtractionRequest(
-                deliveryId,
-                reader.GetInt64(1),
-                reader.GetInt32(2),
-                reader.GetString(3),
-                reader.GetFieldValue<DateTimeOffset>(4),
-                reader.GetFieldValue<DateTimeOffset>(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6),
-                ParsePayload(payloadText),
-                reader.IsDBNull(8) ? null : reader.GetString(8));
+        if (claimed is null)
+        {
+            await transaction.CommitAsync(ct);
+            return null;
         }
 
         await using var attempt = new NpgsqlCommand(
@@ -78,12 +79,12 @@ public sealed class EntityDeliveryStore(
             VALUES (@delivery_id, @started_at, 'in_progress', 0)
             RETURNING delivery_attempt_id
             """, connection, transaction);
-        attempt.Parameters.AddWithValue("delivery_id", deliveryId);
+        attempt.Parameters.AddWithValue("delivery_id", claimed.Request.DeliveryId);
         attempt.Parameters.AddWithValue("started_at", now);
         var attemptId = (long)(await attempt.ExecuteScalarAsync(ct)
             ?? throw new InvalidOperationException("Delivery attempt insert returned no id."));
         await transaction.CommitAsync(ct);
-        return new ClaimedEntityDelivery(attemptId, claimedAt, request);
+        return claimed with { AttemptId = attemptId };
     }
 
     private static JsonElement? ParsePayload(string? value)
