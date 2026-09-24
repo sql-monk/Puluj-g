@@ -10,3 +10,11 @@ logs/
 *.session.updates
 tests/
 docs/
+# Local Python environments, caches and test reports never belong in an image.
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/e2e-report/
+**/test-results/
+*.mp4
