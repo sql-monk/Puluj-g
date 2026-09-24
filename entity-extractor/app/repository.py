@@ -21,6 +21,7 @@ from .models import (
     ExtractRequest,
     LlmSettings,
 )
+from .places import is_place_reference, place_reference, requires_geometry
 
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
 
@@ -400,13 +401,37 @@ class PostgresRepository:
             definition = resolve_entity_definition(definitions, captured.table)
             columns, values, expressions = validate_write(definition, captured.values)
             id_column = f"{definition.entity_name}Id"
-            query = sql.SQL("INSERT INTO {table} ({columns}) VALUES ({values}) RETURNING {id_column}").format(
-                table=sql.Identifier(definition.table_name),
-                columns=sql.SQL(", ").join([sql.Identifier("raw_message_id"), *map(sql.Identifier, columns)]),
-                values=sql.SQL(", ").join([sql.Placeholder(), *expressions]),
-                id_column=sql.Identifier(id_column),
-            )
+            required = required_columns(definition, captured.values)
+            target_columns = sql.SQL(", ").join([sql.Identifier("raw_message_id"), *map(sql.Identifier, columns)])
+            if required:
+                # A place the gazetteer does not know makes no entity: insert only when every required
+                # geometry resolved.
+                aliases = [sql.Identifier(f"c{index}") for index in range(len(columns) + 1)]
+                query = sql.SQL(
+                    "INSERT INTO {table} ({columns}) SELECT * FROM (SELECT {values}) v WHERE {conditions} "
+                    "RETURNING {id_column}"
+                ).format(
+                    table=sql.Identifier(definition.table_name),
+                    columns=target_columns,
+                    values=sql.SQL(", ").join(
+                        sql.SQL("{} AS {}").format(expression, alias)
+                        for expression, alias in zip([sql.Placeholder(), *expressions], aliases, strict=True)
+                    ),
+                    conditions=sql.SQL(" AND ").join(
+                        sql.SQL("{} IS NOT NULL").format(aliases[columns.index(column) + 1]) for column in required
+                    ),
+                    id_column=sql.Identifier(id_column),
+                )
+            else:
+                query = sql.SQL("INSERT INTO {table} ({columns}) VALUES ({values}) RETURNING {id_column}").format(
+                    table=sql.Identifier(definition.table_name),
+                    columns=target_columns,
+                    values=sql.SQL(", ").join([sql.Placeholder(), *expressions]),
+                    id_column=sql.Identifier(id_column),
+                )
             row = await (await connection.execute(query, [raw_message_id, *values])).fetchone()
+            if row is None:
+                continue
             entity_id = str(row[id_column])
             await connection.execute(
                 """
@@ -531,6 +556,15 @@ def validate_write(definition: EntityDefinition, values: dict[str, Any]) -> tupl
     return columns, parameters, expressions
 
 
+def required_columns(definition: EntityDefinition, values: dict[str, Any]) -> list[str]:
+    """Columns of geometry place references marked ``required``: the entity exists only if they resolve."""
+    return [
+        field.column_name or _snake(field.name)
+        for field in definition.fields
+        if field.name in values and requires_geometry(field.type.lower(), values[field.name])
+    ]
+
+
 def index_entity_definitions(definitions: list[EntityDefinition]) -> dict[str, EntityDefinition]:
     aliases: dict[str, EntityDefinition] = {}
     for definition in definitions:
@@ -596,6 +630,12 @@ def _value(field: EntityField, value: Any) -> tuple[Any, sql.Composable]:
         except (TypeError, ValueError) as exc:
             raise ValueError(f"field {field.name!r} must be JSON serializable") from exc
     if kind in {"point", "line", "polygon"}:
+        if is_place_reference(kind, value):
+            # Extractors cannot reach the gazetteer; the database resolves the named place on insert.
+            reference = place_reference(kind, value, field.name)
+            return json.dumps(reference, ensure_ascii=False), sql.SQL("ee_place_geometry({}::jsonb, {})").format(
+                sql.Placeholder(), sql.Literal(kind)
+            )
         geojson = _geojson(kind, value, field.name)
         return json.dumps(geojson), sql.SQL("ST_SetSRID(ST_GeomFromGeoJSON({}), 4326)").format(sql.Placeholder())
     raise ValueError(f"field {field.name!r} has unsupported type {field.type!r}")

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from .config import Settings
 from .llm import EntityLlmExtractor, LlmError
-from .models import ExtractRequest
+from .models import CapturedWrite, EntityDefinition, ExtractRequest
 from .repository import Repository, index_entity_definitions, resolve_entity_definition, validate_write
 from .runtime import execute_extractor
 
@@ -61,6 +61,7 @@ class EntityExtractorService:
         writes_count = sum(completed_steps.values())
         failures: list[str] = []
         extractors = await self.repository.list_extractors()
+        definitions = await self.repository.list_entity_definitions()
         for extractor in extractors:
             if extractor.extractor_id in completed_steps:
                 continue
@@ -87,7 +88,7 @@ class EntityExtractorService:
                     claim.run_id,
                     request.raw_message_id,
                     extractor,
-                    result.writes,
+                    with_event_time(result.writes, definitions, request),
                     result.duration_ms,
                     result.stdout,
                     result.stderr,
@@ -113,7 +114,6 @@ class EntityExtractorService:
             await self.repository.fail_processing(claim.run_id, error)
             raise ExtractionFailed(error)
 
-        definitions = await self.repository.list_entity_definitions()
         # The LLM section of the admin UI (app_settings Llm:*) wins; the Compose environment fills in what it never set.
         llm_settings = await self.repository.get_llm_settings(self.settings.llm_environment)
         if not llm_settings.enabled:
@@ -161,6 +161,7 @@ class EntityExtractorService:
 
         try:
             by_alias = index_entity_definitions(definitions)
+            llm_result.writes = with_event_time(llm_result.writes, definitions, request)
             for captured in llm_result.writes:
                 definition = resolve_entity_definition(by_alias, captured.table)
                 validate_write(definition, captured.values)
@@ -215,3 +216,30 @@ class EntityExtractorService:
                 return False
             self._llm_calls.append(now)
             return True
+
+
+def with_event_time(
+    writes: list[CapturedWrite], definitions: list[EntityDefinition], request: ExtractRequest
+) -> list[CapturedWrite]:
+    """No event without a time: an entity with an ``occurredAt`` field the extractor left empty gets the moment
+    the message was published (received, if the source gave no time)."""
+    try:
+        by_alias = index_entity_definitions(definitions)
+    except ValueError:
+        return writes
+    fallback = request.published_at or request.received_at or datetime.now(timezone.utc)
+    completed: list[CapturedWrite] = []
+    for captured in writes:
+        definition = by_alias.get(captured.table)
+        time_field = next(
+            (
+                field.name
+                for field in (definition.fields if definition else [])
+                if field.name.lower() == "occurredat" and field.type.lower() == "datetime"
+            ),
+            None,
+        )
+        if time_field is not None and captured.values.get(time_field) in (None, ""):
+            captured = CapturedWrite(table=captured.table, values={**captured.values, time_field: fallback})
+        completed.append(captured)
+    return completed

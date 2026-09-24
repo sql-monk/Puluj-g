@@ -102,7 +102,10 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
         await using var command = connection.CreateCommand();
+        var keyColumn = applyLifetime ? OptionalConfiguredColumn(definition, definition.Map.KeyField) : null;
         var clauses = new List<string>();
+        // The map has no place for an event without a time: it could never age out of any time window.
+        if (applyLifetime && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} IS NOT NULL");
         if (at is not null && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} <= @at");
         if (applyLifetime && definition.Map.LifetimeMinutes is > 0 && timeColumn is not null) clauses.Add($"{Quote(timeColumn)} >= @cutoff");
         if (!string.IsNullOrWhiteSpace(search)) clauses.Add("to_jsonb(t)::text ILIKE @search");
@@ -112,7 +115,11 @@ public sealed partial class EntityQueries(IConfiguration configuration)
         var where = clauses.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", clauses);
         var order = timeColumn is not null ? $"{Quote(timeColumn)} DESC NULLS LAST, {Quote(idColumn)} DESC" : $"{Quote(idColumn)} DESC";
         var json = JsonProjection(geometryColumn);
-        command.CommandText = $"SELECT ({json})::text FROM (SELECT * FROM {Quote(definition.TableName)} t {where} ORDER BY {order} LIMIT @limit) t";
+        // A keyed entity is a state (an alert over an area): only the latest row of each key, as of @at, is current.
+        var rows = keyColumn is null || timeColumn is null
+            ? $"SELECT * FROM {Quote(definition.TableName)} t {where}"
+            : $"SELECT DISTINCT ON (coalesce(t.{Quote(keyColumn)}, t.{Quote(idColumn)}::text)) * FROM {Quote(definition.TableName)} t {where} ORDER BY coalesce(t.{Quote(keyColumn)}, t.{Quote(idColumn)}::text), {Quote(timeColumn)} DESC, {Quote(idColumn)} DESC";
+        command.CommandText = $"SELECT ({json})::text FROM (SELECT * FROM ({rows}) t ORDER BY {order} LIMIT @limit) t";
         command.Parameters.AddWithValue("limit", limit);
         if (at is not null && timeColumn is not null) command.Parameters.AddWithValue("at", at.Value);
         if (applyLifetime && definition.Map.LifetimeMinutes is > 0 && timeColumn is not null) command.Parameters.AddWithValue("cutoff", (at ?? DateTimeOffset.UtcNow).AddMinutes(-definition.Map.LifetimeMinutes.Value));
@@ -278,12 +285,13 @@ public sealed partial class EntityQueries(IConfiguration configuration)
 }
 
 public sealed record EntityDefinitionDto(string EntityName, string TableName, JsonElement Fields, MapSettings Map, bool Enabled);
-public sealed record MapSettings(bool Visible, string Renderer, string? LabelField, string? TimeField, string? StatusField, string? GeometryField, string? LatitudeField, string? LongitudeField, int? LifetimeMinutes, string? SvgIcon, string? Color, double? Width, double? Opacity, string? Dash)
+/// <param name="KeyField">A field naming the thing a row is the state of (an alert's area): the map shows only the latest row per key.</param>
+public sealed record MapSettings(bool Visible, string Renderer, string? LabelField, string? TimeField, string? StatusField, string? GeometryField, string? LatitudeField, string? LongitudeField, int? LifetimeMinutes, string? SvgIcon, string? Color, double? Width, double? Opacity, string? Dash, string? KeyField = null)
 {
     public static MapSettings From(JsonElement value) => new(
         Bool(value, "enabled") ?? false, String(value, "renderer") ?? "point", String(value, "labelField"), String(value, "timeField"), String(value, "statusField"),
         String(value, "geometryField"), String(value, "latitudeField"), String(value, "longitudeField"), Int(value, "lifetimeMinutes"), String(value, "svg") ?? String(value, "svgIcon"),
-        String(value, "color"), Double(value, "width"), Double(value, "opacity"), String(value, "dash"));
+        String(value, "color"), Double(value, "width"), Double(value, "opacity"), String(value, "dash"), String(value, "keyField"));
     private static JsonElement? Property(JsonElement value, string name) { if (value.ValueKind != JsonValueKind.Object) return null; foreach (var p in value.EnumerateObject()) if (p.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) return p.Value; return null; }
     private static string? String(JsonElement value, string name) => Property(value, name) is { ValueKind: JsonValueKind.String } p ? p.GetString() : null;
     private static bool? Bool(JsonElement value, string name) => Property(value, name) is { ValueKind: JsonValueKind.True } ? true : Property(value, name) is { ValueKind: JsonValueKind.False } ? false : null;

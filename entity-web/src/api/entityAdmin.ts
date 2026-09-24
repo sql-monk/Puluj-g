@@ -2,7 +2,7 @@ import { adminCall, type ServiceStatusDto } from './admin'
 
 export interface EeExtractor { extractor_id: number; name: string; code: string; enabled: boolean; execution_order: number; timeout_ms: number }
 export interface EeField { name: string; type: string; required: boolean }
-export interface EeMapConfig { enabled: boolean; renderer: 'point' | 'icon' | 'line' | 'polygon'; geometryField?: string; latitudeField?: string; longitudeField?: string; labelField?: string; timeField?: string; statusField?: string; lifetimeMinutes?: number; svg?: string; color?: string; width?: number; opacity?: number; dash?: string }
+export interface EeMapConfig { enabled: boolean; renderer: 'point' | 'icon' | 'line' | 'polygon'; geometryField?: string; latitudeField?: string; longitudeField?: string; labelField?: string; timeField?: string; statusField?: string; keyField?: string; lifetimeMinutes?: number; svg?: string; color?: string; width?: number; opacity?: number; dash?: string }
 export interface EeDefinition { entity_definition_id: number; entity_name: string; table_name: string; fields: EeField[]; map_settings?: EeMapConfig; enabled: boolean }
 
 /** What the delivery queue holds now. `failed` is terminal (a failed delivery is not retried). */

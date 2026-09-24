@@ -239,3 +239,30 @@ async def test_recovery_skips_committed_extractor_steps(monkeypatch) -> None:
 
     assert await service.process(request()) == 1
     assert calls == 1
+
+
+async def test_an_entity_without_its_own_time_takes_the_publication_time(monkeypatch) -> None:
+    repository = FakeRepository()
+    repository.extractors = [extractor(1, "timeless")]
+    repository.definitions = [
+        EntityDefinition(
+            entity_definition_id=1,
+            entity_name="explosion",
+            table_name="ee_explosions",
+            fields=[EntityField(name="place", type="text"), EntityField(name="occurredAt", type="datetime")],
+        )
+    ]
+    stated = datetime(2026, 9, 24, 2, 0, tzinfo=timezone.utc)
+
+    async def execute(*args, **kwargs):
+        return RuntimeResult(writes=[
+            CapturedWrite(table="explosions", values={"place": "Київ"}),
+            CapturedWrite(table="explosions", values={"place": "Суми", "occurredAt": stated.isoformat()}),
+        ])
+
+    monkeypatch.setattr("app.service.execute_extractor", execute)
+    published = datetime(2026, 9, 24, 3, 0, tzinfo=timezone.utc)
+    service = EntityExtractorService(repository, Settings(), FakeLlm())  # type: ignore[arg-type]
+
+    assert await service.process(request().model_copy(update={"published_at": published})) == 1
+    assert [write.values["occurredAt"] for write in repository.committed] == [published, stated.isoformat()]

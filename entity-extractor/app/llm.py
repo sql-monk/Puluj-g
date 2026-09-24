@@ -232,7 +232,11 @@ class EntityLlmExtractor:
         return (
             "Extract only concrete entities supported by the supplied registry. "
             "Return strict JSON as {\"entities\":[{\"table\":\"ee_explosions\",\"values\":{...}}]}. "
-            "Return {\"entities\":[]} when the message contains no supported entity. Do not invent facts.\n"
+            "Return {\"entities\":[]} when the message contains no supported entity. Do not invent facts. "
+            "occurredAt is an ISO datetime; leave it out when the message states no time of its own. "
+            "For a point or polygon field name the place instead of guessing coordinates: "
+            "{\"place\":\"Кременчук\",\"region\":\"Полтавська обл.\"} (region only when the message names it); "
+            "for a line field {\"from\":{\"place\":\"...\"},\"to\":{\"place\":\"...\"}}.\n"
             f"Registry: {json.dumps(schema, ensure_ascii=False)}"
         )
 

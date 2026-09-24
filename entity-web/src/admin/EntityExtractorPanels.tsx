@@ -499,6 +499,10 @@ export function EeDefinitionsPanel() {
             <input className={text} value={map.statusField ?? ''} onChange={(event) => setMap({ ...map, statusField: event.target.value || undefined })} />
           </label>
           <label>
+            Ключ стану
+            <input className={text} title="Поле, що називає предмет стану (напр. район тривоги): на карті лише останній запис кожного ключа" value={map.keyField ?? ''} onChange={(event) => setMap({ ...map, keyField: event.target.value || undefined })} />
+          </label>
+          <label>
             Колір
             <input className={text} value={map.color ?? ''} onChange={(event) => setMap({ ...map, color: event.target.value || undefined })} />
           </label>

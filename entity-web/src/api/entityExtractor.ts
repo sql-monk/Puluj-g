@@ -10,6 +10,8 @@ export interface EntityMapSettings {
   latitudeField?: string
   longitudeField?: string
   lifetimeMinutes?: number
+  /** Names what a row is the state of (an alert's area): the server sends only the latest row per key. */
+  keyField?: string
   svgIcon?: string
   color?: string
   width?: number

@@ -15,9 +15,16 @@ describe('EE map search and time boundaries', () => {
     expect(filterEntityItems(rows, filters, [], now, [], from, to).map(x => x.id)).toEqual(['from', 'inside'])
   })
 
-  it('excludes future and malformed timestamps without requiring an explicit period', () => {
+  it('excludes future, malformed and missing timestamps without requiring an explicit period', () => {
     const rows = [row('now', now.toISOString()), row('future', '2026-09-24T12:00:00.001Z'), row('invalid', 'bad'), row('undated')]
-    expect(filterEntityItems(rows, filters, [], now).map(x => x.id)).toEqual(['now', 'undated'])
+    expect(filterEntityItems(rows, filters, [], now).map(x => x.id)).toEqual(['now'])
+  })
+
+  it('keeps a keyed state for its definition lifetime, not the viewer marker lifetime', () => {
+    const alerts = { entityName: 'alert', map: { keyField: 'stateKey', lifetimeMinutes: 1440 } } as EntityDefinition
+    const alert = (id: string, occurredAt: string): EntityItem => ({ entity: 'alert', table: 'ee_alerts', id, occurredAt, values: { status: 'active' } })
+    const rows = [alert('three-hours', '2026-09-24T09:00:00Z'), alert('two-days', '2026-09-22T12:00:00Z'), row('target-three-hours', '2026-09-24T09:00:00Z')]
+    expect(filterEntityItems(rows, filters, [alerts], now).map(x => x.id)).toEqual(['three-hours'])
   })
 
   it('uses the replay reference instead of wall-clock time', () => {
@@ -26,7 +33,7 @@ describe('EE map search and time boundaries', () => {
   })
 
   it('searches case-insensitively across text, nested values and opaque IDs', () => {
-    const rows = [row('9007199254740993')]
+    const rows = [row('9007199254740993', '2026-09-24T11:59:00Z')]
     for (const q of [' КИЇВ ', 'shaHED', '9007199254740993']) expect(filterEntityItems(rows, filters, [], now, [], undefined, undefined, q)).toEqual(rows)
     expect(filterEntityItems(rows, filters, [], now, [], undefined, undefined, 'absent')).toEqual([])
     expect(filterEntityItems(rows, filters, [], now, [], undefined, undefined, ' ')).toEqual(rows)

@@ -6,10 +6,12 @@ export function filterEntityItems(items: EntityItem[], filters: Filters, definit
   const search = searchQuery.trim().toLocaleLowerCase('uk-UA')
   return items.filter((item) => {
     if (kinds.length && !kinds.some((kind) => kind.toLowerCase() === item.entity.toLowerCase() || kind.toLowerCase() === item.table.toLowerCase())) return false
-    const occurredAt = item.occurredAt ? new Date(item.occurredAt).getTime() : undefined
-    if (occurredAt !== undefined && (!Number.isFinite(occurredAt) || occurredAt > referenceTime.getTime())) return false
-    if (from && (occurredAt === undefined || occurredAt < from.getTime())) return false
-    if (to && (occurredAt === undefined || occurredAt >= to.getTime())) return false
+    // An event without a time can never leave a time window: it has no place on the map.
+    if (!item.occurredAt) return false
+    const occurredAt = new Date(item.occurredAt).getTime()
+    if (!Number.isFinite(occurredAt) || occurredAt > referenceTime.getTime()) return false
+    if (from && occurredAt < from.getTime()) return false
+    if (to && occurredAt >= to.getTime()) return false
     if (search && !JSON.stringify([item.entity, item.table, item.id, item.rawMessageId, item.values]).toLocaleLowerCase('uk-UA').includes(search)) return false
     if (filters.sources?.length && (item.sourceId === undefined || !filters.sources.includes(item.sourceId))) return false
     const kind = item.entity.toLowerCase()
@@ -26,7 +28,11 @@ export function filterEntityItems(items: EntityItem[], filters: Filters, definit
       const normalized = String(status).toLowerCase()
       if (!(status === true || ['active', 'open', 'ongoing', 'true'].includes(normalized))) return false
     }
-    if (occurredAt !== undefined && referenceTime.getTime() - occurredAt > filters.lifetimeMinutes * 60_000) return false
+    // A state (an alert) lasts until its own next row ends it; the server keeps only the latest row per key, so
+    // the viewer's marker lifetime would hide an alert that is still on. The definition's lifetime bounds it instead.
+    const definition = byName.get(item.entity)
+    const lifetimeMinutes = definition?.map.keyField ? definition.map.lifetimeMinutes : filters.lifetimeMinutes
+    if (lifetimeMinutes && referenceTime.getTime() - occurredAt > lifetimeMinutes * 60_000) return false
     return true
   })
 }

@@ -4,7 +4,7 @@ import type { Filters } from '../store/useStore'
 import { filterEntityItems } from './entityFilters'
 
 const filters: Filters = { uav: true, cruise: true, ballistic: true, aircraft: true, alerts: true, events: true, activeOnly: false, forecast: true, highlightTargets: false, sources: null, lifetimeMinutes: 120 }
-const item = (entity: string, type?: string): EntityItem => ({ entity, table: `ee_${entity}s`, id: '9007199254740993', rawMessageId: '9007199254740995', values: type ? { targetType: type } : {} })
+const item = (entity: string, type?: string): EntityItem => ({ entity, table: `ee_${entity}s`, id: '9007199254740993', rawMessageId: '9007199254740995', occurredAt: new Date().toISOString(), values: type ? { targetType: type } : {} })
 
 describe('EE map filters', () => {
   it('applies existing alert, event and target-type toggles to generic EE entities', () => {

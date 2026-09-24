@@ -36,3 +36,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.ruff.lint.per-file-ignores]
+# Each stored extractor is common.py followed by its own file (extractors/install.py): the names are shared.
+"extractors/*.py" = ["F821"]

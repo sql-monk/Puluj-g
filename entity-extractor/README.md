@@ -22,6 +22,38 @@ physical name (`ee_explosions`), the registered entity name (`explosion`), or th
 The writer only captures a name and a key/value collection in the child process. The host validates registered fields
 and commits them afterward. A failed extractor discards all writes captured by that extractor.
 
+No event without a time: when an entity has an `occurredAt` field and the extractor (or the LLM) leaves it empty, the
+host fills in the message's `publishedAt` (`receivedAt` if the source gave none).
+
+Extractors have no database, so a geometry field may name a place instead of carrying GeoJSON; the database resolves it
+against the `places` gazetteer on insert (`ee_place_geometry`, migration `EntityPlacesAndEventTime`):
+
+```python
+write("targets", {"geometry": {"place": "Носівку", "hint": ["Чернігівська обл."], "required": True}, ...})
+write("alerts", {"geometry": {"place": "Чугуївський район", "region": "Харківська обл."}, ...})
+write("tracks", {"geometry": {"from": {"place": "Узина"}, "to": {"place": "Васильків"}}, ...})
+```
+
+Names may be inflected ("на Носівку", "до Славутича"). `region` restricts the match to one oblast, `hint` (one name or a
+list) only prefers it, and an unqualified village name that exists in several oblasts resolves to nothing rather than a
+guess. A point field gets the place's centroid, a polygon field its area (a settlement's hromada), a line field the
+segment between two places or `{"lon", "lat"}` ends. With `"required": true` an unresolved place drops the entity
+instead of storing it without geometry.
+
+## Shipped extractors
+
+`extractors/` holds the extractors for the eight seeded entities (alert, target, track, explosion, impact,
+airDefenseAction, launch, takeoff), written against the messages of the collected channels; `tests/test_extractors.py`
+runs them on real message texts. The sandbox imports only the standard-library allowlist, so each stored extractor is
+`common.py` followed by its own file. Store and enable them (idempotent; `--disable` stores them switched off):
+
+```sh
+python entity-extractor/extractors/install.py | docker exec -i puluj-g-postgis-1 psql -U puluj -d puluj
+```
+
+Alerts are states: `ee_alerts.state_key` names the area and `map_settings.keyField` makes the map show only the latest
+row per key, so an ended alert leaves the map.
+
 Extractor code runs in a separate process group with a wall-clock timeout, CPU/memory/process/file limits, an empty
 environment, a restricted import allowlist, and no `open`, socket, subprocess, or `os` access. Timeout handling kills
 the whole process group. This is containment for trusted administrator-authored rules, not a security boundary for
