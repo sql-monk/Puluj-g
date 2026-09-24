@@ -49,5 +49,6 @@
 - Frontend lint: завершився з кодом 0, існуючі warnings залишено без нерелевантного рефакторингу.
 - Початковий frontend suite: 148 passed, 4 тайм-аути Intl formatting на навантаженому Windows host. Повторний запуск обмежує кількість workers; це ще не фінальний passing evidence.
 - Повторний frontend suite: **160/160 passed** (`--maxWorkers=2 --testTimeout=30000`); TypeScript build пройшов після виправлення missing await у новому E2E. Остаточне незалежне post-review: схвалено, відкритих зауважень немає.
-- .NET integration та браузерні перевірки виконуються. Результати CI/скріншоти буде додано перед merge. PR: https://github.com/sql-monk/Puluj-g/pull/79.
+- CI на checkpoint `731f879`: .NET **395 passed, 1 skipped**, Python **102 passed**; frontend unit/build/lint пройшли. Браузерні регресії: **79 passed, 2 failed** (той самий сценарій вибору джерела на desktop/mobile); до merge потрібен зелений повторний запуск. PR: https://github.com/sql-monk/Puluj-g/pull/79.
+- Візуальна оцінка: світла/темна тема при 1280/415/320 px, реальний перемикач теми, контраст тексту >=4.5 і відсутність горизонтального overflow. Переглянуті screenshots `.tmp/ee-panel-visual/panel-{1280,415,320}-{light,dark}.png`; дані та basemap у fixture mocked. Виправлено світлий текст на світлому фоні. Окремий ручний браузерний огляд перевірив empty/error state, Escape та повернення focus; живий API під час нього був недоступний.
 - Live Docker containers/БД не змінювались; runtime retirement потребує описаного в README rollout.
