@@ -28,7 +28,7 @@ public sealed class EntityTrackRetirementTests(PipelineFixture fixture)
             await db.Database.ExecuteSqlRawAsync("""
                 UPDATE ee_extractors SET enabled=true WHERE name='track';
                 UPDATE ee_entity_definitions SET enabled=true,
-                    map_settings=map_settings || '{"enabled":true}'::jsonb
+                    map_settings=map_settings || jsonb_build_object('enabled',true)
                 WHERE entity_name='track';
                 """);
             var raw = new RawMessage
