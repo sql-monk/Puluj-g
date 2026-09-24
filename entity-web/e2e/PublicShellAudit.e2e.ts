@@ -295,8 +295,9 @@ test('filter panel keeps checkbox selection, URL history, retired kinds and sepa
   await toggle(page).click()
   await expect(panel(page)).toContainText('Треки вимкнено')
   await expect(panel(page)).toContainText('0 записів після фільтрів')
-  await panel(page).getByRole('checkbox', { name: 'Треки вимкнено' }).uncheck()
+  await panel(page).getByRole('checkbox', { name: 'Треки вимкнено' }).click()
   await expect(page).not.toHaveURL(/entityKinds=/)
+  await expect(panel(page).getByRole('checkbox', { name: 'Треки вимкнено' })).toHaveCount(0)
   await panel(page).locator('summary').filter({ hasText: /^Джерела/ }).click()
   await expect(panel(page).getByRole('checkbox', { name: 'Недоступне джерело #999' })).toBeChecked()
   await panel(page).getByRole('checkbox', { name: 'Audit source', exact: true }).check()
@@ -344,7 +345,26 @@ test('panel visual review: desktop and mobile in light and dark', async ({ page 
   for (const width of [1280, 415, 320]) {
     await page.setViewportSize({ width, height: 900 })
     for (const dark of [false, true]) {
-      await page.evaluate(value => document.documentElement.classList.toggle('dark', value), dark)
+      await closePanel(page)
+      await page.getByLabel('Кольорова тема').selectOption(dark ? 'dark' : 'light')
+      await expect(page.locator('html')).toHaveAttribute('data-theme', dark ? 'dark' : 'light')
+      await toggle(page).click()
+      const contrast = await panel(page).evaluate(el => {
+        const style = getComputedStyle(el)
+        const canvas = document.createElement('canvas')
+        canvas.width = canvas.height = 1
+        const context = canvas.getContext('2d')!
+        const luminance = (color: string) => {
+          context.fillStyle = color
+          context.fillRect(0, 0, 1, 1)
+          const channels = Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3).map(value => { const v = value / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 })
+          return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722
+        }
+        const foreground = luminance(style.color)
+        const background = luminance(style.backgroundColor)
+        return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+      })
+      expect(contrast).toBeGreaterThanOrEqual(4.5)
       const path = testInfo.outputPath(`panel-${width}-${dark ? 'dark' : 'light'}.png`)
       await page.screenshot({ path, fullPage: true })
       await testInfo.attach(`panel-${width}-${dark ? 'dark' : 'light'}`, { path, contentType: 'image/png' })

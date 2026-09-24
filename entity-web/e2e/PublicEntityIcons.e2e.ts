@@ -65,6 +65,6 @@ test('default icon, invalid SVG fallback and custom lines survive a style reload
 test('old track detail link has an explicit unavailable state and a way back', async ({ page }) => {
   await fixture(page)
   await page.goto('/#/entities/track/4')
-  await expect(page.getByRole('alert')).toContainText('Треки вимкнено')
+  await expect(page.getByRole('main').getByRole('alert')).toContainText('Треки вимкнено')
   await expect(page.getByRole('link', { name: '← До каталогу' })).toBeVisible()
 })

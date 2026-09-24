@@ -201,7 +201,7 @@ export default function App() {
 
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-slate-100 dark:bg-slate-950" data-feed={feedOpen ? 'open' : 'closed'}>
+    <div className="relative h-full w-full overflow-hidden bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100" data-feed={feedOpen ? 'open' : 'closed'}>
       {activeMap && <MapView dark={mapDark} theme={theme} kyiv={kyivPreset} onPickHome={null} layoutKey={`${panelOpen}-${feedOpen}-${replay}`} snapshotAt={entityPolling.snapshotAt} entityDefinitions={entityPolling.definitions} entityItems={entityPolling.items} searchQuery={dataQuery.q} entityKinds={dataQuery.entityKinds} from={dataQuery.from} to={dataQuery.to} />}
       <TopBar dataStatus={entityPolling} route={route} rememberedRoutes={rememberedRoutes} panelOpen={panelOpen} onTogglePanel={() => panelOpen ? closePanel() : setPanelOpenFor(route.section, true)} panelButtonRef={panelButton} />
       {stats && <StatsPage filter={dataQuery} />}

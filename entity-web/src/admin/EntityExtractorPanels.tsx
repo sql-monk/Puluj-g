@@ -542,7 +542,7 @@ export function EeDefinitionsPanel() {
         </fieldset>
         <label className="mt-2 block">
           SVG-піктограма
-          <textarea className="block min-h-28 w-full rounded border p-2 font-mono text-xs dark:bg-slate-800" value={map.svg ?? ''} onChange={(event) => setMap({ ...map, svg: event.target.value || undefined })} />
+          <textarea aria-label="SVG-піктограма" className="block min-h-28 w-full rounded border p-2 font-mono text-xs dark:bg-slate-800" value={map.svg ?? ''} onChange={(event) => setMap({ ...map, svg: event.target.value || undefined })} />
         </label>
         {editing ? (
           <div className="mt-3 flex gap-2">
