@@ -1,0 +1,24 @@
+FROM postgres:17-bookworm AS system-stats-builder
+
+# system_stats is a native PostgreSQL extension and is not shipped by the
+# Debian-based PostGIS image. Pin its source commit so image rebuilds remain
+# reproducible even if the upstream branch or tag changes.
+ARG SYSTEM_STATS_COMMIT=30be419e34f88e55b70b47aadeed619828450710
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        git \
+        postgresql-server-dev-17 \
+    && git clone https://github.com/EnterpriseDB/system_stats.git /tmp/system_stats \
+    && cd /tmp/system_stats \
+    && git checkout "$SYSTEM_STATS_COMMIT" \
+    && make USE_PGXS=1 \
+    && make install USE_PGXS=1 \
+    && rm -rf /var/lib/apt/lists/* /tmp/system_stats
+
+FROM postgis/postgis:17-3.5
+
+COPY --from=system-stats-builder /usr/lib/postgresql/17/lib/system_stats.so /usr/lib/postgresql/17/lib/system_stats.so
+COPY --from=system-stats-builder /usr/share/postgresql/17/extension/system_stats* /usr/share/postgresql/17/extension/

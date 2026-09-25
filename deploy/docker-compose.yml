@@ -33,7 +33,10 @@ x-worker: &worker
 
 services:
   postgis:
-    image: postgis/postgis:17-3.5
+    image: puluj-g-postgis
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.postgis
     # Tuned for the local 16 GiB Docker host during large history ingestion. Keep this configuration in Compose,
     # rather than altering the external pgdata volume, so deployments stay reproducible.
     command:
