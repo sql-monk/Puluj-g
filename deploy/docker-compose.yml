@@ -81,6 +81,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    restart: unless-stopped
 
   # Applies migrations (including the puluj_reader / puluj_admin roles) and the seed data, then exits.
   # Every other service waits for it, so a schema change is applied exactly once before anything starts.
