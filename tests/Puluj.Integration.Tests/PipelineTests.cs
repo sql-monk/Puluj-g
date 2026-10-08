@@ -27,12 +27,39 @@ public sealed class PipelineTests(PipelineFixture fixture)
         var now = DateTimeOffset.UtcNow;
         foreach (var hours in PipelineBuckets.AllowedHours)
         {
-            await using var db = await factory.CreateDbContextAsync();
-            var report = await PipelineReport.BuildAsync(db, hours, now, CancellationToken.None);
+            var report = await PipelineReport.BuildAsync(factory, hours, now, CancellationToken.None);
 
             Assert.Equal(PipelineBuckets.Unit(hours), report.Bucket);
             Assert.Equal(hours <= 48 ? hours : hours / 24, report.Timeline.Count);
         }
+    }
+
+    [Fact]
+    public async Task Pipeline_report_is_shared_while_current_and_rebuilt_after()
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var factory = _services.GetRequiredService<IDbContextFactory<PulujDbContext>>();
+        var clock = new ManualClock(DateTimeOffset.UtcNow);
+        var first = await PipelineReport.GetAsync(factory, 24, clock, CancellationToken.None);
+        clock.Now += TimeSpan.FromSeconds(5);
+        Assert.Same(first, await PipelineReport.GetAsync(factory, 24, clock, CancellationToken.None));
+
+        // Past its age a day rebuilds in well under the wait for a fresh report, so the caller gets the new one.
+        clock.Now += PipelineReport.MaxAge(24);
+        var rebuilt = await PipelineReport.GetAsync(factory, 24, clock, CancellationToken.None);
+        Assert.NotSame(first, rebuilt);
+        Assert.Equal(clock.Now, rebuilt.To);
+    }
+
+    private sealed class ManualClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 
     [Fact]

@@ -205,7 +205,15 @@ public sealed class P07EventKindTests(PipelineFixture fixture)
         var kindId = await db.EventKinds.Where(k => k.Code == "target.observed").Select(k => k.EventKindId).SingleAsync();
         var mapQuery = $"SELECT target_id FROM targets WHERE event_kind_id = {kindId} ORDER BY observed_at DESC LIMIT 100";
         var mapPlan = await Explain(db, mapQuery);
-        Assert.Contains("ix_targets_event_kind_id_observed_at", mapPlan);
+        // Newest-first straight from an index, never a scan and sort of the table: the kind index, or — for a kind as
+        // common as this one (40% of the rows) — walking the observed_at btree (AddTargetReportIndexes) finds 100 at once.
+        Assert.True(mapPlan.Contains("ix_targets_event_kind_id_observed_at") || mapPlan.Contains("ix_targets_observed_at_covering"), mapPlan);
+        Assert.DoesNotContain("Seq Scan", mapPlan);
+        Assert.DoesNotContain("Sort", mapPlan);
+        // A kind with no rows is where walking observed_at would read the whole table: that one must take the kind index.
+        var absentKindId = await db.EventKinds.Where(k => !db.Targets.Any(t => t.EventKindId == k.EventKindId)).Select(k => k.EventKindId).FirstAsync();
+        var absentPlan = await Explain(db, $"SELECT target_id FROM targets WHERE event_kind_id = {absentKindId} ORDER BY observed_at DESC LIMIT 100");
+        Assert.Contains("ix_targets_event_kind_id_observed_at", absentPlan);
         var backfillScan = "SELECT count(*) FROM targets WHERE event_kind_id IS NULL";
         var scanPlan = await Explain(db, backfillScan);
 

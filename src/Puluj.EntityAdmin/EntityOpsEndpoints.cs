@@ -436,8 +436,7 @@ public static partial class EntityOpsEndpoints
         {
             return Results.BadRequest(new { error = $"hours має бути одним із: {string.Join(", ", PipelineBuckets.AllowedHours)}" });
         }
-        await using var db = await factory.CreateDbContextAsync(ct);
-        return Results.Ok(await PipelineReport.BuildAsync(db, h, clock.GetUtcNow(), ct));
+        return Results.Ok(await PipelineReport.GetAsync(factory, h, clock, ct));
     }
 
     private sealed record HourCount(int SourceId, DateTime Hour, int Count);

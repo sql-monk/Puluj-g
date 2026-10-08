@@ -16,10 +16,11 @@ public class TargetConfiguration : IEntityTypeConfiguration<Target>
         b.Property(x => x.Location).HasColumnType("geography (geometry, 4326)");
 
         b.HasIndex(x => x.Location).HasMethod("gist");
-        b.HasIndex(x => x.ObservedAt).HasMethod("brin");
+        // observed_at alone has a SQL-only covering btree (AddTargetReportIndexes): a history load inserts years of events
+        // in one go, so a BRIN on it matched most of the table for any range.
         b.HasIndex(x => new { x.TargetClassId, x.ObservedAt });
-        // The linker's candidate scan: same category inside the class window. The BRIN on observed_at alone turns lossy
-        // after bulk deletes (a rebuild) and then reads tens of thousands of rows per new target.
+        // The linker's candidate scan: same category inside the class window. The BRIN on observed_at alone turned lossy
+        // after bulk deletes (a rebuild) and then read tens of thousands of rows per new target.
         b.HasIndex(x => new { x.TargetCategoryId, x.ObservedAt });
         b.HasIndex(x => x.RawMessageId);
         b.HasIndex(x => x.DuplicateOfTargetId);

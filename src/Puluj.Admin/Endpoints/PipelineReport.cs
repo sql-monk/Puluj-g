@@ -74,6 +74,83 @@ public static class PipelineReport
 {
     private const string Tz = "Europe/Kyiv";
     private const int RecentErrors = 50;
+    // A month spanning a history load runs for tens of seconds on a cold cache: past Npgsql's 30-s default.
+    private static readonly TimeSpan CommandTimeout = TimeSpan.FromMinutes(2);
+
+    // A rebuild this quick is waited for; a slower one answers with the previous report and lands on a later call.
+    private static readonly TimeSpan WaitForFresh = TimeSpan.FromSeconds(5);
+
+    private sealed class Slot
+    {
+        public PipelineReportDto? Last;
+        public Task<PipelineReportDto>? Building;
+    }
+
+    private static readonly Dictionary<int, Slot> Slots = [];
+    private static readonly Lock SlotsGate = new();
+
+    /// <summary>
+    /// The report for a period, shared by every caller and built once at a time: a month spanning a history load costs
+    /// 30–50 s of database CPU, and every open admin tab polls it. A report younger than <see cref="MaxAge"/> (just under
+    /// the panel's poll interval for that period) is answered as is. An older one starts a rebuild; only the very first
+    /// report of a period is waited for in full, after that the previous one is answered while the next one builds
+    /// (its <c>To</c> says when it was built). The build is not tied to a request: a caller that gives up leaves it running
+    /// for the next one; a failed build is retried by the next call.
+    /// </summary>
+    public static async Task<PipelineReportDto> GetAsync(IDbContextFactory<PulujDbContext> factory, int hours, TimeProvider clock, CancellationToken ct)
+    {
+        PipelineReportDto? last;
+        Task<PipelineReportDto> building;
+        lock (SlotsGate)
+        {
+            var now = clock.GetUtcNow();
+            if (!Slots.TryGetValue(hours, out var slot))
+            {
+                Slots[hours] = slot = new Slot();
+            }
+            last = slot.Last;
+            if (last is not null && now - last.To <= MaxAge(hours))
+            {
+                return last;
+            }
+            building = slot.Building ??= StartBuild(factory, hours, now, slot);
+        }
+        if (last is null)
+        {
+            return await building.WaitAsync(ct);
+        }
+        var first = await Task.WhenAny(building, Task.Delay(WaitForFresh, clock, ct));
+        return first == building && building.IsCompletedSuccessfully ? building.Result : last;
+    }
+
+    private static Task<PipelineReportDto> StartBuild(IDbContextFactory<PulujDbContext> factory, int hours, DateTimeOffset now, Slot slot) =>
+        Task.Run(async () =>
+        {
+            try
+            {
+                var report = await BuildAsync(factory, hours, now, CancellationToken.None);
+                lock (SlotsGate)
+                {
+                    slot.Last = report;
+                }
+                return report;
+            }
+            finally
+            {
+                lock (SlotsGate)
+                {
+                    slot.Building = null;
+                }
+            }
+        });
+
+    /// <summary>How long a report stays current: the panel polls a day every 15 s, a week every minute, a month every 5 minutes.</summary>
+    public static TimeSpan MaxAge(int hours) => hours switch
+    {
+        <= 24 => TimeSpan.FromSeconds(10),
+        <= 168 => TimeSpan.FromSeconds(50),
+        _ => TimeSpan.FromMinutes(4),
+    };
 
     // Unmapped query types follow the snake_case naming convention: the SQL columns are aliased to match.
     // `GROUP BY ROLLUP (source_id)` adds one row with source_id NULL — the total over every source.
@@ -90,10 +167,14 @@ public static class PipelineReport
     private sealed record StatusCount(int Status, long Count);
     private sealed record StageCount(string Stage, long Count);
 
-    public static async Task<PipelineReportDto> BuildAsync(PulujDbContext db, int hours, DateTimeOffset now, CancellationToken ct)
+    public static async Task<PipelineReportDto> BuildAsync(IDbContextFactory<PulujDbContext> factory, int hours, DateTimeOffset now, CancellationToken ct)
     {
         var (from, unit, starts) = PipelineBuckets.Period(hours, now);
         var to = now;
+        // One query at a time on one connection: each is CPU-bound and already uses parallel workers, so running them side
+        // by side on the database's 6 cores made a month slower (48 s against 30 s), not faster.
+        await using var db = await factory.CreateDbContextAsync(ct);
+        db.Database.SetCommandTimeout(CommandTimeout);
 
         // Messages: received by received_at, outcomes by processed_at, current statuses; timings only exist for successes.
         // Three queries, not one with `received_at >= … OR processed_at >= … OR status IN (0, 4)`: no index serves that OR,

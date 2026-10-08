@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { admin, type PipelineReportDto, type ProcessingErrorDto } from '../api/admin'
 import { Badge, Section } from '../components/settings/fields'
 import { Bars, Freshness, Loading, Stat, ago, bucketLabel, fmtMs, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
@@ -18,7 +18,17 @@ const PERIODS: { hours: 24 | 168 | 720; label: string; pollMs: number }[] = [
 export function PipelinePanel() {
   const [hours, setHours] = useState<24 | 168 | 720>(24)
   const pollMs = PERIODS.find((p) => p.hours === hours)?.pollMs ?? 15_000
-  const { data, error, stale, loadedAt } = usePolled(() => admin.ops.pipeline(hours), pollMs, [hours])
+  const { data, error, stale, reload, loadedAt } = usePolled(() => admin.ops.pipeline(hours), pollMs, [hours])
+  // The server shares one report per period between polls, so the snapshot time is when it was built, not fetched.
+  const builtAt = data ? new Date(data.to) : null
+  // An outdated report comes back while the server rebuilds it (a month takes tens of seconds): ask again shortly
+  // instead of a whole poll interval later.
+  const outdated = builtAt !== null && !stale && Date.now() - builtAt.getTime() > pollMs
+  useEffect(() => {
+    if (!outdated) return
+    const id = window.setTimeout(() => void reload(), 10_000)
+    return () => window.clearTimeout(id)
+  }, [outdated, loadedAt, reload]) // every answer that is still outdated schedules the next ask
   const shownPeriod = PERIODS.find((p) => data && Math.round((new Date(data.to).getTime() - new Date(data.from).getTime()) / 3_600_000) === p.hours)?.label
   const t = data?.totals
   const withTargets = data ? data.sources.reduce((s, x) => s + x.withTargets, 0) : 0
@@ -42,10 +52,10 @@ export function PipelinePanel() {
           завантаження історії сюди входять і старі повідомлення, отримані раніше; «Цілей» і «Треків» — за часом події в повідомленні.
           «У черзі» — увесь поточний backlog, незалежно від періоду.
         </p>
-        <Loading error={error} empty={!data && !error} slow="сервер агрегує raw_messages і targets за весь період; 7 і 30 днів рахуються довше" />
+        <Loading error={error} empty={!data && !error} slow="сервер агрегує raw_messages і targets за весь період; перший звіт за 30 днів, поки в нього потрапляє завантаження історії, рахується до хвилини, далі сервер віддає готовий і оновлює його у фоні" />
         {data && (
           <div className="flex flex-wrap items-center gap-2">
-            <Freshness stale={stale} loadedAt={loadedAt} label={shownPeriod ? `період ${shownPeriod}` : undefined} />
+            <Freshness stale={stale} loadedAt={builtAt} label={shownPeriod ? `період ${shownPeriod}` : undefined} />
           </div>
         )}
         {data && t && (

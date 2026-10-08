@@ -1514,11 +1514,6 @@ namespace Puluj.Infrastructure.Persistence.Migrations
                     b.HasIndex("LocationPlaceId")
                         .HasDatabaseName("ix_targets_location_place_id");
 
-                    b.HasIndex("ObservedAt")
-                        .HasDatabaseName("ix_targets_observed_at");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ObservedAt"), "brin");
-
                     b.HasIndex("OriginPlaceId")
                         .HasDatabaseName("ix_targets_origin_place_id");
 
