@@ -77,8 +77,9 @@ public static class PipelineReport
 
     // Unmapped query types follow the snake_case naming convention: the SQL columns are aliased to match.
     // `GROUP BY ROLLUP (source_id)` adds one row with source_id NULL — the total over every source.
-    private sealed record SourceRow(int? SourceId, long Received, long Processed, long Skipped, long Failed, long Pending, long InProgress,
-        long WithTargets, double? P50Ms, double? P90Ms, double? MeanMs, double? MedianLagSeconds);
+    private sealed record ReceivedRow(int? SourceId, long Received, double? MedianLagSeconds);
+    private sealed record ProcessedRow(int? SourceId, long Processed, long Skipped, long Failed, long WithTargets, double? P50Ms, double? P90Ms, double? MeanMs);
+    private sealed record QueueRow(int? SourceId, long Pending, long InProgress);
     private sealed record TargetsRow(int? SourceId, long N, long Duplicates);
     private sealed record TracksRow(int? SourceId, long N);
     private sealed record SourceBucketRow(int SourceId, DateTimeOffset BucketAt, long N);
@@ -95,27 +96,39 @@ public static class PipelineReport
         var to = now;
 
         // Messages: received by received_at, outcomes by processed_at, current statuses; timings only exist for successes.
-        var sourceRows = await db.Database.SqlQuery<SourceRow>($"""
+        // Three queries, not one with `received_at >= … OR processed_at >= … OR status IN (0, 4)`: no index serves that OR,
+        // so it read the whole table. Each of these is an index-only scan of its own range (AddPipelineReportIndexes).
+        var receivedRows = await db.Database.SqlQuery<ReceivedRow>($"""
+            SELECT source_id AS source_id, count(*) AS received,
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(extract(epoch FROM received_at - published_at) AS float8))
+                       FILTER (WHERE received_at >= published_at AND received_at - published_at < interval '6 hours') AS median_lag_seconds
+            FROM raw_messages
+            WHERE received_at >= {from} AND received_at < {to}
+            GROUP BY ROLLUP (source_id)
+            """).ToListAsync(ct);
+        // processed_at is set for the final statuses only (reprocessing and retries clear it), hence `IN (1, 2, 3)`:
+        // the leading column of ix_raw_messages_status_processed_at.
+        var processedRows = await db.Database.SqlQuery<ProcessedRow>($"""
             SELECT r.source_id AS source_id,
-                   count(*) FILTER (WHERE r.received_at >= {from} AND r.received_at < {to}) AS received,
-                   count(*) FILTER (WHERE r.processing_status = 1 AND r.processed_at >= {from} AND r.processed_at < {to}) AS processed,
-                   count(*) FILTER (WHERE r.processing_status = 3 AND r.processed_at >= {from} AND r.processed_at < {to}) AS skipped,
-                   count(*) FILTER (WHERE r.processing_status = 2 AND r.processed_at >= {from} AND r.processed_at < {to}) AS failed,
-                   count(*) FILTER (WHERE r.processing_status = 0) AS pending,
-                   count(*) FILTER (WHERE r.processing_status = 4) AS in_progress,
-                   count(*) FILTER (WHERE r.processing_status = 1 AND r.processed_at >= {from} AND r.processed_at < {to}
+                   count(*) FILTER (WHERE r.processing_status = 1) AS processed,
+                   count(*) FILTER (WHERE r.processing_status = 3) AS skipped,
+                   count(*) FILTER (WHERE r.processing_status = 2) AS failed,
+                   count(*) FILTER (WHERE r.processing_status = 1
                                       AND EXISTS (SELECT 1 FROM targets t WHERE t.raw_message_id = r.raw_message_id)) AS with_targets,
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8))
-                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p50ms,
-                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8))
-                       FILTER (WHERE r.processing_ms IS NOT NULL AND r.processed_at >= {from} AND r.processed_at < {to}) AS p90ms,
-                   CAST(avg(r.processing_ms) FILTER (WHERE r.processed_at >= {from} AND r.processed_at < {to}) AS float8) AS mean_ms,
-                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(extract(epoch FROM r.received_at - r.published_at) AS float8))
-                       FILTER (WHERE r.received_at >= {from} AND r.received_at < {to}
-                                 AND r.received_at >= r.published_at AND r.received_at - r.published_at < interval '6 hours') AS median_lag_seconds
+                   percentile_cont(0.5) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8)) FILTER (WHERE r.processing_ms IS NOT NULL) AS p50ms,
+                   percentile_cont(0.9) WITHIN GROUP (ORDER BY CAST(r.processing_ms AS float8)) FILTER (WHERE r.processing_ms IS NOT NULL) AS p90ms,
+                   CAST(avg(r.processing_ms) AS float8) AS mean_ms
             FROM raw_messages r
-            WHERE r.received_at >= {from} OR r.processed_at >= {from} OR r.processing_status IN (0, 4)
+            WHERE r.processing_status IN (1, 2, 3) AND r.processed_at >= {from} AND r.processed_at < {to}
             GROUP BY ROLLUP (r.source_id)
+            """).ToListAsync(ct);
+        var queueRows = await db.Database.SqlQuery<QueueRow>($"""
+            SELECT source_id AS source_id,
+                   count(*) FILTER (WHERE processing_status = 0) AS pending,
+                   count(*) FILTER (WHERE processing_status = 4) AS in_progress
+            FROM raw_messages
+            WHERE processing_status IN (0, 4)
+            GROUP BY ROLLUP (source_id)
             """).ToListAsync(ct);
         // Everything the pipeline produced in the period, duplicates included (they are counted, not excluded).
         var targetRows = await db.Database.SqlQuery<TargetsRow>($"""
@@ -168,6 +181,7 @@ public static class PipelineReport
             WHERE claimed_by IS NOT NULL AND processing_status = 1 AND processed_at >= {from} AND processed_at < {to}
             GROUP BY 1
             """).ToListAsync(ct);
+        // Every row, but read from ix_raw_messages_status_processed_at (a twentieth of the heap), not the table.
         var processingStatuses = await db.Database.SqlQueryRaw<StatusCount>("SELECT processing_status AS status, count(*) AS count FROM raw_messages GROUP BY 1").ToListAsync(ct);
         var stages = await db.Database.SqlQuery<StageCount>($"SELECT stage AS stage, count(*) AS count FROM processing_errors WHERE occurred_at >= {from} AND occurred_at < {to} GROUP BY 1").ToListAsync(ct);
         var recent = await db.ProcessingErrors.AsNoTracking().OrderByDescending(e => e.OccurredAt).Take(RecentErrors)
@@ -176,8 +190,12 @@ public static class PipelineReport
         var sources = await db.Sources.AsNoTracking().OrderByDescending(s => s.Enabled).ThenByDescending(s => s.Priority).ThenBy(s => s.Name).ToListAsync(ct);
 
         // Fold: the rollup row is the total, the rest go by source.
-        var totalRow = sourceRows.FirstOrDefault(r => r.SourceId is null);
-        var bySource = sourceRows.Where(r => r.SourceId is not null).ToDictionary(r => r.SourceId!.Value);
+        var receivedTotal = receivedRows.FirstOrDefault(r => r.SourceId is null);
+        var receivedBySource = receivedRows.Where(r => r.SourceId is not null).ToDictionary(r => r.SourceId!.Value);
+        var processedTotal = processedRows.FirstOrDefault(r => r.SourceId is null);
+        var processedBySource = processedRows.Where(r => r.SourceId is not null).ToDictionary(r => r.SourceId!.Value);
+        var queueTotal = queueRows.FirstOrDefault(r => r.SourceId is null);
+        var queueBySource = queueRows.Where(r => r.SourceId is not null).ToDictionary(r => r.SourceId!.Value);
         var targetsTotal = targetRows.FirstOrDefault(r => r.SourceId is null);
         var targetsBySource = targetRows.Where(r => r.SourceId is not null).ToDictionary(r => r.SourceId!.Value, r => r.N);
         var tracksTotal = trackRows.FirstOrDefault(r => r.SourceId is null);
@@ -185,9 +203,10 @@ public static class PipelineReport
         var errorsTotal = stages.Sum(s => s.Count);
 
         var totals = new PipelineTotalsDto(
-            totalRow?.Received ?? 0, totalRow?.Processed ?? 0, totalRow?.Skipped ?? 0, totalRow?.Failed ?? 0, totalRow?.Pending ?? 0, totalRow?.InProgress ?? 0,
+            receivedTotal?.Received ?? 0, processedTotal?.Processed ?? 0, processedTotal?.Skipped ?? 0, processedTotal?.Failed ?? 0,
+            queueTotal?.Pending ?? 0, queueTotal?.InProgress ?? 0,
             targetsTotal?.N ?? 0, targetsTotal?.Duplicates ?? 0, tracksTotal?.N ?? 0, errorsTotal,
-            Round(totalRow?.P50Ms), Round(totalRow?.P90Ms), Round(totalRow?.MeanMs));
+            Round(processedTotal?.P50Ms), Round(processedTotal?.P90Ms), Round(processedTotal?.MeanMs));
 
         var series = new Dictionary<int, int[]>();
         var receivedPerBucket = new int[starts.Count];
@@ -203,11 +222,13 @@ public static class PipelineReport
         }
         var sourceDtos = sources.Select(s =>
             {
-                var r = bySource.GetValueOrDefault(s.SourceId);
+                var rc = receivedBySource.GetValueOrDefault(s.SourceId);
+                var p = processedBySource.GetValueOrDefault(s.SourceId);
+                var q = queueBySource.GetValueOrDefault(s.SourceId);
                 return new PipelineSourceDto(s.SourceId, s.Code, s.Name, s.Type.ToString(), s.Enabled,
-                    r?.Received ?? 0, r?.Processed ?? 0, r?.Skipped ?? 0, r?.Failed ?? 0, r?.Pending ?? 0,
-                    r?.WithTargets ?? 0, targetsBySource.GetValueOrDefault(s.SourceId), tracksBySource.GetValueOrDefault(s.SourceId),
-                    Round(r?.MedianLagSeconds), Round(r?.P50Ms), Round(r?.P90Ms),
+                    rc?.Received ?? 0, p?.Processed ?? 0, p?.Skipped ?? 0, p?.Failed ?? 0, q?.Pending ?? 0,
+                    p?.WithTargets ?? 0, targetsBySource.GetValueOrDefault(s.SourceId), tracksBySource.GetValueOrDefault(s.SourceId),
+                    Round(rc?.MedianLagSeconds), Round(p?.P50Ms), Round(p?.P90Ms),
                     series.GetValueOrDefault(s.SourceId) ?? new int[starts.Count]);
             })
             .Where(s => s.Enabled || s.Received > 0 || s.Processed > 0 || s.Pending > 0)

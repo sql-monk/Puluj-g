@@ -333,12 +333,14 @@ public static partial class OpsEndpoints
         var all = await settings.GetAllAsync(ct);
         var heartbeats = WorkerHeartbeats(all, now);
         await using var db = await factory.CreateDbContextAsync(ct);
+        // Both branches of the OR name a status: two ranges of ix_raw_messages_status_processed_at, not a whole-table scan.
         var claims = (await db.Database.SqlQueryRaw<ClaimRow>("""
             SELECT claimed_by AS claimed_by,
-                   count(*) FILTER (WHERE processed_at >= now() - interval '24 hours' AND processing_status = 1) AS processed_day,
+                   count(*) FILTER (WHERE processing_status = 1) AS processed_day,
                    count(*) FILTER (WHERE processing_status = 4) AS in_progress
             FROM raw_messages
-            WHERE claimed_by IS NOT NULL AND (processed_at >= now() - interval '24 hours' OR processing_status = 4)
+            WHERE claimed_by IS NOT NULL
+              AND ((processing_status = 1 AND processed_at >= now() - interval '24 hours') OR processing_status = 4)
             GROUP BY 1
             """).ToListAsync(ct)).ToDictionary(c => c.ClaimedBy, StringComparer.OrdinalIgnoreCase);
         var containers = docker.Enabled ? (await docker.ListAsync(ct)).Containers : [];

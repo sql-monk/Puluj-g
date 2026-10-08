@@ -1278,11 +1278,6 @@ namespace Puluj.Infrastructure.Persistence.Migrations
 
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("PublishedAt"), "brin");
 
-                    b.HasIndex("ReceivedAt")
-                        .HasDatabaseName("ix_raw_messages_received_at");
-
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("ReceivedAt"), "brin");
-
                     b.HasIndex("SourceId", "SourceMessageId")
                         .IsUnique()
                         .HasDatabaseName("ix_raw_messages_source_id_source_message_id");

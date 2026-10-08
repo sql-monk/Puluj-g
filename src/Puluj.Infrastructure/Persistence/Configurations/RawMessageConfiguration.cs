@@ -16,7 +16,7 @@ public class RawMessageConfiguration : IEntityTypeConfiguration<RawMessage>
         b.Property(x => x.Url).HasMaxLength(2048);
         b.Property(x => x.RawPayload).HasColumnType("jsonb");
         b.Property(x => x.ClaimedBy).HasMaxLength(64);
-        b.Property(x => x.ProcessingMs); // aggregated with percentile_cont over received_at/claimed_by ranges: no index of its own
+        b.Property(x => x.ProcessingMs); // aggregated with percentile_cont over processed_at ranges: included in ix_raw_messages_status_processed_at
 
         // Raw identity (ADR-0003, P04): source + message key + revision. The legacy id stays unique for old readers;
         // the content hash is a similarity index only (plan §5.2: a new post with the same text is still a new post).
@@ -29,7 +29,8 @@ public class RawMessageConfiguration : IEntityTypeConfiguration<RawMessage>
         b.HasIndex(x => x.PublishedAt, "ix_raw_messages_pending_published").HasDatabaseName("ix_raw_messages_pending_published").HasFilter("processing_status = 0");
         // Expired claims (processor crashed mid-message) are found by claimed_at; only the few InProgress rows are indexed.
         b.HasIndex(x => x.ClaimedAt, "ix_raw_messages_in_progress_claimed_at").HasDatabaseName("ix_raw_messages_in_progress_claimed_at").HasFilter("processing_status = 4");
-        b.HasIndex(x => x.ReceivedAt).HasMethod("brin");
+        // received_at and the pipeline report's processing_status/processed_at have SQL-only covering btrees
+        // (AddPipelineReportIndexes): processing updates move rows, so a BRIN on received_at matched almost every page.
         b.HasIndex(x => x.PublishedAt).HasMethod("brin");
 
         b.HasOne(x => x.Source).WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);

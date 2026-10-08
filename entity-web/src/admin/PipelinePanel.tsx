@@ -4,19 +4,21 @@ import { Badge, Section } from '../components/settings/fields'
 import { Bars, Freshness, Loading, Stat, ago, bucketLabel, fmtMs, fmtNum, fmtPercent, fmtTime, usePolled } from './shared'
 import { share, sortSources, type SourceSortKey } from './workers'
 
-const PERIODS: { hours: 24 | 168 | 720; label: string }[] = [
-  { hours: 24, label: '24 год' },
-  { hours: 168, label: '7 д' },
-  { hours: 720, label: '30 д' },
+// A longer period changes slower and costs more: a month spanning a history load aggregates millions of rows.
+const PERIODS: { hours: 24 | 168 | 720; label: string; pollMs: number }[] = [
+  { hours: 24, label: '24 год', pollMs: 15_000 },
+  { hours: 168, label: '7 д', pollMs: 60_000 },
+  { hours: 720, label: '30 д', pollMs: 300_000 },
 ]
 
 /**
  * What the pipeline did in the period: totals, per bucket, per source, per instance, current processing statuses and errors.
- * One request per period; polled every 15 s.
+ * One request per period; polled every 15 s for a day, every minute for a week, every 5 minutes for a month.
  */
 export function PipelinePanel() {
   const [hours, setHours] = useState<24 | 168 | 720>(24)
-  const { data, error, stale, loadedAt } = usePolled(() => admin.ops.pipeline(hours), 15_000, [hours])
+  const pollMs = PERIODS.find((p) => p.hours === hours)?.pollMs ?? 15_000
+  const { data, error, stale, loadedAt } = usePolled(() => admin.ops.pipeline(hours), pollMs, [hours])
   const shownPeriod = PERIODS.find((p) => data && Math.round((new Date(data.to).getTime() - new Date(data.from).getTime()) / 3_600_000) === p.hours)?.label
   const t = data?.totals
   const withTargets = data ? data.sources.reduce((s, x) => s + x.withTargets, 0) : 0
